@@ -919,6 +919,7 @@ int main(int argc,char **argv) {
     if(fps<1||fps>60||max_seconds<0||max_seconds>600||wait_seconds<0||wait_seconds>120||pid<1||pid>0x1ffe) return 65;
 
     pace_enabled=env_int("MIBR_PACE",0)?1:0;
+    input_m1au=env_int("MIBR_INPUT_M1AU",0)?1:0;
     pace_buffer=env_int("MIBR_PACE_BUFFER",3);
     input_m1au=env_int("MIBR_INPUT_M1AU",0)?1:0;
     if(pace_buffer<1)pace_buffer=1;
