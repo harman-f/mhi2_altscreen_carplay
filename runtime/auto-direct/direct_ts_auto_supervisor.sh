@@ -276,7 +276,14 @@ while [ -e "$ENABLED" ]; do
     continue
   }
   configure_source_timing
-  MIBR_PACE="$DIRECT_PACE" MIBR_PACE_BUFFER="$DIRECT_PACE_BUFFER" \
+  configure_source_framing || {
+    auto_log "FAIL cannot configure source framing"
+    gate_stock
+    publish_auto_state "config_failed"
+    sleep 2
+    continue
+  }
+  MIBR_PACE="$DIRECT_PACE" MIBR_PACE_BUFFER="$DIRECT_PACE_BUFFER" MIBR_INPUT_M1AU="$DIRECT_SOURCE_FRAMING" \
   "$BRIDGE" "tcp://127.0.0.1:$ALTSCREEN111_TEE_PORT" /dev/mlb/isoTX2 \
       "$DIRECT_OUTPUT_FPS" 0 0 0x11 > "$BRIDGELOG" 2>&1 &
   BRIDGE_PID=$!
