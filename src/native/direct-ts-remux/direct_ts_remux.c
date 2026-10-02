@@ -2,6 +2,9 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +22,8 @@
 #define MOST_BLOCK_BYTES (MOST_BLOCK_PACKETS * TS_SIZE)
 #define REMUX_STATUS_PATH "/tmp/mibr-direct-remux.status"
 #define PACE_QUEUE_CAP 10
+#define M1AU_HEADER_BYTES 56
+#define M1AU_MAX_PAYLOAD (3u * 1024u * 1024u)
 
 typedef struct {
     int fd;
@@ -59,7 +64,38 @@ typedef struct {
     int64_t last_emit_interval_us;
     int64_t max_emit_jitter_us;
     int64_t last_emit_us;
+
+    int input_framed;
+    uint64_t m1au_records;
+    uint64_t m1au_stream;
+    uint64_t m1au_codec;
+    uint64_t m1au_consumer;
+    uint64_t m1au_sequence;
+    uint32_t m1au_flags;
+    uint32_t m1au_ts_word1_le;
+    uint32_t m1au_ts_word2_le;
+    int64_t m1au_ts_word1_delta;
+    int64_t m1au_ts_word2_delta;
+    uint8_t m1au_ts_raw[8];
+    uint64_t m1au_sequence_gaps;
 } OutCtx;
+
+typedef struct {
+    int fd;
+    int64_t *deadline;
+    size_t payload_remaining;
+    pthread_mutex_t lock;
+    uint64_t records;
+    uint64_t stream,codec,consumer,sequence;
+    uint64_t previous_sequence;
+    uint64_t sequence_gaps;
+    uint32_t flags;
+    uint8_t ts_raw[8];
+    uint32_t ts_word1_le,ts_word2_le;
+    uint32_t prev_ts_word1_le,prev_ts_word2_le;
+    int have_prev_ts;
+    int64_t ts_word1_delta,ts_word2_delta;
+} FramedInput;
 
 typedef struct {
     AVPacket pkt;
@@ -90,6 +126,7 @@ typedef struct {
 static uint64_t g_status_seq;
 static int64_t g_last_status_us;
 static int g_status_error_logged;
+static FramedInput *g_framed_status;
 
 static int env_int(const char *name,int defval) {
     const char *v=getenv(name);
@@ -103,6 +140,44 @@ static int env_int(const char *name,int defval) {
 
 static int64_t abs_i64(int64_t v) {
     return v<0?-v:v;
+}
+
+static uint16_t m1au_get_be16(const uint8_t *p) {
+    return (uint16_t)(((uint16_t)p[0]<<8)|p[1]);
+}
+
+static uint32_t m1au_get_be32(const uint8_t *p) {
+    return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+}
+
+static uint64_t m1au_get_be64(const uint8_t *p) {
+    uint64_t v=0;
+    unsigned i;
+    for(i=0;i<8u;++i)v=(v<<8)|p[i];
+    return v;
+}
+
+static uint32_t m1au_get_le32(const uint8_t *p) {
+    return ((uint32_t)p[0])|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);
+}
+
+static void framed_snapshot(OutCtx *o) {
+    FramedInput *f=g_framed_status;
+    if(!o||!f)return;
+    pthread_mutex_lock(&f->lock);
+    o->m1au_records=f->records;
+    o->m1au_stream=f->stream;
+    o->m1au_codec=f->codec;
+    o->m1au_consumer=f->consumer;
+    o->m1au_sequence=f->sequence;
+    o->m1au_flags=f->flags;
+    o->m1au_ts_word1_le=f->ts_word1_le;
+    o->m1au_ts_word2_le=f->ts_word2_le;
+    o->m1au_ts_word1_delta=f->ts_word1_delta;
+    o->m1au_ts_word2_delta=f->ts_word2_delta;
+    memcpy(o->m1au_ts_raw,f->ts_raw,8u);
+    o->m1au_sequence_gaps=f->sequence_gaps;
+    pthread_mutex_unlock(&f->lock);
 }
 
 static void pace_queue_snapshot_locked(PaceQueue *q,OutCtx *o) {
