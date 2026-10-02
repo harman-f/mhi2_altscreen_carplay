@@ -70,14 +70,15 @@ telemetry_init(){
 telemetry_sample(){
   [ "${DIRECT_TELEMETRY:-0}" = "1" ] || return 0
   TELEMETRY_SEQ=$((TELEMETRY_SEQ+1))
+  SCONF=$(status_value "$SOURCE_TIMING_STATUS" configured_max_fps); SCONF=${SCONF:-$ALTSCREEN111_FPS}
   SFPS=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_fps_x100); SFPS=${SFPS:-0}
   SBUCKET=$(fps_bucket "$SFPS")
   SBPS=$(status_value "$SOURCE_TIMING_STATUS" source_input_bps); SBPS=${SBPS:-0}
   SLAST=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_last_us); SLAST=${SLAST:-0}
   SMIN=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_min_us); SMIN=${SMIN:-0}
   SMAX=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_max_us); SMAX=${SMAX:-0}
-  STS1=$(status_value "$SOURCE_TIMING_STATUS" source_ts_word1); STS1=${STS1:--}
-  STS2=$(status_value "$SOURCE_TIMING_STATUS" source_ts_word2); STS2=${STS2:--}
+  STS1=$(status_value "$SOURCE_TIMING_STATUS" source_ts_word1); [ -n "$STS1" ] || STS1=-
+  STS2=$(status_value "$SOURCE_TIMING_STATUS" source_ts_word2); [ -n "$STS2" ] || STS2=-
   RIBPS=$(status_value "$REMUX_STATUS" input_bps); RIBPS=${RIBPS:-0}
   MBPS=$(status_value "$REMUX_STATUS" most_bps); MBPS=${MBPS:-0}
   RINT=$(status_value "$REMUX_STATUS" last_input_interval_us); RINT=${RINT:-0}
@@ -88,7 +89,7 @@ telemetry_sample(){
   LBW=$(status_value "$REMUX_STATUS" last_block_wait_us); LBW=${LBW:-0}
   MBW=$(status_value "$REMUX_STATUS" max_block_wait_us); MBW=${MBW:-0}
   MEJ=$(status_value "$REMUX_STATUS" max_emit_jitter_us); MEJ=${MEJ:-0}
-  echo "$TELEMETRY_SEQ	$(timestamp_now)	$ALTSCREEN111_FPS	$SFPS	$SBUCKET	$SBPS	$SLAST	$SMIN	$SMAX	$STS1	$STS2	$RIBPS	$MBPS	$RINT	$PU	$PL	$PB	$WE	$LBW	$MBW	$MEJ" >> "$TELEMETRY" 2>/dev/null || true
+  echo "$TELEMETRY_SEQ	$(timestamp_now)	$SCONF	$SFPS	$SBUCKET	$SBPS	$SLAST	$SMIN	$SMAX	$STS1	$STS2	$RIBPS	$MBPS	$RINT	$PU	$PL	$PB	$WE	$LBW	$MBW	$MEJ" >> "$TELEMETRY" 2>/dev/null || true
 
   if [ "$SBUCKET" != "0" ] && [ "$SBUCKET" != "other" ] && [ "$SBUCKET" != "$LAST_SOURCE_BUCKET" ]; then
     if [ "$SBUCKET" = "$PENDING_SOURCE_BUCKET" ]; then
@@ -352,7 +353,10 @@ while [ -e "$ENABLED" ]; do
     echo "stop_reason=$STOP_REASON"
     echo "input=tcp://127.0.0.1:$ALTSCREEN111_TEE_PORT"
     echo "output=/dev/mlb/isoTX2"
-    echo "source_max_fps=$ALTSCREEN111_FPS"
+    EFFECTIVE_SOURCE_FPS=$(status_value "$SOURCE_TIMING_STATUS" configured_max_fps)
+    [ -n "$EFFECTIVE_SOURCE_FPS" ] || EFFECTIVE_SOURCE_FPS=$ALTSCREEN111_FPS
+    echo "source_max_fps=$EFFECTIVE_SOURCE_FPS"
+    echo "source_base_fps=$ALTSCREEN111_FPS"
     echo "direct_output_fps=$DIRECT_OUTPUT_FPS"
     echo "direct_pace=$DIRECT_PACE"
     echo "direct_pace_buffer=$DIRECT_PACE_BUFFER"
