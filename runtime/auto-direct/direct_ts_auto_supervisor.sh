@@ -16,6 +16,7 @@ SOURCE_TIMING_STATUS=/tmp/mibr-alt111-source-timing.status
 SOURCE_TIMING_ENABLE=/tmp/mibr-alt111-source-timing.enabled
 SOURCE_TIMING_INTERVAL=/tmp/mibr-alt111-source-timing-interval-ms
 REMUX_STATUS=/tmp/mibr-direct-remux.status
+AU_FRAMING_MARKER=/tmp/mibr-alt111-au-framing.enabled
 GATE=$BASE/scripts/writev_gate.sh
 BRIDGE=$BASE/bin/direct-ts-remux
 BRIDGE_PID=""
@@ -54,6 +55,15 @@ configure_source_timing(){
   else
     rm -f "$SOURCE_TIMING_ENABLE" "$SOURCE_TIMING_INTERVAL" "$SOURCE_TIMING_STATUS" 2>/dev/null || true
   fi
+}
+
+configure_source_framing(){
+  if [ "${DIRECT_SOURCE_FRAMING:-0}" = "1" ]; then
+    : > "$AU_FRAMING_MARKER" 2>/dev/null || return 1
+  else
+    rm -f "$AU_FRAMING_MARKER" 2>/dev/null || true
+  fi
+  return 0
 }
 
 telemetry_init(){
@@ -154,7 +164,7 @@ stop_bridge(){
 cleanup(){
   stop_bridge
   gate_stock
-  rm -f "$SOURCE_TIMING_ENABLE" "$SOURCE_TIMING_INTERVAL" 2>/dev/null || true
+  rm -f "$SOURCE_TIMING_ENABLE" "$SOURCE_TIMING_INTERVAL" "$AU_FRAMING_MARKER" 2>/dev/null || true
   publish_auto_state "stopped"
   rm -f "$AUTOHB" "$PIDFILE" "$BRIDGEPID" 2>/dev/null || true
 }
@@ -379,6 +389,7 @@ while [ -e "$ENABLED" ]; do
     echo "source_timing_debug=$ALTSCREEN111_TIMING_DEBUG"
     echo "source_timing_interval_ms=$ALTSCREEN111_TIMING_INTERVAL_MS"
     echo "direct_telemetry=$DIRECT_TELEMETRY"
+    echo "direct_source_framing=$DIRECT_SOURCE_FRAMING"
     echo "telemetry_file=${TELEMETRY:-disabled}"
     echo "most_blocks=$BLOCKS"
     echo "most_write_size=$WRITE_SIZE"
