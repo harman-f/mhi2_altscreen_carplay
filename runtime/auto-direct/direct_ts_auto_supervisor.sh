@@ -75,7 +75,7 @@ telemetry_init(){
   PENDING_SOURCE_BUCKET=0
   PENDING_SOURCE_BUCKET_COUNT=0
   [ "${DIRECT_TELEMETRY:-0}" = "1" ] || return 0
-  echo "sample	time	source_sample_seq	source_sample_stale	source_max_fps	source_fps_x100	source_bucket	source_frames_total	source_input_bps	source_last_us	source_min_us	source_max_us	source_ts_word1	source_ts_word2	remux_input_bps	most_bps	remux_input_us	pace_underflows	pace_late_frames	pace_backpressure_waits	write_eagain	last_block_wait_us	max_block_wait_us	max_emit_jitter_us" > "$TELEMETRY"
+  echo "sample	time	source_sample_seq	source_sample_stale	source_max_fps	source_fps_x100	source_bucket	source_frames_total	source_input_bps	source_last_us	source_min_us	source_max_us	source_ts_word1	source_ts_word2	remux_input_mode	m1au_sequence	m1au_sequence_gaps	m1au_ts_raw	m1au_ts_word1_delta	m1au_ts_word2_delta	remux_input_bps	most_bps	remux_input_us	pace_underflows	pace_late_frames	pace_backpressure_waits	write_eagain	last_block_wait_us	max_block_wait_us	max_emit_jitter_us" > "$TELEMETRY"
 }
 
 telemetry_sample(){
@@ -105,6 +105,12 @@ telemetry_sample(){
   SMAX=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_max_us); SMAX=${SMAX:-0}
   STS1=$(status_value "$SOURCE_TIMING_STATUS" source_ts_word1); [ -n "$STS1" ] || STS1=-
   STS2=$(status_value "$SOURCE_TIMING_STATUS" source_ts_word2); [ -n "$STS2" ] || STS2=-
+  RMODE=$(status_value "$REMUX_STATUS" input_mode); RMODE=${RMODE:-unknown}
+  MSEQ=$(status_value "$REMUX_STATUS" m1au_sequence); MSEQ=${MSEQ:-0}
+  MGAPS=$(status_value "$REMUX_STATUS" m1au_sequence_gaps); MGAPS=${MGAPS:-0}
+  MTSRAW=$(status_value "$REMUX_STATUS" m1au_ts_raw); MTSRAW=${MTSRAW:--}
+  MTD1=$(status_value "$REMUX_STATUS" m1au_ts_word1_delta); MTD1=${MTD1:-0}
+  MTD2=$(status_value "$REMUX_STATUS" m1au_ts_word2_delta); MTD2=${MTD2:-0}
   RIBPS=$(status_value "$REMUX_STATUS" input_bps); RIBPS=${RIBPS:-0}
   MBPS=$(status_value "$REMUX_STATUS" most_bps); MBPS=${MBPS:-0}
   RINT=$(status_value "$REMUX_STATUS" last_input_interval_us); RINT=${RINT:-0}
@@ -115,7 +121,7 @@ telemetry_sample(){
   LBW=$(status_value "$REMUX_STATUS" last_block_wait_us); LBW=${LBW:-0}
   MBW=$(status_value "$REMUX_STATUS" max_block_wait_us); MBW=${MBW:-0}
   MEJ=$(status_value "$REMUX_STATUS" max_emit_jitter_us); MEJ=${MEJ:-0}
-  echo "$TELEMETRY_SEQ	$(timestamp_now)	$SSEQ	$SSTALE	$SCONF	$SFPS	$SBUCKET	$SFRAMES	$SBPS	$SLAST	$SMIN	$SMAX	$STS1	$STS2	$RIBPS	$MBPS	$RINT	$PU	$PL	$PB	$WE	$LBW	$MBW	$MEJ" >> "$TELEMETRY" 2>/dev/null || true
+  echo "$TELEMETRY_SEQ	$(timestamp_now)	$SSEQ	$SSTALE	$SCONF	$SFPS	$SBUCKET	$SFRAMES	$SBPS	$SLAST	$SMIN	$SMAX	$STS1	$STS2	$RMODE	$MSEQ	$MGAPS	$MTSRAW	$MTD1	$MTD2	$RIBPS	$MBPS	$RINT	$PU	$PL	$PB	$WE	$LBW	$MBW	$MEJ" >> "$TELEMETRY" 2>/dev/null || true
 
   if [ "$SSTALE" = "0" ] && [ "$SBUCKET" != "0" ] && [ "$SBUCKET" != "other" ] && [ "$SBUCKET" != "$LAST_SOURCE_BUCKET" ]; then
     if [ "$SBUCKET" = "$PENDING_SOURCE_BUCKET" ]; then
