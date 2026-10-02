@@ -145,12 +145,24 @@ case "${1:---check}" in
     ;;
 esac
 
+same_as_package(){
+  LIVE=$1
+  PKG=$2
+  LH=$(hashf "$LIVE" 2>/dev/null) || return 1
+  PH=$(hashf "$PKG" 2>/dev/null) || return 1
+  [ "$LH" = "$PH" ]
+}
+
 if [ -e "$ACTIVE" ]; then
-  G=$(hashf "$DST/bin/libaltscreen111.so" 2>/dev/null)
-  R=$(hashf "$DST/bin/direct-ts-remux" 2>/dev/null)
-  CG=$(candidate_hash gen2)
-  CR=$(candidate_hash remux)
-  if [ "$G" = "$CG" ] && [ "$R" = "$CR" ]; then
+  if same_as_package "$DST/bin/libaltscreen111.so" "$PAYLOAD/libaltscreen111.so" &&
+     same_as_package "$DST/bin/direct-ts-remux" "$PAYLOAD/direct-ts-remux" &&
+     same_as_package "$HOOK" "$PAYLOAD/libaltscreen111.so" &&
+     same_as_package "$DST/scripts/common.sh" "$RUNTIME/auto-direct/common.sh" &&
+     same_as_package "$DST/scripts/direct_fps.sh" "$RUNTIME/auto-direct/direct_fps.sh" &&
+     same_as_package "$DST/scripts/direct_ts_auto_supervisor.sh" "$RUNTIME/auto-direct/direct_ts_auto_supervisor.sh" &&
+     same_as_package "$DST/scripts/direct_ts_auto_status.sh" "$RUNTIME/auto-direct/direct_ts_auto_status.sh" &&
+     same_as_package "$DST/scripts/direct_source_mode.sh" "$RUNTIME/auto-direct/direct_source_mode.sh" &&
+     same_as_package "$DST/scripts/gen2_safearea.sh" "$RUNTIME/navigation/gen2_safearea.sh"; then
     echo "MIBR_FRAMING_V1=ALREADY_INSTALLED"
     exit 0
   fi
