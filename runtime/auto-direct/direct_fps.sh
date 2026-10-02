@@ -46,8 +46,8 @@ case "${1:-status}" in
   20|25|30|40)
     FPS=$1
     mount -uw /mnt/app 2>/dev/null || { echo "DIRECT_FPS=FAIL_MOUNT_RW"; exit 10; }
-    TMP="$FILE.new.$"
-    STMP="$SOURCE_FILE.new.$"
+    TMP="$FILE.new.$$"
+    STMP="$SOURCE_FILE.new.$$"
     echo "$FPS" > "$TMP" || {
       rm -f "$TMP" "$STMP" 2>/dev/null || true
       mount -ur /mnt/app 2>/dev/null || true
