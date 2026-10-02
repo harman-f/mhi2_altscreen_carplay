@@ -135,6 +135,11 @@ jobs:
           fi
           grep -Fq 'MIBR_FRAMING_V1=PASS' deployment/mu1440-framing-v1/install.sh
           grep -Fq 'MIBR_FRAMING_V1_UNINSTALL=PASS' deployment/mu1440-framing-v1/uninstall.sh
+          grep -Fq 'TMP="$FILE.new.$$"' build/framing-v1/package/runtime/auto-direct/direct_fps.sh
+          grep -Fq 'backup_one "$STATE_SOURCE" state/mibr-direct-source-framing' build/framing-v1/package/install.sh
+          grep -Fq 'backup_one "$STATE_SAFEAREA" state/mibr-carplay111-safearea.conf' build/framing-v1/package/install.sh
+          grep -Fq 'restore_one state/mibr-direct-source-framing "$STATE_SOURCE" 644' build/framing-v1/package/uninstall.sh
+          grep -Fq 'restore_one state/mibr-carplay111-safearea.conf "$STATE_SAFEAREA" 644' build/framing-v1/package/uninstall.sh
 
           (
             cd build/framing-v1/package
