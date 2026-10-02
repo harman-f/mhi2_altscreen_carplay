@@ -34,8 +34,13 @@ restore_one(){
   mv "$DSTF.new.$$" "$DSTF" || fail "restore_replace=$DSTF"
 }
 
-[ -e "$ACTIVE" ] || { echo "MIBR_FRAMING_V1_UNINSTALL=NOT_ACTIVE"; exit 0; }
+if [ ! -e "$ACTIVE" ] && [ ! -e "$BACK/BACKUP_COMPLETE" ]; then
+  echo "MIBR_FRAMING_V1_UNINSTALL=NOT_ACTIVE"
+  exit 0
+fi
 [ -d "$BACK" ] || fail "backup_dir_missing"
+[ -e "$BACK/BACKUP_COMPLETE" ] || fail "backup_incomplete_refusing_automatic_restore"
+[ -e "$ACTIVE" ] || echo "MIBR_FRAMING_V1_UNINSTALL=RECOVERY_FROM_INTERRUPTED_INSTALL"
 
 if [ -x "$DST/scripts/direct_ts_auto_stop.sh" ]; then
   "$DST/scripts/direct_ts_auto_stop.sh" >/dev/null 2>&1 || true
