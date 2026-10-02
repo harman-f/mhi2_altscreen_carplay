@@ -319,11 +319,12 @@ static void pace_sleep_until(int64_t due_us) {
 static void publish_remux_status(OutCtx *o, int64_t frame_no,
                                  int64_t start_us, int64_t last_input_us,
                                  const char *state, int rc, int force) {
-    char buf[1800], tmp[96];
+    char buf[2800], tmp[96];
     int fd, n;
     int64_t now=av_gettime_relative();
     if(!force && g_last_status_us>0 && now-g_last_status_us<1000000LL) return;
     g_last_status_us=now;
+    if(o && o->input_framed) framed_snapshot(o);
     if(o) {
         uint64_t most_bytes_now=o->blocks*(uint64_t)MOST_BLOCK_BYTES;
         if(o->rate_prev_us>0 && now>o->rate_prev_us) {
@@ -372,6 +373,19 @@ static void publish_remux_status(OutCtx *o, int64_t frame_no,
         "max_input_interval_us=%lld\n"
         "last_emit_interval_us=%lld\n"
         "max_emit_jitter_us=%lld\n"
+        "input_mode=%s\n"
+        "m1au_records=%llu\n"
+        "m1au_stream=%llu\n"
+        "m1au_codec=%llu\n"
+        "m1au_consumer=%llu\n"
+        "m1au_sequence=%llu\n"
+        "m1au_sequence_gaps=%llu\n"
+        "m1au_flags=0x%08x\n"
+        "m1au_ts_raw=%02x%02x%02x%02x%02x%02x%02x%02x\n"
+        "m1au_ts_word1_le=%u\n"
+        "m1au_ts_word2_le=%u\n"
+        "m1au_ts_word1_delta=%lld\n"
+        "m1au_ts_word2_delta=%lld\n"
         "elapsed_ms=%lld\n"
         "rc=%d\n",
         state?state:"unknown",(int)getpid(),
@@ -407,6 +421,22 @@ static void publish_remux_status(OutCtx *o, int64_t frame_no,
         (long long)(o?o->max_input_interval_us:0),
         (long long)(o?o->last_emit_interval_us:0),
         (long long)(o?o->max_emit_jitter_us:0),
+        (o&&o->input_framed)?"m1au-v1":"raw-annexb",
+        (unsigned long long)(o?o->m1au_records:0),
+        (unsigned long long)(o?o->m1au_stream:0),
+        (unsigned long long)(o?o->m1au_codec:0),
+        (unsigned long long)(o?o->m1au_consumer:0),
+        (unsigned long long)(o?o->m1au_sequence:0),
+        (unsigned long long)(o?o->m1au_sequence_gaps:0),
+        (unsigned)(o?o->m1au_flags:0),
+        o?o->m1au_ts_raw[0]:0,o?o->m1au_ts_raw[1]:0,
+        o?o->m1au_ts_raw[2]:0,o?o->m1au_ts_raw[3]:0,
+        o?o->m1au_ts_raw[4]:0,o?o->m1au_ts_raw[5]:0,
+        o?o->m1au_ts_raw[6]:0,o?o->m1au_ts_raw[7]:0,
+        (unsigned)(o?o->m1au_ts_word1_le:0),
+        (unsigned)(o?o->m1au_ts_word2_le:0),
+        (long long)(o?o->m1au_ts_word1_delta:0),
+        (long long)(o?o->m1au_ts_word2_delta:0),
         (long long)(start_us>0?(now-start_us)/1000LL:0),rc);
     if(n<=0) return;
     if((size_t)n>=sizeof(buf)) n=(int)sizeof(buf)-1;
