@@ -614,6 +614,199 @@ static void errstr(int e,char *buf,size_t n) {
     if(av_strerror(e,buf,n)<0) snprintf(buf,n,"err=%d",e);
 }
 
+static int framed_deadline_expired(const FramedInput *f) {
+    return f && f->deadline && *f->deadline>0 &&
+           av_gettime_relative()>=*f->deadline;
+}
+
+static int framed_recv_wait(FramedInput *f,uint8_t *p,size_t n,int exact) {
+    size_t off=0;
+    for(;;) {
+        ssize_t r;
+        if(framed_deadline_expired(f))return AVERROR_EXIT;
+        r=recv(f->fd,p+off,n-off,0);
+        if(r>0) {
+            off+=(size_t)r;
+            if(!exact || off==n)return (int)off;
+            continue;
+        }
+        if(r==0)return off?AVERROR_INVALIDDATA:AVERROR_EOF;
+        if(errno==EINTR)continue;
+        if(errno==EAGAIN || errno==EWOULDBLOCK) {
+            usleep(5000);
+            continue;
+        }
+        return AVERROR(errno?errno:EIO);
+    }
+}
+
+static void framed_note_header(FramedInput *f,const uint8_t h[M1AU_HEADER_BYTES]) {
+    uint32_t w1=m1au_get_le32(h+48);
+    uint32_t w2=m1au_get_le32(h+52);
+    uint64_t seq=m1au_get_be64(h+40);
+
+    pthread_mutex_lock(&f->lock);
+    ++f->records;
+    f->stream=m1au_get_be64(h+16);
+    f->codec=m1au_get_be64(h+24);
+    f->consumer=m1au_get_be64(h+32);
+    f->flags=m1au_get_be32(h+8);
+    if(f->previous_sequence && seq!=f->previous_sequence+1u)++f->sequence_gaps;
+    f->previous_sequence=seq;
+    f->sequence=seq;
+    memcpy(f->ts_raw,h+48,8u);
+    f->ts_word1_le=w1;
+    f->ts_word2_le=w2;
+    if(f->have_prev_ts) {
+        f->ts_word1_delta=(int64_t)(int32_t)(w1-f->prev_ts_word1_le);
+        f->ts_word2_delta=(int64_t)(int32_t)(w2-f->prev_ts_word2_le);
+    } else {
+        f->ts_word1_delta=0;
+        f->ts_word2_delta=0;
+        f->have_prev_ts=1;
+    }
+    f->prev_ts_word1_le=w1;
+    f->prev_ts_word2_le=w2;
+    pthread_mutex_unlock(&f->lock);
+}
+
+static int framed_read_cb(void *opaque,uint8_t *buf,int buf_size) {
+    FramedInput *f=(FramedInput *)opaque;
+    uint8_t h[M1AU_HEADER_BYTES];
+    int rc;
+    size_t want;
+
+    if(!f || f->fd<0 || !buf || buf_size<=0)return AVERROR(EINVAL);
+
+    if(f->payload_remaining==0) {
+        rc=framed_recv_wait(f,h,sizeof(h),1);
+        if(rc<0)return rc;
+        if(memcmp(h,"M1AU",4u)!=0 ||
+           m1au_get_be16(h+4)!=1u ||
+           m1au_get_be16(h+6)!=M1AU_HEADER_BYTES) {
+            fprintf(stderr,
+                    "ERROR M1AU header magic/version/size invalid magic=%02x%02x%02x%02x version=%u header=%u\n",
+                    h[0],h[1],h[2],h[3],
+                    (unsigned)m1au_get_be16(h+4),
+                    (unsigned)m1au_get_be16(h+6));
+            return AVERROR_INVALIDDATA;
+        }
+        f->payload_remaining=(size_t)m1au_get_be32(h+12);
+        if(!f->payload_remaining || f->payload_remaining>M1AU_MAX_PAYLOAD) {
+            fprintf(stderr,"ERROR M1AU payload invalid bytes=%zu\n",f->payload_remaining);
+            return AVERROR_INVALIDDATA;
+        }
+        framed_note_header(f,h);
+    }
+
+    want=f->payload_remaining<(size_t)buf_size?f->payload_remaining:(size_t)buf_size;
+    rc=framed_recv_wait(f,buf,want,0);
+    if(rc<0)return rc;
+    if((size_t)rc>f->payload_remaining)return AVERROR_INVALIDDATA;
+    f->payload_remaining-=(size_t)rc;
+    return rc;
+}
+
+static int framed_parse_loopback_url(const char *url,int *port) {
+    const char *pfx="tcp://127.0.0.1:";
+    char *end=NULL;
+    long v;
+    if(!url||strncmp(url,pfx,strlen(pfx))!=0)return -1;
+    v=strtol(url+strlen(pfx),&end,10);
+    if(end==url+strlen(pfx)||*end!='\0'||v<1||v>65535)return -1;
+    *port=(int)v;
+    return 0;
+}
+
+static int framed_connect_retry(const char *url,int wait_seconds,int64_t *deadline) {
+    int port,attempt=0;
+    int64_t until=wait_seconds>0?av_gettime_relative()+(int64_t)wait_seconds*1000000LL:0;
+    if(framed_parse_loopback_url(url,&port)!=0) {
+        fprintf(stderr,"ERROR M1AU supports only tcp://127.0.0.1:PORT input, got %s\n",url?url:"<null>");
+        return -1;
+    }
+    for(;;) {
+        int fd=socket(AF_INET,SOCK_STREAM,0);
+        struct sockaddr_in a;
+        if(fd<0)return -1;
+        memset(&a,0,sizeof(a));
+        a.sin_family=AF_INET;
+        a.sin_port=htons((uint16_t)port);
+        a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+        if(connect(fd,(struct sockaddr *)&a,sizeof(a))==0) {
+            int flags=fcntl(fd,F_GETFL,0);
+            if(flags>=0)(void)fcntl(fd,F_SETFL,flags|O_NONBLOCK);
+            *deadline=until;
+            fprintf(stderr,"M1AU_CONNECT_OK attempt=%d url=%s\n",attempt+1,url);
+            return fd;
+        }
+        close(fd);
+        if(wait_seconds<=0 || av_gettime_relative()>=until)return -1;
+        ++attempt;
+        usleep(1000000);
+    }
+}
+
+static AVFormatContext *open_m1au_h264(const char *url,int fps,int wait_seconds,
+                                      int64_t *deadline,FramedInput *f,
+                                      AVIOContext **pb_out) {
+    AVFormatContext *ic=NULL;
+    AVIOContext *pb=NULL;
+    uint8_t *buf=NULL;
+    const AVInputFormat *fmt=av_find_input_format("h264");
+    AVDictionary *opts=NULL;
+    char fpsbuf[32],ebuf[128];
+    int fd,rc;
+
+    if(!f||!pb_out||!fmt)return NULL;
+    memset(f,0,sizeof(*f));
+    f->fd=-1;
+    pthread_mutex_init(&f->lock,NULL);
+    fd=framed_connect_retry(url,wait_seconds,deadline);
+    if(fd<0)goto fail;
+    f->fd=fd;
+    f->deadline=deadline;
+
+    buf=av_malloc(32768);
+    if(!buf)goto fail;
+    pb=avio_alloc_context(buf,32768,0,f,framed_read_cb,NULL,NULL);
+    if(!pb)goto fail;
+    buf=NULL;
+
+    ic=avformat_alloc_context();
+    if(!ic)goto fail;
+    ic->pb=pb;
+    ic->flags|=AVFMT_FLAG_CUSTOM_IO;
+    ic->interrupt_callback.callback=interrupt_cb;
+    ic->interrupt_callback.opaque=deadline;
+
+    snprintf(fpsbuf,sizeof(fpsbuf),"%d",fps);
+    av_dict_set(&opts,"framerate",fpsbuf,0);
+    rc=avformat_open_input(&ic,NULL,fmt,&opts);
+    av_dict_free(&opts);
+    if(rc<0) {
+        errstr(rc,ebuf,sizeof(ebuf));
+        fprintf(stderr,"ERROR M1AU H264 open rc=%d %s\n",rc,ebuf);
+        goto fail;
+    }
+    *pb_out=pb;
+    *deadline=0;
+    fprintf(stderr,"INPUT_OPEN_OK mode=m1au-v1 url=%s\n",url);
+    return ic;
+
+fail:
+    if(opts)av_dict_free(&opts);
+    if(ic)avformat_free_context(ic);
+    if(pb) {
+        av_freep(&pb->buffer);
+        avio_context_free(&pb);
+    } else if(buf) av_free(buf);
+    if(f->fd>=0)close(f->fd);
+    f->fd=-1;
+    pthread_mutex_destroy(&f->lock);
+    return NULL;
+}
+
 static AVFormatContext *open_h264_retry(const char *url,int fps,int wait_seconds,int64_t *deadline) {
     int attempt=0;
     int64_t until=wait_seconds>0?av_gettime_relative()+(int64_t)wait_seconds*1000000LL:0;
