@@ -28,7 +28,13 @@ load_altscreen_config >/dev/null 2>&1 || true
 
 echo
 echo "=== FRAME PACING ==="
-echo "source_max_fps=${ALTSCREEN111_FPS:-UNKNOWN}"
+EFFECTIVE_SOURCE_FPS=${ALTSCREEN111_FPS:-UNKNOWN}
+if [ -r "$SOURCE_FPS_OVERRIDE_FILE" ]; then
+  V=$(cat "$SOURCE_FPS_OVERRIDE_FILE" 2>/dev/null)
+  case "$V" in 20|25|30|40) EFFECTIVE_SOURCE_FPS=$V ;; esac
+fi
+echo "source_base_fps=${ALTSCREEN111_FPS:-UNKNOWN}"
+echo "source_max_fps=$EFFECTIVE_SOURCE_FPS"
 echo "direct_output_fps=${DIRECT_OUTPUT_FPS:-UNKNOWN}"
 echo "direct_pace=${DIRECT_PACE:-UNKNOWN}"
 echo "direct_pace_buffer=${DIRECT_PACE_BUFFER:-UNKNOWN}"
