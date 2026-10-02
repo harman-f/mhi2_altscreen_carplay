@@ -16,8 +16,11 @@ show_status(){
   echo "direct_pace_buffer=$DIRECT_PACE_BUFFER"
   [ -r "$FILE" ] && echo "direct_override=$(cat "$FILE" 2>/dev/null)" || echo "direct_override=none"
   [ -r "$SOURCE_FILE" ] && echo "source_override=$(cat "$SOURCE_FILE" 2>/dev/null)" || echo "source_override=none"
+  if [ -r /tmp/mibr-alt111-gen2.status ]; then
+    grep -E '^(source_timing_|source_ts_|source_arrival_|source_input_)' /tmp/mibr-alt111-gen2.status 2>/dev/null || true
+  fi
   if [ -r /tmp/mibr-direct-remux.status ]; then
-    grep -E '^(pace_|last_input_interval_us|min_input_interval_us|max_input_interval_us|last_emit_interval_us|max_emit_jitter_us)=' /tmp/mibr-direct-remux.status 2>/dev/null || true
+    grep -E '^(input_bps|most_bps|pace_|last_input_interval_us|min_input_interval_us|max_input_interval_us|last_emit_interval_us|max_emit_jitter_us|write_eagain|last_block_wait_us|max_block_wait_us)=' /tmp/mibr-direct-remux.status 2>/dev/null || true
   fi
 }
 
@@ -25,14 +28,14 @@ OLD_SOURCE_FPS=$ALTSCREEN111_FPS
 if [ -r "$SOURCE_FILE" ]; then
   OLD_SOURCE_FPS=$(cat "$SOURCE_FILE" 2>/dev/null)
 fi
-case "$OLD_SOURCE_FPS" in 20|25|30) ;; *) OLD_SOURCE_FPS=$ALTSCREEN111_FPS ;; esac
+case "$OLD_SOURCE_FPS" in 20|25|30|40) ;; *) OLD_SOURCE_FPS=$ALTSCREEN111_FPS ;; esac
 
 case "${1:-status}" in
   status)
     show_status
     exit 0
     ;;
-  20|25|30)
+  20|25|30|40)
     FPS=$1
     mount -uw /mnt/app 2>/dev/null || { echo "DIRECT_FPS=FAIL_MOUNT_RW"; exit 10; }
     TMP="$FILE.new.$"
@@ -105,7 +108,7 @@ case "${1:-status}" in
     exit 0
     ;;
   *)
-    echo "usage: $0 status|20|25|30|default"
+    echo "usage: $0 status|20|25|30|40|default"
     exit 64
     ;;
 esac
