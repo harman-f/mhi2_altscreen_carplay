@@ -10,7 +10,13 @@ BRIDGEPID=/tmp/mibr-direct-auto-bridge.pid
 
 show_status(){
   load_altscreen_config >/dev/null 2>&1 || true
-  echo "source_max_fps=$ALTSCREEN111_FPS"
+  EFFECTIVE_SOURCE_FPS=$ALTSCREEN111_FPS
+  if [ -r "$SOURCE_FILE" ]; then
+    V=$(cat "$SOURCE_FILE" 2>/dev/null)
+    case "$V" in 20|25|30|40) EFFECTIVE_SOURCE_FPS=$V ;; esac
+  fi
+  echo "source_base_fps=$ALTSCREEN111_FPS"
+  echo "source_max_fps=$EFFECTIVE_SOURCE_FPS"
   echo "direct_output_fps=$DIRECT_OUTPUT_FPS"
   echo "direct_pace=$DIRECT_PACE"
   echo "direct_pace_buffer=$DIRECT_PACE_BUFFER"
