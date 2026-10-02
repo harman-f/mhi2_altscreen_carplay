@@ -18,6 +18,10 @@ EXPECTED_AIRPLAY=193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b
 
 BACK=/mnt/app/root/mibr-framing-v1-backup
 ACTIVE=/mnt/app/root/mibr-framing-v1-active
+STATE_SOURCE=/mnt/app/root/mibr-direct-source-framing
+STATE_DIRECT_FPS=/mnt/app/root/mibr-direct-output-fps
+STATE_SOURCE_FPS=/mnt/app/root/mibr-carplay111-fps
+STATE_SAFEAREA=/mnt/app/root/mibr-carplay111-safearea.conf
 APP_RW=0
 
 hashf(){
@@ -173,6 +177,10 @@ backup_one "$DST/scripts/direct_ts_auto_supervisor.sh" scripts/direct_ts_auto_su
 backup_one "$DST/scripts/direct_ts_auto_status.sh" scripts/direct_ts_auto_status.sh
 backup_one "$DST/scripts/direct_source_mode.sh" scripts/direct_source_mode.sh
 backup_one "$DST/scripts/gen2_safearea.sh" scripts/gen2_safearea.sh
+backup_one "$STATE_SOURCE" state/mibr-direct-source-framing
+backup_one "$STATE_DIRECT_FPS" state/mibr-direct-output-fps
+backup_one "$STATE_SOURCE_FPS" state/mibr-carplay111-fps
+backup_one "$STATE_SAFEAREA" state/mibr-carplay111-safearea.conf
 : > "$BACK/BACKUP_COMPLETE" || fail "backup_complete_marker"
 
 install_one "$PAYLOAD/libaltscreen111.so" "$DST/bin/libaltscreen111.so"
@@ -193,7 +201,7 @@ install_one "$RUNTIME/navigation/gen2_safearea.sh" "$DST/scripts/gen2_safearea.s
 } > "$ACTIVE" || fail "active_marker_write"
 
 # Default remains raw Annex-B even if a stale candidate override survived a prior experiment.
-rm -f /mnt/app/root/mibr-direct-source-framing 2>/dev/null || true
+rm -f "$STATE_SOURCE" 2>/dev/null || true
 
 app_ro
 
