@@ -242,6 +242,7 @@ while [ -e "$ENABLED" ]; do
     sleep 2
     continue
   }
+  configure_source_timing
   MIBR_PACE="$DIRECT_PACE" MIBR_PACE_BUFFER="$DIRECT_PACE_BUFFER" \
   "$BRIDGE" "tcp://127.0.0.1:$ALTSCREEN111_TEE_PORT" /dev/mlb/isoTX2 \
       "$DIRECT_OUTPUT_FPS" 0 0 0x11 > "$BRIDGELOG" 2>&1 &
