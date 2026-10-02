@@ -61,18 +61,34 @@ telemetry_init(){
   TELEMETRY_EVENTS=$RUN/telemetry-events.log
   TELEMETRY_SEQ=0
   LAST_SOURCE_BUCKET=0
+  LAST_SOURCE_SAMPLE_SEQ=0
   PENDING_SOURCE_BUCKET=0
   PENDING_SOURCE_BUCKET_COUNT=0
   [ "${DIRECT_TELEMETRY:-0}" = "1" ] || return 0
-  echo "sample	time	source_max_fps	source_fps_x100	source_bucket	source_input_bps	source_last_us	source_min_us	source_max_us	source_ts_word1	source_ts_word2	remux_input_bps	most_bps	remux_input_us	pace_underflows	pace_late_frames	pace_backpressure_waits	write_eagain	last_block_wait_us	max_block_wait_us	max_emit_jitter_us" > "$TELEMETRY"
+  echo "sample	time	source_sample_seq	source_sample_stale	source_max_fps	source_fps_x100	source_bucket	source_frames_total	source_input_bps	source_last_us	source_min_us	source_max_us	source_ts_word1	source_ts_word2	remux_input_bps	most_bps	remux_input_us	pace_underflows	pace_late_frames	pace_backpressure_waits	write_eagain	last_block_wait_us	max_block_wait_us	max_emit_jitter_us" > "$TELEMETRY"
 }
 
 telemetry_sample(){
   [ "${DIRECT_TELEMETRY:-0}" = "1" ] || return 0
   TELEMETRY_SEQ=$((TELEMETRY_SEQ+1))
-  SCONF=$(status_value "$SOURCE_TIMING_STATUS" configured_max_fps); SCONF=${SCONF:-$ALTSCREEN111_FPS}
+  SCONF=$(status_value "$SOURCE_TIMING_STATUS" configured_max_fps)
+  if [ -z "$SCONF" ]; then
+    SCONF=$ALTSCREEN111_FPS
+    if [ -r "$SOURCE_FPS_OVERRIDE_FILE" ]; then
+      V=$(cat "$SOURCE_FPS_OVERRIDE_FILE" 2>/dev/null)
+      case "$V" in 20|25|30|40) SCONF=$V ;; esac
+    fi
+  fi
+  SSEQ=$(status_value "$SOURCE_TIMING_STATUS" sample_seq); SSEQ=${SSEQ:-0}
+  if [ "$SSEQ" != "0" ] && [ "$SSEQ" = "$LAST_SOURCE_SAMPLE_SEQ" ]; then
+    SSTALE=1
+  else
+    SSTALE=0
+    LAST_SOURCE_SAMPLE_SEQ=$SSEQ
+  fi
   SFPS=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_fps_x100); SFPS=${SFPS:-0}
   SBUCKET=$(fps_bucket "$SFPS")
+  SFRAMES=$(status_value "$SOURCE_TIMING_STATUS" frames_total); SFRAMES=${SFRAMES:-0}
   SBPS=$(status_value "$SOURCE_TIMING_STATUS" source_input_bps); SBPS=${SBPS:-0}
   SLAST=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_last_us); SLAST=${SLAST:-0}
   SMIN=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_min_us); SMIN=${SMIN:-0}
@@ -89,9 +105,9 @@ telemetry_sample(){
   LBW=$(status_value "$REMUX_STATUS" last_block_wait_us); LBW=${LBW:-0}
   MBW=$(status_value "$REMUX_STATUS" max_block_wait_us); MBW=${MBW:-0}
   MEJ=$(status_value "$REMUX_STATUS" max_emit_jitter_us); MEJ=${MEJ:-0}
-  echo "$TELEMETRY_SEQ	$(timestamp_now)	$SCONF	$SFPS	$SBUCKET	$SBPS	$SLAST	$SMIN	$SMAX	$STS1	$STS2	$RIBPS	$MBPS	$RINT	$PU	$PL	$PB	$WE	$LBW	$MBW	$MEJ" >> "$TELEMETRY" 2>/dev/null || true
+  echo "$TELEMETRY_SEQ	$(timestamp_now)	$SSEQ	$SSTALE	$SCONF	$SFPS	$SBUCKET	$SFRAMES	$SBPS	$SLAST	$SMIN	$SMAX	$STS1	$STS2	$RIBPS	$MBPS	$RINT	$PU	$PL	$PB	$WE	$LBW	$MBW	$MEJ" >> "$TELEMETRY" 2>/dev/null || true
 
-  if [ "$SBUCKET" != "0" ] && [ "$SBUCKET" != "other" ] && [ "$SBUCKET" != "$LAST_SOURCE_BUCKET" ]; then
+  if [ "$SSTALE" = "0" ] && [ "$SBUCKET" != "0" ] && [ "$SBUCKET" != "other" ] && [ "$SBUCKET" != "$LAST_SOURCE_BUCKET" ]; then
     if [ "$SBUCKET" = "$PENDING_SOURCE_BUCKET" ]; then
       PENDING_SOURCE_BUCKET_COUNT=$((PENDING_SOURCE_BUCKET_COUNT+1))
     else
