@@ -52,7 +52,7 @@ configure_source_timing(){
     echo "${ALTSCREEN111_TIMING_INTERVAL_MS:-1000}" > "$SOURCE_TIMING_INTERVAL" 2>/dev/null || true
     : > "$SOURCE_TIMING_ENABLE" 2>/dev/null || true
   else
-    rm -f "$SOURCE_TIMING_ENABLE" "$SOURCE_TIMING_INTERVAL" 2>/dev/null || true
+    rm -f "$SOURCE_TIMING_ENABLE" "$SOURCE_TIMING_INTERVAL" "$SOURCE_TIMING_STATUS" 2>/dev/null || true
   fi
 }
 
