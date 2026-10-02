@@ -435,9 +435,18 @@ static void source_timing_write_locked(const char *state, int64_t now_us)
 
     elapsed_us = g_source_timing.window_start_us > 0 ?
         now_us - g_source_timing.window_start_us : 0;
-    if(elapsed_us > 0) {
-        fps_x100 = (g_source_timing.window_frames * 100000000ULL) /
+    if(elapsed_us > 0 && g_source_timing.window_frames > 1) {
+        /*
+         * The elapsed interval runs from the first frame arrival to the latest
+         * frame arrival, so N frames contain N-1 frame intervals. Counting N
+         * here would bias a one-second 30-fps window upward by roughly 1 fps.
+         */
+        fps_x100 = ((g_source_timing.window_frames - 1u) * 100000000ULL) /
                    (uint64_t)elapsed_us;
+        /*
+         * window_bytes intentionally excludes the first frame in the window;
+         * it therefore measures bytes that arrived during this exact interval.
+         */
         bps = (g_source_timing.window_bytes * 8000000ULL) /
               (uint64_t)elapsed_us;
     }
@@ -501,7 +510,15 @@ static void source_timing_note_frame(const AirPlayScreenHeaderCompat *h, size_t 
     memcpy(&w2,h->params+4,sizeof(w2));
 
     pthread_mutex_lock(&g_source_timing_lock);
-    if(g_source_timing.window_start_us==0)g_source_timing.window_start_us=now_us;
+    if(g_source_timing.window_start_us==0){
+        g_source_timing.window_start_us=now_us;
+        g_source_timing.window_frames=1u;
+        g_source_timing.window_bytes=0u;
+    } else {
+        ++g_source_timing.window_frames;
+        /* Bytes for frame 2..N span the measured first->last arrival interval. */
+        g_source_timing.window_bytes+=(uint64_t)bytes;
+    }
     if(g_source_timing.last_arrival_us>0){
         dt=now_us-g_source_timing.last_arrival_us;
         g_source_timing.last_interval_us=dt;
@@ -512,8 +529,6 @@ static void source_timing_note_frame(const AirPlayScreenHeaderCompat *h, size_t 
     g_source_timing.last_arrival_us=now_us;
     ++g_source_timing.frames_total;
     g_source_timing.bytes_total+=(uint64_t)bytes;
-    ++g_source_timing.window_frames;
-    g_source_timing.window_bytes+=(uint64_t)bytes;
     g_source_timing.ts_word1=w1;
     g_source_timing.ts_word2=w2;
 
@@ -524,7 +539,8 @@ static void source_timing_note_frame(const AirPlayScreenHeaderCompat *h, size_t 
         source_timing_write_locked("running",now_us);
         g_source_timing.window_frames=0;
         g_source_timing.window_bytes=0;
-        g_source_timing.window_start_us=now_us;
+        /* Next accepted frame becomes the exact start of the next window. */
+        g_source_timing.window_start_us=0;
         g_source_timing.min_interval_us=0;
         g_source_timing.max_interval_us=0;
     }
