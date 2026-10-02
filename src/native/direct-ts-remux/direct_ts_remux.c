@@ -889,18 +889,22 @@ static int open_out(const char *path,int *device_mode) {
 int main(int argc,char **argv) {
     const char *in_url,*out_path;
     int fps,max_seconds,wait_seconds,pid;
-    int pace_enabled,pace_buffer;
+    int pace_enabled,pace_buffer,input_m1au;
     AVFormatContext *ic=NULL,*oc=NULL;
     AVStream *is=NULL,*os=NULL;
     AVDictionary *mux_opts=NULL;
-    AVIOContext *avio=NULL;
+    AVIOContext *avio=NULL,*input_avio=NULL;
     unsigned char *avio_buf=NULL;
+    FramedInput framed;
+    int framed_active=0;
     OutCtx out;
     int64_t deadline=0,start_us=0,frame_no=0,last_input_us=0;
     int video=-1,rc=0;
     char ebuf[128];
 
     memset(&out,0,sizeof(out));
+    memset(&framed,0,sizeof(framed));
+    framed.fd=-1;
     out.fd=-1;
     (void)unlink(REMUX_STATUS_PATH);
 
@@ -915,6 +919,7 @@ int main(int argc,char **argv) {
 
     pace_enabled=env_int("MIBR_PACE",0)?1:0;
     pace_buffer=env_int("MIBR_PACE_BUFFER",3);
+    input_m1au=env_int("MIBR_INPUT_M1AU",0)?1:0;
     if(pace_buffer<1)pace_buffer=1;
     if(pace_buffer>6)pace_buffer=6;
     out.pace_enabled=pace_enabled;
@@ -922,8 +927,17 @@ int main(int argc,char **argv) {
     out.pace_buffer_target=pace_enabled?pace_buffer:0;
 
     avformat_network_init();
-    ic=open_h264_retry(in_url,fps,wait_seconds,&deadline);
-    if(!ic){fprintf(stderr,"ERROR cannot open H264 input\n");return 2;}
+    if(input_m1au) {
+        ic=open_m1au_h264(in_url,fps,wait_seconds,&deadline,&framed,&input_avio);
+        if(ic) {
+            framed_active=1;
+            g_framed_status=&framed;
+            out.input_framed=1;
+        }
+    } else {
+        ic=open_h264_retry(in_url,fps,wait_seconds,&deadline);
+    }
+    if(!ic){fprintf(stderr,"ERROR cannot open H264 input mode=%s\n",input_m1au?"m1au-v1":"raw-annexb");return 2;}
     rc=avformat_find_stream_info(ic,NULL);
     if(rc<0){errstr(rc,ebuf,sizeof(ebuf));fprintf(stderr,"ERROR stream info: %s\n",ebuf);goto done;}
     for(unsigned i=0;i<ic->nb_streams;i++) if(ic->streams[i]->codecpar->codec_type==AVMEDIA_TYPE_VIDEO){video=(int)i;break;}
@@ -958,8 +972,8 @@ int main(int argc,char **argv) {
     av_dict_free(&mux_opts);
     if(rc<0){errstr(rc,ebuf,sizeof(ebuf));fprintf(stderr,"ERROR write header: %s\n",ebuf);goto done;}
 
-    fprintf(stderr,"REMUX_START input=%s output=%s fps=%d max_seconds=%d pid=0x%x device=%d most_block_packets=%d write_size=%d pace=%d pace_buffer=%d\n",
-            in_url,out_path,fps,max_seconds,pid,out.device_mode,
+    fprintf(stderr,"REMUX_START input=%s input_mode=%s output=%s fps=%d max_seconds=%d pid=0x%x device=%d most_block_packets=%d write_size=%d pace=%d pace_buffer=%d\n",
+            in_url,input_m1au?"m1au-v1":"raw-annexb",out_path,fps,max_seconds,pid,out.device_mode,
             out.device_mode?MOST_BLOCK_PACKETS:0,
             out.device_mode?MOST_BLOCK_BYTES:0,
             pace_enabled,pace_enabled?pace_buffer:0);
@@ -1138,6 +1152,15 @@ done:
     if(out.fd>=0) close(out.fd);
     if(oc) avformat_free_context(oc);
     if(ic) avformat_close_input(&ic);
+    if(input_avio) {
+        av_freep(&input_avio->buffer);
+        avio_context_free(&input_avio);
+    }
+    if(framed_active) {
+        if(framed.fd>=0) close(framed.fd);
+        g_framed_status=NULL;
+        pthread_mutex_destroy(&framed.lock);
+    }
     avformat_network_deinit();
     return rc<0?10:0;
 }
