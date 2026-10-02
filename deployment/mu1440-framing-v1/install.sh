@@ -155,6 +155,10 @@ if [ -e "$ACTIVE" ]; then
   fail "active_marker_with_different_runtime"
 fi
 
+if [ -d "$BACK" ] && [ ! -e "$ACTIVE" ]; then
+  fail "orphan_backup_exists=$BACK run_uninstall_for_recovery_or_review_backup"
+fi
+
 if [ -x "$DST/scripts/direct_ts_auto_stop.sh" ]; then
   "$DST/scripts/direct_ts_auto_stop.sh" >/dev/null 2>&1 || true
 fi
@@ -171,6 +175,7 @@ backup_one "$DST/scripts/direct_ts_auto_supervisor.sh" scripts/direct_ts_auto_su
 backup_one "$DST/scripts/direct_ts_auto_status.sh" scripts/direct_ts_auto_status.sh
 backup_one "$DST/scripts/direct_source_mode.sh" scripts/direct_source_mode.sh
 backup_one "$DST/scripts/gen2_safearea.sh" scripts/gen2_safearea.sh
+: > "$BACK/BACKUP_COMPLETE" || fail "backup_complete_marker"
 
 install_one "$PAYLOAD/libaltscreen111.so" "$DST/bin/libaltscreen111.so"
 install_one "$PAYLOAD/libaltscreen111.so" "$HOOK"
