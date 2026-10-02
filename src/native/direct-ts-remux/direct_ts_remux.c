@@ -921,7 +921,6 @@ int main(int argc,char **argv) {
     pace_enabled=env_int("MIBR_PACE",0)?1:0;
     input_m1au=env_int("MIBR_INPUT_M1AU",0)?1:0;
     pace_buffer=env_int("MIBR_PACE_BUFFER",3);
-    input_m1au=env_int("MIBR_INPUT_M1AU",0)?1:0;
     if(pace_buffer<1)pace_buffer=1;
     if(pace_buffer>6)pace_buffer=6;
     out.pace_enabled=pace_enabled;
