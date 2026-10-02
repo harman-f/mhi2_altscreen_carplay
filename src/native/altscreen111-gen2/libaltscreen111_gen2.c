@@ -97,6 +97,27 @@ typedef struct {
     uint8_t params[15 * 8];
 } AirPlayScreenHeaderCompat;
 
+/*
+ * Diagnostic-only ingress timing. The two Stream-111 timestamp words are kept
+ * raw on purpose: their unit/epoch is not yet proven for MU1440. Arrival
+ * cadence is measured independently with CLOCK_MONOTONIC so 15/20/30/40-fps
+ * transitions can be observed without changing the media path.
+ */
+typedef struct {
+    uint64_t frames_total;
+    uint64_t bytes_total;
+    uint64_t samples;
+    uint64_t window_frames;
+    uint64_t window_bytes;
+    int64_t window_start_us;
+    int64_t last_arrival_us;
+    int64_t last_interval_us;
+    int64_t min_interval_us;
+    int64_t max_interval_us;
+    uint32_t ts_word1;
+    uint32_t ts_word2;
+} mibr_source_timing_t;
+
 typedef OSStatus (*fn_setup_t)(AirPlayReceiverSessionRef, CFDictionaryRef, CFDictionaryRef *);
 typedef OSStatus (*fn_start_t)(AirPlayReceiverSessionRef, void *);
 typedef void (*fn_teardown_t)(AirPlayReceiverSessionRef, CFDictionaryRef, OSStatus, Boolean *);
@@ -276,6 +297,11 @@ static const char *g_log_path = "/tmp/altscreen111.log";
 static const char *g_state_path = "/tmp/mibr-carplay111.state";
 static const char *g_heartbeat_path = "/tmp/mibr-carplay111.heartbeat";
 static const char *g_capture_status_path = "/tmp/mibr-alt111-capture.status";
+static const char *g_source_timing_status_path = "/tmp/mibr-alt111-source-timing.status";
+static const char *g_source_timing_enable_marker = "/tmp/mibr-alt111-source-timing.enabled";
+static const char *g_source_timing_interval_path = "/tmp/mibr-alt111-source-timing-interval-ms";
+static pthread_mutex_t g_source_timing_lock = PTHREAD_MUTEX_INITIALIZER;
+static mibr_source_timing_t g_source_timing;
 static int g_streaming;
 static int g_video_config_seen;
 static uint64_t g_last_heartbeat_ms;
@@ -327,6 +353,7 @@ static uint64_t g2_d2_watchdog_triggers;
 static uint64_t g2_d2_coalesced;
 
 static void gen2_publish_status(void);
+static int current_advertised_fps(void);
 static void gen2_control_projection_on(void);
 static void gen2_control_release(void);
 static void gen2_set_command_ready(unsigned ready);
@@ -366,6 +393,154 @@ static uint64_t monotonic_ms(void)
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
     return (uint64_t)ts.tv_sec * 1000u + (uint64_t)(ts.tv_nsec / 1000000L);
+}
+
+static int64_t monotonic_us(void)
+{
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
+    return (int64_t)ts.tv_sec * 1000000LL + (int64_t)(ts.tv_nsec / 1000L);
+}
+
+static unsigned source_timing_interval_ms(void)
+{
+    char b[24];
+    int fd, v = 1000;
+    ssize_t n;
+    fd=open(g_source_timing_interval_path,O_RDONLY);
+    if(fd<0)return 1000u;
+    n=read(fd,b,sizeof(b)-1u);
+    close(fd);
+    if(n<=0)return 1000u;
+    b[n]='\0';
+    v=atoi(b);
+    if(v<250||v>5000)return 1000u;
+    return (unsigned)v;
+}
+
+static void source_timing_reset(void)
+{
+    pthread_mutex_lock(&g_source_timing_lock);
+    memset(&g_source_timing,0,sizeof(g_source_timing));
+    pthread_mutex_unlock(&g_source_timing_lock);
+    (void)unlink(g_source_timing_status_path);
+}
+
+static void source_timing_write_locked(const char *state, int64_t now_us)
+{
+    char b[1024], tmp[160];
+    int fd, n;
+    int64_t elapsed_us;
+    uint64_t fps_x100 = 0, bps = 0;
+
+    elapsed_us = g_source_timing.window_start_us > 0 ?
+        now_us - g_source_timing.window_start_us : 0;
+    if(elapsed_us > 0) {
+        fps_x100 = (g_source_timing.window_frames * 100000000ULL) /
+                   (uint64_t)elapsed_us;
+        bps = (g_source_timing.window_bytes * 8000000ULL) /
+              (uint64_t)elapsed_us;
+    }
+
+    n=snprintf(b,sizeof(b),
+        "state=%s\n"
+        "sample_seq=%llu\n"
+        "configured_max_fps=%d\n"
+        "frames_total=%llu\n"
+        "bytes_total=%llu\n"
+        "window_elapsed_us=%lld\n"
+        "window_frames=%llu\n"
+        "window_bytes=%llu\n"
+        "source_arrival_fps_x100=%llu\n"
+        "source_input_bps=%llu\n"
+        "source_arrival_last_us=%lld\n"
+        "source_arrival_min_us=%lld\n"
+        "source_arrival_max_us=%lld\n"
+        "source_ts_word1=0x%08x\n"
+        "source_ts_word2=0x%08x\n",
+        state?state:"running",
+        (unsigned long long)g_source_timing.samples,
+        current_advertised_fps(),
+        (unsigned long long)g_source_timing.frames_total,
+        (unsigned long long)g_source_timing.bytes_total,
+        (long long)elapsed_us,
+        (unsigned long long)g_source_timing.window_frames,
+        (unsigned long long)g_source_timing.window_bytes,
+        (unsigned long long)fps_x100,
+        (unsigned long long)bps,
+        (long long)g_source_timing.last_interval_us,
+        (long long)g_source_timing.min_interval_us,
+        (long long)g_source_timing.max_interval_us,
+        (unsigned)g_source_timing.ts_word1,
+        (unsigned)g_source_timing.ts_word2);
+    if(n<=0)return;
+    if((size_t)n>=sizeof(b))n=(int)sizeof(b)-1;
+    snprintf(tmp,sizeof(tmp),"%s.tmp.%d",g_source_timing_status_path,(int)getpid());
+    fd=open(tmp,O_WRONLY|O_CREAT|O_TRUNC,0644);
+    if(fd<0)return;
+    if(write(fd,b,(size_t)n)==(ssize_t)n){
+        close(fd);
+        if(rename(tmp,g_source_timing_status_path)==0)return;
+    } else {
+        close(fd);
+    }
+    (void)unlink(tmp);
+    fd=open(g_source_timing_status_path,O_WRONLY|O_CREAT|O_TRUNC,0644);
+    if(fd>=0){(void)write(fd,b,(size_t)n);close(fd);}
+}
+
+static void source_timing_note_frame(const AirPlayScreenHeaderCompat *h, size_t bytes)
+{
+    int64_t now_us, dt;
+    uint32_t w1=0, w2=0;
+    unsigned interval_ms;
+
+    if(!h)return;
+    now_us=monotonic_us();
+    memcpy(&w1,h->params,sizeof(w1));
+    memcpy(&w2,h->params+4,sizeof(w2));
+
+    pthread_mutex_lock(&g_source_timing_lock);
+    if(g_source_timing.window_start_us==0)g_source_timing.window_start_us=now_us;
+    if(g_source_timing.last_arrival_us>0){
+        dt=now_us-g_source_timing.last_arrival_us;
+        g_source_timing.last_interval_us=dt;
+        if(g_source_timing.min_interval_us==0||dt<g_source_timing.min_interval_us)
+            g_source_timing.min_interval_us=dt;
+        if(dt>g_source_timing.max_interval_us)g_source_timing.max_interval_us=dt;
+    }
+    g_source_timing.last_arrival_us=now_us;
+    ++g_source_timing.frames_total;
+    g_source_timing.bytes_total+=(uint64_t)bytes;
+    ++g_source_timing.window_frames;
+    g_source_timing.window_bytes+=(uint64_t)bytes;
+    g_source_timing.ts_word1=w1;
+    g_source_timing.ts_word2=w2;
+
+    interval_ms=source_timing_interval_ms();
+    if(access(g_source_timing_enable_marker,F_OK)==0 &&
+       now_us-g_source_timing.window_start_us >= (int64_t)interval_ms*1000LL){
+        ++g_source_timing.samples;
+        source_timing_write_locked("running",now_us);
+        g_source_timing.window_frames=0;
+        g_source_timing.window_bytes=0;
+        g_source_timing.window_start_us=now_us;
+        g_source_timing.min_interval_us=0;
+        g_source_timing.max_interval_us=0;
+    }
+    pthread_mutex_unlock(&g_source_timing_lock);
+}
+
+static void source_timing_finish(void)
+{
+    int64_t now_us=monotonic_us();
+    pthread_mutex_lock(&g_source_timing_lock);
+    if(access(g_source_timing_enable_marker,F_OK)==0 &&
+       g_source_timing.frames_total>0){
+        ++g_source_timing.samples;
+        source_timing_write_locked("disconnected",now_us);
+    }
+    pthread_mutex_unlock(&g_source_timing_lock);
 }
 
 static unsigned gen2_d2_enabled(void)
@@ -932,7 +1107,7 @@ static int current_advertised_fps(void)
     if(n<=0)return g_fps;
     b[n]='\0';
     v=atoi(b);
-    if(v==20||v==25||v==30)return v;
+    if(v==20||v==25||v==30||v==40)return v;
     return g_fps;
 }
 
@@ -1628,6 +1803,7 @@ static void *alt_receiver_thread(void *arg)
                         int accepted = 0, consumer_attached = 0;
                         int vrc = gen2_video_submit_au(body, h.bodySize, &accepted, &consumer_attached);
                         if (accepted) {
+                            source_timing_note_frame(&h,h.bodySize);
                             if (!g_streaming) {
                                 g_streaming = 1;
                                 publish_state("streaming");
@@ -1663,6 +1839,7 @@ static void *alt_receiver_thread(void *arg)
     }
 done:
     logf_u2("AltScreen stream 111 disconnected");
+    source_timing_finish();
     clear_video_observer();
     publish_state("disconnected");
     pthread_mutex_lock(&g_lock);
@@ -1687,6 +1864,7 @@ static int start_alt_receiver(uint64_t connection_id)
     /* Complete previous worker teardown before reusing global session state. */
     stop_alt_receiver();
     clear_video_observer();
+    source_timing_reset();
 
     /* Start the core generation before taking g_lock: gen2_video_begin_current()
      * deliberately closes/reset the local consumer and therefore takes g_lock. */
