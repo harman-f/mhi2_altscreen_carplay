@@ -41,6 +41,7 @@ echo "direct_pace_buffer=${DIRECT_PACE_BUFFER:-UNKNOWN}"
 echo "source_timing_debug=${ALTSCREEN111_TIMING_DEBUG:-UNKNOWN}"
 echo "source_timing_interval_ms=${ALTSCREEN111_TIMING_INTERVAL_MS:-UNKNOWN}"
 echo "direct_telemetry=${DIRECT_TELEMETRY:-UNKNOWN}"
+echo "direct_source_framing=${DIRECT_SOURCE_FRAMING:-UNKNOWN}"
 [ -r "$DIRECT_FPS_OVERRIDE_FILE" ] && echo "direct_fps_override=$(cat "$DIRECT_FPS_OVERRIDE_FILE" 2>/dev/null)" || echo "direct_fps_override=none"
 [ -r "$SOURCE_FPS_OVERRIDE_FILE" ] && echo "source_fps_override=$(cat "$SOURCE_FPS_OVERRIDE_FILE" 2>/dev/null)" || echo "source_fps_override=none"
 
@@ -55,7 +56,7 @@ fi
 echo
 echo "=== REMUX / MOST TIMING ==="
 if [ -r /tmp/mibr-direct-remux.status ]; then
-  grep -E '^(input_bps|most_bps|pace_|last_input_interval_us|min_input_interval_us|max_input_interval_us|last_emit_interval_us|max_emit_jitter_us|write_eagain|write_timeouts|write_errors|last_write_call_us|last_block_wait_us|max_block_wait_us|over20ms_blocks)=' /tmp/mibr-direct-remux.status 2>/dev/null || true
+  grep -E '^(input_mode|m1au_|input_bps|most_bps|pace_|last_input_interval_us|min_input_interval_us|max_input_interval_us|last_emit_interval_us|max_emit_jitter_us|write_eagain|write_timeouts|write_errors|last_write_call_us|last_block_wait_us|max_block_wait_us|over20ms_blocks)=' /tmp/mibr-direct-remux.status 2>/dev/null || true
 else
   echo "remux_pace_status=missing"
 fi
