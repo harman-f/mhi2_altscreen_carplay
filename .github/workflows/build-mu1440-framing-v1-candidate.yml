@@ -1,0 +1,147 @@
+name: Build MU1440 framing-v1 candidate overlay
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/build-mu1440-framing-v1-candidate.yml'
+      - 'src/native/altscreen111-gen2/**'
+      - 'src/native/direct-ts-remux/**'
+      - 'runtime/auto-direct/**'
+      - 'runtime/navigation/gen2_safearea.sh'
+      - 'deployment/mu1440-framing-v1/**'
+      - 'tools/build_altscreen111_gen2.sh'
+      - 'tools/build_direct_ts_remux.sh'
+      - 'tools/prepare_mu1440_framing_v1_overlay.sh'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mu1440-framing-v1-candidate
+  cancel-in-progress: true
+
+env:
+  TOOLCHAIN_REPO: https://github.com/luka-dev/qnx65-armv7-toolchain.git
+  TOOLCHAIN_COMMIT: 56a66557245af14077678cd28a83ce3a337d9e2d
+  TOOLCHAIN_DOCKERFILE_SHA256: 9a867a7ae70f2c0222a241b80232856526ccec0db2cfe013f8991ca31c74bcb1
+  IMAGE: mhi2-qnx65-armv7-public:4.9
+  ZIP_NAME: MHI2_AltScreen_MU1440_FRAMING_V1_CANDIDATE.zip
+
+jobs:
+  build:
+    name: Build and package framing-v1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Build pinned QNX 6.5 ARMv7 toolchain image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone "$TOOLCHAIN_REPO" "$RUNNER_TEMP/qnx-toolchain"
+          git -C "$RUNNER_TEMP/qnx-toolchain" checkout "$TOOLCHAIN_COMMIT"
+          test "$(sha256sum "$RUNNER_TEMP/qnx-toolchain/Dockerfile" | awk '{print $1}')" = "$TOOLCHAIN_DOCKERFILE_SHA256"
+
+          python3 - "$RUNNER_TEMP/qnx-toolchain/Dockerfile" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1])
+          s=p.read_text()
+          needle="RUN dpkg --add-architecture i386 && apt-get update && \\\n"
+          replacement=(
+              "RUN sed -i 's#http://deb.debian.org/debian-security#"
+              "http://snapshot.debian.org/archive/debian-security/20260903T220410Z#g' "
+              "/etc/apt/sources.list && \\\n"
+              "    echo 'Acquire::Check-Valid-Until \"false\";' "
+              "> /etc/apt/apt.conf.d/99snapshot && \\\n"
+              "    dpkg --add-architecture i386 && apt-get update && \\\n"
+          )
+          if needle not in s:
+              raise SystemExit("qnx-sdp apt bootstrap anchor not found")
+          p.write_text(s.replace(needle,replacement,1))
+          PY
+
+          docker buildx build --platform=linux/amd64 \
+            --target base-env --build-arg BASE=base-4.9 \
+            --cache-from type=gha --cache-to type=gha,mode=max \
+            --load -t "$IMAGE" "$RUNNER_TEMP/qnx-toolchain"
+
+      - name: Build GEN2 and direct-ts-remux
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p build/framing-v1
+          docker run --rm --platform=linux/amd64 \
+            -v "$PWD:/src" -w /src "$IMAGE" \
+            bash -c 'bash ./tools/build_altscreen111_gen2.sh build/framing-v1/libaltscreen111.so'
+          docker run --rm --platform=linux/amd64 \
+            -v "$PWD:/src" -w /src "$IMAGE" \
+            bash -c 'bash ./tools/build_direct_ts_remux.sh src/native/direct-ts-remux/direct_ts_remux.c build/framing-v1/direct-ts-remux'
+          sudo chown -R "$(id -u):$(id -g)" build/framing-v1
+
+      - name: Validate QNX binaries
+        shell: bash
+        run: |
+          set -euxo pipefail
+          GEN2=build/framing-v1/libaltscreen111.so
+          REMUX=build/framing-v1/direct-ts-remux
+
+          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h "$GEN2" > build/framing-v1/gen2-elf.txt
+          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h "$REMUX" > build/framing-v1/remux-elf.txt
+          grep -q 'Machine:.*ARM' build/framing-v1/gen2-elf.txt
+          grep -q 'Machine:.*ARM' build/framing-v1/remux-elf.txt
+
+          strings "$GEN2" | grep -Fq 'M1AU'
+          strings "$GEN2" | grep -Fq 'mibr-alt111-au-framing.enabled'
+          strings "$GEN2" | grep -Fq 'mibr-alt111-source-timing.status'
+          strings "$REMUX" | grep -Fq 'M1AU_CONNECT_OK'
+          strings "$REMUX" | grep -Fq 'm1au_sequence_gaps'
+          strings "$REMUX" | grep -Fq 'input_mode=%s'
+
+          sha256sum "$GEN2" "$REMUX" | tee build/framing-v1/BINARIES.sha256
+
+      - name: Build reversible candidate overlay
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x tools/prepare_mu1440_framing_v1_overlay.sh
+          tools/prepare_mu1440_framing_v1_overlay.sh \
+            build/framing-v1/package \
+            build/framing-v1/libaltscreen111.so \
+            build/framing-v1/direct-ts-remux
+
+          (
+            cd build/framing-v1/package
+            sha256sum -c PAYLOAD.sha256
+            while IFS= read -r script; do bash -n "$script"; done < <(find . -type f -name '*.sh' -print | sort)
+          )
+
+          grep -Fq 'pts_pcr=unchanged_cfr' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'transport_default=raw-annexb' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'MIBR_FRAMING_V1=PASS' deployment/mu1440-framing-v1/install.sh
+          grep -Fq 'MIBR_FRAMING_V1_UNINSTALL=PASS' deployment/mu1440-framing-v1/uninstall.sh
+
+          (
+            cd build/framing-v1/package
+            zip -9 -r "$GITHUB_WORKSPACE/$ZIP_NAME" .
+          )
+          unzip -t "$ZIP_NAME"
+          sha256sum "$ZIP_NAME" > "$ZIP_NAME.sha256"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mu1440-framing-v1-candidate
+          path: |
+            ${{ env.ZIP_NAME }}
+            ${{ env.ZIP_NAME }}.sha256
+            build/framing-v1/BINARIES.sha256
+            build/framing-v1/gen2-elf.txt
+            build/framing-v1/remux-elf.txt
