@@ -551,8 +551,12 @@ static void source_timing_finish(void)
 {
     int64_t now_us=monotonic_us();
     pthread_mutex_lock(&g_source_timing_lock);
+    /*
+     * Do not overwrite the most recent useful cadence snapshot with an empty
+     * zero-rate window when the stream disconnects while static/idle.
+     */
     if(access(g_source_timing_enable_marker,F_OK)==0 &&
-       g_source_timing.frames_total>0){
+       g_source_timing.window_frames>1){
         ++g_source_timing.samples;
         source_timing_write_locked("disconnected",now_us);
     }
