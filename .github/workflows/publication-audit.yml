@@ -146,6 +146,10 @@ jobs:
           grep -Fq '20|25|30|40' runtime/auto-direct/direct_fps.sh
           grep -Fq 'mibr-alt111-source-timing.status' src/native/altscreen111-gen2/libaltscreen111_gen2.c
           grep -Fq 'telemetry.tsv' runtime/auto-direct/direct_ts_auto_supervisor.sh
+          grep -Fq 'DIRECT_SOURCE_FRAMING=0' runtime/auto-direct/altscreen111.conf
+          grep -Fq 'MIBR_INPUT_M1AU="$DIRECT_SOURCE_FRAMING"' runtime/auto-direct/direct_ts_auto_supervisor.sh
+          grep -Fq '"M1AU"' src/native/altscreen111-gen2/libaltscreen111_gen2.c
+          grep -Fq 'M1AU_CONNECT_OK' src/native/direct-ts-remux/direct_ts_remux.c
           test -s docs/testing/MU1440_SOURCE_TIMING_TELEMETRY.md
           grep -Fq 'for SPEC in "NavIgnore:MIBR-NavIgnore.jar:$EXPECTED_NAVIGNORE" "Most20:MIBR-Most20FPS.jar:$EXPECTED_MOST20"; do' deployment/mu1440/install.sh
           grep -Fq 'fail "${NAME}_required expected=$EXPECT"' deployment/mu1440/install.sh
