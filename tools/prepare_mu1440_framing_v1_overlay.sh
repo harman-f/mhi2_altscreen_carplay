@@ -41,11 +41,13 @@ chmod +x "$DEST/"*.sh "$DEST/payload/"* "$DEST/runtime/auto-direct/"*.sh "$DEST/
 
 GEN2_SHA=$(sha256sum "$GEN2" | awk '{print $1}')
 REMUX_SHA=$(sha256sum "$REMUX" | awk '{print $1}')
+SOURCE_HEAD_COMMIT_VALUE=${SOURCE_HEAD_COMMIT:-${GITHUB_SHA:-local}}
+CI_MERGE_COMMIT_VALUE=${CI_MERGE_COMMIT:-}
 cat > "$DEST/CANDIDATE-MANIFEST.txt" <<EOF
 candidate=framing-v1
 target=MHI2_ER_SKG13_P4526_MU1440
 cluster=AID10-class
-source_commit=${GITHUB_SHA:-local}
+source_head_commit=$SOURCE_HEAD_COMMIT_VALUE
 gen2_sha256=$GEN2_SHA
 direct_ts_remux_sha256=$REMUX_SHA
 source_fps_default=30
@@ -58,6 +60,10 @@ pts_pcr=unchanged_cfr
 safearea_helper=included
 install_type=reversible_overlay
 EOF
+
+if [[ -n "$CI_MERGE_COMMIT_VALUE" ]]; then
+  echo "ci_merge_commit=$CI_MERGE_COMMIT_VALUE" >> "$DEST/CANDIDATE-MANIFEST.txt"
+fi
 
 cat > "$DEST/README-FIRST.txt" <<'EOF'
 MHI2 AltScreen — MU1440 framing-v1 candidate overlay
