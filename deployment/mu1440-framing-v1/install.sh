@@ -56,9 +56,7 @@ verify_manifest(){
   [ -r "$MANIFEST" ] || fail "missing_manifest=$MANIFEST"
   while read EXPECT REL; do
     [ -n "${EXPECT:-}" ] || continue
-    case "$REL" in
-      ** ) REL=${REL#*} ;;
-    esac
+    [ -n "${REL:-}" ] || fail "invalid_manifest_line"
     F=$ROOT/$REL
     [ -r "$F" ] || fail "missing_payload=$REL"
     GOT=$(hashf "$F") || fail "hash_failed=$REL"
