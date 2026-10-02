@@ -127,6 +127,7 @@ static uint64_t g_status_seq;
 static int64_t g_last_status_us;
 static int g_status_error_logged;
 static FramedInput *g_framed_status;
+static int interrupt_cb(void *opaque);
 
 static int env_int(const char *name,int defval) {
     const char *v=getenv(name);
