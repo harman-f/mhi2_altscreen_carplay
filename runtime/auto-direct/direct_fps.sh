@@ -16,8 +16,10 @@ show_status(){
   echo "direct_pace_buffer=$DIRECT_PACE_BUFFER"
   [ -r "$FILE" ] && echo "direct_override=$(cat "$FILE" 2>/dev/null)" || echo "direct_override=none"
   [ -r "$SOURCE_FILE" ] && echo "source_override=$(cat "$SOURCE_FILE" 2>/dev/null)" || echo "source_override=none"
-  if [ -r /tmp/mibr-alt111-gen2.status ]; then
-    grep -E '^(source_timing_|source_ts_|source_arrival_|source_input_)' /tmp/mibr-alt111-gen2.status 2>/dev/null || true
+  if [ -r /tmp/mibr-alt111-source-timing.status ]; then
+    cat /tmp/mibr-alt111-source-timing.status 2>/dev/null || true
+  else
+    echo "source_timing_status=missing"
   fi
   if [ -r /tmp/mibr-direct-remux.status ]; then
     grep -E '^(input_bps|most_bps|pace_|last_input_interval_us|min_input_interval_us|max_input_interval_us|last_emit_interval_us|max_emit_jitter_us|write_eagain|last_block_wait_us|max_block_wait_us)=' /tmp/mibr-direct-remux.status 2>/dev/null || true
