@@ -110,6 +110,9 @@ jobs:
 
       - name: Build reversible candidate overlay
         shell: bash
+        env:
+          SOURCE_HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          CI_MERGE_COMMIT: ${{ github.event_name == 'pull_request' && github.sha || '' }}
         run: |
           set -euxo pipefail
           chmod +x tools/prepare_mu1440_framing_v1_overlay.sh
@@ -126,6 +129,10 @@ jobs:
 
           grep -Fq 'pts_pcr=unchanged_cfr' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fq 'transport_default=raw-annexb' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fxq "source_head_commit=$SOURCE_HEAD_COMMIT" build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          if [[ -n "$CI_MERGE_COMMIT" ]]; then
+            grep -Fxq "ci_merge_commit=$CI_MERGE_COMMIT" build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          fi
           grep -Fq 'MIBR_FRAMING_V1=PASS' deployment/mu1440-framing-v1/install.sh
           grep -Fq 'MIBR_FRAMING_V1_UNINSTALL=PASS' deployment/mu1440-framing-v1/uninstall.sh
 
