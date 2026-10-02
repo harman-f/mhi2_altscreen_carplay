@@ -248,6 +248,32 @@ static uint64_t g_tee_consumer_generation;
 static pthread_t g_tee_thread;
 static int g_tee_started;
 
+/*
+ * Optional local AU framing. Raw Annex-B remains the default transport.
+ * M1AU v1 is selected only when a new local renderer connects while the
+ * volatile marker exists, so a live TCP connection never changes format.
+ *
+ * Header layout (56 bytes, numeric fields big-endian):
+ *   0x00  char[4]  "M1AU"
+ *   0x04  u16      version = 1
+ *   0x06  u16      header bytes = 56
+ *   0x08  u32      flags: bit0 IDR, bit1 priming(config+IDR)
+ *   0x0c  u32      complete Annex-B AU payload bytes
+ *   0x10  u64      stream generation
+ *   0x18  u64      codec generation
+ *   0x20  u64      consumer generation
+ *   0x28  u64      AU sequence/ordinal
+ *   0x30  u8[8]    raw Stream-111 timestamp bytes, unchanged
+ */
+#define M1AU_HEADER_BYTES 56u
+#define M1AU_FLAG_IDR 0x00000001u
+#define M1AU_FLAG_PRIMING 0x00000002u
+static const char *g_au_framing_marker = "/tmp/mibr-alt111-au-framing.enabled";
+static int g_tee_framed;
+static uint8_t g_tee_frame_header[M1AU_HEADER_BYTES];
+static size_t g_tee_frame_header_off;
+static uint64_t g_tee_frame_header_sequence;
+
 static int g_capture_listen = -1;
 static int g_capture_client = -1;
 static int g_capture_port = 19821;
@@ -1345,7 +1371,9 @@ static int gen2_video_config(const uint8_t *p, size_t n)
     return rc;
 }
 
-static int gen2_video_submit_au(const uint8_t *p, size_t n, int *accepted, int *consumer_attached)
+static int gen2_video_submit_au(const uint8_t *p, size_t n,
+                                const uint8_t source_ts_raw[8],
+                                int *accepted, int *consumer_attached)
 {
     int rc;
     uint64_t before, after_count;
@@ -1353,7 +1381,9 @@ static int gen2_video_submit_au(const uint8_t *p, size_t n, int *accepted, int *
     if (consumer_attached) *consumer_attached = 0;
     pthread_mutex_lock(&g2_core_lock);
     before = g2_video.source_aus;
-    rc = g2_video_stream ? alt111_video_submit(&g2_video, g2_video_stream, p, n, 1) : ALT111_STALE;
+    rc = g2_video_stream ? alt111_video_submit_timed(&g2_video, g2_video_stream,
+                                                     p, n, 1, source_ts_raw)
+                         : ALT111_STALE;
     after_count = g2_video.source_aus;
     if (accepted && after_count > before) *accepted = 1;
     if (consumer_attached) *consumer_attached = g2_video.attached ? 1 : 0;
@@ -1399,6 +1429,44 @@ static void gen2_consumer_attach(void)
     gen2_publish_status();
 }
 
+static void m1au_put_be16(uint8_t *p, uint16_t v)
+{
+    p[0]=(uint8_t)(v>>8); p[1]=(uint8_t)v;
+}
+
+static void m1au_put_be32(uint8_t *p, uint32_t v)
+{
+    p[0]=(uint8_t)(v>>24); p[1]=(uint8_t)(v>>16);
+    p[2]=(uint8_t)(v>>8); p[3]=(uint8_t)v;
+}
+
+static void m1au_put_be64(uint8_t *p, uint64_t v)
+{
+    unsigned i;
+    for(i=0;i<8u;++i)p[i]=(uint8_t)(v>>(56u-(i*8u)));
+}
+
+static void m1au_prepare_header_locked(const struct alt111_output_ticket *ticket,
+                                       size_t payload_bytes)
+{
+    uint32_t flags=0;
+    memset(g_tee_frame_header,0,sizeof(g_tee_frame_header));
+    memcpy(g_tee_frame_header,"M1AU",4u);
+    m1au_put_be16(g_tee_frame_header+4u,1u);
+    m1au_put_be16(g_tee_frame_header+6u,(uint16_t)M1AU_HEADER_BYTES);
+    if(ticket->idr)flags|=M1AU_FLAG_IDR;
+    if(ticket->priming)flags|=M1AU_FLAG_PRIMING;
+    m1au_put_be32(g_tee_frame_header+8u,flags);
+    m1au_put_be32(g_tee_frame_header+12u,(uint32_t)payload_bytes);
+    m1au_put_be64(g_tee_frame_header+16u,ticket->stream);
+    m1au_put_be64(g_tee_frame_header+24u,ticket->codec);
+    m1au_put_be64(g_tee_frame_header+32u,ticket->consumer);
+    m1au_put_be64(g_tee_frame_header+40u,ticket->sequence);
+    memcpy(g_tee_frame_header+48u,ticket->source_ts_raw,8u);
+    g_tee_frame_header_off=0;
+    g_tee_frame_header_sequence=ticket->sequence;
+}
+
 static void *gen2_output_worker(void *arg)
 {
     uint8_t *copy = NULL;
@@ -1410,6 +1478,7 @@ static void *gen2_output_worker(void *arg)
         size_t n = 0, chunk = 0;
         struct alt111_output_ticket ticket;
         int prc, fd, send_failed = 0, would_block = 0, stale_socket = 0;
+        int header_pending = 0;
         int arc = ALT111_WAIT, primed_before = 0, primed_after = 0;
         uint64_t delivered_before = 0, delivered_after = 0;
         ssize_t sent = 0;
@@ -1453,15 +1522,48 @@ static void *gen2_output_worker(void *arg)
         if (fd >= 0 && g_tee_consumer_generation != ticket.consumer) {
             stale_socket = 1;
         } else if (fd >= 0) {
-            do {
-                sent = send(fd, copy, chunk, MSG_NOSIGNAL);
-            } while (sent < 0 && errno == EINTR);
+            if (g_tee_framed) {
+                if (g_tee_frame_header_sequence != ticket.sequence) {
+                    if (ticket.offset != 0) {
+                        logf_u2("M1AU invariant failure sequence=%llu offset=%zu; dropping renderer",
+                                (unsigned long long)ticket.sequence,ticket.offset);
+                        tee_drop_client_locked();
+                        send_failed = 1;
+                    } else {
+                        m1au_prepare_header_locked(&ticket,n);
+                    }
+                }
+                if (!send_failed && g_tee_frame_header_off < M1AU_HEADER_BYTES) {
+                    size_t remain=M1AU_HEADER_BYTES-g_tee_frame_header_off;
+                    do {
+                        sent=send(fd,g_tee_frame_header+g_tee_frame_header_off,
+                                  remain,MSG_NOSIGNAL);
+                    } while(sent<0 && errno==EINTR);
+                    if(sent>0) {
+                        g_tee_frame_header_off+=(size_t)sent;
+                        sent=0; /* header bytes never advance the AU payload */
+                        if(g_tee_frame_header_off<M1AU_HEADER_BYTES)header_pending=1;
+                    } else if(sent<0 && (errno==EAGAIN || errno==EWOULDBLOCK)) {
+                        would_block=1;
+                    } else {
+                        tee_drop_client_locked();
+                        send_failed=1;
+                    }
+                }
+            }
 
-            if (sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                would_block = 1;
-            } else if (sent <= 0) {
-                tee_drop_client_locked();
-                send_failed = 1;
+            if (!send_failed && !would_block && !header_pending &&
+                (!g_tee_framed || g_tee_frame_header_off==M1AU_HEADER_BYTES)) {
+                do {
+                    sent = send(fd, copy, chunk, MSG_NOSIGNAL);
+                } while (sent < 0 && errno == EINTR);
+
+                if (sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                    would_block = 1;
+                } else if (sent <= 0) {
+                    tee_drop_client_locked();
+                    send_failed = 1;
+                }
             }
         } else {
             send_failed = 1;
@@ -1474,9 +1576,9 @@ static void *gen2_output_worker(void *arg)
             continue;
         }
 
-        if (would_block) {
+        if (would_block || header_pending) {
             pthread_mutex_unlock(&g2_core_lock);
-            usleep(5000);
+            usleep(header_pending ? 1000 : 5000);
             continue;
         }
 
@@ -1542,6 +1644,10 @@ static void tee_drop_client_locked(void)
     if (g_tee_client >= 0) close(g_tee_client);
     g_tee_client = -1;
     g_tee_consumer_generation = 0;
+    g_tee_framed = 0;
+    g_tee_frame_header_off = 0;
+    g_tee_frame_header_sequence = 0;
+    memset(g_tee_frame_header,0,sizeof(g_tee_frame_header));
 }
 
 static void capture_drop_client_locked(void)
@@ -1609,8 +1715,12 @@ static void *tee_accept_thread(void *arg)
         pthread_mutex_lock(&g_lock);
         tee_drop_client_locked();
         g_tee_client = c;
+        g_tee_framed = access(g_au_framing_marker,F_OK)==0 ? 1 : 0;
+        g_tee_frame_header_off = 0;
+        g_tee_frame_header_sequence = 0;
         pthread_mutex_unlock(&g_lock);
-        logf_u2("gen2 renderer connected nonblocking on 127.0.0.1:%d; waiting for config+complete IDR", g_tee_port);
+        logf_u2("gen2 renderer connected nonblocking on 127.0.0.1:%d mode=%s; waiting for config+complete IDR",
+                g_tee_port,g_tee_framed?"m1au-v1":"raw-annexb");
         gen2_consumer_attach();
     }
     return NULL;
@@ -1821,7 +1931,8 @@ static void *alt_receiver_thread(void *arg)
                     }
                     {
                         int accepted = 0, consumer_attached = 0;
-                        int vrc = gen2_video_submit_au(body, h.bodySize, &accepted, &consumer_attached);
+                        int vrc = gen2_video_submit_au(body, h.bodySize, h.params,
+                                                       &accepted, &consumer_attached);
                         if (accepted) {
                             source_timing_note_frame(&h,h.bodySize);
                             if (!g_streaming) {
