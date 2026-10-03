@@ -345,6 +345,7 @@ static const char *g2_reacquire_marker = "/tmp/mibr-alt111-gen2-reacquire";
 static const char *g2_diag_stop_marker = "/tmp/mibr-alt111-stop-only";
 static const char *g2_diag_show_marker = "/tmp/mibr-alt111-show-only";
 static const char *g2_diag_keyframe_marker = "/tmp/mibr-alt111-keyframe-only";
+static const char *g2_view_request_path = "/tmp/mibr-alt111-viewarea-request";
 static const char *g2_resync_enable_marker = "/tmp/mibr-alt111-resync.enabled";
 static const char *g2_resync_arm_marker = "/tmp/mibr-alt111-resync-arm";
 static const char *g2_d2_config_name = "mibr-carplay111-keyframes.conf";
@@ -2272,6 +2273,26 @@ static void gen2_resync_poll(void)
 
 static void gen2_process_diag_markers(void)
 {
+    if(access(g2_view_request_path,F_OK)==0){
+        char b[16];
+        int fd,n,v=-1,rc=ALT111_INVALID;
+        fd=open(g2_view_request_path,O_RDONLY);
+        if(fd>=0){
+            n=(int)read(fd,b,sizeof(b)-1u);
+            close(fd);
+            if(n>0){b[n]='\0';v=atoi(b);}
+        }
+        unlink(g2_view_request_path);
+        pthread_mutex_lock(&g2_core_lock);
+        if(g2_control_session && (v==0||v==1)){
+            rc=alt111_control_intent(&g2_control,1u,(unsigned)v);
+            pthread_cond_broadcast(&g2_core_cv);
+        }
+        pthread_mutex_unlock(&g2_core_lock);
+        logf_u2("gen2 VIEWAREA request index=%d rc=%d session=%llu",
+                v,rc,(unsigned long long)g2_control_session);
+        gen2_publish_status();
+    }
     if(access(g2_diag_keyframe_marker,F_OK)==0){
         unlink(g2_diag_keyframe_marker);
         logf_u2("gen2 DIAG marker keyframe-only");
