@@ -1329,7 +1329,7 @@ done:
     if(areas)p_CFRelease(areas);
 }
 
-static void log_stream_types(static void log_stream_types(const char *tag, CFDictionaryRef request)
+static void log_stream_types(const char *tag, CFDictionaryRef request)
 {
     CFArrayRef a=get_streams(request);
     CFIndex i,n;
