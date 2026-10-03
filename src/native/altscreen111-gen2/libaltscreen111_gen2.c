@@ -361,12 +361,25 @@ static const char *g2_resync_enable_marker = "/tmp/mibr-alt111-resync.enabled";
 static const char *g2_resync_arm_marker = "/tmp/mibr-alt111-resync-arm";
 static const char *g2_d2_enable_marker = "/tmp/mibr-alt111-keyframe-policy.enabled";
 static const char *g2_d2_persist_marker = "/mnt/app/root/mibr-alt111-keyframe-policy.enabled";
+static const char *g2_d2_timing_config_path = "/mnt/app/root/mibr-carplay111-keyframes.conf";
+static const char *g_source_version_path = "/mnt/app/root/mibr-carplay111-sourceversion";
 
-#define G2_D2_EVENT_DELAY_MS 250u
-#define G2_D2_MIN_GAP_MS 1000u
-#define G2_D2_WATCHDOG_MS 1000u
+#define G2_D2_EVENT_DELAY_DEFAULT_MS 250u
+#define G2_D2_MIN_GAP_DEFAULT_MS 1000u
+#define G2_D2_WATCHDOG_DEFAULT_MS 1000u
+#define G2_D2_EVENT_DELAY_MAX_MS 5000u
+#define G2_D2_MIN_GAP_MAX_MS 60000u
+#define G2_D2_WATCHDOG_MAX_MS 60000u
+#define GEN2_SOURCE_VERSION_DEFAULT "1005.8.1"
 #define G2_D2_SOURCE_TURNS 0x01u
 #define G2_D2_SOURCE_SUGGEST_UI 0x02u
+
+struct gen2_d2_timing {
+    unsigned event_delay_ms;
+    unsigned min_gap_ms;
+    unsigned watchdog_ms;
+    unsigned from_file;
+};
 
 static unsigned g2_d2_was_enabled;
 static unsigned g2_d2_pending_sources;
@@ -597,18 +610,22 @@ static unsigned gen2_d2_enabled(void)
 
 static void gen2_d2_schedule(unsigned source, const char *label)
 {
+    struct gen2_d2_timing timing;
     uint64_t now = monotonic_ms();
-    uint64_t due = now + G2_D2_EVENT_DELAY_MS;
+    uint64_t due;
     uint64_t last_request = 0;
     unsigned active = 0;
     unsigned pending = 0;
     int enabled = gen2_d2_enabled() ? 1 : 0;
 
     if(!enabled) return;
+    gen2_d2_timing_load(&timing);
+    due = now + timing.event_delay_ms;
 
     pthread_mutex_lock(&g2_core_lock);
-    if(g2_d2_last_request_ms && due < g2_d2_last_request_ms + G2_D2_MIN_GAP_MS)
-        due = g2_d2_last_request_ms + G2_D2_MIN_GAP_MS;
+    if(g2_d2_last_request_ms && timing.min_gap_ms &&
+       due < g2_d2_last_request_ms + timing.min_gap_ms)
+        due = g2_d2_last_request_ms + timing.min_gap_ms;
 
     if(g2_resync.state == ALT111_RESYNC_NEED_IDR) {
         ++g2_d2_coalesced;
@@ -627,9 +644,11 @@ static void gen2_d2_schedule(unsigned source, const char *label)
     last_request = g2_d2_last_request_ms;
     pthread_mutex_unlock(&g2_core_lock);
 
-    logf_u2("GEN2 D2 EVENT source=%s action=%s pending=0x%x due_ms=%llu last_request_ms=%llu",
+    logf_u2("GEN2 D2 EVENT source=%s action=%s pending=0x%x due_ms=%llu last_request_ms=%llu delay_ms=%u min_gap_ms=%u timing_source=%s",
             label?label:"unknown",active?"coalesced-active":"scheduled",pending,
-            (unsigned long long)due,(unsigned long long)last_request);
+            (unsigned long long)due,(unsigned long long)last_request,
+            timing.event_delay_ms,timing.min_gap_ms,
+            timing.from_file?"file":"default");
 }
 
 static void capture_publish_status(const char *state)
@@ -769,6 +788,80 @@ static int read_trimmed_value(const char *path, char *out, size_t cap)
                      out[n-1] == ' ' || out[n-1] == '\t'))
         out[--n] = '\0';
     return n > 0 ? 0 : -1;
+}
+
+static void gen2_d2_timing_load(struct gen2_d2_timing *cfg)
+{
+    char b[192];
+    int fd, n;
+    unsigned event_delay, min_gap, watchdog;
+
+    if(!cfg) return;
+    cfg->event_delay_ms = G2_D2_EVENT_DELAY_DEFAULT_MS;
+    cfg->min_gap_ms = G2_D2_MIN_GAP_DEFAULT_MS;
+    cfg->watchdog_ms = G2_D2_WATCHDOG_DEFAULT_MS;
+    cfg->from_file = 0u;
+
+    fd=open(g2_d2_timing_config_path,O_RDONLY);
+    if(fd<0) return;
+    n=(int)read(fd,b,sizeof(b)-1u);
+    close(fd);
+    if(n<=0) return;
+    b[n]='\0';
+
+    if(sscanf(b,"event_delay_ms=%u\nmin_gap_ms=%u\nwatchdog_ms=%u",
+              &event_delay,&min_gap,&watchdog)!=3) return;
+    if(event_delay>G2_D2_EVENT_DELAY_MAX_MS ||
+       min_gap>G2_D2_MIN_GAP_MAX_MS ||
+       watchdog>G2_D2_WATCHDOG_MAX_MS) return;
+
+    cfg->event_delay_ms=event_delay;
+    cfg->min_gap_ms=min_gap;
+    cfg->watchdog_ms=watchdog;
+    cfg->from_file=1u;
+}
+
+static int source_version_is_valid(const char *s)
+{
+    const char *p;
+    unsigned dots=0, digits=0;
+    if(!s || !*s) return 0;
+    for(p=s; *p; ++p){
+        if(*p>='0' && *p<='9'){
+            digits=1u;
+            continue;
+        }
+        if(*p=='.' && digits && p[1]){
+            ++dots;
+            digits=0u;
+            if(dots>3u) return 0;
+            continue;
+        }
+        return 0;
+    }
+    return digits && dots>=1u;
+}
+
+static void source_version_value(char *out, size_t cap,
+                                 unsigned *preserve_stock,
+                                 unsigned *from_file)
+{
+    char b[32];
+    if(!out || cap<2u) return;
+    snprintf(out,cap,"%s",GEN2_SOURCE_VERSION_DEFAULT);
+    if(preserve_stock) *preserve_stock=0u;
+    if(from_file) *from_file=0u;
+
+    if(read_trimmed_value(g_source_version_path,b,sizeof(b))!=0) return;
+    if(strcmp(b,"stock")==0){
+        if(preserve_stock) *preserve_stock=1u;
+        if(from_file) *from_file=1u;
+        snprintf(out,cap,"%s","stock");
+        return;
+    }
+    if(!source_version_is_valid(b)) return;
+    snprintf(out,cap,"%s",b);
+    if(from_file) *from_file=1u;
 }
 
 static void load_safearea_config(int *x, int *y, int *w, int *h)
@@ -2054,6 +2147,21 @@ static void set_str(CFMutableDictionaryRef d, const char *key, const char *val)
     CFStringRef k=s_cf(key), v=s_cf(val); p_CFDictionarySetValue(d,k,v); p_CFRelease(v); p_CFRelease(k);
 }
 
+static void apply_source_version_persona(CFMutableDictionaryRef info)
+{
+    char version[32];
+    unsigned preserve_stock=0u, from_file=0u;
+    if(!info) return;
+    source_version_value(version,sizeof(version),&preserve_stock,&from_file);
+    if(preserve_stock){
+        logf_u2("GEN2 sourceVersion persona=stock source=file");
+        return;
+    }
+    set_str(info,"sourceVersion",version);
+    logf_u2("GEN2 sourceVersion persona=%s source=%s",
+            version,from_file?"file":"default");
+}
+
 static void set_i64(CFMutableDictionaryRef d, const char *key, int64_t val)
 {
     CFStringRef k=s_cf(key); p_CFDictionarySetInt64(d,k,val); p_CFRelease(k);
@@ -2533,7 +2641,8 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
     info=dict_clone(base);
     if(!info)return base;
 
-    /* Reference order: root capability first, display transformation second. */
+    /* Reference order: compatibility/root capability first, display transformation second. */
+    apply_source_version_persona(info);
     apply_airplay_bit26_ab(info);
     set_reference_enabled_features(info);
 
@@ -2683,7 +2792,10 @@ static void gen2_publish_status(void)
     int last_completion_status;
     unsigned d2_enabled, d2_pending_sources;
     unsigned nav_query_enabled;
+    struct gen2_d2_timing d2_timing;
     char nav_url[384];
+    char source_version[32];
+    unsigned source_version_stock=0u, source_version_from_file=0u;
     uint64_t d2_pending_due_ms, d2_last_request_ms, d2_last_idr_ms;
     uint64_t d2_event_triggers, d2_watchdog_triggers, d2_coalesced;
     pthread_mutex_lock(&g2_core_lock);
@@ -2707,6 +2819,9 @@ static void gen2_publish_status(void)
     d2_coalesced = g2_d2_coalesced;
     pthread_mutex_unlock(&g2_core_lock);
     nav_query_enabled = access(g_nav_query_enable_marker,F_OK)==0 ? 1u : 0u;
+    gen2_d2_timing_load(&d2_timing);
+    source_version_value(source_version,sizeof(source_version),
+                         &source_version_stock,&source_version_from_file);
     active_alt_url_copy(nav_url,sizeof(nav_url));
     n = snprintf(b,sizeof(b),
         "gen2=1\ncontrol_session=%llu\ncommand_ready=%u\nprojection_desired=%u\nshown_ack=%u\nreacquiring=%u\n"
@@ -2721,7 +2836,10 @@ static void gen2_publish_status(void)
         "resync_requests=%llu\nresync_retries=%llu\nresync_completions=%llu\nresync_cancels=%llu\n"
         "resync_last_request_ms=%llu\nresync_next_request_ms=%llu\nresync_completed_ms=%llu\n"
         "resync_retry_ms=%u\n"
-        "d2_enabled=%u\nd2_pending_sources=%u\nd2_pending_due_ms=%llu\n"
+        "d2_enabled=%u\nd2_event_delay_ms=%u\nd2_min_gap_ms=%u\nd2_watchdog_ms=%u\n"
+        "d2_watchdog_enabled=%u\nd2_timing_source=%s\nd2_timing_config=%s\n"
+        "source_version_persona=%s\nsource_version_source=%s\n"
+        "d2_pending_sources=%u\nd2_pending_due_ms=%llu\n"
         "d2_last_request_ms=%llu\nd2_last_idr_ms=%llu\n"
         "d2_event_triggers=%llu\nd2_watchdog_triggers=%llu\nd2_coalesced=%llu\n"
         "mode_valid=%u\nmode_sequence=%llu\nmode_screen=%d\nmode_main_audio=%d\n"
@@ -2742,7 +2860,10 @@ static void gen2_publish_status(void)
         (unsigned long long)rs.completions,(unsigned long long)rs.cancels,
         (unsigned long long)rs.last_request_ms,(unsigned long long)rs.next_request_ms,
         (unsigned long long)rs.completed_ms,rs.retry_ms,
-        d2_enabled,d2_pending_sources,(unsigned long long)d2_pending_due_ms,
+        d2_enabled,d2_timing.event_delay_ms,d2_timing.min_gap_ms,d2_timing.watchdog_ms,
+        d2_timing.watchdog_ms?1u:0u,d2_timing.from_file?"file":"default",g2_d2_timing_config_path,
+        source_version,source_version_stock?"stock":(source_version_from_file?"file":"default"),
+        d2_pending_sources,(unsigned long long)d2_pending_due_ms,
         (unsigned long long)d2_last_request_ms,(unsigned long long)d2_last_idr_ms,
         (unsigned long long)d2_event_triggers,(unsigned long long)d2_watchdog_triggers,
         (unsigned long long)d2_coalesced,
@@ -2919,6 +3040,7 @@ static void gen2_resync_snapshot_locked(struct alt111_resync_snapshot *snap)
 static void gen2_resync_poll(void)
 {
     struct alt111_resync_snapshot snap;
+    struct gen2_d2_timing d2_timing;
     enum alt111_resync_action action;
     uint64_t now = monotonic_ms();
     uint64_t epoch = 0, idr_at_arm = 0, source_idrs = 0;
@@ -2935,6 +3057,7 @@ static void gen2_resync_poll(void)
     int keyframe_rc = ALT111_WAIT;
     int changed = 0;
 
+    gen2_d2_timing_load(&d2_timing);
     if(arm) (void)unlink(g2_resync_arm_marker);
 
     pthread_mutex_lock(&g2_core_lock);
@@ -2978,10 +3101,11 @@ static void gen2_resync_poll(void)
                 g2_d2_pending_sources = 0;
                 g2_d2_pending_due_ms = 0;
             }
-        } else if(!g2_d2_pending_sources && g2_d2_last_idr_ms &&
-                  now >= g2_d2_last_idr_ms + G2_D2_WATCHDOG_MS &&
-                  (!g2_d2_last_request_ms ||
-                   now >= g2_d2_last_request_ms + G2_D2_MIN_GAP_MS)) {
+        } else if(!g2_d2_pending_sources && d2_timing.watchdog_ms &&
+                  g2_d2_last_idr_ms &&
+                  now >= g2_d2_last_idr_ms + d2_timing.watchdog_ms &&
+                  (!g2_d2_last_request_ms || !d2_timing.min_gap_ms ||
+                   now >= g2_d2_last_request_ms + d2_timing.min_gap_ms)) {
             auto_reason = ALT111_RESYNC_REASON_WATCHDOG;
             auto_arm_rc = alt111_resync_arm(&g2_resync,now,auto_reason,&snap);
             if(auto_arm_rc == ALT111_OK)
@@ -3041,10 +3165,11 @@ static void gen2_resync_poll(void)
     }
 
     if(auto_arm_rc==ALT111_OK){
-        logf_u2("GEN2 D2 ARM epoch=%llu reason=%u sources=0x%x idr_at_arm=%llu source_idrs=%llu delay_ms=%u watchdog_ms=%u",
+        logf_u2("GEN2 D2 ARM epoch=%llu reason=%u sources=0x%x idr_at_arm=%llu source_idrs=%llu delay_ms=%u watchdog_ms=%u min_gap_ms=%u timing_source=%s",
                 (unsigned long long)epoch,auto_reason,auto_sources,
                 (unsigned long long)idr_at_arm,(unsigned long long)source_idrs,
-                G2_D2_EVENT_DELAY_MS,G2_D2_WATCHDOG_MS);
+                d2_timing.event_delay_ms,d2_timing.watchdog_ms,
+                d2_timing.min_gap_ms,d2_timing.from_file?"file":"default");
     }else if(auto_reason!=ALT111_RESYNC_REASON_NONE && auto_arm_rc!=ALT111_WAIT){
         logf_u2("GEN2 D2 ARM rejected rc=%d reason=%u sources=0x%x projection=%u config=%u primed=%u",
                 auto_arm_rc,auto_reason,auto_sources,
@@ -3830,9 +3955,19 @@ static void altscreen111_init(void)
     logf_u2("GEN2 candidate active: 111=%dx%d@%d physical=%dx%d altPort=%d tee=%d capture=%d URL=%s uuid=%s viewAreas=%d autoShow=%d bit26Mode=%d",
             g_width,g_height,g_fps,g_width_mm,g_height_mm,g_alt_port,g_tee_port,g_capture_port,active_url,g_alt_uuid,
             g_viewareas,g_auto_show,airplay_bit26_mode());
-    logf_u2("GEN2 Candidate-D manual=%s D2_keyframes=%s eventDelayMs=%u watchdogMs=%u minGapMs=%u sessionMarker=%s persistentMarker=%s",
-            access(g2_resync_enable_marker,F_OK)==0 ? "enabled" : "disabled",
-            gen2_d2_enabled() ? "enabled" : "disabled",
-            G2_D2_EVENT_DELAY_MS,G2_D2_WATCHDOG_MS,G2_D2_MIN_GAP_MS,
-            g2_d2_enable_marker,g2_d2_persist_marker);
+    {
+        struct gen2_d2_timing d2_timing;
+        char source_version[32];
+        unsigned source_stock=0u, source_from_file=0u;
+        gen2_d2_timing_load(&d2_timing);
+        source_version_value(source_version,sizeof(source_version),
+                             &source_stock,&source_from_file);
+        logf_u2("GEN2 Candidate-D manual=%s D2_keyframes=%s eventDelayMs=%u watchdogMs=%u minGapMs=%u timingSource=%s timingConfig=%s sourceVersion=%s sourceVersionSource=%s sessionMarker=%s persistentMarker=%s",
+                access(g2_resync_enable_marker,F_OK)==0 ? "enabled" : "disabled",
+                gen2_d2_enabled() ? "enabled" : "disabled",
+                d2_timing.event_delay_ms,d2_timing.watchdog_ms,d2_timing.min_gap_ms,
+                d2_timing.from_file?"file":"default",g2_d2_timing_config_path,
+                source_version,source_stock?"stock":(source_from_file?"file":"default"),
+                g2_d2_enable_marker,g2_d2_persist_marker);
+    }
 }
