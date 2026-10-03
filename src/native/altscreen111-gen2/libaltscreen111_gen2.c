@@ -899,17 +899,12 @@ static void source_version_value(char *out, size_t cap,
 static void load_safearea_config(int *x, int *y, int *w, int *h)
 {
     char b[192];
-    int n;
     int tx=0, ty=0, tw=g_width, th=g_height;
 
     if(!x||!y||!w||!h) return;
     *x=0; *y=0; *w=g_width; *h=g_height;
 
-    {
-        unsigned layer=0u;
-        if(read_layered_value(g_safearea_config_name,b,sizeof(b),&layer)!=0)return;
-        n=(int)strlen(b);
-    }
+    if(read_layered_value(g_safearea_config_name,b,sizeof(b),NULL)!=0)return;
 
     if(sscanf(b,"x=%d\ny=%d\nw=%d\nh=%d",&tx,&ty,&tw,&th)!=4){
         logf_u2("GEN2 SafeArea config invalid; using full canvas");
