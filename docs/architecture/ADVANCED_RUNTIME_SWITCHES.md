@@ -64,6 +64,7 @@ Read-only state/telemetry includes:
 ```text
 /tmp/mibr-alt111-gen2.status
 /tmp/mibr-alt111-capture.status
+/tmp/mibr-alt111-source-timing.status
 /tmp/mibr-carplay111.state
 /tmp/mibr-carplay111.heartbeat
 /tmp/mibr-direct-remux.status
@@ -121,6 +122,7 @@ Runtime helper:
 /mnt/app/root/altscreen-u2/scripts/direct_fps.sh 30
 /mnt/app/root/altscreen-u2/scripts/direct_fps.sh 25
 /mnt/app/root/altscreen-u2/scripts/direct_fps.sh 20
+/mnt/app/root/altscreen-u2/scripts/direct_fps.sh 40
 /mnt/app/root/altscreen-u2/scripts/direct_fps.sh default
 ```
 
@@ -128,12 +130,20 @@ The switch persists the same requested rate for both layers:
 `/mnt/app/root/mibr-direct-output-fps` controls the direct remux/pacer and
 `/mnt/app/root/mibr-carplay111-fps` changes the maxFPS advertised by GEN2 on subsequent `/info`
 responses. The active Direct-VC bridge is restarted immediately. A currently connected CarPlay
-session keeps the rate it already negotiated, so after changing 30 -> 25 or 20, reconnect CarPlay
-before judging the matched source/sink result. No compressed H.264 P-frames are discarded to fake a
-lower frame rate.
+session keeps the rate it already negotiated, so after changing the source maxFPS reconnect CarPlay
+before judging the matched source/sink result. 30 fps remains the reference default; 40 fps is an
+explicit diagnostic option. No compressed H.264 P-frames are discarded to fake a lower frame rate.
 
-Useful remux telemetry is published in `/tmp/mibr-direct-remux.status`, including queue depth,
-underflows, late frames, input inter-arrival time, output interval and maximum output jitter.
+Source timing telemetry can be enabled with the shipped configuration:
+`ALTSCREEN111_TIMING_DEBUG=1`, `ALTSCREEN111_TIMING_INTERVAL_MS=1000` and
+`DIRECT_TELEMETRY=1`. GEN2 then publishes measured accepted-AU cadence, source H.264 bit rate and
+the two **raw/uninterpreted** Stream-111 timestamp words in
+`/tmp/mibr-alt111-source-timing.status`. Auto-Direct correlates these with
+`/tmp/mibr-direct-remux.status` and persists a per-session `telemetry.tsv` plus stable FPS-change
+events.
+
+This is observation only: Apple timestamp words do not yet drive PTS/PCR. See
+`docs/testing/MU1440_SOURCE_TIMING_TELEMETRY.md`.
 
 ## Most20FPS
 

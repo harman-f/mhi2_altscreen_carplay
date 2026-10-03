@@ -28,14 +28,34 @@ load_altscreen_config >/dev/null 2>&1 || true
 
 echo
 echo "=== FRAME PACING ==="
-echo "source_max_fps=${ALTSCREEN111_FPS:-UNKNOWN}"
+EFFECTIVE_SOURCE_FPS=${ALTSCREEN111_FPS:-UNKNOWN}
+if [ -r "$SOURCE_FPS_OVERRIDE_FILE" ]; then
+  V=$(cat "$SOURCE_FPS_OVERRIDE_FILE" 2>/dev/null)
+  case "$V" in 20|25|30|40) EFFECTIVE_SOURCE_FPS=$V ;; esac
+fi
+echo "source_base_fps=${ALTSCREEN111_FPS:-UNKNOWN}"
+echo "source_max_fps=$EFFECTIVE_SOURCE_FPS"
 echo "direct_output_fps=${DIRECT_OUTPUT_FPS:-UNKNOWN}"
 echo "direct_pace=${DIRECT_PACE:-UNKNOWN}"
 echo "direct_pace_buffer=${DIRECT_PACE_BUFFER:-UNKNOWN}"
+echo "source_timing_debug=${ALTSCREEN111_TIMING_DEBUG:-UNKNOWN}"
+echo "source_timing_interval_ms=${ALTSCREEN111_TIMING_INTERVAL_MS:-UNKNOWN}"
+echo "direct_telemetry=${DIRECT_TELEMETRY:-UNKNOWN}"
 [ -r "$DIRECT_FPS_OVERRIDE_FILE" ] && echo "direct_fps_override=$(cat "$DIRECT_FPS_OVERRIDE_FILE" 2>/dev/null)" || echo "direct_fps_override=none"
 [ -r "$SOURCE_FPS_OVERRIDE_FILE" ] && echo "source_fps_override=$(cat "$SOURCE_FPS_OVERRIDE_FILE" 2>/dev/null)" || echo "source_fps_override=none"
+
+echo
+echo "=== SOURCE TIMING ==="
+if [ -r /tmp/mibr-alt111-source-timing.status ]; then
+  cat /tmp/mibr-alt111-source-timing.status
+else
+  echo "source_timing_status=missing"
+fi
+
+echo
+echo "=== REMUX / MOST TIMING ==="
 if [ -r /tmp/mibr-direct-remux.status ]; then
-  grep -E '^(pace_|last_input_interval_us|min_input_interval_us|max_input_interval_us|last_emit_interval_us|max_emit_jitter_us)=' /tmp/mibr-direct-remux.status 2>/dev/null || true
+  grep -E '^(input_bps|most_bps|pace_|last_input_interval_us|min_input_interval_us|max_input_interval_us|last_emit_interval_us|max_emit_jitter_us|write_eagain|write_timeouts|write_errors|last_write_call_us|last_block_wait_us|max_block_wait_us|over20ms_blocks)=' /tmp/mibr-direct-remux.status 2>/dev/null || true
 else
   echo "remux_pace_status=missing"
 fi

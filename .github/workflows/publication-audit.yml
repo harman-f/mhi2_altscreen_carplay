@@ -43,6 +43,9 @@ jobs:
           bash -n runtime/diagnostics/keypanel_note.sh
           grep -Fq '/mnt/app/root/mibr-alt111-keyframe-policy.enabled' runtime/diagnostics/gen2_keyframes.sh
           bash -n runtime/auto-direct/common.sh
+          bash -n runtime/auto-direct/direct_fps.sh
+          bash -n runtime/auto-direct/direct_ts_auto_status.sh
+          bash -n runtime/auto-direct/direct_ts_auto_supervisor.sh
           bash -n runtime/deployment/session.sh
           bash -n runtime/isotx2-gate/install_preload.sh
           bash -n runtime/isotx2-gate/restore_preload.sh
@@ -144,6 +147,10 @@ jobs:
           grep -Fq 'g_fps_override_path = "/mnt/app/root/mibr-carplay111-fps"' src/native/altscreen111-gen2/libaltscreen111_gen2.c
           grep -Fq 'MIBR_PACE="$DIRECT_PACE" MIBR_PACE_BUFFER="$DIRECT_PACE_BUFFER"' runtime/auto-direct/direct_ts_auto_supervisor.sh
           grep -Fq 'DIRECT_FPS=SET fps=$FPS' runtime/auto-direct/direct_fps.sh
+          grep -Fq '20|25|30|40' runtime/auto-direct/direct_fps.sh
+          grep -Fq 'mibr-alt111-source-timing.status' src/native/altscreen111-gen2/libaltscreen111_gen2.c
+          grep -Fq 'telemetry.tsv' runtime/auto-direct/direct_ts_auto_supervisor.sh
+          test -s docs/testing/MU1440_SOURCE_TIMING_TELEMETRY.md
           grep -Fq 'for SPEC in "NavIgnore:MIBR-NavIgnore.jar:$EXPECTED_NAVIGNORE" "Most20:MIBR-Most20FPS.jar:$EXPECTED_MOST20"; do' deployment/mu1440/install.sh
           grep -Fq 'fail "${NAME}_required expected=$EXPECT"' deployment/mu1440/install.sh
           grep -Fq 'fail "${NAME}_lsd_insertion_point_missing"' deployment/mu1440/install.sh

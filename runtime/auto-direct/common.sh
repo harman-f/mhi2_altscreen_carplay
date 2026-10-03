@@ -312,15 +312,18 @@ load_altscreen_config(){
   : ${DIRECT_OUTPUT_FPS:=30}
   : ${DIRECT_PACE:=1}
   : ${DIRECT_PACE_BUFFER:=3}
+  : ${ALTSCREEN111_TIMING_DEBUG:=1}
+  : ${ALTSCREEN111_TIMING_INTERVAL_MS:=1000}
+  : ${DIRECT_TELEMETRY:=1}
   : ${ALTSCREEN111_AUTO_SHOW:=1}
   : ${ALTSCREEN111_URL:=maps:/car/instrumentcluster/map}
 
-  case "$ALTSCREEN111_PORT:$ALTSCREEN111_TEE_PORT:$ALTSCREEN111_WIDTH:$ALTSCREEN111_HEIGHT:$ALTSCREEN111_FPS:$ALTSCREEN111_AUTO_SHOW:$DIRECT_OUTPUT_FPS:$DIRECT_PACE:$DIRECT_PACE_BUFFER" in
+  case "$ALTSCREEN111_PORT:$ALTSCREEN111_TEE_PORT:$ALTSCREEN111_WIDTH:$ALTSCREEN111_HEIGHT:$ALTSCREEN111_FPS:$ALTSCREEN111_AUTO_SHOW:$DIRECT_OUTPUT_FPS:$DIRECT_PACE:$DIRECT_PACE_BUFFER:$ALTSCREEN111_TIMING_DEBUG:$ALTSCREEN111_TIMING_INTERVAL_MS:$DIRECT_TELEMETRY" in
     *[!0-9:]*|'') log "ERROR invalid numeric AltScreen/direct output config"; return 1 ;;
   esac
   case "$DIRECT_OUTPUT_FPS" in
-    20|25|30) ;;
-    *) log "ERROR DIRECT_OUTPUT_FPS must be 20, 25 or 30"; return 1 ;;
+    20|25|30|40) ;;
+    *) log "ERROR DIRECT_OUTPUT_FPS must be 20, 25, 30 or 40"; return 1 ;;
   esac
   case "$DIRECT_PACE" in
     0|1) ;;
@@ -330,10 +333,18 @@ load_altscreen_config(){
     1|2|3|4|5|6) ;;
     *) log "ERROR DIRECT_PACE_BUFFER must be 1..6"; return 1 ;;
   esac
+  case "$ALTSCREEN111_TIMING_DEBUG:$DIRECT_TELEMETRY" in
+    0:0|0:1|1:0|1:1) ;;
+    *) log "ERROR timing/debug switches must be 0 or 1"; return 1 ;;
+  esac
+  case "$ALTSCREEN111_TIMING_INTERVAL_MS" in
+    250|500|1000|2000|5000) ;;
+    *) log "ERROR ALTSCREEN111_TIMING_INTERVAL_MS must be 250, 500, 1000, 2000 or 5000"; return 1 ;;
+  esac
   if [ -r "$DIRECT_FPS_OVERRIDE_FILE" ]; then
     FPS_OVERRIDE=$(cat "$DIRECT_FPS_OVERRIDE_FILE" 2>/dev/null)
     case "$FPS_OVERRIDE" in
-      20|25|30) DIRECT_OUTPUT_FPS=$FPS_OVERRIDE ;;
+      20|25|30|40) DIRECT_OUTPUT_FPS=$FPS_OVERRIDE ;;
       *) log "WARN ignoring invalid direct FPS override: $FPS_OVERRIDE" ;;
     esac
   fi

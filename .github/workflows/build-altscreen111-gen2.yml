@@ -94,6 +94,8 @@ jobs:
           strings "$BIN" | grep -Fq 'mibr-carplay111-nav-query.enabled'
           strings "$BIN" | grep -Fq 'showSpeedLimit=%s&showCompass=%s&showETA=%s&maneuverLayout=%s'
           strings "$BIN" | grep -Fq 'mibr-carplay111-safearea.conf'
+          strings "$BIN" | grep -Fq 'mibr-alt111-source-timing.status'
+          strings "$BIN" | grep -Fq 'source_arrival_fps_x100'
           strings "$BIN" | grep -Fq 'GEN2 RESYNC ARM'
           strings "$BIN" | grep -Fq '/mnt/app/root/mibr-alt111-keyframe-policy.enabled'
           sha256sum "$BIN" > build/gen2/libaltscreen111.so.sha256
