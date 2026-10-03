@@ -13,7 +13,8 @@ fi
 
 # Auto-Direct is U2-owned runtime state. Full restore must make STOCK the
 # fail-safe state before touching the persistent CarPlay preload.
-AUTO_ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
+AUTO_CONFIG=/mnt/app/root/mibr-carplay-autodirect
+AUTO_LEGACY=/mnt/app/root/mibr-carplay-autodirect.enabled
 AUTO_BEGIN="# MIBR AUTO-DIRECT BEGIN"
 AUTO_END="# MIBR AUTO-DIRECT END"
 AUTO_TMP=/tmp/lsd.sh.mibr-autodirect-remove.$$
@@ -27,9 +28,9 @@ else
   rm -f /tmp/mibr-isotx2-gate.direct 2>/dev/null || true
 fi
 
-if [ -e "$AUTO_ENABLED" ] || grep -Fq "$AUTO_BEGIN" /mnt/app/eso/hmi/lsd/lsd.sh 2>/dev/null; then
+if [ -e "$AUTO_CONFIG" ] || grep -Fq "$AUTO_BEGIN" /mnt/app/eso/hmi/lsd/lsd.sh 2>/dev/null; then
   if mount -uw /mnt/app 2>/dev/null; then
-    rm -f "$AUTO_ENABLED" 2>/dev/null || true
+    rm -f "$AUTO_CONFIG" 2>/dev/null || true
     if grep -Fq "$AUTO_BEGIN" /mnt/app/eso/hmi/lsd/lsd.sh 2>/dev/null; then
       awk -v b="$AUTO_BEGIN" -v e="$AUTO_END" '
         $0 == b { skip=1; next }
