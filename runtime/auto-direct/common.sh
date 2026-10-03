@@ -52,6 +52,7 @@ MIBR_CFG_TEMP_ROOT=/tmp
 MIBR_CFG_PERSIST_ROOT=/mnt/app/root
 FPS_CONFIG_NAME=mibr-carplay111-fps
 FRAMING_CONFIG_NAME=mibr-carplay111-framing
+VIDEO_CONFIG_NAME=mibr-carplay111-video.conf
 AUTODIRECT_CONFIG_NAME=mibr-carplay-autodirect
 BACKUP=$CARPLAY_BACKDIR/smartphone_integrator.json.stock
 BACKUP_SHA=$CARPLAY_BACKDIR/smartphone_integrator.json.stock.sha256
@@ -121,6 +122,18 @@ runtime_cfg_bool(){
     0|off|no|false) echo 0 ;;
     *) echo "$DEF" ;;
   esac
+}
+
+runtime_cfg_field(){
+  NAME=$1
+  FIELD=$2
+  DEF=$3
+  V=$(runtime_cfg_get "$NAME" "")
+  if [ -n "$V" ]; then
+    R=$(printf '%s\n' "$V" | awk -F= -v k="$FIELD" '$1==k {print substr($0,index($0,"=")+1); exit}')
+    [ -n "$R" ] && { echo "$R"; return; }
+  fi
+  echo "$DEF"
 }
 
 runtime_require_cmds(){
@@ -364,14 +377,10 @@ load_altscreen_config(){
     20|25|30|40) ;;
     *) log "ERROR DIRECT_OUTPUT_FPS must be 20, 25, 30 or 40"; return 1 ;;
   esac
-  case "$DIRECT_PACE" in
-    0|1) ;;
-    *) log "ERROR DIRECT_PACE must be 0 or 1"; return 1 ;;
-  esac
-  case "$DIRECT_PACE_BUFFER" in
-    1|2|3|4|5|6) ;;
-    *) log "ERROR DIRECT_PACE_BUFFER must be 1..6"; return 1 ;;
-  esac
+  VIDEO_PACE=$(runtime_cfg_field "$VIDEO_CONFIG_NAME" pace "$DIRECT_PACE")
+  VIDEO_BUFFER=$(runtime_cfg_field "$VIDEO_CONFIG_NAME" pace_buffer "$DIRECT_PACE_BUFFER")
+  case "$VIDEO_PACE" in 0|1) DIRECT_PACE=$VIDEO_PACE ;; *) log "WARN invalid video pace override=$VIDEO_PACE" ;; esac
+  case "$VIDEO_BUFFER" in 1|2|3|4|5|6) DIRECT_PACE_BUFFER=$VIDEO_BUFFER ;; *) log "WARN invalid pace_buffer override=$VIDEO_BUFFER" ;; esac
   case "$ALTSCREEN111_TIMING_DEBUG:$DIRECT_TELEMETRY" in
     0:0|0:1|1:0|1:1) ;;
     *) log "ERROR timing/debug switches must be 0 or 1"; return 1 ;;
