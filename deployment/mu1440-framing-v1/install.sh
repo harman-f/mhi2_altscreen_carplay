@@ -82,7 +82,7 @@ check_base(){
   [ "$AH" = "$EXPECTED_AIRPLAY" ] || fail "wrong_target_libairplay=$AH"
   grep -Fq "LD_PRELOAD=$HOOK" "$TARGET" 2>/dev/null ||
     fail "base_carplay_preload_not_active"
-  for F in     "$DST/bin/libaltscreen111.so"     "$DST/bin/direct-ts-remux"     "$DST/scripts/common.sh"     "$DST/scripts/direct_ts_auto_supervisor.sh"     "$DST/scripts/direct_ts_auto_status.sh"     "$DST/scripts/direct_fps.sh"     "$DST/scripts/gen2_keyframes.sh"     "$DST/scripts/direct_ts_auto_start.sh"     "$DST/scripts/direct_ts_auto_watchdog.sh"     "$DST/scripts/direct_ts_auto_enable.sh"     "$DST/scripts/direct_ts_auto_disable.sh"     "$DST/scripts/gen2_nav_config.sh"     "$DST/scripts/gen2_sourceversion.sh"     "$DST/scripts/viewarea_mode.sh"     "$HOOK"; do
+  for F in     "$DST/bin/libaltscreen111.so"     "$DST/bin/direct-ts-remux"     "$DST/scripts/common.sh"     "$DST/scripts/direct_ts_auto_supervisor.sh"     "$DST/scripts/direct_ts_auto_status.sh"     "$DST/scripts/direct_fps.sh"     "$DST/scripts/gen2_keyframes.sh"     "$HOOK"; do
       [ -r "$F" ] || fail "base_file_missing=$F"
   done
 }
