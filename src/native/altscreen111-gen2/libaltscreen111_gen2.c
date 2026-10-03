@@ -97,6 +97,27 @@ typedef struct {
     uint8_t params[15 * 8];
 } AirPlayScreenHeaderCompat;
 
+/*
+ * Diagnostic-only ingress timing. The two Stream-111 timestamp words are kept
+ * raw on purpose: their unit/epoch is not yet proven for MU1440. Arrival
+ * cadence is measured independently with CLOCK_MONOTONIC so 15/20/30/40-fps
+ * transitions can be observed without changing the media path.
+ */
+typedef struct {
+    uint64_t frames_total;
+    uint64_t bytes_total;
+    uint64_t samples;
+    uint64_t window_frames;
+    uint64_t window_bytes;
+    int64_t window_start_us;
+    int64_t last_arrival_us;
+    int64_t last_interval_us;
+    int64_t min_interval_us;
+    int64_t max_interval_us;
+    uint32_t ts_word1;
+    uint32_t ts_word2;
+} mibr_source_timing_t;
+
 typedef OSStatus (*fn_setup_t)(AirPlayReceiverSessionRef, CFDictionaryRef, CFDictionaryRef *);
 typedef OSStatus (*fn_start_t)(AirPlayReceiverSessionRef, void *);
 typedef void (*fn_teardown_t)(AirPlayReceiverSessionRef, CFDictionaryRef, OSStatus, Boolean *);
@@ -227,6 +248,32 @@ static uint64_t g_tee_consumer_generation;
 static pthread_t g_tee_thread;
 static int g_tee_started;
 
+/*
+ * Optional local AU framing. Raw Annex-B remains the default transport.
+ * M1AU v1 is selected only when a new local renderer connects while the
+ * volatile marker exists, so a live TCP connection never changes format.
+ *
+ * Header layout (56 bytes, numeric fields big-endian):
+ *   0x00  char[4]  "M1AU"
+ *   0x04  u16      version = 1
+ *   0x06  u16      header bytes = 56
+ *   0x08  u32      flags: bit0 IDR, bit1 priming(config+IDR)
+ *   0x0c  u32      complete Annex-B AU payload bytes
+ *   0x10  u64      stream generation
+ *   0x18  u64      codec generation
+ *   0x20  u64      consumer generation
+ *   0x28  u64      AU sequence/ordinal
+ *   0x30  u8[8]    raw Stream-111 timestamp bytes, unchanged
+ */
+#define M1AU_HEADER_BYTES 56u
+#define M1AU_FLAG_IDR 0x00000001u
+#define M1AU_FLAG_PRIMING 0x00000002u
+static const char *g_au_framing_marker = "/tmp/mibr-alt111-au-framing.enabled";
+static int g_tee_framed;
+static uint8_t g_tee_frame_header[M1AU_HEADER_BYTES];
+static size_t g_tee_frame_header_off;
+static uint64_t g_tee_frame_header_sequence;
+
 static int g_capture_listen = -1;
 static int g_capture_client = -1;
 static int g_capture_port = 19821;
@@ -276,6 +323,11 @@ static const char *g_log_path = "/tmp/altscreen111.log";
 static const char *g_state_path = "/tmp/mibr-carplay111.state";
 static const char *g_heartbeat_path = "/tmp/mibr-carplay111.heartbeat";
 static const char *g_capture_status_path = "/tmp/mibr-alt111-capture.status";
+static const char *g_source_timing_status_path = "/tmp/mibr-alt111-source-timing.status";
+static const char *g_source_timing_enable_marker = "/tmp/mibr-alt111-source-timing.enabled";
+static const char *g_source_timing_interval_path = "/tmp/mibr-alt111-source-timing-interval-ms";
+static pthread_mutex_t g_source_timing_lock = PTHREAD_MUTEX_INITIALIZER;
+static mibr_source_timing_t g_source_timing;
 static int g_streaming;
 static int g_video_config_seen;
 static uint64_t g_last_heartbeat_ms;
@@ -309,12 +361,25 @@ static const char *g2_resync_enable_marker = "/tmp/mibr-alt111-resync.enabled";
 static const char *g2_resync_arm_marker = "/tmp/mibr-alt111-resync-arm";
 static const char *g2_d2_enable_marker = "/tmp/mibr-alt111-keyframe-policy.enabled";
 static const char *g2_d2_persist_marker = "/mnt/app/root/mibr-alt111-keyframe-policy.enabled";
+static const char *g2_d2_timing_config_path = "/mnt/app/root/mibr-carplay111-keyframes.conf";
+static const char *g_source_version_path = "/mnt/app/root/mibr-carplay111-sourceversion";
 
-#define G2_D2_EVENT_DELAY_MS 250u
-#define G2_D2_MIN_GAP_MS 1000u
-#define G2_D2_WATCHDOG_MS 1000u
+#define G2_D2_EVENT_DELAY_DEFAULT_MS 250u
+#define G2_D2_MIN_GAP_DEFAULT_MS 1000u
+#define G2_D2_WATCHDOG_DEFAULT_MS 1000u
+#define G2_D2_EVENT_DELAY_MAX_MS 5000u
+#define G2_D2_MIN_GAP_MAX_MS 60000u
+#define G2_D2_WATCHDOG_MAX_MS 60000u
+#define GEN2_SOURCE_VERSION_DEFAULT "1005.8.1"
 #define G2_D2_SOURCE_TURNS 0x01u
 #define G2_D2_SOURCE_SUGGEST_UI 0x02u
+
+struct gen2_d2_timing {
+    unsigned event_delay_ms;
+    unsigned min_gap_ms;
+    unsigned watchdog_ms;
+    unsigned from_file;
+};
 
 static unsigned g2_d2_was_enabled;
 static unsigned g2_d2_pending_sources;
@@ -327,6 +392,7 @@ static uint64_t g2_d2_watchdog_triggers;
 static uint64_t g2_d2_coalesced;
 
 static void gen2_publish_status(void);
+static int current_advertised_fps(void);
 static void gen2_control_projection_on(void);
 static void gen2_control_release(void);
 static void gen2_set_command_ready(unsigned ready);
@@ -334,6 +400,10 @@ static void gen2_video_begin_current(void);
 static void gen2_video_end_current(void);
 static void gen2_close_consumer(void);
 static void gen2_resync_poll(void);
+static void gen2_d2_timing_load(struct gen2_d2_timing *cfg);
+static void source_version_value(char *out, size_t cap,
+                                 unsigned *preserve_stock,
+                                 unsigned *from_file);
 static void gen2_d2_schedule(unsigned source, const char *label);
 static void tee_drop_client_locked(void);
 static void capture_drop_client_locked(void);
@@ -368,6 +438,174 @@ static uint64_t monotonic_ms(void)
     return (uint64_t)ts.tv_sec * 1000u + (uint64_t)(ts.tv_nsec / 1000000L);
 }
 
+static int64_t monotonic_us(void)
+{
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
+    return (int64_t)ts.tv_sec * 1000000LL + (int64_t)(ts.tv_nsec / 1000L);
+}
+
+static unsigned source_timing_interval_ms(void)
+{
+    char b[24];
+    int fd, v = 1000;
+    ssize_t n;
+    fd=open(g_source_timing_interval_path,O_RDONLY);
+    if(fd<0)return 1000u;
+    n=read(fd,b,sizeof(b)-1u);
+    close(fd);
+    if(n<=0)return 1000u;
+    b[n]='\0';
+    v=atoi(b);
+    if(v<250||v>5000)return 1000u;
+    return (unsigned)v;
+}
+
+static void source_timing_reset(void)
+{
+    pthread_mutex_lock(&g_source_timing_lock);
+    memset(&g_source_timing,0,sizeof(g_source_timing));
+    pthread_mutex_unlock(&g_source_timing_lock);
+    (void)unlink(g_source_timing_status_path);
+}
+
+static void source_timing_write_locked(const char *state, int64_t now_us)
+{
+    char b[1024], tmp[160];
+    int fd, n;
+    int64_t elapsed_us;
+    uint64_t fps_x100 = 0, bps = 0;
+
+    elapsed_us = g_source_timing.window_start_us > 0 ?
+        now_us - g_source_timing.window_start_us : 0;
+    if(elapsed_us > 0 && g_source_timing.window_frames > 1) {
+        /*
+         * The elapsed interval runs from the first frame arrival to the latest
+         * frame arrival, so N frames contain N-1 frame intervals. Counting N
+         * here would bias a one-second 30-fps window upward by roughly 1 fps.
+         */
+        fps_x100 = ((g_source_timing.window_frames - 1u) * 100000000ULL) /
+                   (uint64_t)elapsed_us;
+        /*
+         * window_bytes intentionally excludes the first frame in the window;
+         * it therefore measures bytes that arrived during this exact interval.
+         */
+        bps = (g_source_timing.window_bytes * 8000000ULL) /
+              (uint64_t)elapsed_us;
+    }
+
+    n=snprintf(b,sizeof(b),
+        "state=%s\n"
+        "sample_seq=%llu\n"
+        "configured_max_fps=%d\n"
+        "frames_total=%llu\n"
+        "bytes_total=%llu\n"
+        "window_elapsed_us=%lld\n"
+        "window_frames=%llu\n"
+        "window_bytes=%llu\n"
+        "source_arrival_fps_x100=%llu\n"
+        "source_input_bps=%llu\n"
+        "source_arrival_last_us=%lld\n"
+        "source_arrival_min_us=%lld\n"
+        "source_arrival_max_us=%lld\n"
+        "source_ts_word1=0x%08x\n"
+        "source_ts_word2=0x%08x\n",
+        state?state:"running",
+        (unsigned long long)g_source_timing.samples,
+        current_advertised_fps(),
+        (unsigned long long)g_source_timing.frames_total,
+        (unsigned long long)g_source_timing.bytes_total,
+        (long long)elapsed_us,
+        (unsigned long long)g_source_timing.window_frames,
+        (unsigned long long)g_source_timing.window_bytes,
+        (unsigned long long)fps_x100,
+        (unsigned long long)bps,
+        (long long)g_source_timing.last_interval_us,
+        (long long)g_source_timing.min_interval_us,
+        (long long)g_source_timing.max_interval_us,
+        (unsigned)g_source_timing.ts_word1,
+        (unsigned)g_source_timing.ts_word2);
+    if(n<=0)return;
+    if((size_t)n>=sizeof(b))n=(int)sizeof(b)-1;
+    snprintf(tmp,sizeof(tmp),"%s.tmp.%d",g_source_timing_status_path,(int)getpid());
+    fd=open(tmp,O_WRONLY|O_CREAT|O_TRUNC,0644);
+    if(fd<0)return;
+    if(write(fd,b,(size_t)n)==(ssize_t)n){
+        close(fd);
+        if(rename(tmp,g_source_timing_status_path)==0)return;
+    } else {
+        close(fd);
+    }
+    (void)unlink(tmp);
+    fd=open(g_source_timing_status_path,O_WRONLY|O_CREAT|O_TRUNC,0644);
+    if(fd>=0){(void)write(fd,b,(size_t)n);close(fd);}
+}
+
+static void source_timing_note_frame(const AirPlayScreenHeaderCompat *h, size_t bytes)
+{
+    int64_t now_us, dt;
+    uint32_t w1=0, w2=0;
+    unsigned interval_ms;
+
+    if(!h)return;
+    now_us=monotonic_us();
+    memcpy(&w1,h->params,sizeof(w1));
+    memcpy(&w2,h->params+4,sizeof(w2));
+
+    pthread_mutex_lock(&g_source_timing_lock);
+    if(g_source_timing.window_start_us==0){
+        g_source_timing.window_start_us=now_us;
+        g_source_timing.window_frames=1u;
+        g_source_timing.window_bytes=0u;
+    } else {
+        ++g_source_timing.window_frames;
+        /* Bytes for frame 2..N span the measured first->last arrival interval. */
+        g_source_timing.window_bytes+=(uint64_t)bytes;
+    }
+    if(g_source_timing.last_arrival_us>0){
+        dt=now_us-g_source_timing.last_arrival_us;
+        g_source_timing.last_interval_us=dt;
+        if(g_source_timing.min_interval_us==0||dt<g_source_timing.min_interval_us)
+            g_source_timing.min_interval_us=dt;
+        if(dt>g_source_timing.max_interval_us)g_source_timing.max_interval_us=dt;
+    }
+    g_source_timing.last_arrival_us=now_us;
+    ++g_source_timing.frames_total;
+    g_source_timing.bytes_total+=(uint64_t)bytes;
+    g_source_timing.ts_word1=w1;
+    g_source_timing.ts_word2=w2;
+
+    interval_ms=source_timing_interval_ms();
+    if(access(g_source_timing_enable_marker,F_OK)==0 &&
+       now_us-g_source_timing.window_start_us >= (int64_t)interval_ms*1000LL){
+        ++g_source_timing.samples;
+        source_timing_write_locked("running",now_us);
+        g_source_timing.window_frames=0;
+        g_source_timing.window_bytes=0;
+        /* Next accepted frame becomes the exact start of the next window. */
+        g_source_timing.window_start_us=0;
+        g_source_timing.min_interval_us=0;
+        g_source_timing.max_interval_us=0;
+    }
+    pthread_mutex_unlock(&g_source_timing_lock);
+}
+
+static void source_timing_finish(void)
+{
+    int64_t now_us=monotonic_us();
+    pthread_mutex_lock(&g_source_timing_lock);
+    /*
+     * Do not overwrite the most recent useful cadence snapshot with an empty
+     * zero-rate window when the stream disconnects while static/idle.
+     */
+    if(access(g_source_timing_enable_marker,F_OK)==0 &&
+       g_source_timing.window_frames>1){
+        ++g_source_timing.samples;
+        source_timing_write_locked("disconnected",now_us);
+    }
+    pthread_mutex_unlock(&g_source_timing_lock);
+}
+
 static unsigned gen2_d2_enabled(void)
 {
     return (access(g2_d2_enable_marker,F_OK)==0 ||
@@ -376,18 +614,22 @@ static unsigned gen2_d2_enabled(void)
 
 static void gen2_d2_schedule(unsigned source, const char *label)
 {
+    struct gen2_d2_timing timing;
     uint64_t now = monotonic_ms();
-    uint64_t due = now + G2_D2_EVENT_DELAY_MS;
+    uint64_t due;
     uint64_t last_request = 0;
     unsigned active = 0;
     unsigned pending = 0;
     int enabled = gen2_d2_enabled() ? 1 : 0;
 
     if(!enabled) return;
+    gen2_d2_timing_load(&timing);
+    due = now + timing.event_delay_ms;
 
     pthread_mutex_lock(&g2_core_lock);
-    if(g2_d2_last_request_ms && due < g2_d2_last_request_ms + G2_D2_MIN_GAP_MS)
-        due = g2_d2_last_request_ms + G2_D2_MIN_GAP_MS;
+    if(g2_d2_last_request_ms && timing.min_gap_ms &&
+       due < g2_d2_last_request_ms + timing.min_gap_ms)
+        due = g2_d2_last_request_ms + timing.min_gap_ms;
 
     if(g2_resync.state == ALT111_RESYNC_NEED_IDR) {
         ++g2_d2_coalesced;
@@ -406,9 +648,11 @@ static void gen2_d2_schedule(unsigned source, const char *label)
     last_request = g2_d2_last_request_ms;
     pthread_mutex_unlock(&g2_core_lock);
 
-    logf_u2("GEN2 D2 EVENT source=%s action=%s pending=0x%x due_ms=%llu last_request_ms=%llu",
+    logf_u2("GEN2 D2 EVENT source=%s action=%s pending=0x%x due_ms=%llu last_request_ms=%llu delay_ms=%u min_gap_ms=%u timing_source=%s",
             label?label:"unknown",active?"coalesced-active":"scheduled",pending,
-            (unsigned long long)due,(unsigned long long)last_request);
+            (unsigned long long)due,(unsigned long long)last_request,
+            timing.event_delay_ms,timing.min_gap_ms,
+            timing.from_file?"file":"default");
 }
 
 static void capture_publish_status(const char *state)
@@ -548,6 +792,80 @@ static int read_trimmed_value(const char *path, char *out, size_t cap)
                      out[n-1] == ' ' || out[n-1] == '\t'))
         out[--n] = '\0';
     return n > 0 ? 0 : -1;
+}
+
+static void gen2_d2_timing_load(struct gen2_d2_timing *cfg)
+{
+    char b[192];
+    int fd, n;
+    unsigned event_delay, min_gap, watchdog;
+
+    if(!cfg) return;
+    cfg->event_delay_ms = G2_D2_EVENT_DELAY_DEFAULT_MS;
+    cfg->min_gap_ms = G2_D2_MIN_GAP_DEFAULT_MS;
+    cfg->watchdog_ms = G2_D2_WATCHDOG_DEFAULT_MS;
+    cfg->from_file = 0u;
+
+    fd=open(g2_d2_timing_config_path,O_RDONLY);
+    if(fd<0) return;
+    n=(int)read(fd,b,sizeof(b)-1u);
+    close(fd);
+    if(n<=0) return;
+    b[n]='\0';
+
+    if(sscanf(b,"event_delay_ms=%u\nmin_gap_ms=%u\nwatchdog_ms=%u",
+              &event_delay,&min_gap,&watchdog)!=3) return;
+    if(event_delay>G2_D2_EVENT_DELAY_MAX_MS ||
+       min_gap>G2_D2_MIN_GAP_MAX_MS ||
+       watchdog>G2_D2_WATCHDOG_MAX_MS) return;
+
+    cfg->event_delay_ms=event_delay;
+    cfg->min_gap_ms=min_gap;
+    cfg->watchdog_ms=watchdog;
+    cfg->from_file=1u;
+}
+
+static int source_version_is_valid(const char *s)
+{
+    const char *p;
+    unsigned dots=0, digits=0;
+    if(!s || !*s) return 0;
+    for(p=s; *p; ++p){
+        if(*p>='0' && *p<='9'){
+            digits=1u;
+            continue;
+        }
+        if(*p=='.' && digits && p[1]){
+            ++dots;
+            digits=0u;
+            if(dots>3u) return 0;
+            continue;
+        }
+        return 0;
+    }
+    return digits && dots>=1u;
+}
+
+static void source_version_value(char *out, size_t cap,
+                                 unsigned *preserve_stock,
+                                 unsigned *from_file)
+{
+    char b[32];
+    if(!out || cap<2u) return;
+    snprintf(out,cap,"%s",GEN2_SOURCE_VERSION_DEFAULT);
+    if(preserve_stock) *preserve_stock=0u;
+    if(from_file) *from_file=0u;
+
+    if(read_trimmed_value(g_source_version_path,b,sizeof(b))!=0) return;
+    if(strcmp(b,"stock")==0){
+        if(preserve_stock) *preserve_stock=1u;
+        if(from_file) *from_file=1u;
+        snprintf(out,cap,"%s","stock");
+        return;
+    }
+    if(!source_version_is_valid(b)) return;
+    snprintf(out,cap,"%s",b);
+    if(from_file) *from_file=1u;
 }
 
 static void load_safearea_config(int *x, int *y, int *w, int *h)
@@ -932,7 +1250,7 @@ static int current_advertised_fps(void)
     if(n<=0)return g_fps;
     b[n]='\0';
     v=atoi(b);
-    if(v==20||v==25||v==30)return v;
+    if(v==20||v==25||v==30||v==40)return v;
     return g_fps;
 }
 
@@ -1150,7 +1468,9 @@ static int gen2_video_config(const uint8_t *p, size_t n)
     return rc;
 }
 
-static int gen2_video_submit_au(const uint8_t *p, size_t n, int *accepted, int *consumer_attached)
+static int gen2_video_submit_au(const uint8_t *p, size_t n,
+                                const uint8_t source_ts_raw[8],
+                                int *accepted, int *consumer_attached)
 {
     int rc;
     uint64_t before, after_count;
@@ -1158,7 +1478,9 @@ static int gen2_video_submit_au(const uint8_t *p, size_t n, int *accepted, int *
     if (consumer_attached) *consumer_attached = 0;
     pthread_mutex_lock(&g2_core_lock);
     before = g2_video.source_aus;
-    rc = g2_video_stream ? alt111_video_submit(&g2_video, g2_video_stream, p, n, 1) : ALT111_STALE;
+    rc = g2_video_stream ? alt111_video_submit_timed(&g2_video, g2_video_stream,
+                                                     p, n, 1, source_ts_raw)
+                         : ALT111_STALE;
     after_count = g2_video.source_aus;
     if (accepted && after_count > before) *accepted = 1;
     if (consumer_attached) *consumer_attached = g2_video.attached ? 1 : 0;
@@ -1204,6 +1526,44 @@ static void gen2_consumer_attach(void)
     gen2_publish_status();
 }
 
+static void m1au_put_be16(uint8_t *p, uint16_t v)
+{
+    p[0]=(uint8_t)(v>>8); p[1]=(uint8_t)v;
+}
+
+static void m1au_put_be32(uint8_t *p, uint32_t v)
+{
+    p[0]=(uint8_t)(v>>24); p[1]=(uint8_t)(v>>16);
+    p[2]=(uint8_t)(v>>8); p[3]=(uint8_t)v;
+}
+
+static void m1au_put_be64(uint8_t *p, uint64_t v)
+{
+    unsigned i;
+    for(i=0;i<8u;++i)p[i]=(uint8_t)(v>>(56u-(i*8u)));
+}
+
+static void m1au_prepare_header_locked(const struct alt111_output_ticket *ticket,
+                                       size_t payload_bytes)
+{
+    uint32_t flags=0;
+    memset(g_tee_frame_header,0,sizeof(g_tee_frame_header));
+    memcpy(g_tee_frame_header,"M1AU",4u);
+    m1au_put_be16(g_tee_frame_header+4u,1u);
+    m1au_put_be16(g_tee_frame_header+6u,(uint16_t)M1AU_HEADER_BYTES);
+    if(ticket->idr)flags|=M1AU_FLAG_IDR;
+    if(ticket->priming)flags|=M1AU_FLAG_PRIMING;
+    m1au_put_be32(g_tee_frame_header+8u,flags);
+    m1au_put_be32(g_tee_frame_header+12u,(uint32_t)payload_bytes);
+    m1au_put_be64(g_tee_frame_header+16u,ticket->stream);
+    m1au_put_be64(g_tee_frame_header+24u,ticket->codec);
+    m1au_put_be64(g_tee_frame_header+32u,ticket->consumer);
+    m1au_put_be64(g_tee_frame_header+40u,ticket->sequence);
+    memcpy(g_tee_frame_header+48u,ticket->source_ts_raw,8u);
+    g_tee_frame_header_off=0;
+    g_tee_frame_header_sequence=ticket->sequence;
+}
+
 static void *gen2_output_worker(void *arg)
 {
     uint8_t *copy = NULL;
@@ -1215,6 +1575,7 @@ static void *gen2_output_worker(void *arg)
         size_t n = 0, chunk = 0;
         struct alt111_output_ticket ticket;
         int prc, fd, send_failed = 0, would_block = 0, stale_socket = 0;
+        int header_pending = 0;
         int arc = ALT111_WAIT, primed_before = 0, primed_after = 0;
         uint64_t delivered_before = 0, delivered_after = 0;
         ssize_t sent = 0;
@@ -1258,15 +1619,48 @@ static void *gen2_output_worker(void *arg)
         if (fd >= 0 && g_tee_consumer_generation != ticket.consumer) {
             stale_socket = 1;
         } else if (fd >= 0) {
-            do {
-                sent = send(fd, copy, chunk, MSG_NOSIGNAL);
-            } while (sent < 0 && errno == EINTR);
+            if (g_tee_framed) {
+                if (g_tee_frame_header_sequence != ticket.sequence) {
+                    if (ticket.offset != 0) {
+                        logf_u2("M1AU invariant failure sequence=%llu offset=%zu; dropping renderer",
+                                (unsigned long long)ticket.sequence,ticket.offset);
+                        tee_drop_client_locked();
+                        send_failed = 1;
+                    } else {
+                        m1au_prepare_header_locked(&ticket,n);
+                    }
+                }
+                if (!send_failed && g_tee_frame_header_off < M1AU_HEADER_BYTES) {
+                    size_t remain=M1AU_HEADER_BYTES-g_tee_frame_header_off;
+                    do {
+                        sent=send(fd,g_tee_frame_header+g_tee_frame_header_off,
+                                  remain,MSG_NOSIGNAL);
+                    } while(sent<0 && errno==EINTR);
+                    if(sent>0) {
+                        g_tee_frame_header_off+=(size_t)sent;
+                        sent=0; /* header bytes never advance the AU payload */
+                        if(g_tee_frame_header_off<M1AU_HEADER_BYTES)header_pending=1;
+                    } else if(sent<0 && (errno==EAGAIN || errno==EWOULDBLOCK)) {
+                        would_block=1;
+                    } else {
+                        tee_drop_client_locked();
+                        send_failed=1;
+                    }
+                }
+            }
 
-            if (sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                would_block = 1;
-            } else if (sent <= 0) {
-                tee_drop_client_locked();
-                send_failed = 1;
+            if (!send_failed && !would_block && !header_pending &&
+                (!g_tee_framed || g_tee_frame_header_off==M1AU_HEADER_BYTES)) {
+                do {
+                    sent = send(fd, copy, chunk, MSG_NOSIGNAL);
+                } while (sent < 0 && errno == EINTR);
+
+                if (sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                    would_block = 1;
+                } else if (sent <= 0) {
+                    tee_drop_client_locked();
+                    send_failed = 1;
+                }
             }
         } else {
             send_failed = 1;
@@ -1279,9 +1673,9 @@ static void *gen2_output_worker(void *arg)
             continue;
         }
 
-        if (would_block) {
+        if (would_block || header_pending) {
             pthread_mutex_unlock(&g2_core_lock);
-            usleep(5000);
+            usleep(header_pending ? 1000 : 5000);
             continue;
         }
 
@@ -1347,6 +1741,10 @@ static void tee_drop_client_locked(void)
     if (g_tee_client >= 0) close(g_tee_client);
     g_tee_client = -1;
     g_tee_consumer_generation = 0;
+    g_tee_framed = 0;
+    g_tee_frame_header_off = 0;
+    g_tee_frame_header_sequence = 0;
+    memset(g_tee_frame_header,0,sizeof(g_tee_frame_header));
 }
 
 static void capture_drop_client_locked(void)
@@ -1414,8 +1812,12 @@ static void *tee_accept_thread(void *arg)
         pthread_mutex_lock(&g_lock);
         tee_drop_client_locked();
         g_tee_client = c;
+        g_tee_framed = access(g_au_framing_marker,F_OK)==0 ? 1 : 0;
+        g_tee_frame_header_off = 0;
+        g_tee_frame_header_sequence = 0;
         pthread_mutex_unlock(&g_lock);
-        logf_u2("gen2 renderer connected nonblocking on 127.0.0.1:%d; waiting for config+complete IDR", g_tee_port);
+        logf_u2("gen2 renderer connected nonblocking on 127.0.0.1:%d mode=%s; waiting for config+complete IDR",
+                g_tee_port,g_tee_framed?"m1au-v1":"raw-annexb");
         gen2_consumer_attach();
     }
     return NULL;
@@ -1626,8 +2028,10 @@ static void *alt_receiver_thread(void *arg)
                     }
                     {
                         int accepted = 0, consumer_attached = 0;
-                        int vrc = gen2_video_submit_au(body, h.bodySize, &accepted, &consumer_attached);
+                        int vrc = gen2_video_submit_au(body, h.bodySize, h.params,
+                                                       &accepted, &consumer_attached);
                         if (accepted) {
+                            source_timing_note_frame(&h,h.bodySize);
                             if (!g_streaming) {
                                 g_streaming = 1;
                                 publish_state("streaming");
@@ -1663,6 +2067,7 @@ static void *alt_receiver_thread(void *arg)
     }
 done:
     logf_u2("AltScreen stream 111 disconnected");
+    source_timing_finish();
     clear_video_observer();
     publish_state("disconnected");
     pthread_mutex_lock(&g_lock);
@@ -1687,6 +2092,7 @@ static int start_alt_receiver(uint64_t connection_id)
     /* Complete previous worker teardown before reusing global session state. */
     stop_alt_receiver();
     clear_video_observer();
+    source_timing_reset();
 
     /* Start the core generation before taking g_lock: gen2_video_begin_current()
      * deliberately closes/reset the local consumer and therefore takes g_lock. */
@@ -1743,6 +2149,21 @@ static int start_alt_receiver(uint64_t connection_id)
 static void set_str(CFMutableDictionaryRef d, const char *key, const char *val)
 {
     CFStringRef k=s_cf(key), v=s_cf(val); p_CFDictionarySetValue(d,k,v); p_CFRelease(v); p_CFRelease(k);
+}
+
+static void apply_source_version_persona(CFMutableDictionaryRef info)
+{
+    char version[32];
+    unsigned preserve_stock=0u, from_file=0u;
+    if(!info) return;
+    source_version_value(version,sizeof(version),&preserve_stock,&from_file);
+    if(preserve_stock){
+        logf_u2("GEN2 sourceVersion persona=stock source=file");
+        return;
+    }
+    set_str(info,"sourceVersion",version);
+    logf_u2("GEN2 sourceVersion persona=%s source=%s",
+            version,from_file?"file":"default");
 }
 
 static void set_i64(CFMutableDictionaryRef d, const char *key, int64_t val)
@@ -2224,7 +2645,8 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
     info=dict_clone(base);
     if(!info)return base;
 
-    /* Reference order: root capability first, display transformation second. */
+    /* Reference order: compatibility/root capability first, display transformation second. */
+    apply_source_version_persona(info);
     apply_airplay_bit26_ab(info);
     set_reference_enabled_features(info);
 
@@ -2374,7 +2796,10 @@ static void gen2_publish_status(void)
     int last_completion_status;
     unsigned d2_enabled, d2_pending_sources;
     unsigned nav_query_enabled;
+    struct gen2_d2_timing d2_timing;
     char nav_url[384];
+    char source_version[32];
+    unsigned source_version_stock=0u, source_version_from_file=0u;
     uint64_t d2_pending_due_ms, d2_last_request_ms, d2_last_idr_ms;
     uint64_t d2_event_triggers, d2_watchdog_triggers, d2_coalesced;
     pthread_mutex_lock(&g2_core_lock);
@@ -2398,6 +2823,9 @@ static void gen2_publish_status(void)
     d2_coalesced = g2_d2_coalesced;
     pthread_mutex_unlock(&g2_core_lock);
     nav_query_enabled = access(g_nav_query_enable_marker,F_OK)==0 ? 1u : 0u;
+    gen2_d2_timing_load(&d2_timing);
+    source_version_value(source_version,sizeof(source_version),
+                         &source_version_stock,&source_version_from_file);
     active_alt_url_copy(nav_url,sizeof(nav_url));
     n = snprintf(b,sizeof(b),
         "gen2=1\ncontrol_session=%llu\ncommand_ready=%u\nprojection_desired=%u\nshown_ack=%u\nreacquiring=%u\n"
@@ -2412,7 +2840,10 @@ static void gen2_publish_status(void)
         "resync_requests=%llu\nresync_retries=%llu\nresync_completions=%llu\nresync_cancels=%llu\n"
         "resync_last_request_ms=%llu\nresync_next_request_ms=%llu\nresync_completed_ms=%llu\n"
         "resync_retry_ms=%u\n"
-        "d2_enabled=%u\nd2_pending_sources=%u\nd2_pending_due_ms=%llu\n"
+        "d2_enabled=%u\nd2_event_delay_ms=%u\nd2_min_gap_ms=%u\nd2_watchdog_ms=%u\n"
+        "d2_watchdog_enabled=%u\nd2_timing_source=%s\nd2_timing_config=%s\n"
+        "source_version_persona=%s\nsource_version_source=%s\n"
+        "d2_pending_sources=%u\nd2_pending_due_ms=%llu\n"
         "d2_last_request_ms=%llu\nd2_last_idr_ms=%llu\n"
         "d2_event_triggers=%llu\nd2_watchdog_triggers=%llu\nd2_coalesced=%llu\n"
         "mode_valid=%u\nmode_sequence=%llu\nmode_screen=%d\nmode_main_audio=%d\n"
@@ -2433,7 +2864,10 @@ static void gen2_publish_status(void)
         (unsigned long long)rs.completions,(unsigned long long)rs.cancels,
         (unsigned long long)rs.last_request_ms,(unsigned long long)rs.next_request_ms,
         (unsigned long long)rs.completed_ms,rs.retry_ms,
-        d2_enabled,d2_pending_sources,(unsigned long long)d2_pending_due_ms,
+        d2_enabled,d2_timing.event_delay_ms,d2_timing.min_gap_ms,d2_timing.watchdog_ms,
+        d2_timing.watchdog_ms?1u:0u,d2_timing.from_file?"file":"default",g2_d2_timing_config_path,
+        source_version,source_version_stock?"stock":(source_version_from_file?"file":"default"),
+        d2_pending_sources,(unsigned long long)d2_pending_due_ms,
         (unsigned long long)d2_last_request_ms,(unsigned long long)d2_last_idr_ms,
         (unsigned long long)d2_event_triggers,(unsigned long long)d2_watchdog_triggers,
         (unsigned long long)d2_coalesced,
@@ -2610,6 +3044,7 @@ static void gen2_resync_snapshot_locked(struct alt111_resync_snapshot *snap)
 static void gen2_resync_poll(void)
 {
     struct alt111_resync_snapshot snap;
+    struct gen2_d2_timing d2_timing;
     enum alt111_resync_action action;
     uint64_t now = monotonic_ms();
     uint64_t epoch = 0, idr_at_arm = 0, source_idrs = 0;
@@ -2626,6 +3061,7 @@ static void gen2_resync_poll(void)
     int keyframe_rc = ALT111_WAIT;
     int changed = 0;
 
+    gen2_d2_timing_load(&d2_timing);
     if(arm) (void)unlink(g2_resync_arm_marker);
 
     pthread_mutex_lock(&g2_core_lock);
@@ -2669,10 +3105,11 @@ static void gen2_resync_poll(void)
                 g2_d2_pending_sources = 0;
                 g2_d2_pending_due_ms = 0;
             }
-        } else if(!g2_d2_pending_sources && g2_d2_last_idr_ms &&
-                  now >= g2_d2_last_idr_ms + G2_D2_WATCHDOG_MS &&
-                  (!g2_d2_last_request_ms ||
-                   now >= g2_d2_last_request_ms + G2_D2_MIN_GAP_MS)) {
+        } else if(!g2_d2_pending_sources && d2_timing.watchdog_ms &&
+                  g2_d2_last_idr_ms &&
+                  now >= g2_d2_last_idr_ms + d2_timing.watchdog_ms &&
+                  (!g2_d2_last_request_ms || !d2_timing.min_gap_ms ||
+                   now >= g2_d2_last_request_ms + d2_timing.min_gap_ms)) {
             auto_reason = ALT111_RESYNC_REASON_WATCHDOG;
             auto_arm_rc = alt111_resync_arm(&g2_resync,now,auto_reason,&snap);
             if(auto_arm_rc == ALT111_OK)
@@ -2732,10 +3169,11 @@ static void gen2_resync_poll(void)
     }
 
     if(auto_arm_rc==ALT111_OK){
-        logf_u2("GEN2 D2 ARM epoch=%llu reason=%u sources=0x%x idr_at_arm=%llu source_idrs=%llu delay_ms=%u watchdog_ms=%u",
+        logf_u2("GEN2 D2 ARM epoch=%llu reason=%u sources=0x%x idr_at_arm=%llu source_idrs=%llu delay_ms=%u watchdog_ms=%u min_gap_ms=%u timing_source=%s",
                 (unsigned long long)epoch,auto_reason,auto_sources,
                 (unsigned long long)idr_at_arm,(unsigned long long)source_idrs,
-                G2_D2_EVENT_DELAY_MS,G2_D2_WATCHDOG_MS);
+                d2_timing.event_delay_ms,d2_timing.watchdog_ms,
+                d2_timing.min_gap_ms,d2_timing.from_file?"file":"default");
     }else if(auto_reason!=ALT111_RESYNC_REASON_NONE && auto_arm_rc!=ALT111_WAIT){
         logf_u2("GEN2 D2 ARM rejected rc=%d reason=%u sources=0x%x projection=%u config=%u primed=%u",
                 auto_arm_rc,auto_reason,auto_sources,
@@ -3521,9 +3959,19 @@ static void altscreen111_init(void)
     logf_u2("GEN2 candidate active: 111=%dx%d@%d physical=%dx%d altPort=%d tee=%d capture=%d URL=%s uuid=%s viewAreas=%d autoShow=%d bit26Mode=%d",
             g_width,g_height,g_fps,g_width_mm,g_height_mm,g_alt_port,g_tee_port,g_capture_port,active_url,g_alt_uuid,
             g_viewareas,g_auto_show,airplay_bit26_mode());
-    logf_u2("GEN2 Candidate-D manual=%s D2_keyframes=%s eventDelayMs=%u watchdogMs=%u minGapMs=%u sessionMarker=%s persistentMarker=%s",
-            access(g2_resync_enable_marker,F_OK)==0 ? "enabled" : "disabled",
-            gen2_d2_enabled() ? "enabled" : "disabled",
-            G2_D2_EVENT_DELAY_MS,G2_D2_WATCHDOG_MS,G2_D2_MIN_GAP_MS,
-            g2_d2_enable_marker,g2_d2_persist_marker);
+    {
+        struct gen2_d2_timing d2_timing;
+        char source_version[32];
+        unsigned source_stock=0u, source_from_file=0u;
+        gen2_d2_timing_load(&d2_timing);
+        source_version_value(source_version,sizeof(source_version),
+                             &source_stock,&source_from_file);
+        logf_u2("GEN2 Candidate-D manual=%s D2_keyframes=%s eventDelayMs=%u watchdogMs=%u minGapMs=%u timingSource=%s timingConfig=%s sourceVersion=%s sourceVersionSource=%s sessionMarker=%s persistentMarker=%s",
+                access(g2_resync_enable_marker,F_OK)==0 ? "enabled" : "disabled",
+                gen2_d2_enabled() ? "enabled" : "disabled",
+                d2_timing.event_delay_ms,d2_timing.watchdog_ms,d2_timing.min_gap_ms,
+                d2_timing.from_file?"file":"default",g2_d2_timing_config_path,
+                source_version,source_stock?"stock":(source_from_file?"file":"default"),
+                g2_d2_enable_marker,g2_d2_persist_marker);
+    }
 }

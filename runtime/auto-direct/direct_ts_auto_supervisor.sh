@@ -12,6 +12,11 @@ AUTOSTATE=/tmp/mibr-direct-auto.state
 SOURCE_STATE=/tmp/mibr-carplay111.state
 SOURCE_HB=/tmp/mibr-carplay111.heartbeat
 GATE_STATS=/tmp/mibr-isotx2-gate.stats
+SOURCE_TIMING_STATUS=/tmp/mibr-alt111-source-timing.status
+SOURCE_TIMING_ENABLE=/tmp/mibr-alt111-source-timing.enabled
+SOURCE_TIMING_INTERVAL=/tmp/mibr-alt111-source-timing-interval-ms
+REMUX_STATUS=/tmp/mibr-direct-remux.status
+AU_FRAMING_MARKER=/tmp/mibr-alt111-au-framing.enabled
 GATE=$BASE/scripts/writev_gate.sh
 BRIDGE=$BASE/bin/direct-ts-remux
 BRIDGE_PID=""
@@ -21,6 +26,120 @@ SESSION=0
 
 auto_log(){
   direct_log "AUTO-DIRECT $*"
+}
+
+status_value(){
+  F=$1
+  K=$2
+  [ -r "$F" ] || return 1
+  awk -F= -v k="$K" '$1==k { print substr($0,index($0,"=")+1); exit }' "$F" 2>/dev/null
+}
+
+fps_bucket(){
+  V=${1:-0}
+  case "$V" in *[!0-9]*|'') echo 0; return ;; esac
+  if [ "$V" -ge 3600 ]; then echo 40
+  elif [ "$V" -ge 2750 ]; then echo 30
+  elif [ "$V" -ge 2250 ]; then echo 25
+  elif [ "$V" -ge 1750 ]; then echo 20
+  elif [ "$V" -ge 1250 ]; then echo 15
+  elif [ "$V" -gt 0 ]; then echo other
+  else echo 0
+  fi
+}
+
+configure_source_timing(){
+  if [ "${ALTSCREEN111_TIMING_DEBUG:-0}" = "1" ]; then
+    echo "${ALTSCREEN111_TIMING_INTERVAL_MS:-1000}" > "$SOURCE_TIMING_INTERVAL" 2>/dev/null || true
+    : > "$SOURCE_TIMING_ENABLE" 2>/dev/null || true
+  else
+    rm -f "$SOURCE_TIMING_ENABLE" "$SOURCE_TIMING_INTERVAL" "$SOURCE_TIMING_STATUS" 2>/dev/null || true
+  fi
+}
+
+configure_source_framing(){
+  if [ "${DIRECT_SOURCE_FRAMING:-0}" = "1" ]; then
+    : > "$AU_FRAMING_MARKER" 2>/dev/null || return 1
+  else
+    rm -f "$AU_FRAMING_MARKER" 2>/dev/null || true
+  fi
+  return 0
+}
+
+telemetry_init(){
+  TELEMETRY=$RUN/telemetry.tsv
+  TELEMETRY_EVENTS=$RUN/telemetry-events.log
+  TELEMETRY_SEQ=0
+  LAST_SOURCE_BUCKET=0
+  LAST_SOURCE_SAMPLE_SEQ=0
+  PENDING_SOURCE_BUCKET=0
+  PENDING_SOURCE_BUCKET_COUNT=0
+  [ "${DIRECT_TELEMETRY:-0}" = "1" ] || return 0
+  echo "sample	time	source_sample_seq	source_sample_stale	source_max_fps	source_fps_x100	source_bucket	source_frames_total	source_input_bps	source_last_us	source_min_us	source_max_us	source_ts_word1	source_ts_word2	remux_input_mode	m1au_sequence	m1au_sequence_gaps	m1au_ts_raw	m1au_ts_word1_delta	m1au_ts_word2_delta	remux_input_bps	most_bps	remux_input_us	pace_underflows	pace_late_frames	pace_backpressure_waits	write_eagain	last_block_wait_us	max_block_wait_us	max_emit_jitter_us" > "$TELEMETRY"
+}
+
+telemetry_sample(){
+  [ "${DIRECT_TELEMETRY:-0}" = "1" ] || return 0
+  TELEMETRY_SEQ=$((TELEMETRY_SEQ+1))
+  SCONF=$(status_value "$SOURCE_TIMING_STATUS" configured_max_fps)
+  if [ -z "$SCONF" ]; then
+    SCONF=$ALTSCREEN111_FPS
+    if [ -r "$SOURCE_FPS_OVERRIDE_FILE" ]; then
+      V=$(cat "$SOURCE_FPS_OVERRIDE_FILE" 2>/dev/null)
+      case "$V" in 20|25|30|40) SCONF=$V ;; esac
+    fi
+  fi
+  SSEQ=$(status_value "$SOURCE_TIMING_STATUS" sample_seq); SSEQ=${SSEQ:-0}
+  if [ "$SSEQ" != "0" ] && [ "$SSEQ" = "$LAST_SOURCE_SAMPLE_SEQ" ]; then
+    SSTALE=1
+  else
+    SSTALE=0
+    LAST_SOURCE_SAMPLE_SEQ=$SSEQ
+  fi
+  SFPS=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_fps_x100); SFPS=${SFPS:-0}
+  SBUCKET=$(fps_bucket "$SFPS")
+  SFRAMES=$(status_value "$SOURCE_TIMING_STATUS" frames_total); SFRAMES=${SFRAMES:-0}
+  SBPS=$(status_value "$SOURCE_TIMING_STATUS" source_input_bps); SBPS=${SBPS:-0}
+  SLAST=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_last_us); SLAST=${SLAST:-0}
+  SMIN=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_min_us); SMIN=${SMIN:-0}
+  SMAX=$(status_value "$SOURCE_TIMING_STATUS" source_arrival_max_us); SMAX=${SMAX:-0}
+  STS1=$(status_value "$SOURCE_TIMING_STATUS" source_ts_word1); [ -n "$STS1" ] || STS1=-
+  STS2=$(status_value "$SOURCE_TIMING_STATUS" source_ts_word2); [ -n "$STS2" ] || STS2=-
+  RMODE=$(status_value "$REMUX_STATUS" input_mode); RMODE=${RMODE:-unknown}
+  MSEQ=$(status_value "$REMUX_STATUS" m1au_sequence); MSEQ=${MSEQ:-0}
+  MGAPS=$(status_value "$REMUX_STATUS" m1au_sequence_gaps); MGAPS=${MGAPS:-0}
+  MTSRAW=$(status_value "$REMUX_STATUS" m1au_ts_raw); MTSRAW=${MTSRAW:--}
+  MTD1=$(status_value "$REMUX_STATUS" m1au_ts_word1_delta); MTD1=${MTD1:-0}
+  MTD2=$(status_value "$REMUX_STATUS" m1au_ts_word2_delta); MTD2=${MTD2:-0}
+  RIBPS=$(status_value "$REMUX_STATUS" input_bps); RIBPS=${RIBPS:-0}
+  MBPS=$(status_value "$REMUX_STATUS" most_bps); MBPS=${MBPS:-0}
+  RINT=$(status_value "$REMUX_STATUS" last_input_interval_us); RINT=${RINT:-0}
+  PU=$(status_value "$REMUX_STATUS" pace_underflows); PU=${PU:-0}
+  PL=$(status_value "$REMUX_STATUS" pace_late_frames); PL=${PL:-0}
+  PB=$(status_value "$REMUX_STATUS" pace_backpressure_waits); PB=${PB:-0}
+  WE=$(status_value "$REMUX_STATUS" write_eagain); WE=${WE:-0}
+  LBW=$(status_value "$REMUX_STATUS" last_block_wait_us); LBW=${LBW:-0}
+  MBW=$(status_value "$REMUX_STATUS" max_block_wait_us); MBW=${MBW:-0}
+  MEJ=$(status_value "$REMUX_STATUS" max_emit_jitter_us); MEJ=${MEJ:-0}
+  echo "$TELEMETRY_SEQ	$(timestamp_now)	$SSEQ	$SSTALE	$SCONF	$SFPS	$SBUCKET	$SFRAMES	$SBPS	$SLAST	$SMIN	$SMAX	$STS1	$STS2	$RMODE	$MSEQ	$MGAPS	$MTSRAW	$MTD1	$MTD2	$RIBPS	$MBPS	$RINT	$PU	$PL	$PB	$WE	$LBW	$MBW	$MEJ" >> "$TELEMETRY" 2>/dev/null || true
+
+  if [ "$SSTALE" = "0" ] && [ "$SBUCKET" != "0" ] && [ "$SBUCKET" != "other" ] && [ "$SBUCKET" != "$LAST_SOURCE_BUCKET" ]; then
+    if [ "$SBUCKET" = "$PENDING_SOURCE_BUCKET" ]; then
+      PENDING_SOURCE_BUCKET_COUNT=$((PENDING_SOURCE_BUCKET_COUNT+1))
+    else
+      PENDING_SOURCE_BUCKET=$SBUCKET
+      PENDING_SOURCE_BUCKET_COUNT=1
+    fi
+    if [ "$PENDING_SOURCE_BUCKET_COUNT" -ge 2 ]; then
+      echo "$(timestamp_now) source_fps_bucket old=$LAST_SOURCE_BUCKET new=$SBUCKET measured_x100=$SFPS source_bps=$SBPS most_bps=$MBPS" >> "$TELEMETRY_EVENTS" 2>/dev/null || true
+      LAST_SOURCE_BUCKET=$SBUCKET
+      PENDING_SOURCE_BUCKET=0
+      PENDING_SOURCE_BUCKET_COUNT=0
+    fi
+  else
+    PENDING_SOURCE_BUCKET=0
+    PENDING_SOURCE_BUCKET_COUNT=0
+  fi
 }
 
 publish_auto_hb(){
@@ -51,6 +170,7 @@ stop_bridge(){
 cleanup(){
   stop_bridge
   gate_stock
+  rm -f "$SOURCE_TIMING_ENABLE" "$SOURCE_TIMING_INTERVAL" "$AU_FRAMING_MARKER" 2>/dev/null || true
   publish_auto_state "stopped"
   rm -f "$AUTOHB" "$PIDFILE" "$BRIDGEPID" 2>/dev/null || true
 }
@@ -66,6 +186,7 @@ fi
 echo "$$" > "$PIDFILE" || exit 5
 publish_auto_state "starting"
 publish_auto_hb
+configure_source_timing
 
 [ -x "$BRIDGE" ] || { auto_log "FAIL missing bridge $BRIDGE"; exit 10; }
 [ -x "$GATE" ] || { auto_log "FAIL missing gate control $GATE"; exit 11; }
@@ -126,6 +247,7 @@ while [ -e "$ENABLED" ]; do
   }
   BRIDGELOG=$RUN/bridge.log
   SUMMARY=$RUN/SUMMARY.txt
+  telemetry_init
   DM_BEFORE=$(pidin ar 2>/dev/null | awk '/pps\/displaymanager/ && !/awk/ {print $1; exit}')
   if [ -z "${DM_BEFORE:-}" ]; then
     publish_auto_state "waiting_displaymanager"
@@ -153,7 +275,15 @@ while [ -e "$ENABLED" ]; do
     sleep 2
     continue
   }
-  MIBR_PACE="$DIRECT_PACE" MIBR_PACE_BUFFER="$DIRECT_PACE_BUFFER" \
+  configure_source_timing
+  configure_source_framing || {
+    auto_log "FAIL cannot configure source framing"
+    gate_stock
+    publish_auto_state "config_failed"
+    sleep 2
+    continue
+  }
+  MIBR_PACE="$DIRECT_PACE" MIBR_PACE_BUFFER="$DIRECT_PACE_BUFFER" MIBR_INPUT_M1AU="$DIRECT_SOURCE_FRAMING" \
   "$BRIDGE" "tcp://127.0.0.1:$ALTSCREEN111_TEE_PORT" /dev/mlb/isoTX2 \
       "$DIRECT_OUTPUT_FPS" 0 0 0x11 > "$BRIDGELOG" 2>&1 &
   BRIDGE_PID=$!
@@ -224,6 +354,7 @@ while [ -e "$ENABLED" ]; do
       LAST_SOURCE_HB=$NOW_HB
     fi
 
+    telemetry_sample
     sleep 1
   done
 
@@ -233,10 +364,13 @@ while [ -e "$ENABLED" ]; do
     STOP_REASON=bridge_exit
   fi
 
+  telemetry_sample
   stop_bridge
   gate_stock
   publish_auto_state "stock"
   sleep 1
+  [ -r "$SOURCE_TIMING_STATUS" ] && cp "$SOURCE_TIMING_STATUS" "$RUN/source-timing-final.status" 2>/dev/null || true
+  [ -r "$REMUX_STATUS" ] && cp "$REMUX_STATUS" "$RUN/remux-final.status" 2>/dev/null || true
 
   DM_AFTER=$(pidin ar 2>/dev/null | awk '/pps\/displaymanager/ && !/awk/ {print $1; exit}')
   BLOCKS=$(awk '
@@ -258,10 +392,18 @@ while [ -e "$ENABLED" ]; do
     echo "stop_reason=$STOP_REASON"
     echo "input=tcp://127.0.0.1:$ALTSCREEN111_TEE_PORT"
     echo "output=/dev/mlb/isoTX2"
-    echo "source_max_fps=$ALTSCREEN111_FPS"
+    EFFECTIVE_SOURCE_FPS=$(status_value "$SOURCE_TIMING_STATUS" configured_max_fps)
+    [ -n "$EFFECTIVE_SOURCE_FPS" ] || EFFECTIVE_SOURCE_FPS=$ALTSCREEN111_FPS
+    echo "source_max_fps=$EFFECTIVE_SOURCE_FPS"
+    echo "source_base_fps=$ALTSCREEN111_FPS"
     echo "direct_output_fps=$DIRECT_OUTPUT_FPS"
     echo "direct_pace=$DIRECT_PACE"
     echo "direct_pace_buffer=$DIRECT_PACE_BUFFER"
+    echo "source_timing_debug=$ALTSCREEN111_TIMING_DEBUG"
+    echo "source_timing_interval_ms=$ALTSCREEN111_TIMING_INTERVAL_MS"
+    echo "direct_telemetry=$DIRECT_TELEMETRY"
+    echo "direct_source_framing=$DIRECT_SOURCE_FRAMING"
+    echo "telemetry_file=${TELEMETRY:-disabled}"
     echo "most_blocks=$BLOCKS"
     echo "most_write_size=$WRITE_SIZE"
     echo "displaymanager_pid_before=$DM_BEFORE"

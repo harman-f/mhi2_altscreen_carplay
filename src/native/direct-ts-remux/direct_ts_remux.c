@@ -2,6 +2,9 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +22,8 @@
 #define MOST_BLOCK_BYTES (MOST_BLOCK_PACKETS * TS_SIZE)
 #define REMUX_STATUS_PATH "/tmp/mibr-direct-remux.status"
 #define PACE_QUEUE_CAP 10
+#define M1AU_HEADER_BYTES 56
+#define M1AU_MAX_PAYLOAD (3u * 1024u * 1024u)
 
 typedef struct {
     int fd;
@@ -59,7 +64,38 @@ typedef struct {
     int64_t last_emit_interval_us;
     int64_t max_emit_jitter_us;
     int64_t last_emit_us;
+
+    int input_framed;
+    uint64_t m1au_records;
+    uint64_t m1au_stream;
+    uint64_t m1au_codec;
+    uint64_t m1au_consumer;
+    uint64_t m1au_sequence;
+    uint32_t m1au_flags;
+    uint32_t m1au_ts_word1_le;
+    uint32_t m1au_ts_word2_le;
+    int64_t m1au_ts_word1_delta;
+    int64_t m1au_ts_word2_delta;
+    uint8_t m1au_ts_raw[8];
+    uint64_t m1au_sequence_gaps;
 } OutCtx;
+
+typedef struct {
+    int fd;
+    int64_t *deadline;
+    size_t payload_remaining;
+    pthread_mutex_t lock;
+    uint64_t records;
+    uint64_t stream,codec,consumer,sequence;
+    uint64_t previous_sequence;
+    uint64_t sequence_gaps;
+    uint32_t flags;
+    uint8_t ts_raw[8];
+    uint32_t ts_word1_le,ts_word2_le;
+    uint32_t prev_ts_word1_le,prev_ts_word2_le;
+    int have_prev_ts;
+    int64_t ts_word1_delta,ts_word2_delta;
+} FramedInput;
 
 typedef struct {
     AVPacket pkt;
@@ -90,6 +126,8 @@ typedef struct {
 static uint64_t g_status_seq;
 static int64_t g_last_status_us;
 static int g_status_error_logged;
+static FramedInput *g_framed_status;
+static int interrupt_cb(void *opaque);
 
 static int env_int(const char *name,int defval) {
     const char *v=getenv(name);
@@ -103,6 +141,44 @@ static int env_int(const char *name,int defval) {
 
 static int64_t abs_i64(int64_t v) {
     return v<0?-v:v;
+}
+
+static uint16_t m1au_get_be16(const uint8_t *p) {
+    return (uint16_t)(((uint16_t)p[0]<<8)|p[1]);
+}
+
+static uint32_t m1au_get_be32(const uint8_t *p) {
+    return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+}
+
+static uint64_t m1au_get_be64(const uint8_t *p) {
+    uint64_t v=0;
+    unsigned i;
+    for(i=0;i<8u;++i)v=(v<<8)|p[i];
+    return v;
+}
+
+static uint32_t m1au_get_le32(const uint8_t *p) {
+    return ((uint32_t)p[0])|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);
+}
+
+static void framed_snapshot(OutCtx *o) {
+    FramedInput *f=g_framed_status;
+    if(!o||!f)return;
+    pthread_mutex_lock(&f->lock);
+    o->m1au_records=f->records;
+    o->m1au_stream=f->stream;
+    o->m1au_codec=f->codec;
+    o->m1au_consumer=f->consumer;
+    o->m1au_sequence=f->sequence;
+    o->m1au_flags=f->flags;
+    o->m1au_ts_word1_le=f->ts_word1_le;
+    o->m1au_ts_word2_le=f->ts_word2_le;
+    o->m1au_ts_word1_delta=f->ts_word1_delta;
+    o->m1au_ts_word2_delta=f->ts_word2_delta;
+    memcpy(o->m1au_ts_raw,f->ts_raw,8u);
+    o->m1au_sequence_gaps=f->sequence_gaps;
+    pthread_mutex_unlock(&f->lock);
 }
 
 static void pace_queue_snapshot_locked(PaceQueue *q,OutCtx *o) {
@@ -244,11 +320,12 @@ static void pace_sleep_until(int64_t due_us) {
 static void publish_remux_status(OutCtx *o, int64_t frame_no,
                                  int64_t start_us, int64_t last_input_us,
                                  const char *state, int rc, int force) {
-    char buf[1800], tmp[96];
+    char buf[2800], tmp[96];
     int fd, n;
     int64_t now=av_gettime_relative();
     if(!force && g_last_status_us>0 && now-g_last_status_us<1000000LL) return;
     g_last_status_us=now;
+    if(o && o->input_framed) framed_snapshot(o);
     if(o) {
         uint64_t most_bytes_now=o->blocks*(uint64_t)MOST_BLOCK_BYTES;
         if(o->rate_prev_us>0 && now>o->rate_prev_us) {
@@ -297,6 +374,19 @@ static void publish_remux_status(OutCtx *o, int64_t frame_no,
         "max_input_interval_us=%lld\n"
         "last_emit_interval_us=%lld\n"
         "max_emit_jitter_us=%lld\n"
+        "input_mode=%s\n"
+        "m1au_records=%llu\n"
+        "m1au_stream=%llu\n"
+        "m1au_codec=%llu\n"
+        "m1au_consumer=%llu\n"
+        "m1au_sequence=%llu\n"
+        "m1au_sequence_gaps=%llu\n"
+        "m1au_flags=0x%08x\n"
+        "m1au_ts_raw=%02x%02x%02x%02x%02x%02x%02x%02x\n"
+        "m1au_ts_word1_le=%u\n"
+        "m1au_ts_word2_le=%u\n"
+        "m1au_ts_word1_delta=%lld\n"
+        "m1au_ts_word2_delta=%lld\n"
         "elapsed_ms=%lld\n"
         "rc=%d\n",
         state?state:"unknown",(int)getpid(),
@@ -332,6 +422,22 @@ static void publish_remux_status(OutCtx *o, int64_t frame_no,
         (long long)(o?o->max_input_interval_us:0),
         (long long)(o?o->last_emit_interval_us:0),
         (long long)(o?o->max_emit_jitter_us:0),
+        (o&&o->input_framed)?"m1au-v1":"raw-annexb",
+        (unsigned long long)(o?o->m1au_records:0),
+        (unsigned long long)(o?o->m1au_stream:0),
+        (unsigned long long)(o?o->m1au_codec:0),
+        (unsigned long long)(o?o->m1au_consumer:0),
+        (unsigned long long)(o?o->m1au_sequence:0),
+        (unsigned long long)(o?o->m1au_sequence_gaps:0),
+        (unsigned)(o?o->m1au_flags:0),
+        o?o->m1au_ts_raw[0]:0,o?o->m1au_ts_raw[1]:0,
+        o?o->m1au_ts_raw[2]:0,o?o->m1au_ts_raw[3]:0,
+        o?o->m1au_ts_raw[4]:0,o?o->m1au_ts_raw[5]:0,
+        o?o->m1au_ts_raw[6]:0,o?o->m1au_ts_raw[7]:0,
+        (unsigned)(o?o->m1au_ts_word1_le:0),
+        (unsigned)(o?o->m1au_ts_word2_le:0),
+        (long long)(o?o->m1au_ts_word1_delta:0),
+        (long long)(o?o->m1au_ts_word2_delta:0),
         (long long)(start_us>0?(now-start_us)/1000LL:0),rc);
     if(n<=0) return;
     if((size_t)n>=sizeof(buf)) n=(int)sizeof(buf)-1;
@@ -539,6 +645,199 @@ static void errstr(int e,char *buf,size_t n) {
     if(av_strerror(e,buf,n)<0) snprintf(buf,n,"err=%d",e);
 }
 
+static int framed_deadline_expired(const FramedInput *f) {
+    return f && f->deadline && *f->deadline>0 &&
+           av_gettime_relative()>=*f->deadline;
+}
+
+static int framed_recv_wait(FramedInput *f,uint8_t *p,size_t n,int exact) {
+    size_t off=0;
+    for(;;) {
+        ssize_t r;
+        if(framed_deadline_expired(f))return AVERROR_EXIT;
+        r=recv(f->fd,p+off,n-off,0);
+        if(r>0) {
+            off+=(size_t)r;
+            if(!exact || off==n)return (int)off;
+            continue;
+        }
+        if(r==0)return off?AVERROR_INVALIDDATA:AVERROR_EOF;
+        if(errno==EINTR)continue;
+        if(errno==EAGAIN || errno==EWOULDBLOCK) {
+            usleep(5000);
+            continue;
+        }
+        return AVERROR(errno?errno:EIO);
+    }
+}
+
+static void framed_note_header(FramedInput *f,const uint8_t h[M1AU_HEADER_BYTES]) {
+    uint32_t w1=m1au_get_le32(h+48);
+    uint32_t w2=m1au_get_le32(h+52);
+    uint64_t seq=m1au_get_be64(h+40);
+
+    pthread_mutex_lock(&f->lock);
+    ++f->records;
+    f->stream=m1au_get_be64(h+16);
+    f->codec=m1au_get_be64(h+24);
+    f->consumer=m1au_get_be64(h+32);
+    f->flags=m1au_get_be32(h+8);
+    if(f->previous_sequence && seq!=f->previous_sequence+1u)++f->sequence_gaps;
+    f->previous_sequence=seq;
+    f->sequence=seq;
+    memcpy(f->ts_raw,h+48,8u);
+    f->ts_word1_le=w1;
+    f->ts_word2_le=w2;
+    if(f->have_prev_ts) {
+        f->ts_word1_delta=(int64_t)(int32_t)(w1-f->prev_ts_word1_le);
+        f->ts_word2_delta=(int64_t)(int32_t)(w2-f->prev_ts_word2_le);
+    } else {
+        f->ts_word1_delta=0;
+        f->ts_word2_delta=0;
+        f->have_prev_ts=1;
+    }
+    f->prev_ts_word1_le=w1;
+    f->prev_ts_word2_le=w2;
+    pthread_mutex_unlock(&f->lock);
+}
+
+static int framed_read_cb(void *opaque,uint8_t *buf,int buf_size) {
+    FramedInput *f=(FramedInput *)opaque;
+    uint8_t h[M1AU_HEADER_BYTES];
+    int rc;
+    size_t want;
+
+    if(!f || f->fd<0 || !buf || buf_size<=0)return AVERROR(EINVAL);
+
+    if(f->payload_remaining==0) {
+        rc=framed_recv_wait(f,h,sizeof(h),1);
+        if(rc<0)return rc;
+        if(memcmp(h,"M1AU",4u)!=0 ||
+           m1au_get_be16(h+4)!=1u ||
+           m1au_get_be16(h+6)!=M1AU_HEADER_BYTES) {
+            fprintf(stderr,
+                    "ERROR M1AU header magic/version/size invalid magic=%02x%02x%02x%02x version=%u header=%u\n",
+                    h[0],h[1],h[2],h[3],
+                    (unsigned)m1au_get_be16(h+4),
+                    (unsigned)m1au_get_be16(h+6));
+            return AVERROR_INVALIDDATA;
+        }
+        f->payload_remaining=(size_t)m1au_get_be32(h+12);
+        if(!f->payload_remaining || f->payload_remaining>M1AU_MAX_PAYLOAD) {
+            fprintf(stderr,"ERROR M1AU payload invalid bytes=%zu\n",f->payload_remaining);
+            return AVERROR_INVALIDDATA;
+        }
+        framed_note_header(f,h);
+    }
+
+    want=f->payload_remaining<(size_t)buf_size?f->payload_remaining:(size_t)buf_size;
+    rc=framed_recv_wait(f,buf,want,0);
+    if(rc<0)return rc;
+    if((size_t)rc>f->payload_remaining)return AVERROR_INVALIDDATA;
+    f->payload_remaining-=(size_t)rc;
+    return rc;
+}
+
+static int framed_parse_loopback_url(const char *url,int *port) {
+    const char *pfx="tcp://127.0.0.1:";
+    char *end=NULL;
+    long v;
+    if(!url||strncmp(url,pfx,strlen(pfx))!=0)return -1;
+    v=strtol(url+strlen(pfx),&end,10);
+    if(end==url+strlen(pfx)||*end!='\0'||v<1||v>65535)return -1;
+    *port=(int)v;
+    return 0;
+}
+
+static int framed_connect_retry(const char *url,int wait_seconds,int64_t *deadline) {
+    int port,attempt=0;
+    int64_t until=wait_seconds>0?av_gettime_relative()+(int64_t)wait_seconds*1000000LL:0;
+    if(framed_parse_loopback_url(url,&port)!=0) {
+        fprintf(stderr,"ERROR M1AU supports only tcp://127.0.0.1:PORT input, got %s\n",url?url:"<null>");
+        return -1;
+    }
+    for(;;) {
+        int fd=socket(AF_INET,SOCK_STREAM,0);
+        struct sockaddr_in a;
+        if(fd<0)return -1;
+        memset(&a,0,sizeof(a));
+        a.sin_family=AF_INET;
+        a.sin_port=htons((uint16_t)port);
+        a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+        if(connect(fd,(struct sockaddr *)&a,sizeof(a))==0) {
+            int flags=fcntl(fd,F_GETFL,0);
+            if(flags>=0)(void)fcntl(fd,F_SETFL,flags|O_NONBLOCK);
+            *deadline=until;
+            fprintf(stderr,"M1AU_CONNECT_OK attempt=%d url=%s\n",attempt+1,url);
+            return fd;
+        }
+        close(fd);
+        if(wait_seconds<=0 || av_gettime_relative()>=until)return -1;
+        ++attempt;
+        usleep(1000000);
+    }
+}
+
+static AVFormatContext *open_m1au_h264(const char *url,int fps,int wait_seconds,
+                                      int64_t *deadline,FramedInput *f,
+                                      AVIOContext **pb_out) {
+    AVFormatContext *ic=NULL;
+    AVIOContext *pb=NULL;
+    uint8_t *buf=NULL;
+    const AVInputFormat *fmt=av_find_input_format("h264");
+    AVDictionary *opts=NULL;
+    char fpsbuf[32],ebuf[128];
+    int fd,rc;
+
+    if(!f||!pb_out||!fmt)return NULL;
+    memset(f,0,sizeof(*f));
+    f->fd=-1;
+    pthread_mutex_init(&f->lock,NULL);
+    fd=framed_connect_retry(url,wait_seconds,deadline);
+    if(fd<0)goto fail;
+    f->fd=fd;
+    f->deadline=deadline;
+
+    buf=av_malloc(32768);
+    if(!buf)goto fail;
+    pb=avio_alloc_context(buf,32768,0,f,framed_read_cb,NULL,NULL);
+    if(!pb)goto fail;
+    buf=NULL;
+
+    ic=avformat_alloc_context();
+    if(!ic)goto fail;
+    ic->pb=pb;
+    ic->flags|=AVFMT_FLAG_CUSTOM_IO;
+    ic->interrupt_callback.callback=interrupt_cb;
+    ic->interrupt_callback.opaque=deadline;
+
+    snprintf(fpsbuf,sizeof(fpsbuf),"%d",fps);
+    av_dict_set(&opts,"framerate",fpsbuf,0);
+    rc=avformat_open_input(&ic,NULL,fmt,&opts);
+    av_dict_free(&opts);
+    if(rc<0) {
+        errstr(rc,ebuf,sizeof(ebuf));
+        fprintf(stderr,"ERROR M1AU H264 open rc=%d %s\n",rc,ebuf);
+        goto fail;
+    }
+    *pb_out=pb;
+    *deadline=0;
+    fprintf(stderr,"INPUT_OPEN_OK mode=m1au-v1 url=%s\n",url);
+    return ic;
+
+fail:
+    if(opts)av_dict_free(&opts);
+    if(ic)avformat_free_context(ic);
+    if(pb) {
+        av_freep(&pb->buffer);
+        avio_context_free(&pb);
+    } else if(buf) av_free(buf);
+    if(f->fd>=0)close(f->fd);
+    f->fd=-1;
+    pthread_mutex_destroy(&f->lock);
+    return NULL;
+}
+
 static AVFormatContext *open_h264_retry(const char *url,int fps,int wait_seconds,int64_t *deadline) {
     int attempt=0;
     int64_t until=wait_seconds>0?av_gettime_relative()+(int64_t)wait_seconds*1000000LL:0;
@@ -591,18 +890,22 @@ static int open_out(const char *path,int *device_mode) {
 int main(int argc,char **argv) {
     const char *in_url,*out_path;
     int fps,max_seconds,wait_seconds,pid;
-    int pace_enabled,pace_buffer;
+    int pace_enabled,pace_buffer,input_m1au;
     AVFormatContext *ic=NULL,*oc=NULL;
     AVStream *is=NULL,*os=NULL;
     AVDictionary *mux_opts=NULL;
-    AVIOContext *avio=NULL;
+    AVIOContext *avio=NULL,*input_avio=NULL;
     unsigned char *avio_buf=NULL;
+    FramedInput framed;
+    int framed_active=0;
     OutCtx out;
     int64_t deadline=0,start_us=0,frame_no=0,last_input_us=0;
     int video=-1,rc=0;
     char ebuf[128];
 
     memset(&out,0,sizeof(out));
+    memset(&framed,0,sizeof(framed));
+    framed.fd=-1;
     out.fd=-1;
     (void)unlink(REMUX_STATUS_PATH);
 
@@ -616,6 +919,7 @@ int main(int argc,char **argv) {
     if(fps<1||fps>60||max_seconds<0||max_seconds>600||wait_seconds<0||wait_seconds>120||pid<1||pid>0x1ffe) return 65;
 
     pace_enabled=env_int("MIBR_PACE",0)?1:0;
+    input_m1au=env_int("MIBR_INPUT_M1AU",0)?1:0;
     pace_buffer=env_int("MIBR_PACE_BUFFER",3);
     if(pace_buffer<1)pace_buffer=1;
     if(pace_buffer>6)pace_buffer=6;
@@ -624,8 +928,17 @@ int main(int argc,char **argv) {
     out.pace_buffer_target=pace_enabled?pace_buffer:0;
 
     avformat_network_init();
-    ic=open_h264_retry(in_url,fps,wait_seconds,&deadline);
-    if(!ic){fprintf(stderr,"ERROR cannot open H264 input\n");return 2;}
+    if(input_m1au) {
+        ic=open_m1au_h264(in_url,fps,wait_seconds,&deadline,&framed,&input_avio);
+        if(ic) {
+            framed_active=1;
+            g_framed_status=&framed;
+            out.input_framed=1;
+        }
+    } else {
+        ic=open_h264_retry(in_url,fps,wait_seconds,&deadline);
+    }
+    if(!ic){fprintf(stderr,"ERROR cannot open H264 input mode=%s\n",input_m1au?"m1au-v1":"raw-annexb");return 2;}
     rc=avformat_find_stream_info(ic,NULL);
     if(rc<0){errstr(rc,ebuf,sizeof(ebuf));fprintf(stderr,"ERROR stream info: %s\n",ebuf);goto done;}
     for(unsigned i=0;i<ic->nb_streams;i++) if(ic->streams[i]->codecpar->codec_type==AVMEDIA_TYPE_VIDEO){video=(int)i;break;}
@@ -660,8 +973,8 @@ int main(int argc,char **argv) {
     av_dict_free(&mux_opts);
     if(rc<0){errstr(rc,ebuf,sizeof(ebuf));fprintf(stderr,"ERROR write header: %s\n",ebuf);goto done;}
 
-    fprintf(stderr,"REMUX_START input=%s output=%s fps=%d max_seconds=%d pid=0x%x device=%d most_block_packets=%d write_size=%d pace=%d pace_buffer=%d\n",
-            in_url,out_path,fps,max_seconds,pid,out.device_mode,
+    fprintf(stderr,"REMUX_START input=%s input_mode=%s output=%s fps=%d max_seconds=%d pid=0x%x device=%d most_block_packets=%d write_size=%d pace=%d pace_buffer=%d\n",
+            in_url,input_m1au?"m1au-v1":"raw-annexb",out_path,fps,max_seconds,pid,out.device_mode,
             out.device_mode?MOST_BLOCK_PACKETS:0,
             out.device_mode?MOST_BLOCK_BYTES:0,
             pace_enabled,pace_enabled?pace_buffer:0);
@@ -840,6 +1153,15 @@ done:
     if(out.fd>=0) close(out.fd);
     if(oc) avformat_free_context(oc);
     if(ic) avformat_close_input(&ic);
+    if(input_avio) {
+        av_freep(&input_avio->buffer);
+        avio_context_free(&input_avio);
+    }
+    if(framed_active) {
+        if(framed.fd>=0) close(framed.fd);
+        g_framed_status=NULL;
+        pthread_mutex_destroy(&framed.lock);
+    }
     avformat_network_deinit();
     return rc<0?10:0;
 }

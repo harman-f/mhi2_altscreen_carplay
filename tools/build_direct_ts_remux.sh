@@ -19,7 +19,7 @@ fi
 
 # Fail early with a tiny target link test instead of hiding a toolchain problem
 # inside FFmpeg configure.
-printf '#include <stddef.h>\nint main(void){return 0;}\n' | "$CC" \
+printf '#include <stddef.h>\n#include <pthread.h>\nstatic void *w(void *p){return p;}\nint main(void){pthread_t t; return pthread_create(&t,0,w,0);}\n' | "$CC" \
   -include stddef.h -D_QNX_SOURCE -O2 \
   -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16 \
   -x c - -lsocket -o /tmp/mibr-qnx-link-smoke
@@ -47,7 +47,7 @@ if [ ! -f "$FFDIR/libavformat/libavformat.a" ]; then
   )
 fi
 
-"$CC"   -include stddef.h -D_QNX_SOURCE   -O2 -g -std=gnu99   -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16   -I"$FFDIR" "$SRC"   -Wl,--start-group   "$FFDIR/libavformat/libavformat.a"   "$FFDIR/libavcodec/libavcodec.a"   "$FFDIR/libavutil/libavutil.a"   -Wl,--end-group   -lbz2 -lz -lsocket -lpthread -lm -lc   -o "$OUT"
+"$CC"   -include stddef.h -D_QNX_SOURCE   -O2 -g -std=gnu99   -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16   -I"$FFDIR" "$SRC"   -Wl,--start-group   "$FFDIR/libavformat/libavformat.a"   "$FFDIR/libavcodec/libavcodec.a"   "$FFDIR/libavutil/libavutil.a"   -Wl,--end-group   -lbz2 -lz -lsocket -lm -lc   -o "$OUT"
 
 # Intentionally NO strip here.
 test -s "$OUT"

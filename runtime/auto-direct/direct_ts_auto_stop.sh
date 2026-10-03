@@ -19,7 +19,8 @@ done
 
 sleep 2
 "$GATE" stock >/dev/null 2>&1 || rm -f /tmp/mibr-isotx2-gate.direct 2>/dev/null || true
-rm -f "$BRIDGEPID" "$SUPPID" "$WDPID" /tmp/mibr-direct-auto.heartbeat 2>/dev/null || true
+rm -f "$BRIDGEPID" "$SUPPID" "$WDPID" /tmp/mibr-direct-auto.heartbeat \
+  /tmp/mibr-alt111-au-framing.enabled 2>/dev/null || true
 echo "stopped" > /tmp/mibr-direct-auto.state 2>/dev/null || true
 
 echo "AUTO_DIRECT_STOP=PASS"
