@@ -830,6 +830,12 @@ static unsigned read_layered_bool(const char *name, unsigned defv,
     return defv?1u:0u;
 }
 
+static unsigned master_enabled(void)
+{
+    return read_layered_bool(g_enabled_config_name,1u,NULL);
+}
+
+
 static int config_line_value(const char *blob, const char *key,
                              char *out, size_t cap)
 {
@@ -1703,7 +1709,7 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
         return NULL;
     }
     base=g_real_serverinfo(session,properties,mac,outErr);
-    if(!g_enabled||!base)return base;
+    if(!g_enabled||!master_enabled()||!base)return base;
 
     info=dict_clone(base);
     if(!info)return base;
@@ -2741,7 +2747,7 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
      */
     e=call_stock_setup(s,request,&stockResp);
     logf_u2("SETUP stock result=%d response=%s",(int)e,stockResp?"yes":"no");
-    if(e==K_NO_ERR && g_enabled) set_active_session(s);
+    if(e==K_NO_ERR && g_enabled && master_enabled()) set_active_session(s);
     if(e!=K_NO_ERR){
         if(outResponse)*outResponse=stockResp;
         else if(stockResp)p_CFRelease(stockResp);
@@ -2754,7 +2760,7 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
      * enabledFeatures when SessionSetup was hooked successfully but a later
      * SessionStart/TearDown hook failed.
      */
-    if(!g_enabled){
+    if(!g_enabled || !master_enabled()){
         if(outResponse)*outResponse=stockResp;
         else if(stockResp)p_CFRelease(stockResp);
         return e;
@@ -2927,9 +2933,7 @@ static void altscreen111_init(void)
     {
         struct mibr_display_config dcfg;
         struct mibr_viewareas_config vcfg;
-        unsigned enabled_default=(unsigned)env_i("ALTSCREEN111_ENABLED",1);
-
-        g_enabled=(int)read_layered_bool(g_enabled_config_name,enabled_default,NULL);
+        g_enabled=env_i("ALTSCREEN111_ENABLED",1);
         g_alt_port=env_i("ALTSCREEN111_PORT",6031);
         g_tee_port=env_i("ALTSCREEN111_TEE_PORT",19820);
         g_capture_port=env_i("ALTSCREEN111_CAPTURE_PORT",19821);
