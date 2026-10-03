@@ -3908,7 +3908,7 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
 static OSStatus mibr_session_start(AirPlayReceiverSessionRef s, void *info)
 {
     OSStatus e=call_stock_start(s,info);
-    if(e==K_NO_ERR && g_enabled) {
+    if(e==K_NO_ERR && g_enabled && master_enabled()) {
         set_active_session(s);
         gen2_set_command_ready(1);
     }
