@@ -1214,105 +1214,122 @@ static void remove_key(CFMutableDictionaryRef d, const char *name)
 static void add_alt_suggest_ui_urls(CFMutableDictionaryRef alt)
 {
     CFMutableArrayRef urls=NULL;
-    CFStringRef key=NULL,base=NULL,map=NULL,card=NULL;
+    CFStringRef key=NULL,item=NULL;
+    char blob[2048],url[384],name[32];
+    unsigned layer=0u;
+    int i,count=0;
     if(!alt)return;
 
     urls=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
     if(!urls)return;
 
-    base=s_cf(ALT_URL_DEFAULT);
-    map=s_cf(ALT_URL_MAP);
-    card=s_cf(ALT_URL_INSTRUCTIONCARD);
-    if(!base||!map||!card)goto done;
+    if(read_layered_value(g_ui_urls_config_name,blob,sizeof(blob),&layer)==0){
+        for(i=0;i<8;++i){
+            snprintf(name,sizeof(name),"url%d",i);
+            if(config_line_value(blob,name,url,sizeof(url))!=0)continue;
+            if(!strchr(url,':'))continue;
+            item=s_cf(url);
+            if(!item)continue;
+            p_CFArrayAppendValue(urls,item);
+            p_CFRelease(item); item=NULL;
+            ++count;
+        }
+    }
 
-    p_CFArrayAppendValue(urls,base);
-    p_CFArrayAppendValue(urls,map);
-    p_CFArrayAppendValue(urls,card);
+    if(count==0){
+        static const char *defaults[]={
+            ALT_URL_DEFAULT,ALT_URL_MAP,ALT_URL_INSTRUCTIONCARD
+        };
+        for(i=0;i<3;++i){
+            item=s_cf(defaults[i]);
+            if(!item)continue;
+            p_CFArrayAppendValue(urls,item);
+            p_CFRelease(item); item=NULL;
+            ++count;
+        }
+        layer=0u;
+    }
 
     key=s_cf("altScreenSuggestUIURLs");
     if(!key)goto done;
     p_CFDictionarySetValue(alt,key,urls);
-
-    logf_u2("GEN2 advertised altScreenSuggestUIURLs[0]=%s [1]=%s [2]=%s",
-            ALT_URL_DEFAULT,ALT_URL_MAP,ALT_URL_INSTRUCTIONCARD);
+    logf_u2("GEN2 advertised altScreenSuggestUIURLs count=%d source=%s",
+            count,config_layer_name(layer));
 
 done:
+    if(item)p_CFRelease(item);
     if(key)p_CFRelease(key);
-    if(card)p_CFRelease(card);
-    if(map)p_CFRelease(map);
-    if(base)p_CFRelease(base);
     if(urls)p_CFRelease(urls);
 }
 
 /*
- * Keep the recovered reference ViewArea/SafeArea structure, but do not import
- * the Audi-specific 420x330 safe window into the 1010x376 Skoda VC baseline.
- *
- * Vehicle-PoC policy: initially expose the complete secondary-display canvas
- * as both ViewArea and SafeArea. This lets iOS/the navigation app decide what
- * cluster UI it can render without us prematurely constraining overlays to a
- * narrow center strip. A smaller/tube-specific SafeArea can be added later
- * once the full-width and classic VC layouts have been measured on-car.
+ * Advertise up to two pre-negotiated ViewAreas. Geometry changes require a
+ * fresh /info negotiation; switching between already advertised indices stays
+ * in-session via updateViewArea.
  */
 static void add_reference_viewarea(CFMutableDictionaryRef alt)
 {
-    CFMutableDictionaryRef view=NULL,safe=NULL;
+    struct mibr_viewareas_config cfg;
     CFMutableArrayRef areas=NULL;
     CFStringRef k=NULL;
-    int safe_w,safe_h,safe_x,safe_y;
+    unsigned i;
 
-    if(!alt || g_width<=0 || g_height<=0) return;
+    if(!alt||g_width<=0||g_height<=0)return;
+    load_viewareas_config(&cfg);
+    if(!cfg.enabled)return;
 
-    /*
-     * Full-canvas remains the fail-safe default.  Vehicle-test overrides are
-     * persistent plain-text integers so the iOS composition envelope can be
-     * tuned without recompiling again.  Clamp every value to the advertised
-     * 1010x376 display canvas; malformed/out-of-range files fall back safely.
-     */
-    load_safearea_config(&safe_x,&safe_y,&safe_w,&safe_h);
-
-    view=dict_new();
-    safe=dict_new();
     areas=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
-    if(!view||!safe||!areas) goto done;
+    if(!areas)return;
 
-    set_i64(view,"widthPixels",g_width);
-    set_i64(view,"heightPixels",g_height);
-    set_i64(view,"originXPixels",0);
-    set_i64(view,"originYPixels",0);
+    for(i=0;i<cfg.count;++i){
+        CFMutableDictionaryRef view=dict_new(),safe=dict_new();
+        if(!view||!safe){
+            if(safe)p_CFRelease(safe);
+            if(view)p_CFRelease(view);
+            goto done;
+        }
 
-    set_i64(safe,"widthPixels",safe_w);
-    set_i64(safe,"heightPixels",safe_h);
-    set_i64(safe,"originXPixels",safe_x);
-    set_i64(safe,"originYPixels",safe_y);
+        set_i64(view,"widthPixels",cfg.view[i].w);
+        set_i64(view,"heightPixels",cfg.view[i].h);
+        set_i64(view,"originXPixels",cfg.view[i].x);
+        set_i64(view,"originYPixels",cfg.view[i].y);
 
-    /*
-     * These are ViewArea policy booleans, not numeric zero values. MIBSI
-     * serializes both as real CFBoolean false objects.
-     */
-    set_false(view,"drawUIOutsideSafeArea");
-    set_false(view,"viewAreaTransitionControl");
+        set_i64(safe,"widthPixels",cfg.view[i].safe_w);
+        set_i64(safe,"heightPixels",cfg.view[i].safe_h);
+        set_i64(safe,"originXPixels",cfg.view[i].safe_x);
+        set_i64(safe,"originYPixels",cfg.view[i].safe_y);
 
-    k=s_cf("safeArea");
-    p_CFDictionarySetValue(view,k,safe);
-    p_CFRelease(k); k=NULL;
+        set_false(view,"drawUIOutsideSafeArea");
+        set_false(view,"viewAreaTransitionControl");
 
-    p_CFArrayAppendValue(areas,view);
+        k=s_cf("safeArea");
+        if(!k){p_CFRelease(safe);p_CFRelease(view);goto done;}
+        p_CFDictionarySetValue(view,k,safe);
+        p_CFRelease(k);k=NULL;
+        p_CFArrayAppendValue(areas,view);
+        p_CFRelease(safe);
+        p_CFRelease(view);
+
+        logf_u2("GEN2 ViewArea[%u] area=%dx%d@%d,%d safe=%dx%d@%d,%d adjacent=%d",
+                i,cfg.view[i].w,cfg.view[i].h,cfg.view[i].x,cfg.view[i].y,
+                cfg.view[i].safe_w,cfg.view[i].safe_h,
+                cfg.view[i].safe_x,cfg.view[i].safe_y,cfg.view[i].adjacent);
+    }
+
     k=s_cf("viewAreas");
+    if(!k)goto done;
     p_CFDictionarySetValue(alt,k,areas);
-    p_CFRelease(k); k=NULL;
-    set_i64(alt,"initialViewArea",0);
-    logf_u2("GEN2 ViewArea full=%dx%d safe=%dx%d@%d,%d",
-            g_width,g_height,safe_w,safe_h,safe_x,safe_y);
+    p_CFRelease(k);k=NULL;
+    set_i64(alt,"initialViewArea",(int64_t)cfg.initial);
+    logf_u2("GEN2 ViewAreas advertised count=%u initial=%u transitionMs=%u source=%s",
+            cfg.count,cfg.initial,cfg.transition_ms,config_layer_name(cfg.source_layer));
 
 done:
     if(k)p_CFRelease(k);
     if(areas)p_CFRelease(areas);
-    if(safe)p_CFRelease(safe);
-    if(view)p_CFRelease(view);
 }
 
-static void log_stream_types(const char *tag, CFDictionaryRef request)
+static void log_stream_types(static void log_stream_types(const char *tag, CFDictionaryRef request)
 {
     CFArrayRef a=get_streams(request);
     CFIndex i,n;
