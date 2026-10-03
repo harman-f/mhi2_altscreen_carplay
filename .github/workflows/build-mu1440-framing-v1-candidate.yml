@@ -169,6 +169,7 @@ jobs:
           grep -Fq 'FPS_CONFIG_NAME=mibr-carplay111-fps' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'FRAMING_CONFIG_NAME=mibr-carplay111-framing' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'VIDEO_CONFIG_NAME=mibr-carplay111-video.conf' build/framing-v1/package/runtime/auto-direct/common.sh
+          grep -Fq 'NAME=$AUTODIRECT_CONFIG_NAME' build/framing-v1/package/runtime/auto-direct/direct_autodirect.sh
           grep -Fq 'NAME=mibr-carplay111-keyframes.conf' build/framing-v1/package/runtime/diagnostics/gen2_keyframes.sh
           grep -Fq 'NAME=mibr-carplay111-sourceversion' build/framing-v1/package/runtime/diagnostics/gen2_sourceversion.sh
           grep -Fq 'NAME=mibr-carplay111-enabled' build/framing-v1/package/runtime/diagnostics/gen2_enabled.sh
