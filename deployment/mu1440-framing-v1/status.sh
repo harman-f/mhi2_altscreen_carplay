@@ -14,66 +14,56 @@ hashf(){
   echo "$1"
 }
 
-echo "=== MU1440 framing-v1 candidate ==="
+echo "=== MU1440 Classic Type-111 candidate ==="
 [ -e "$ACTIVE" ] && { echo "candidate_active=1"; cat "$ACTIVE" 2>/dev/null; } || echo "candidate_active=0"
 
 if [ -x "$SHA" ]; then
-  for SPEC in     "gen2:$DST/bin/libaltscreen111.so:$ROOT/payload/libaltscreen111.so"     "hook:$HOOK:$ROOT/payload/libaltscreen111.so"     "remux:$DST/bin/direct-ts-remux:$ROOT/payload/direct-ts-remux"; do
-      N=${SPEC%%:*}; REST=${SPEC#*:}; LIVE=${REST%%:*}; PKG=${REST#*:}
-      LH=$(hashf "$LIVE" 2>/dev/null); PH=$(hashf "$PKG" 2>/dev/null)
-      echo "${N}_live_sha256=${LH:-MISSING}"
-      echo "${N}_candidate_sha256=${PH:-MISSING}"
-      [ -n "$LH" ] && [ "$LH" = "$PH" ] && echo "${N}_state=PASS_CANDIDATE" || echo "${N}_state=DIFFERENT"
+  for SPEC in     "gen2:$DST/bin/libaltscreen111.so:$ROOT/payload/libaltscreen111.so"     "hook:$HOOK:$ROOT/payload/libaltscreen111.so"     "remux:$DST/bin/direct-ts-remux:$ROOT/payload/direct-ts-remux"
+  do
+    N=${SPEC%%:*}; REST=${SPEC#*:}; LIVE=${REST%%:*}; PKG=${REST#*:}
+    LH=$(hashf "$LIVE" 2>/dev/null); PH=$(hashf "$PKG" 2>/dev/null)
+    echo "${N}_live_sha256=${LH:-MISSING}"
+    echo "${N}_candidate_sha256=${PH:-MISSING}"
+    [ -n "$LH" ] && [ "$LH" = "$PH" ] && echo "${N}_state=PASS_CANDIDATE" || echo "${N}_state=DIFFERENT"
   done
 fi
 
 echo
-if [ -x "$DST/scripts/direct_source_mode.sh" ]; then
-  "$DST/scripts/direct_source_mode.sh" status
-else
-  echo "direct_source_mode=missing"
-fi
+echo "=== CONFIG CONTRACT ==="
+echo "precedence=/tmp_then_/mnt/app/root_then_default"
+
+for H in   gen2_enabled.sh   direct_fps.sh   direct_source_mode.sh   gen2_video.sh   gen2_keyframes.sh   gen2_sourceversion.sh   gen2_url.sh   gen2_ui_urls.sh   gen2_nav_config.sh   gen2_display.sh   gen2_viewareas.sh
+do
+  echo
+  if [ -x "$DST/scripts/$H" ]; then
+    "$DST/scripts/$H" status 2>/dev/null || echo "$H=STATUS_FAILED"
+  else
+    echo "$H=MISSING"
+  fi
+done
 
 echo
-if [ -x "$DST/scripts/direct_fps.sh" ]; then
-  "$DST/scripts/direct_fps.sh" status
-fi
-
-echo
-if [ -x "$DST/scripts/gen2_safearea.sh" ]; then
-  "$DST/scripts/gen2_safearea.sh" status
-fi
-
-echo
-if [ -x "$DST/scripts/gen2_keyframes.sh" ]; then
-  "$DST/scripts/gen2_keyframes.sh" status
-else
-  echo "gen2_keyframes=missing"
-fi
-
-echo
-if [ -x "$DST/scripts/gen2_sourceversion.sh" ]; then
-  "$DST/scripts/gen2_sourceversion.sh" status
-else
-  echo "gen2_sourceversion=missing"
-fi
-
-echo
-if [ -x "$DST/scripts/viewarea_mode.sh" ]; then
-  "$DST/scripts/viewarea_mode.sh" status
-fi
-
-echo
-if [ -x "$DST/scripts/gen2_nav_config.sh" ]; then
-  "$DST/scripts/gen2_nav_config.sh" status
-fi
-
-echo
+echo "=== GEN2 CORE ==="
 if [ -r /tmp/mibr-alt111-gen2.status ]; then
-  grep '^source_version_' /tmp/mibr-alt111-gen2.status 2>/dev/null || true
+  cat /tmp/mibr-alt111-gen2.status
+else
+  echo "gen2_core_status=NOT_AVAILABLE"
 fi
 
 echo
+echo "=== SOURCE TIMING ==="
+if [ -r /tmp/mibr-alt111-source-timing.status ]; then
+  cat /tmp/mibr-alt111-source-timing.status
+else
+  echo "source_timing_status=NOT_AVAILABLE"
+fi
+echo "source_timestamp_policy=raw_8_bytes_preserved_in_m1au_not_used_for_pts_pcr"
+echo "pts_pcr=CFR_UNCHANGED"
+
+echo
+echo "=== AUTO-DIRECT / REMUX / MOST ==="
 if [ -x "$DST/scripts/direct_ts_auto_status.sh" ]; then
   "$DST/scripts/direct_ts_auto_status.sh"
+else
+  echo "direct_ts_auto_status=MISSING"
 fi
