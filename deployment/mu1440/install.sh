@@ -567,11 +567,12 @@ apply(){
   install_required_navignore
   install_required_most20
 
-  echo "=== enable persistent D2 keyframe recovery default ==="
-  app_rw || fail "d2_persistent_mount_app_rw"
-  : > /mnt/app/root/mibr-alt111-keyframe-policy.enabled || fail "d2_persistent_marker"
+  echo "=== normalize D2 keyframe recovery default ==="
+  app_rw || fail "d2_default_mount_app_rw"
+  rm -f /mnt/app/root/mibr-alt111-keyframe-policy.enabled 2>/dev/null || true
   app_ro
-  echo "D2_KEYFRAMES=PERSISTENT_DEFAULT watchdog_ms=1000 min_gap_ms=1000"
+  "$DST/scripts/gen2_keyframes.sh" clear-persist >/dev/null 2>&1 || fail "d2_clear_persist"
+  echo "D2_KEYFRAMES=DEFAULT enabled=1 event_delay_ms=250 watchdog_ms=1000 min_gap_ms=1000"
 
   echo "=== set deployment navigation default ==="
   "$DST/scripts/gen2_nav_config.sh" profile map-rich || fail "map_rich_profile"
@@ -583,11 +584,12 @@ apply(){
   echo "MIBR_INSTALL=PASS"
   echo "navigation_profile=map-rich"
   echo "most20=enabled_by_default"
-  echo "d2_keyframes=persistent_default"
+  echo "d2_keyframes=default"
   echo "d2_watchdog_ms=1000"
   echo "REBOOT_REQUIRED=YES"
   echo "After reboot: ./status.sh"
-  echo "Disable D2 at runtime/persistently with: /mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh off"
+  echo "Temporary D2 off: /mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh off"
+  echo "Persistent D2 off: /mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh persist off"
 }
 
 case "${1:---check}" in
