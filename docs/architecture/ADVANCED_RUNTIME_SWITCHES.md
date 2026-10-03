@@ -1,120 +1,224 @@
-# Advanced runtime switches and hidden feature flags
+# Runtime-control contract
 
-This is the consolidated reference for runtime switches that otherwise live only in scripts or in
-the GEN2 native source.
+This is the authoritative runtime-switch contract for the MU1440 / AID10 AltScreen development path.
 
-## MU1440 reference defaults
+## Precedence
 
-- coded-frame/map canvas: **1010x376**
-- `MIBR-NavIgnore.jar`: active
-- `MIBR-Most20FPS.jar`: active
-- Auto-Direct: persistent
-- GEN2 D2 source-keyframe recovery: persistent
-- D2 source-IDR watchdog: **1000 ms**
-- D2 minimum keyframe-request gap: **1000 ms**
-- `turns` / `suggestUI` event debounce: **250 ms**
-- AirPlay receiver compatibility persona (`sourceVersion`): **1005.8.1**
-
-## Persistent controls under `/mnt/app/root`
-
-| Path | Meaning |
-| --- | --- |
-| `/mnt/app/root/mibr-carplay-autodirect.enabled` | Persistent Auto-Direct enable. |
-| `/mnt/app/root/mibr-alt111-keyframe-policy.enabled` | Persistent D2 keyframe policy. Default on the MU1440 reference deployment. |
-| `/mnt/app/root/mibr-carplay111-keyframes.conf` | Live D2 timing control: event delay, minimum request gap and watchdog interval. |
-| `/mnt/app/root/mibr-carplay111-sourceversion` | Optional `sourceVersion` persona override. Missing file defaults to `1005.8.1`; value `stock` preserves the stock 210.81 value. |
-| `/mnt/app/root/mibr-carplay111-viewareas.enabled` | Enable the experimental ViewArea-capable descriptor. |
-| `/mnt/app/root/mibr-carplay111-safearea.conf` | SafeArea geometry configuration. |
-| `/mnt/app/root/mibr-carplay111-autoshow.disabled` | Disable automatic showUI behavior. |
-| `/mnt/app/root/mibr-carplay111-url-map.enabled` | Prefer `maps:/car/instrumentcluster/map` over the bare base URL. |
-| `/mnt/app/root/mibr-carplay111-bit26.force-on` | Force AirPlay root feature bit 26 on. Diagnostic A/B only. |
-| `/mnt/app/root/mibr-carplay111-bit26.force-off` | Force AirPlay root feature bit 26 off. Diagnostic A/B only. Never set both bit26 markers. |
-| `/mnt/app/root/mibr-carplay111-nav-query.enabled` | Enable navigation query parameters. |
-| `/mnt/app/root/mibr-carplay111-nav.surface` | Navigation surface selector: base, map or instructioncard. |
-| `/mnt/app/root/mibr-carplay111-nav.showETA` | ETA preference: yes, no or user. |
-| `/mnt/app/root/mibr-carplay111-nav.showSpeedLimit` | Speed-limit preference: yes, no or user. |
-| `/mnt/app/root/mibr-carplay111-nav.showCompass` | Compass preference: yes, no or user. |
-| `/mnt/app/root/mibr-carplay111-nav.maneuverLayout` | Maneuver alignment: none, leftAligned, rightAligned or topAligned. |
-
-Use the shipped helpers where possible:
-
-```sh
-/mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh status
-/mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh on
-/mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh off
-
-/mnt/app/root/altscreen-u2/scripts/gen2_nav_config.sh status
-```
-
-`gen2_keyframes.sh on` is persistent across reboot. `session-on` is the explicit volatile variant.
-
-### Live D2 keyframe timing
-
-The current defaults are still the vehicle-tested D2 policy, but they are no longer compile-time-only.
-GEN2 reads the persistent control file live:
+Every **user-facing configuration value** uses the same basename in two locations:
 
 ```text
-/mnt/app/root/mibr-carplay111-keyframes.conf
+/tmp/<name>                   temporary override, highest priority
+/mnt/app/root/<name>          persistent override
+compiled/config default       used when neither file exists
+```
 
+Consequences:
+
+- temporary A/B tests never require writing `/mnt/app`;
+- a reboot removes the temporary layer automatically;
+- after reboot the previous persistent value becomes effective again;
+- a temporary value can explicitly disable a persistent enable by containing `0`;
+- marker-file presence is no longer the user-facing configuration API.
+
+One-shot diagnostic commands and read-only runtime state remain `/tmp`-only and are intentionally
+outside this two-layer configuration model.
+
+## Audited active settings
+
+| Basename | Default | Values | Function |
+| --- | --- | --- | --- |
+| `mibr-carplay-autodirect` | `1` | `0/1` | Automatic Stream111 -> remux -> MOST ownership/runtime. |
+| `mibr-carplay111-fps` | `30` | `20/25/30/40` | One FPS contract for both advertised Type-111 `maxFPS` and direct-output pacing. |
+| `mibr-carplay111-framing` | `raw` | `raw/m1au` | Local GEN2 -> remux framing. M1AU preserves metadata; PTS/PCR remains CFR. |
+| `mibr-carplay111-keyframes.conf` | see below | config | Automatic D2 receiver-requested keyframe recovery and timing. |
+| `mibr-carplay111-sourceversion` | `1005.8.1` | `stock` or dotted version | AirPlay compatibility persona. Not the AltScreen gate. |
+| `mibr-carplay111-viewareas` | `1` | `0/1` | Advertise `viewAreas` capability/descriptor. |
+| `mibr-carplay111-safearea.conf` | full 1010x376 | rectangle config | SafeArea inside the Type-111 1010x376 logical canvas. |
+| `mibr-carplay111-nav-query` | `0` | `0/1` | Enable navigation URL query parameters. |
+| `mibr-carplay111-nav.surface` | `base` | `base/map/instructioncard` | Select classic cluster URL role. |
+| `mibr-carplay111-nav.showETA` | `yes` | `yes/no/user` | `showETA` query value. |
+| `mibr-carplay111-nav.showSpeedLimit` | `user` | `yes/no/user` | `showSpeedLimit` query value. |
+| `mibr-carplay111-nav.showCompass` | `user` | `yes/no/user` | `showCompass` query value. |
+| `mibr-carplay111-nav.maneuverLayout` | `none` | `none/left/right/top` | Maneuver alignment query. |
+
+For every basename above the paths are mechanically:
+
+```text
+temporary  = /tmp/<basename>
+persistent = /mnt/app/root/<basename>
+```
+
+## FPS
+
+`mibr-carplay111-fps` intentionally replaces the former split between source FPS and direct-output
+FPS. Testing mismatched source/sink rates is no longer a normal runtime switch; if such an experiment
+is required it should be a deliberately instrumented diagnostic build.
+
+Helper:
+
+```sh
+direct_fps.sh status
+direct_fps.sh 20              # temporary
+direct_fps.sh temp 25
+direct_fps.sh persist 30
+direct_fps.sh clear-temp
+direct_fps.sh clear-persist
+```
+
+Changing effective source `maxFPS` requires a fresh CarPlay negotiation.
+
+## Local framing
+
+```sh
+direct_source_mode.sh status
+direct_source_mode.sh m1au          # temporary
+direct_source_mode.sh persist raw
+direct_source_mode.sh clear-temp
+```
+
+`raw` is raw Annex-B. `m1au` selects the 56-byte M1AU v1 access-unit envelope. The eight source
+timestamp bytes remain raw/uninterpreted and do not drive PTS/PCR yet.
+
+## D2 keyframe policy
+
+Both enable/disable and timing now live in one file:
+
+```text
+mibr-carplay111-keyframes.conf
+
+enabled=1
 event_delay_ms=250
 min_gap_ms=1000
 watchdog_ms=1000
 ```
 
-Use the helper instead of editing the file by hand:
+Defaults are exactly those four values. `watchdog_ms=0` disables only the periodic source-IDR
+watchdog; event/suggestUI recovery can remain enabled.
+
+These controls govern additional receiver-requested `forceKeyFrame` recovery. They do **not** set
+the iPhone encoder's native GOP/IDR cadence.
+
+Helper:
 
 ```sh
-# current defaults
-/mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh timing 250 1000 1000
-
-# keep event-driven recovery but disable the periodic source-IDR watchdog
-/mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh timing 250 1000 0
-
-# restore compiled fail-safe defaults by removing the override
-/mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh timing-default
+gen2_keyframes.sh status
+gen2_keyframes.sh off                       # temporary
+gen2_keyframes.sh timing 250 2000 0         # temporary
+gen2_keyframes.sh persist on
+gen2_keyframes.sh persist timing 250 1000 1000
+gen2_keyframes.sh clear-temp
 ```
 
-Accepted ranges are 0–5000 ms for event delay and 0–60000 ms for minimum gap/watchdog.
-`watchdog_ms=0` disables only the watchdog. A malformed or out-of-range file fails safely to
-250/1000/1000. Changes are consumed live; no CarPlay reconnect or unit reboot is required.
+## sourceVersion
 
-These values govern **additional receiver-requested `forceKeyFrame` recovery**, not the iPhone's
-native GOP or autonomous IDR cadence.
+Default compatibility persona:
 
-### AirPlay `sourceVersion` persona
+```text
+1005.8.1
+```
 
-GEN2 now advertises `sourceVersion=1005.8.1` by default on its modified server-info path. This is
-the exact AirPlaySender generation associated with the current iOS 27.2 beta-2 research target and
-is treated only as a compatibility persona; it is **not** the AltScreen capability gate.
-
-Optional persistent diagnostic overrides:
+Useful diagnostics:
 
 ```sh
-echo stock    > /mnt/app/root/mibr-carplay111-sourceversion   # preserve MU1440 stock 210.81
-echo 950.7.1  > /mnt/app/root/mibr-carplay111-sourceversion   # historical compatibility persona
-echo 1005.8.1 > /mnt/app/root/mibr-carplay111-sourceversion   # current development persona
+gen2_sourceversion.sh 950.7.1          # temporary
+gen2_sourceversion.sh stock            # temporary; preserve stock MU1440 value
+gen2_sourceversion.sh persist 1005.8.1
+gen2_sourceversion.sh clear-temp
 ```
 
-Any well-formed numeric dotted version is accepted; malformed values fall back to `1005.8.1`.
-Changing this value requires a fresh CarPlay connection so the iPhone consumes a new `/info`
-response. The direct AltScreen contract remains `"altScreen"` in `enabledFeatures` followed by
-ScreenAlt/type 111.
+Changing the effective value requires a fresh CarPlay connection.
 
-## Volatile `/tmp` controls
+The canonical auxiliary-screen capability remains:
 
-| Path | Meaning |
-| --- | --- |
-| `/tmp/mibr-alt111-keyframe-policy.enabled` | Session-only D2 enable; also compatibility mirror for older vehicle-tested GEN2 binaries. |
-| `/tmp/mibr-alt111-gen2-reacquire` | One-shot same-stream reacquire: stopUI -> showUI -> updateViewArea -> forceKeyFrame. |
-| `/tmp/mibr-alt111-resync.enabled` | Enable manual Candidate-D same-stream IDR recovery. |
-| `/tmp/mibr-alt111-resync-arm` | One-shot manual resync arm. |
-| `/tmp/mibr-alt111-keyframe-only` | Diagnostic forceKeyFrame-only command. |
-| `/tmp/mibr-alt111-show-only` | Diagnostic showUI-only command. |
-| `/tmp/mibr-alt111-stop-only` | Diagnostic stopUI-only command. |
-| `/tmp/mibr-alt111-url-mode` | Volatile URL-mode diagnostic state. |
-| `/tmp/mibr-isotx2-gate.direct` | DisplayManager gate is in DIRECT ownership mode. Normally controlled by Auto-Direct. |
+```text
+AlternateScreen 0x01
+ -> "altScreen" in enabledFeatures
+ -> ScreenAlt / Type 111
+```
 
-Read-only state/telemetry includes:
+## Navigation composition
+
+The individual navigation fields remain separate on purpose: they map one-to-one to the classic
+cluster URL/query contract and are useful for isolated A/B tests.
+
+```sh
+gen2_nav_config.sh status
+gen2_nav_config.sh use-temp map-clean
+gen2_nav_config.sh use-persist map-rich
+gen2_nav_config.sh temp eta no
+gen2_nav_config.sh persist maneuver right
+gen2_nav_config.sh clear-temp
+```
+
+Known profiles remain:
+
+`stock`, `base-rich`, `base-right`, `base-left`, `base-top`, `map-rich`,
+`map-clean`, `maneuver-only`.
+
+## SafeArea / ViewAreas
+
+SafeArea is always relative to the 1010x376 Type-111 logical canvas, not the physical 1280x480 AID
+panel.
+
+```sh
+gen2_safearea.sh status
+gen2_safearea.sh set 0 58 1010 248          # temporary
+gen2_safearea.sh persist set 0 58 1010 248
+gen2_safearea.sh clear-temp
+
+viewarea_mode.sh off                         # temporary
+viewarea_mode.sh persist on
+```
+
+## Removed from the active contract
+
+The switch audit deliberately removes these user-facing controls:
+
+- `mibr-carplay111-bit26.force-on`
+- `mibr-carplay111-bit26.force-off`
+
+Root AirPlay bit 26 (`0x04000000`) is `AudioAES_128_MFi_SAPv1`, not AlternateScreen. MU1440
+stock already advertises it. It is no longer an AltScreen runtime knob.
+
+Also removed:
+
+- `mibr-carplay111-url-map.enabled` — superseded by `mibr-carplay111-nav.surface`;
+- `mibr-carplay111-autoshow.disabled` — GEN2 control ownership already has AutoShow disabled;
+- `mibr-direct-output-fps` — merged into `mibr-carplay111-fps`;
+- `mibr-direct-source-framing` — renamed/normalized to `mibr-carplay111-framing`;
+- `mibr-alt111-keyframe-policy.enabled` — merged into `mibr-carplay111-keyframes.conf`;
+- `mibr-carplay111-viewareas.enabled` — replaced by the explicit `0/1` value file;
+- `mibr-carplay111-nav-query.enabled` — replaced by the explicit `0/1` value file;
+- `mibr-carplay-autodirect.enabled` — replaced by the explicit `0/1` value file.
+
+Legacy files may be preserved by rollback/evidence logic, but current runtime code does not treat
+them as active configuration.
+
+## /tmp-only diagnostic commands
+
+These are not persistent settings and therefore intentionally do not get `/mnt/app/root` twins:
+
+```text
+/tmp/mibr-alt111-gen2-reacquire
+/tmp/mibr-alt111-resync.enabled
+/tmp/mibr-alt111-resync-arm
+/tmp/mibr-alt111-keyframe-only
+/tmp/mibr-alt111-show-only
+/tmp/mibr-alt111-stop-only
+```
+
+They are development commands/diagnostic state, not product configuration.
+
+Internal runtime state is likewise not a user switch, for example:
+
+```text
+/tmp/mibr-isotx2-gate.direct
+/tmp/mibr-alt111-au-framing.enabled
+/tmp/mibr-alt111-source-timing.enabled
+/tmp/mibr-alt111-source-timing-interval-ms
+```
+
+Read-only status/telemetry includes:
 
 ```text
 /tmp/mibr-alt111-gen2.status
@@ -126,104 +230,15 @@ Read-only state/telemetry includes:
 /tmp/mibr-isotx2-gate.stats
 ```
 
-## Navigation composition profiles
+## Reference Java patches
 
-```sh
-gen2_nav_config.sh use stock
-gen2_nav_config.sh use base-rich
-gen2_nav_config.sh use base-right
-gen2_nav_config.sh use base-left
-gen2_nav_config.sh use base-top
-gen2_nav_config.sh use map-rich
-gen2_nav_config.sh use map-clean
-gen2_nav_config.sh use maneuver-only
-```
+`MIBR-NavIgnore.jar` and `MIBR-Most20FPS.jar` remain separate from this runtime configuration
+contract. Most20FPS changes the stock DisplayManager native-navigation output path; it is not the
+CarPlay source-FPS or D2 keyframe setting.
 
-`use` persists the profile and applies it through the serialized same-stream transition ending in a
-fresh keyframe request. It does not deliberately rebuild Stream 111.
+## Recovery
 
-## SafeArea / ViewArea
-
-SafeArea operates inside the fixed **1010x376** reference canvas. Do not use SafeArea to reinterpret
-the physical 1280x480 cluster panel as the coded video contract.
-
-Development helper:
-
-```sh
-runtime/navigation/gen2_safearea.sh status
-runtime/navigation/gen2_safearea.sh full
-```
-
-Custom SafeArea values remain layout/target specific until vehicle-calibrated.
-
-## Direct Stream-111 frame pacing
-
-The direct remuxer has an optional low-cost packet-level pacer. It does **not** decode or re-encode
-H.264. A small reader queue absorbs short arrival-time jitter and the mux/write side releases access
-units on a monotonic output clock.
-
-Reference settings:
-
-```text
-DIRECT_OUTPUT_FPS=30
-DIRECT_PACE=1
-DIRECT_PACE_BUFFER=3
-```
-
-Runtime helper:
-
-```sh
-/mnt/app/root/altscreen-u2/scripts/direct_fps.sh status
-/mnt/app/root/altscreen-u2/scripts/direct_fps.sh 30
-/mnt/app/root/altscreen-u2/scripts/direct_fps.sh 25
-/mnt/app/root/altscreen-u2/scripts/direct_fps.sh 20
-/mnt/app/root/altscreen-u2/scripts/direct_fps.sh 40
-/mnt/app/root/altscreen-u2/scripts/direct_fps.sh default
-```
-
-The switch persists the same requested rate for both layers:
-`/mnt/app/root/mibr-direct-output-fps` controls the direct remux/pacer and
-`/mnt/app/root/mibr-carplay111-fps` changes the maxFPS advertised by GEN2 on subsequent `/info`
-responses. The active Direct-VC bridge is restarted immediately. A currently connected CarPlay
-session keeps the rate it already negotiated, so after changing the source maxFPS reconnect CarPlay
-before judging the matched source/sink result. 30 fps remains the reference default; 40 fps is an
-explicit diagnostic option. No compressed H.264 P-frames are discarded to fake a lower frame rate.
-
-Source timing telemetry can be enabled with the shipped configuration:
-`ALTSCREEN111_TIMING_DEBUG=1`, `ALTSCREEN111_TIMING_INTERVAL_MS=1000` and
-`DIRECT_TELEMETRY=1`. GEN2 then publishes measured accepted-AU cadence, source H.264 bit rate and
-the two **raw/uninterpreted** Stream-111 timestamp words in
-`/tmp/mibr-alt111-source-timing.status`. Auto-Direct correlates these with
-`/tmp/mibr-direct-remux.status` and persists a per-session `telemetry.tsv` plus stable FPS-change
-events.
-
-This is observation only: Apple timestamp words do not yet drive PTS/PCR. See
-`docs/testing/MU1440_SOURCE_TIMING_TELEMETRY.md`.
-
-## Most20FPS
-
-The standalone one-class Java patch is now a reference default for the exact MU1440/AID10-class target.
-
-```text
-MIBR-Most20FPS.jar
-SHA-256 dbd45609fe4ba69948d39e9e649b224484f680f6aa7934b68c261a4d360ea5bb
-```
-
-Vehicle capture proved real stock DisplayManager H.264/MPEG-TS output changing from **10 fps to 20 fps**
-at 1010x376. The five-frame GOP remains, so native I/IDR cadence changes from about 0.5 s to about 0.25 s.
-
-This is separate from the GEN2 CarPlay `forceKeyFrame` recovery policy. `MIBR-NavIgnore.jar` owns the
-navigation/CarPlay arbitration classes; `MIBR-Most20FPS.jar` owns only `ChangeDataRateSequence.class`.
-Do not reintroduce the historical combined `NavActiveIgnore.jar` alongside the split pair.
-
-## Bit26
-
-Bit26 is an AirPlay capability A/B switch, not an AltScreen mode bit. The reference default is
-**stock/unforced**. Force-on and force-off exist only for receiver capability experiments.
-
-## Recovery note
-
-If a development switch leaves the VC stale/frozen, return the gate to STOCK and disable the
-experimental switch first. A fast MHI2 reboot does not necessarily reset every cluster/MOST/DSI peer
-state; the reference vehicle has required a full vehicle bus-sleep cycle to recover a missing dynamic
-H.264/MOST display.
+If a development override produces a stale/frozen VC, delete the relevant temporary file first.
+A reboot automatically clears the whole temporary configuration layer and returns to persistent
+settings/defaults. A fast MHI2 reboot does not necessarily reset every cluster/MOST peer; a full
+vehicle bus-sleep cycle may still be required for receiver-side recovery.
