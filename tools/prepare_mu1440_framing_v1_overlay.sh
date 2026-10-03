@@ -18,7 +18,7 @@ for f in "$GEN2" "$REMUX" "$SHAHELP"; do
 done
 
 rm -rf "$DEST"
-mkdir -p "$DEST/payload" "$DEST/runtime/auto-direct" "$DEST/runtime/navigation"
+mkdir -p "$DEST/payload" "$DEST/runtime/auto-direct" "$DEST/runtime/navigation" "$DEST/runtime/diagnostics"
 
 cp "$ROOT/deployment/mu1440-framing-v1/install.sh" "$DEST/install.sh"
 cp "$ROOT/deployment/mu1440-framing-v1/uninstall.sh" "$DEST/uninstall.sh"
@@ -31,12 +31,13 @@ for f in common.sh direct_fps.sh direct_source_mode.sh direct_ts_auto_supervisor
   cp "$ROOT/runtime/auto-direct/$f" "$DEST/runtime/auto-direct/$f"
 done
 cp "$ROOT/runtime/navigation/gen2_safearea.sh" "$DEST/runtime/navigation/gen2_safearea.sh"
+cp "$ROOT/runtime/diagnostics/gen2_keyframes.sh" "$DEST/runtime/diagnostics/gen2_keyframes.sh"
 
-chmod +x "$DEST/"*.sh "$DEST/payload/"* "$DEST/runtime/auto-direct/"*.sh "$DEST/runtime/navigation/"*.sh
+chmod +x "$DEST/"*.sh "$DEST/payload/"* "$DEST/runtime/auto-direct/"*.sh "$DEST/runtime/navigation/"*.sh "$DEST/runtime/diagnostics/"*.sh
 
 (
   cd "$DEST"
-  sha256sum     payload/libaltscreen111.so     payload/direct-ts-remux     payload/sha256sum     runtime/auto-direct/common.sh     runtime/auto-direct/direct_fps.sh     runtime/auto-direct/direct_source_mode.sh     runtime/auto-direct/direct_ts_auto_supervisor.sh     runtime/auto-direct/direct_ts_auto_status.sh     runtime/navigation/gen2_safearea.sh     > PAYLOAD.sha256
+  sha256sum     payload/libaltscreen111.so     payload/direct-ts-remux     payload/sha256sum     runtime/auto-direct/common.sh     runtime/auto-direct/direct_fps.sh     runtime/auto-direct/direct_source_mode.sh     runtime/auto-direct/direct_ts_auto_supervisor.sh     runtime/auto-direct/direct_ts_auto_status.sh     runtime/navigation/gen2_safearea.sh     runtime/diagnostics/gen2_keyframes.sh     > PAYLOAD.sha256
 )
 
 GEN2_SHA=$(sha256sum "$GEN2" | awk '{print $1}')
@@ -52,6 +53,10 @@ gen2_sha256=$GEN2_SHA
 direct_ts_remux_sha256=$REMUX_SHA
 source_fps_default=30
 source_fps_diagnostic=40
+source_version_default=1005.8.1
+source_version_override=/mnt/app/root/mibr-carplay111-sourceversion
+keyframe_timing_default=250,1000,1000
+keyframe_timing_control=/mnt/app/root/mibr-carplay111-keyframes.conf
 transport_default=raw-annexb
 transport_optional=m1au-v1
 m1au_header_bytes=56
@@ -83,13 +88,24 @@ can restore that exact pre-candidate state.
 Defaults after install:
   source maxFPS: 30
   direct output: 30
+  sourceVersion compatibility persona: 1005.8.1
+  D2 timing: event delay 250 ms / minimum request gap 1000 ms / watchdog 1000 ms
   local transport: raw Annex-B
   PTS/PCR: existing CFR path
 
 Optional:
   /mnt/app/root/altscreen-u2/scripts/direct_source_mode.sh m1au
   /mnt/app/root/altscreen-u2/scripts/direct_fps.sh 40
+  /mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh timing 250 1000 1000
+  /mnt/app/root/altscreen-u2/scripts/gen2_keyframes.sh timing 250 1000 0
   /mnt/app/root/altscreen-u2/scripts/gen2_safearea.sh status
+
+sourceVersion diagnostics:
+  no override file                                      -> 1005.8.1
+  echo stock   > /mnt/app/root/mibr-carplay111-sourceversion -> preserve stock 210.81
+  echo 950.7.1 > /mnt/app/root/mibr-carplay111-sourceversion -> historical compatibility persona
+  echo 1005.8.1 > /mnt/app/root/mibr-carplay111-sourceversion -> current development persona
+  reconnect CarPlay after changing sourceVersion so a fresh /info negotiation is used
 
 M1AU v1 preserves per-AU stream/codec/consumer generations, sequence/IDR metadata and the exact
 eight raw Stream-111 timestamp bytes. Framing-v1 does NOT yet use those bytes for PTS/PCR.
