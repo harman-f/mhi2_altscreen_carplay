@@ -8,9 +8,14 @@ LOGFILE=/tmp/altscreen111.log
 echo "=== MU1440 CarPlay111 boot preload verification ==="
 echo "hook=$CARPLAY_HOOK"
 echo "config=$TARGET"
-[ -e /mnt/app/root/mibr-carplay111-viewareas.enabled ] &&
-  echo "viewarea_fallback=ENABLED_THIS_BOOT" ||
-  echo "viewarea_fallback=DISABLED_THIS_BOOT"
+VIEWAREA_NAME=mibr-carplay111-viewareas
+if [ -r /tmp/$VIEWAREA_NAME ]; then
+  echo "viewareas=$(cat /tmp/$VIEWAREA_NAME 2>/dev/null) source=temp"
+elif [ -r /mnt/app/root/$VIEWAREA_NAME ]; then
+  echo "viewareas=$(cat /mnt/app/root/$VIEWAREA_NAME 2>/dev/null) source=persistent"
+else
+  echo "viewareas=1 source=default"
+fi
 
 [ -r "$CARPLAY_HOOK" ] || {
   echo "VERIFY_CARPLAY111_BOOT=FAIL_HOOK_MISSING"
