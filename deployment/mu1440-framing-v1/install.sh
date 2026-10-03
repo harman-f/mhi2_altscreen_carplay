@@ -91,7 +91,7 @@ check_base(){
   AH=$(hashf "$AIRPLAY") || fail "libairplay_hash_failed"
   [ "$AH" = "$EXPECTED_AIRPLAY" ] || fail "wrong_target_libairplay=$AH"
   grep -Fq "LD_PRELOAD=$HOOK" "$TARGET" 2>/dev/null || fail "base_carplay_preload_not_active"
-  for F in     "$DST/bin/libaltscreen111.so"     "$DST/bin/direct-ts-remux"     "$DST/scripts/common.sh"     "$DST/scripts/direct_ts_auto_supervisor.sh"     "$DST/scripts/direct_ts_auto_status.sh"     "$DST/scripts/direct_fps.sh"     "$HOOK"
+  for F in     "$DST/bin/libaltscreen111.so"     "$DST/bin/direct-ts-remux"     "$DST/scripts/common.sh"     "$DST/scripts/direct_ts_auto_supervisor.sh"     "$DST/scripts/direct_ts_auto_status.sh"     "$DST/scripts/direct_ts_auto_stop.sh"     "$DST/scripts/writev_gate.sh"     "$DST/scripts/direct_fps.sh"     "$HOOK"
   do
     [ -r "$F" ] || fail "base_file_missing=$F"
   done
