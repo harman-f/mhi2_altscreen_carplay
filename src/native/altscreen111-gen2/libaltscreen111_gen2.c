@@ -298,15 +298,13 @@ static int g_viewareas = 1;
 /* User-facing settings: /tmp wins over /mnt/app/root, then code default. */
 #define MIBR_CFG_TEMP_ROOT "/tmp"
 #define MIBR_CFG_PERSIST_ROOT "/mnt/app/root"
+static const char *g_enabled_config_name = "mibr-carplay111-enabled";
 static const char *g_fps_config_name = "mibr-carplay111-fps";
-static const char *g_viewareas_config_name = "mibr-carplay111-viewareas";
-static const char *g_safearea_config_name = "mibr-carplay111-safearea.conf";
-static const char *g_nav_query_config_name = "mibr-carplay111-nav-query";
-static const char *g_nav_surface_config_name = "mibr-carplay111-nav.surface";
-static const char *g_nav_eta_config_name = "mibr-carplay111-nav.showETA";
-static const char *g_nav_speed_config_name = "mibr-carplay111-nav.showSpeedLimit";
-static const char *g_nav_compass_config_name = "mibr-carplay111-nav.showCompass";
-static const char *g_nav_maneuver_config_name = "mibr-carplay111-nav.maneuverLayout";
+static const char *g_url_config_name = "mibr-carplay111-url";
+static const char *g_ui_urls_config_name = "mibr-carplay111-ui-urls.conf";
+static const char *g_nav_config_name = "mibr-carplay111-nav.conf";
+static const char *g_display_config_name = "mibr-carplay111-display.conf";
+static const char *g_viewareas_config_name = "mibr-carplay111-viewareas.conf";
 static char g_alt_uuid[96] = ALT_UUID_DEFAULT;
 static char g_alt_url[160] = ALT_URL_DEFAULT;
 static const char *g_log_path = "/tmp/altscreen111.log";
@@ -830,6 +828,80 @@ static unsigned read_layered_bool(const char *name, unsigned defv,
     if(source_layer)*source_layer=0u;
     return defv?1u:0u;
 }
+
+static int config_line_value(const char *blob, const char *key,
+                             char *out, size_t cap)
+{
+    const char *p,*e;
+    size_t klen,n;
+    if(!blob||!key||!out||cap<2u)return -1;
+    out[0]='\0';
+    klen=strlen(key);
+    p=blob;
+    while(*p){
+        while(*p=='\r'||*p=='\n')++p;
+        if(strncmp(p,key,klen)==0 && p[klen]=='='){
+            p+=klen+1u;
+            e=p;
+            while(*e && *e!='\r' && *e!='\n')++e;
+            n=(size_t)(e-p);
+            while(n>0u && (p[n-1]==' '||p[n-1]=='\t'))--n;
+            if(n>=cap)n=cap-1u;
+            memcpy(out,p,n);
+            out[n]='\0';
+            return n?0:-1;
+        }
+        while(*p && *p!='\r' && *p!='\n')++p;
+    }
+    return -1;
+}
+
+static int config_line_int(const char *blob, const char *key, int *out)
+{
+    char b[32],*end=NULL;
+    long v;
+    if(!out||config_line_value(blob,key,b,sizeof(b))!=0)return -1;
+    errno=0;
+    v=strtol(b,&end,10);
+    if(errno||!end||*end)return -1;
+    if(v<(long)INT32_MIN||v>(long)INT32_MAX)return -1;
+    *out=(int)v;
+    return 0;
+}
+
+struct mibr_nav_config {
+    unsigned query;
+    char surface[24];
+    char eta[16];
+    char speed[16];
+    char compass[16];
+    char maneuver[24];
+    unsigned source_layer;
+};
+
+struct mibr_display_config {
+    int width;
+    int height;
+    int width_mm;
+    int height_mm;
+    char uuid[96];
+    unsigned source_layer;
+};
+
+struct mibr_viewarea_item {
+    int x,y,w,h;
+    int safe_x,safe_y,safe_w,safe_h;
+    int adjacent;
+};
+
+struct mibr_viewareas_config {
+    unsigned enabled;
+    unsigned count;
+    unsigned initial;
+    unsigned transition_ms;
+    struct mibr_viewarea_item view[2];
+    unsigned source_layer;
+};
 
 static void gen2_d2_timing_load(struct gen2_d2_timing *cfg)
 {
