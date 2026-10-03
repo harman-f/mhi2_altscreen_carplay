@@ -82,7 +82,10 @@ typedef void *AirPlayReceiverSessionRef;
 #define ALT_URL_DEFAULT  "maps:/car/instrumentcluster"
 #define ALT_URL_MAP      "maps:/car/instrumentcluster/map"
 #define ALT_URL_INSTRUCTIONCARD "maps:/car/instrumentcluster/instructioncard"
-#define AIRPLAY_FEATURE_BIT26 (1ULL << 26)
+#define MIBR_DISPLAY_WIDTH_DEFAULT 1010
+#define MIBR_DISPLAY_HEIGHT_DEFAULT 376
+#define MIBR_DISPLAY_WIDTH_MM_DEFAULT 200
+#define MIBR_DISPLAY_HEIGHT_MM_DEFAULT 74
 
 /* Opaque storage. Stock AES_CTR_Context is smaller than this on the target. */
 typedef union {
@@ -1054,11 +1057,11 @@ static void load_display_config(struct mibr_display_config *cfg)
     int n;
     if(!cfg)return;
     memset(cfg,0,sizeof(*cfg));
-    cfg->width=g_width;
-    cfg->height=g_height;
-    cfg->width_mm=g_width_mm;
-    cfg->height_mm=g_height_mm;
-    snprintf(cfg->uuid,sizeof(cfg->uuid),"%s",g_alt_uuid);
+    cfg->width=MIBR_DISPLAY_WIDTH_DEFAULT;
+    cfg->height=MIBR_DISPLAY_HEIGHT_DEFAULT;
+    cfg->width_mm=MIBR_DISPLAY_WIDTH_MM_DEFAULT;
+    cfg->height_mm=MIBR_DISPLAY_HEIGHT_MM_DEFAULT;
+    snprintf(cfg->uuid,sizeof(cfg->uuid),"%s",ALT_UUID_DEFAULT);
     if(read_layered_value(g_display_config_name,blob,sizeof(blob),&layer)!=0)return;
     cfg->source_layer=layer;
 
@@ -1693,6 +1696,27 @@ static void log_stock_url_capability(CFDictionaryRef stock_display, const char *
     }
 }
 
+static void refresh_negotiation_config(void)
+{
+    struct mibr_display_config dcfg;
+    struct mibr_viewareas_config vcfg;
+
+    load_display_config(&dcfg);
+    g_width=dcfg.width;
+    g_height=dcfg.height;
+    g_width_mm=dcfg.width_mm;
+    g_height_mm=dcfg.height_mm;
+    snprintf(g_alt_uuid,sizeof(g_alt_uuid),"%s",dcfg.uuid);
+
+    load_viewareas_config(&vcfg);
+    g_viewareas=vcfg.enabled ? 1 : 0;
+
+    logf_u2("GEN2 negotiation config display=%dx%d physical=%dx%d uuid=%s displaySource=%s viewAreas=%u count=%u viewSource=%s",
+            g_width,g_height,g_width_mm,g_height_mm,g_alt_uuid,
+            config_layer_name(dcfg.source_layer),vcfg.enabled,vcfg.count,
+            config_layer_name(vcfg.source_layer));
+}
+
 CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArrayRef properties, uint8_t *mac, OSStatus *outErr)
 {
     CFDictionaryRef base,stock_display;
@@ -1700,7 +1724,10 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
     CFStringRef kdisplays=NULL;
     CFArrayRef old=NULL;
     CFMutableArrayRef displays=NULL;
-    int advertised_fps=current_advertised_fps();
+    int advertised_fps;
+
+    refresh_negotiation_config();
+    advertised_fps=current_advertised_fps();
 
     if(!g_real_serverinfo)g_real_serverinfo=(fn_serverinfo_t)sym_next("AirPlayCopyServerInfo");
     if(!g_real_serverinfo){
@@ -1769,10 +1796,10 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
         set_i64(alt,"type",(int64_t)g2_profile.type);
         set_i64(alt,"maxFPS",(int64_t)advertised_fps);
         set_i64(alt,"features",(int64_t)g2_profile.features);
-        set_i64(alt,"widthPixels",(int64_t)g2_profile.width);
-        set_i64(alt,"heightPixels",(int64_t)g2_profile.height);
-        set_i64(alt,"widthPhysical",(int64_t)g2_profile.width_mm);
-        set_i64(alt,"heightPhysical",(int64_t)g2_profile.height_mm);
+        set_i64(alt,"widthPixels",(int64_t)g_width);
+        set_i64(alt,"heightPixels",(int64_t)g_height);
+        set_i64(alt,"widthPhysical",(int64_t)g_width_mm);
+        set_i64(alt,"heightPhysical",(int64_t)g_height_mm);
         set_str(alt,"uuid",g_alt_uuid);
         set_str(alt,"initialURL",active_url);
         add_alt_suggest_ui_urls(alt);
@@ -1783,7 +1810,7 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
         logf_u2("GEN2 /info ready: root=altScreen%s type=%u maxFPS=%u features=%u input=none geometry=%ux%u physical=%ux%u uuid=%s url=%s",
                 g_viewareas?"+viewAreas":"",
                 g2_profile.type,(unsigned)advertised_fps,g2_profile.features,
-                g2_profile.width,g2_profile.height,g2_profile.width_mm,g2_profile.height_mm,
+                g_width,g_height,g_width_mm,g_height_mm,
                 g_alt_uuid,active_url);
     }else{
         logf_u2("IRC-parity /info: display clone failed");
@@ -2989,9 +3016,15 @@ static void altscreen111_init(void)
     g2_profile.width_mm=(uint32_t)g_width_mm;
     g2_profile.height_mm=(uint32_t)g_height_mm;
     g2_profile.max_fps=(uint32_t)g_fps;
+    g2_profile.view_count=2u;
+    g2_profile.initial_view=0u;
+    g2_profile.views[0].area.x=0u;
+    g2_profile.views[0].area.y=0u;
     g2_profile.views[0].area.width=g2_profile.width;
     g2_profile.views[0].area.height=g2_profile.height;
     g2_profile.views[0].safe=g2_profile.views[0].area;
+    g2_profile.views[1].area=g2_profile.views[0].area;
+    g2_profile.views[1].safe=g2_profile.views[0].area;
     if(alt111_profile_validate(&g2_profile)!=ALT111_OK){
         g_enabled=0;
         logf_u2("gen2 runtime profile validation failed; disabled fail-closed");
