@@ -39,7 +39,13 @@ jobs:
           bash -n deployment/mu1440/status.sh
           bash -n deployment/mu1440/compatibility-report.sh
           bash -n runtime/diagnostics/keypanel_trace_discovery.sh
-          grep -Fq '/mnt/app/root/mibr-alt111-keyframe-policy.enabled' runtime/diagnostics/gen2_keyframes.sh
+          grep -Fq 'NAME=mibr-carplay111-keyframes.conf' runtime/diagnostics/gen2_keyframes.sh
+          grep -Fq 'TEMP=/tmp/$NAME' runtime/diagnostics/gen2_keyframes.sh
+          grep -Fq 'PERSIST=/mnt/app/root/$NAME' runtime/diagnostics/gen2_keyframes.sh
+          bash -n runtime/diagnostics/gen2_sourceversion.sh
+          bash -n runtime/navigation/gen2_nav_config.sh
+          bash -n runtime/navigation/gen2_safearea.sh
+          bash -n runtime/experimental/viewarea_mode.sh
           bash -n runtime/auto-direct/common.sh
           bash -n runtime/auto-direct/direct_fps.sh
           bash -n runtime/auto-direct/direct_ts_auto_status.sh
@@ -76,11 +82,13 @@ jobs:
             runtime/isotx2-gate/install_preload.sh \
             runtime/isotx2-gate/restore_preload.sh \
             runtime/diagnostics/gen2_keyframes.sh \
+            runtime/diagnostics/gen2_sourceversion.sh \
             runtime/diagnostics/gen2_resync.sh \
             runtime/diagnostics/gen2_status.sh \
             runtime/diagnostics/keypanel_trace_discovery.sh \
             runtime/navigation/gen2_nav_config.sh \
-            runtime/navigation/gen2_safearea.sh
+            runtime/navigation/gen2_safearea.sh \
+            runtime/experimental/viewarea_mode.sh
           do
             test -s "$f"
           done
