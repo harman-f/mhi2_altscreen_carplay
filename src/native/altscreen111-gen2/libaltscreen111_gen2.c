@@ -3071,18 +3071,31 @@ static void gen2_set_command_ready(unsigned ready)
 
 static void gen2_control_projection_on(void)
 {
+    struct mibr_viewareas_config vcfg;
+    unsigned initial_view=0u, view_count=1u;
     int repeated = 0, rrc = ALT111_OK;
+
+    load_viewareas_config(&vcfg);
+    if(vcfg.enabled){
+        view_count=vcfg.count;
+        initial_view=vcfg.initial<vcfg.count?vcfg.initial:0u;
+    }
+
     pthread_mutex_lock(&g2_core_lock);
+    g2_control.view_count=view_count;
     if (!g2_control_session) {
         g2_control_session = alt111_control_begin(&g2_control);
     } else {
         repeated = 1;
     }
-    (void)alt111_control_intent(&g2_control,1,0);
+    (void)alt111_control_intent(&g2_control,1,initial_view);
     if (repeated)
         rrc = alt111_control_reacquire(&g2_control,g2_control_session);
     pthread_cond_broadcast(&g2_core_cv);
     pthread_mutex_unlock(&g2_core_lock);
+
+    logf_u2("gen2 projection ownership view_count=%u initial_view=%u source=%s",
+            view_count,initial_view,config_layer_name(vcfg.source_layer));
     if (repeated)
         logf_u2("gen2 repeated stream111 SETUP -> ownership reacquire rc=%d",rrc);
     gen2_publish_status();
