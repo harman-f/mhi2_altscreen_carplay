@@ -68,14 +68,27 @@ field(){
   echo "$D"
 }
 
-load_effective(){
-  F=$(source_file)
+load_from_file(){
+  F=$1
   Q=$(field "$F" query 0)
   S=$(field "$F" surface base)
   E=$(field "$F" showETA yes)
   P=$(field "$F" showSpeedLimit user)
   C=$(field "$F" showCompass user)
   M=$(field "$F" maneuverLayout none)
+}
+
+load_effective(){
+  load_from_file "$(source_file)"
+}
+
+load_for_layer(){
+  L=$1
+  if [ "$L" = persistent ]; then
+    [ -r "$PERSIST" ] && load_from_file "$PERSIST" || load_from_file ""
+  else
+    load_effective
+  fi
 }
 
 canonical(){
@@ -113,7 +126,7 @@ write_config(){
 set_field(){
   L=$1; K=$2; RAW=$3
   V=$(canonical "$K" "$RAW") || usage
-  load_effective
+  load_for_layer "$L"
   case "$K" in
     query) Q=$V ;;
     surface) S=$V ;;
