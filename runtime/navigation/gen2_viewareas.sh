@@ -93,7 +93,7 @@ set_key(){
     TGT=$TEMP
     F=$(source_file)
   fi
-  BASE="$TGT.base.$"
+  BASE="$TGT.base.$$"
   if [ -n "$F" ]; then cp "$F" "$BASE" || exit 13; else emit_default > "$BASE" || exit 13; fi
   T="$TGT.new.$$"
   awk -F= -v k="$K" -v v="$V" '
