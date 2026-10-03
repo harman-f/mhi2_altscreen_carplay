@@ -64,7 +64,7 @@ status(){
   echo "persistent_path=$PERSIST"
   echo "apply_definition=reconnect"
   echo "apply_select=live"
-  [ -r "$STATUS" ] && grep -E '^(control_session|projection_desired|shown_ack)=' "$STATUS" 2>/dev/null || true
+  [ -r "$STATUS" ] && grep -E '^(control_session|projection_desired|shown_ack|view_count|desired_view|acknowledged_view)=' "$STATUS" 2>/dev/null || true
 }
 write_default(){
   L=$1
@@ -108,10 +108,41 @@ set_key(){
   [ "$L" = persistent ] && { sync; mount -ur /mnt/app 2>/dev/null || true; }
 }
 select_view(){
-  [ "$1" = 0 ] || [ "$1" = 1 ] || usage
-  echo "$1" > "$REQUEST.new.$$" || exit 20
-  mv "$REQUEST.new.$$" "$REQUEST" || exit 21
-  echo "GEN2_VIEWAREA_SELECT=REQUESTED index=$1"
+  IDX=$1
+  [ "$IDX" = 0 ] || [ "$IDX" = 1 ] || usage
+
+  if [ -r "$STATUS" ]; then
+    SESSION=$(awk -F= '/^control_session=/{print $2; exit}' "$STATUS" 2>/dev/null)
+    READY=$(awk -F= '/^command_ready=/{print $2; exit}' "$STATUS" 2>/dev/null)
+    COUNT=$(awk -F= '/^view_count=/{print $2; exit}' "$STATUS" 2>/dev/null)
+    [ "${SESSION:-0}" != 0 ] && [ "${READY:-0}" = 1 ] || {
+      echo "GEN2_VIEWAREA_SELECT=NO_ACTIVE_SESSION"
+      exit 22
+    }
+    [ -z "${COUNT:-}" ] || [ "$IDX" -lt "$COUNT" ] || {
+      echo "GEN2_VIEWAREA_SELECT=INVALID_FOR_ACTIVE_COUNT index=$IDX count=$COUNT"
+      exit 23
+    }
+  fi
+
+  echo "$IDX" > "$REQUEST.new.$" || exit 20
+  mv "$REQUEST.new.$" "$REQUEST" || exit 21
+  echo "GEN2_VIEWAREA_SELECT=REQUESTED index=$IDX"
+
+  I=0
+  while [ "$I" -lt 30 ]; do
+    ACK=
+    [ -r "$STATUS" ] && ACK=$(awk -F= '/^acknowledged_view=/{print $2; exit}' "$STATUS" 2>/dev/null)
+    if [ "$ACK" = "$IDX" ]; then
+      echo "GEN2_VIEWAREA_SELECT=CONFIRMED index=$IDX"
+      return 0
+    fi
+    I=$((I+1))
+    if command -v usleep >/dev/null 2>&1; then usleep 100000; else sleep 1; fi
+  done
+
+  echo "GEN2_VIEWAREA_SELECT=NOT_CONFIRMED index=$IDX acknowledged=${ACK:-unknown}"
+  exit 24
 }
 case "${1:-status}" in
   status) status ;;
