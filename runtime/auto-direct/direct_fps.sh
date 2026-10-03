@@ -4,119 +4,123 @@
 runtime_init || { echo "DIRECT_FPS=FAIL_RUNTIME"; exit 3; }
 load_altscreen_config || { echo "DIRECT_FPS=FAIL_CONFIG"; exit 4; }
 
-FILE=$DIRECT_FPS_OVERRIDE_FILE
-SOURCE_FILE=$SOURCE_FPS_OVERRIDE_FILE
+NAME=$FPS_CONFIG_NAME
+TEMP="$MIBR_CFG_TEMP_ROOT/$NAME"
+PERSIST="$MIBR_CFG_PERSIST_ROOT/$NAME"
 BRIDGEPID=/tmp/mibr-direct-auto-bridge.pid
 
+usage(){
+  echo "usage: $0 status|20|25|30|40|temp {20|25|30|40}|persist {20|25|30|40}|clear-temp|clear-persist|default"
+  echo "bare FPS writes a temporary override; persistent changes require the 'persist' verb"
+  exit 64
+}
+
+valid_fps(){
+  case "$1" in 20|25|30|40) return 0 ;; *) return 1 ;; esac
+}
+
+effective(){
+  runtime_cfg_get "$NAME" "$ALTSCREEN111_FPS"
+}
+
 show_status(){
-  load_altscreen_config >/dev/null 2>&1 || true
-  EFFECTIVE_SOURCE_FPS=$ALTSCREEN111_FPS
-  if [ -r "$SOURCE_FILE" ]; then
-    V=$(cat "$SOURCE_FILE" 2>/dev/null)
-    case "$V" in 20|25|30|40) EFFECTIVE_SOURCE_FPS=$V ;; esac
-  fi
-  echo "source_base_fps=$ALTSCREEN111_FPS"
-  echo "source_max_fps=$EFFECTIVE_SOURCE_FPS"
-  echo "direct_output_fps=$DIRECT_OUTPUT_FPS"
-  echo "direct_pace=$DIRECT_PACE"
-  echo "direct_pace_buffer=$DIRECT_PACE_BUFFER"
-  [ -r "$FILE" ] && echo "direct_override=$(cat "$FILE" 2>/dev/null)" || echo "direct_override=none"
-  [ -r "$SOURCE_FILE" ] && echo "source_override=$(cat "$SOURCE_FILE" 2>/dev/null)" || echo "source_override=none"
+  E=$(effective)
+  echo "=== CARPLAY111 FPS ==="
+  echo "default=$ALTSCREEN111_FPS"
+  echo "effective=$E"
+  echo "source=$(runtime_cfg_source "$NAME")"
+  echo "temporary_path=$TEMP"
+  [ -r "$TEMP" ] && echo "temporary_value=$(cat "$TEMP" 2>/dev/null)" || echo "temporary_value=none"
+  echo "persistent_path=$PERSIST"
+  [ -r "$PERSIST" ] && echo "persistent_value=$(cat "$PERSIST" 2>/dev/null)" || echo "persistent_value=none"
+  echo "scope=source_maxFPS+direct_output_pacer"
   if [ -r /tmp/mibr-alt111-source-timing.status ]; then
     cat /tmp/mibr-alt111-source-timing.status 2>/dev/null || true
-  else
-    echo "source_timing_status=missing"
   fi
   if [ -r /tmp/mibr-direct-remux.status ]; then
     grep -E '^(input_bps|most_bps|pace_|last_input_interval_us|min_input_interval_us|max_input_interval_us|last_emit_interval_us|max_emit_jitter_us|write_eagain|last_block_wait_us|max_block_wait_us)=' /tmp/mibr-direct-remux.status 2>/dev/null || true
   fi
 }
 
-OLD_SOURCE_FPS=$ALTSCREEN111_FPS
-if [ -r "$SOURCE_FILE" ]; then
-  OLD_SOURCE_FPS=$(cat "$SOURCE_FILE" 2>/dev/null)
-fi
-case "$OLD_SOURCE_FPS" in 20|25|30|40) ;; *) OLD_SOURCE_FPS=$ALTSCREEN111_FPS ;; esac
+write_temp(){
+  V=$1
+  T="$TEMP.new.$$"
+  echo "$V" > "$T" || { rm -f "$T" 2>/dev/null || true; echo "DIRECT_FPS=FAIL_TEMP_WRITE"; exit 11; }
+  mv "$T" "$TEMP" || { rm -f "$T" 2>/dev/null || true; echo "DIRECT_FPS=FAIL_TEMP_RENAME"; exit 12; }
+}
 
+write_persist(){
+  V=$1
+  mount -uw /mnt/app 2>/dev/null || { echo "DIRECT_FPS=FAIL_MOUNT_RW"; exit 10; }
+  T="$PERSIST.new.$$"
+  echo "$V" > "$T" || {
+    rm -f "$T" 2>/dev/null || true
+    mount -ur /mnt/app 2>/dev/null || true
+    echo "DIRECT_FPS=FAIL_PERSIST_WRITE"; exit 11
+  }
+  mv "$T" "$PERSIST" || {
+    rm -f "$T" 2>/dev/null || true
+    mount -ur /mnt/app 2>/dev/null || true
+    echo "DIRECT_FPS=FAIL_PERSIST_RENAME"; exit 12
+  }
+  chmod 644 "$PERSIST" 2>/dev/null || true
+  sync
+  mount -ur /mnt/app 2>/dev/null || true
+}
+
+clear_persist(){
+  mount -uw /mnt/app 2>/dev/null || { echo "DIRECT_FPS=FAIL_MOUNT_RW"; exit 10; }
+  rm -f "$PERSIST" 2>/dev/null || true
+  sync
+  mount -ur /mnt/app 2>/dev/null || true
+}
+
+report_change(){
+  OLD=$1
+  NEW=$(effective)
+  echo "DIRECT_FPS_EFFECTIVE=$NEW"
+  echo "config_source=$(runtime_cfg_source "$NAME")"
+  if [ "$OLD" != "$NEW" ]; then
+    echo "CARPLAY_RECONNECT_REQUIRED=YES old_source_fps=$OLD new_source_fps=$NEW"
+    echo "bridge_restart_requested=deferred_until_source_renegotiation"
+  else
+    echo "CARPLAY_RECONNECT_REQUIRED=NO"
+  fi
+}
+
+OLD=$(effective)
 case "${1:-status}" in
   status)
     show_status
-    exit 0
     ;;
   20|25|30|40)
-    FPS=$1
-    mount -uw /mnt/app 2>/dev/null || { echo "DIRECT_FPS=FAIL_MOUNT_RW"; exit 10; }
-    TMP="$FILE.new.$$"
-    STMP="$SOURCE_FILE.new.$$"
-    echo "$FPS" > "$TMP" || {
-      rm -f "$TMP" "$STMP" 2>/dev/null || true
-      mount -ur /mnt/app 2>/dev/null || true
-      echo "DIRECT_FPS=FAIL_WRITE"
-      exit 11
-    }
-    echo "$FPS" > "$STMP" || {
-      rm -f "$TMP" "$STMP" 2>/dev/null || true
-      mount -ur /mnt/app 2>/dev/null || true
-      echo "DIRECT_FPS=FAIL_SOURCE_WRITE"
-      exit 11
-    }
-    mv "$TMP" "$FILE" || {
-      rm -f "$TMP" "$STMP" 2>/dev/null || true
-      mount -ur /mnt/app 2>/dev/null || true
-      echo "DIRECT_FPS=FAIL_RENAME"
-      exit 12
-    }
-    mv "$STMP" "$SOURCE_FILE" || {
-      rm -f "$STMP" 2>/dev/null || true
-      mount -ur /mnt/app 2>/dev/null || true
-      echo "DIRECT_FPS=FAIL_SOURCE_RENAME"
-      exit 12
-    }
-    sync
-    mount -ur /mnt/app 2>/dev/null || true
-    echo "DIRECT_FPS=SET fps=$FPS"
-    if [ "$FPS" != "$ALTSCREEN111_FPS" ]; then
-      echo "SOURCE_RATE_NOTE=new /info advertisements request maxFPS=$FPS"
-      echo "SOURCE_RATE_NOTE=current CarPlay session keeps its existing negotiation; reconnect CarPlay before judging the matched $FPS-fps test"
-    fi
-    if [ "$FPS" != "$OLD_SOURCE_FPS" ]; then
-      echo "CARPLAY_RECONNECT_REQUIRED=YES old_source_fps=$OLD_SOURCE_FPS new_source_fps=$FPS"
-      echo "bridge_restart_requested=deferred_until_source_renegotiation"
-    else
-      P=
-      [ -r "$BRIDGEPID" ] && P=$(cat "$BRIDGEPID" 2>/dev/null)
-      if [ -n "$P" ] && kill -0 "$P" 2>/dev/null; then
-        kill "$P" 2>/dev/null || true
-        echo "bridge_restart_requested=1"
-      else
-        echo "bridge_restart_requested=0"
-      fi
-    fi
-    exit 0
+    write_temp "$1"
+    echo "DIRECT_FPS=SET layer=temp fps=$1"
+    report_change "$OLD"
     ;;
-  default)
-    mount -uw /mnt/app 2>/dev/null || { echo "DIRECT_FPS=FAIL_MOUNT_RW"; exit 10; }
-    rm -f "$FILE" "$SOURCE_FILE" 2>/dev/null || true
-    sync
-    mount -ur /mnt/app 2>/dev/null || true
-    echo "DIRECT_FPS=DEFAULT"
-    if [ "$OLD_SOURCE_FPS" != "$ALTSCREEN111_FPS" ]; then
-      echo "CARPLAY_RECONNECT_REQUIRED=YES old_source_fps=$OLD_SOURCE_FPS new_source_fps=$ALTSCREEN111_FPS"
-      echo "bridge_restart_requested=deferred_until_source_renegotiation"
-    else
-      P=
-      [ -r "$BRIDGEPID" ] && P=$(cat "$BRIDGEPID" 2>/dev/null)
-      if [ -n "$P" ] && kill -0 "$P" 2>/dev/null; then
-        kill "$P" 2>/dev/null || true
-        echo "bridge_restart_requested=1"
-      else
-        echo "bridge_restart_requested=0"
-      fi
-    fi
-    exit 0
+  temp)
+    [ "$#" -eq 2 ] && valid_fps "$2" || usage
+    write_temp "$2"
+    echo "DIRECT_FPS=SET layer=temp fps=$2"
+    report_change "$OLD"
+    ;;
+  persist)
+    [ "$#" -eq 2 ] && valid_fps "$2" || usage
+    write_persist "$2"
+    echo "DIRECT_FPS=SET layer=persistent fps=$2"
+    report_change "$OLD"
+    ;;
+  clear-temp|default)
+    rm -f "$TEMP" 2>/dev/null || true
+    echo "DIRECT_FPS=CLEAR layer=temp"
+    report_change "$OLD"
+    ;;
+  clear-persist)
+    clear_persist
+    echo "DIRECT_FPS=CLEAR layer=persistent"
+    report_change "$OLD"
     ;;
   *)
-    echo "usage: $0 status|20|25|30|40|default"
-    exit 64
+    usage
     ;;
 esac
