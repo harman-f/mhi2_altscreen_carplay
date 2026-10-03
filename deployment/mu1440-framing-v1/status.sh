@@ -32,7 +32,7 @@ echo
 echo "=== CONFIG CONTRACT ==="
 echo "precedence=/tmp_then_/mnt/app/root_then_default"
 
-for H in   gen2_enabled.sh   direct_fps.sh   direct_source_mode.sh   gen2_video.sh   gen2_keyframes.sh   gen2_sourceversion.sh   gen2_url.sh   gen2_ui_urls.sh   gen2_nav_config.sh   gen2_display.sh   gen2_viewareas.sh
+for H in   gen2_enabled.sh   direct_autodirect.sh   direct_fps.sh   direct_source_mode.sh   gen2_video.sh   gen2_keyframes.sh   gen2_sourceversion.sh   gen2_url.sh   gen2_ui_urls.sh   gen2_nav_config.sh   gen2_display.sh   gen2_viewareas.sh
 do
   echo
   if [ -x "$DST/scripts/$H" ]; then
