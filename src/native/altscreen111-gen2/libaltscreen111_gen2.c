@@ -640,7 +640,7 @@ static void gen2_d2_schedule(unsigned source, const char *label)
             label?label:"unknown",active?"coalesced-active":"scheduled",pending,
             (unsigned long long)due,(unsigned long long)last_request,
             timing.event_delay_ms,timing.min_gap_ms,
-            timing.from_file?"file":"default");
+            config_layer_name(timing.source_layer));
 }
 
 static void capture_publish_status(const char *state)
@@ -1790,12 +1790,21 @@ static CFMutableDictionaryRef command_stopui(void)
 
 static CFMutableDictionaryRef command_update_view(unsigned view)
 {
+    struct mibr_viewareas_config cfg;
     CFMutableDictionaryRef req=dict_new(), params=dict_new();
     if(!req||!params){if(req)p_CFRelease(req);if(params)p_CFRelease(params);return NULL;}
+    load_viewareas_config(&cfg);
+    if(!cfg.enabled || view>=cfg.count){
+        if(req)p_CFRelease(req);
+        if(params)p_CFRelease(params);
+        logf_u2("GEN2 updateViewArea rejected index=%u enabled=%u count=%u",
+                view,cfg.enabled,cfg.count);
+        return NULL;
+    }
     set_str(req,"type","updateViewArea");
     set_str(params,"uuid",g_alt_uuid);
     set_i64(params,"viewAreaIndex",(int64_t)view);
-    set_i64(params,"animationDurationMillis",0);
+    set_i64(params,"animationDurationMillis",(int64_t)cfg.transition_ms);
     { CFStringRef k=s_cf("params"); p_CFDictionarySetValue(req,k,params); p_CFRelease(k); }
     p_CFRelease(params); return req;
 }
@@ -2864,27 +2873,38 @@ static void altscreen111_init(void)
     char active_url[384];
     void *setup,*start,*td,*platform,*control;
     signal(SIGPIPE,SIG_IGN);
-    g_enabled=env_i("ALTSCREEN111_ENABLED",1);
-    g_alt_port=env_i("ALTSCREEN111_PORT",6031);
-    g_tee_port=env_i("ALTSCREEN111_TEE_PORT",19820);
-    g_capture_port=env_i("ALTSCREEN111_CAPTURE_PORT",19821);
-    g_width=env_i("ALTSCREEN111_WIDTH",1010);
-    g_height=env_i("ALTSCREEN111_HEIGHT",376);
-    /* Keep MU-target physical geometry; Audi 290x90 is not portable evidence. */
-    g_width_mm=env_i("ALTSCREEN111_WIDTH_MM",200);
-    g_height_mm=env_i("ALTSCREEN111_HEIGHT_MM",
-                      g_width>0 ? (200*g_height)/g_width : 74);
-    g_fps=env_i("ALTSCREEN111_FPS",30);
-    /*
-     * Reference IRC does not prove startup showUI/forceKeyFrame. Ignore the
-     * legacy AUTO_SHOW=1 package default unless parity-specific opt-in is set.
-     */
-    g_auto_show=0; /* Gen-2 control worker owns UI acquisition. */
-    g_viewareas=(int)read_layered_bool(g_viewareas_config_name,
-                                      (unsigned)env_i("ALTSCREEN111_PARITY_VIEWAREAS",1),NULL);
-    /* Do not inherit Run117/118 legacy UUID/URL env values in the parity build. */
-    env_s("ALTSCREEN111_PARITY_UUID",g_alt_uuid,sizeof(g_alt_uuid),ALT_UUID_DEFAULT);
-    env_s("ALTSCREEN111_PARITY_URL",g_alt_url,sizeof(g_alt_url),ALT_URL_DEFAULT);
+    {
+        struct mibr_display_config dcfg;
+        struct mibr_viewareas_config vcfg;
+        unsigned enabled_default=(unsigned)env_i("ALTSCREEN111_ENABLED",1);
+
+        g_enabled=(int)read_layered_bool(g_enabled_config_name,enabled_default,NULL);
+        g_alt_port=env_i("ALTSCREEN111_PORT",6031);
+        g_tee_port=env_i("ALTSCREEN111_TEE_PORT",19820);
+        g_capture_port=env_i("ALTSCREEN111_CAPTURE_PORT",19821);
+        g_width=env_i("ALTSCREEN111_WIDTH",1010);
+        g_height=env_i("ALTSCREEN111_HEIGHT",376);
+        g_width_mm=env_i("ALTSCREEN111_WIDTH_MM",200);
+        g_height_mm=env_i("ALTSCREEN111_HEIGHT_MM",
+                          g_width>0 ? (200*g_height)/g_width : 74);
+        g_fps=env_i("ALTSCREEN111_FPS",30);
+
+        /* Keep env defaults for backward compatibility, then overlay file config. */
+        env_s("ALTSCREEN111_PARITY_UUID",g_alt_uuid,sizeof(g_alt_uuid),ALT_UUID_DEFAULT);
+        env_s("ALTSCREEN111_PARITY_URL",g_alt_url,sizeof(g_alt_url),ALT_URL_DEFAULT);
+        load_display_config(&dcfg);
+        g_width=dcfg.width;
+        g_height=dcfg.height;
+        g_width_mm=dcfg.width_mm;
+        g_height_mm=dcfg.height_mm;
+        snprintf(g_alt_uuid,sizeof(g_alt_uuid),"%s",dcfg.uuid);
+
+        load_viewareas_config(&vcfg);
+        g_viewareas=vcfg.enabled ? 1 : 0;
+    }
+
+    /* Gen-2 control worker owns UI acquisition. */
+    g_auto_show=0;
     clear_video_observer();
     publish_state(g_enabled ? "initializing" : "disabled");
     if(!g_enabled)return;
