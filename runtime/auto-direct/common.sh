@@ -48,9 +48,11 @@ fi
 
 CARPLAY_HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
 CARPLAY_BACKDIR=/mnt/app/root/mibr-carplay111-backup
-DIRECT_FPS_OVERRIDE_FILE=/mnt/app/root/mibr-direct-output-fps
-SOURCE_FPS_OVERRIDE_FILE=/mnt/app/root/mibr-carplay111-fps
-DIRECT_SOURCE_FRAMING_OVERRIDE_FILE=/mnt/app/root/mibr-direct-source-framing
+MIBR_CFG_TEMP_ROOT=/tmp
+MIBR_CFG_PERSIST_ROOT=/mnt/app/root
+FPS_CONFIG_NAME=mibr-carplay111-fps
+FRAMING_CONFIG_NAME=mibr-carplay111-framing
+AUTODIRECT_CONFIG_NAME=mibr-carplay-autodirect
 BACKUP=$CARPLAY_BACKDIR/smartphone_integrator.json.stock
 BACKUP_SHA=$CARPLAY_BACKDIR/smartphone_integrator.json.stock.sha256
 
@@ -84,6 +86,41 @@ runtime_emit(){
     echo "$MSG"
     [ -n "${LOG:-}" ] && echo "$MSG" >> "$LOG" 2>/dev/null || true
   fi
+}
+
+runtime_cfg_temp_path(){ echo "$MIBR_CFG_TEMP_ROOT/$1"; }
+runtime_cfg_persist_path(){ echo "$MIBR_CFG_PERSIST_ROOT/$1"; }
+
+runtime_cfg_get(){
+  NAME=$1
+  DEF=$2
+  TP="$MIBR_CFG_TEMP_ROOT/$NAME"
+  PP="$MIBR_CFG_PERSIST_ROOT/$NAME"
+  if [ -r "$TP" ]; then
+    cat "$TP" 2>/dev/null
+  elif [ -r "$PP" ]; then
+    cat "$PP" 2>/dev/null
+  else
+    echo "$DEF"
+  fi
+}
+
+runtime_cfg_source(){
+  NAME=$1
+  [ -r "$MIBR_CFG_TEMP_ROOT/$NAME" ] && { echo temp; return; }
+  [ -r "$MIBR_CFG_PERSIST_ROOT/$NAME" ] && { echo persistent; return; }
+  echo default
+}
+
+runtime_cfg_bool(){
+  NAME=$1
+  DEF=$2
+  V=$(runtime_cfg_get "$NAME" "$DEF")
+  case "$V" in
+    1|on|yes|true) echo 1 ;;
+    0|off|no|false) echo 0 ;;
+    *) echo "$DEF" ;;
+  esac
 }
 
 runtime_require_cmds(){
@@ -343,24 +380,22 @@ load_altscreen_config(){
     0|1) ;;
     *) log "ERROR DIRECT_SOURCE_FRAMING must be 0 or 1"; return 1 ;;
   esac
-  if [ -r "$DIRECT_SOURCE_FRAMING_OVERRIDE_FILE" ]; then
-    FRAMING_OVERRIDE=$(cat "$DIRECT_SOURCE_FRAMING_OVERRIDE_FILE" 2>/dev/null)
-    case "$FRAMING_OVERRIDE" in
-      0|1) DIRECT_SOURCE_FRAMING=$FRAMING_OVERRIDE ;;
-      *) log "WARN ignoring invalid source framing override: $FRAMING_OVERRIDE" ;;
-    esac
-  fi
+  FRAMING_OVERRIDE=$(runtime_cfg_get "$FRAMING_CONFIG_NAME" default)
+  case "$FRAMING_OVERRIDE" in
+    raw|0) DIRECT_SOURCE_FRAMING=0 ;;
+    m1au|1) DIRECT_SOURCE_FRAMING=1 ;;
+    default) ;;
+    *) log "WARN ignoring invalid source framing override: $FRAMING_OVERRIDE" ;;
+  esac
   case "$ALTSCREEN111_TIMING_INTERVAL_MS" in
     250|500|1000|2000|5000) ;;
     *) log "ERROR ALTSCREEN111_TIMING_INTERVAL_MS must be 250, 500, 1000, 2000 or 5000"; return 1 ;;
   esac
-  if [ -r "$DIRECT_FPS_OVERRIDE_FILE" ]; then
-    FPS_OVERRIDE=$(cat "$DIRECT_FPS_OVERRIDE_FILE" 2>/dev/null)
-    case "$FPS_OVERRIDE" in
-      20|25|30|40) DIRECT_OUTPUT_FPS=$FPS_OVERRIDE ;;
-      *) log "WARN ignoring invalid direct FPS override: $FPS_OVERRIDE" ;;
-    esac
-  fi
+  FPS_OVERRIDE=$(runtime_cfg_get "$FPS_CONFIG_NAME" "$ALTSCREEN111_FPS")
+  case "$FPS_OVERRIDE" in
+    20|25|30|40) DIRECT_OUTPUT_FPS=$FPS_OVERRIDE ;;
+    *) log "WARN ignoring invalid FPS override: $FPS_OVERRIDE"; DIRECT_OUTPUT_FPS=$ALTSCREEN111_FPS ;;
+  esac
   case "$ALTSCREEN111_URL" in
     *\"*|*\\*) log "ERROR invalid ALTSCREEN111_URL"; return 1 ;;
   esac
