@@ -180,6 +180,7 @@ if [ -e "$ACTIVE" ]; then
      same_as_package "$DST/scripts/common.sh" "$RUNTIME/auto-direct/common.sh" &&
      same_as_package "$DST/scripts/direct_fps.sh" "$RUNTIME/auto-direct/direct_fps.sh" &&
      same_as_package "$DST/scripts/direct_source_mode.sh" "$RUNTIME/auto-direct/direct_source_mode.sh" &&
+     same_as_package "$DST/scripts/direct_autodirect.sh" "$RUNTIME/auto-direct/direct_autodirect.sh" &&
      same_as_package "$DST/scripts/gen2_video.sh" "$RUNTIME/auto-direct/gen2_video.sh" &&
      same_as_package "$DST/scripts/gen2_nav_config.sh" "$RUNTIME/navigation/gen2_nav_config.sh" &&
      same_as_package "$DST/scripts/gen2_url.sh" "$RUNTIME/navigation/gen2_url.sh" &&
