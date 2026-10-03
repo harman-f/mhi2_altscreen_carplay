@@ -26,7 +26,7 @@ cp "$GEN2" "$DEST/payload/libaltscreen111.so"
 cp "$REMUX" "$DEST/payload/direct-ts-remux"
 cp "$SHAHELP" "$DEST/payload/sha256sum"
 
-for f in   common.sh direct_fps.sh direct_source_mode.sh gen2_video.sh   direct_ts_auto_supervisor.sh direct_ts_auto_status.sh   direct_ts_auto_start.sh direct_ts_auto_watchdog.sh   direct_ts_auto_enable.sh direct_ts_auto_disable.sh
+for f in   common.sh direct_fps.sh direct_source_mode.sh direct_autodirect.sh gen2_video.sh   direct_ts_auto_supervisor.sh direct_ts_auto_status.sh   direct_ts_auto_start.sh direct_ts_auto_watchdog.sh   direct_ts_auto_enable.sh direct_ts_auto_disable.sh
 do
   cp "$ROOT/runtime/auto-direct/$f" "$DEST/runtime/auto-direct/$f"
 done
@@ -45,7 +45,7 @@ chmod +x "$DEST/"*.sh "$DEST/payload/"*   "$DEST/runtime/auto-direct/"*.sh   "$D
 
 (
   cd "$DEST"
-  sha256sum     payload/libaltscreen111.so     payload/direct-ts-remux     payload/sha256sum     runtime/auto-direct/common.sh     runtime/auto-direct/direct_fps.sh     runtime/auto-direct/direct_source_mode.sh     runtime/auto-direct/gen2_video.sh     runtime/auto-direct/direct_ts_auto_supervisor.sh     runtime/auto-direct/direct_ts_auto_status.sh     runtime/auto-direct/direct_ts_auto_start.sh     runtime/auto-direct/direct_ts_auto_watchdog.sh     runtime/auto-direct/direct_ts_auto_enable.sh     runtime/auto-direct/direct_ts_auto_disable.sh     runtime/navigation/gen2_nav_config.sh     runtime/navigation/gen2_url.sh     runtime/navigation/gen2_ui_urls.sh     runtime/navigation/gen2_viewareas.sh     runtime/navigation/gen2_safearea.sh     runtime/diagnostics/gen2_keyframes.sh     runtime/diagnostics/gen2_sourceversion.sh     runtime/diagnostics/gen2_display.sh     runtime/diagnostics/gen2_enabled.sh     runtime/experimental/viewarea_mode.sh     > PAYLOAD.sha256
+  sha256sum     payload/libaltscreen111.so     payload/direct-ts-remux     payload/sha256sum     runtime/auto-direct/common.sh     runtime/auto-direct/direct_fps.sh     runtime/auto-direct/direct_source_mode.sh     runtime/auto-direct/direct_autodirect.sh     runtime/auto-direct/gen2_video.sh     runtime/auto-direct/direct_ts_auto_supervisor.sh     runtime/auto-direct/direct_ts_auto_status.sh     runtime/auto-direct/direct_ts_auto_start.sh     runtime/auto-direct/direct_ts_auto_watchdog.sh     runtime/auto-direct/direct_ts_auto_enable.sh     runtime/auto-direct/direct_ts_auto_disable.sh     runtime/navigation/gen2_nav_config.sh     runtime/navigation/gen2_url.sh     runtime/navigation/gen2_ui_urls.sh     runtime/navigation/gen2_viewareas.sh     runtime/navigation/gen2_safearea.sh     runtime/diagnostics/gen2_keyframes.sh     runtime/diagnostics/gen2_sourceversion.sh     runtime/diagnostics/gen2_display.sh     runtime/diagnostics/gen2_enabled.sh     runtime/experimental/viewarea_mode.sh     > PAYLOAD.sha256
 )
 
 GEN2_SHA=$(sha256sum "$GEN2" | awk '{print $1}')
