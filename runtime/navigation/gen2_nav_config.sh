@@ -1,55 +1,54 @@
 #!/bin/ksh
+# SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 
+TMPROOT=/tmp
 ROOT=/mnt/app/root
-QUERY=$ROOT/mibr-carplay111-nav-query.enabled
-SURFACE=$ROOT/mibr-carplay111-nav.surface
-ETA=$ROOT/mibr-carplay111-nav.showETA
-SPEED=$ROOT/mibr-carplay111-nav.showSpeedLimit
-COMPASS=$ROOT/mibr-carplay111-nav.showCompass
-MANEUVER=$ROOT/mibr-carplay111-nav.maneuverLayout
-LEGACY_MAP=$ROOT/mibr-carplay111-url-map.enabled
-VOLATILE_SURFACE=/tmp/mibr-alt111-url-mode
+PREFIX=mibr-carplay111-nav
+QUERY_NAME=$PREFIX-query
+SURFACE_NAME=$PREFIX.surface
+ETA_NAME=$PREFIX.showETA
+SPEED_NAME=$PREFIX.showSpeedLimit
+COMPASS_NAME=$PREFIX.showCompass
+MANEUVER_NAME=$PREFIX.maneuverLayout
 REACQUIRE=/tmp/mibr-alt111-gen2-reacquire
 STATUS=/tmp/mibr-alt111-gen2.status
-
 RW=0
 
 usage(){
   cat <<'EOF'
 usage:
   gen2_nav_config.sh status
-  gen2_nav_config.sh enable|disable
-  gen2_nav_config.sh surface {base|map|instructioncard}
-  gen2_nav_config.sh eta {yes|no|user}
-  gen2_nav_config.sh speed {yes|no|user}
-  gen2_nav_config.sh compass {yes|no|user}
-  gen2_nav_config.sh maneuver {none|left|right|top}
-  gen2_nav_config.sh profile {stock|base-rich|base-right|base-left|base-top|map-rich|map-clean|maneuver-only}
-  gen2_nav_config.sh use {stock|base-rich|base-right|base-left|base-top|map-rich|map-clean|maneuver-only}
-  gen2_nav_config.sh live {surface|eta|speed|compass|maneuver} VALUE
+  gen2_nav_config.sh temp FIELD VALUE
+  gen2_nav_config.sh persist FIELD VALUE
+  gen2_nav_config.sh temp-profile PROFILE
+  gen2_nav_config.sh persist-profile PROFILE
+  gen2_nav_config.sh use-temp PROFILE
+  gen2_nav_config.sh use-persist PROFILE
+  gen2_nav_config.sh clear-temp|clear-persist
   gen2_nav_config.sh apply
-  gen2_nav_config.sh paths
 
-Changes are persistent under /mnt/app/root. They do not rebuild Stream111.
-'apply' requests the existing serialized GEN2 same-stream reacquire sequence
-(STOP -> SHOW with the new URL -> forceKeyFrame). 'use PROFILE' stores a profile
-and immediately performs that live apply, including the fresh keyframe request.
-Do not use apply/use during an isolated D1/D2 recovery experiment unless that
-transition is the test itself.
+Compatibility aliases:
+  enable|disable, surface/eta/speed/compass/maneuver, profile, use -> persistent
+  live FIELD VALUE -> temporary + apply
+
+FIELD:
+  query {0|1}
+  surface {base|map|instructioncard}
+  eta|speed|compass {yes|no|user}
+  maneuver {none|left|right|top}
+
+PROFILE:
+  stock|base-rich|base-right|base-left|base-top|map-rich|map-clean|maneuver-only
 EOF
   exit 2
 }
 
 app_rw(){
   [ "$RW" -eq 1 ] && return 0
-  mount -uw /mnt/app 2>/dev/null || {
-    echo "GEN2_NAV=FAIL_MOUNT_APP_RW"
-    exit 10
-  }
+  mount -uw /mnt/app 2>/dev/null || { echo "GEN2_NAV=FAIL_MOUNT_APP_RW"; exit 10; }
   RW=1
 }
-
 app_ro(){
   if [ "$RW" -eq 1 ]; then
     sync 2>/dev/null || true
@@ -59,60 +58,95 @@ app_ro(){
 }
 trap app_ro 0 1 2 15
 
-write_value(){
-  target=$1
-  value=$2
-  tmp="$target.tmp.$$"
-  echo "$value" > "$tmp" || {
-    rm -f "$tmp" 2>/dev/null || true
-    echo "GEN2_NAV=FAIL_WRITE path=$target"
-    exit 11
-  }
-  mv "$tmp" "$target" || {
-    rm -f "$tmp" 2>/dev/null || true
-    echo "GEN2_NAV=FAIL_RENAME path=$target"
-    exit 12
-  }
+path_for(){
+  layer=$1; name=$2
+  [ "$layer" = temp ] && echo "$TMPROOT/$name" || echo "$ROOT/$name"
 }
 
-read_value(){
-  path=$1
-  def=$2
-  if [ -r "$path" ]; then
-    v=$(awk 'NR==1 { sub(/[[:space:]]+$/, ""); print; exit }' "$path" 2>/dev/null)
+effective_path(){
+  name=$1
+  [ -r "$TMPROOT/$name" ] && { echo "$TMPROOT/$name"; return; }
+  [ -r "$ROOT/$name" ] && { echo "$ROOT/$name"; return; }
+  echo ""
+}
+
+source_for(){
+  name=$1
+  [ -r "$TMPROOT/$name" ] && { echo temp; return; }
+  [ -r "$ROOT/$name" ] && { echo persistent; return; }
+  echo default
+}
+
+read_file(){
+  p=$1; d=$2
+  if [ -n "$p" ] && [ -r "$p" ]; then
+    v=$(awk 'NR==1 { sub(/[[:space:]]+$/, ""); print; exit }' "$p" 2>/dev/null)
     [ -n "$v" ] && { echo "$v"; return; }
   fi
-  echo "$def"
+  echo "$d"
 }
 
-canonical_tristate(){
-  case "$1" in
-    yes|no|user) echo "$1" ;;
+read_setting(){
+  name=$1; d=$2
+  read_file "$(effective_path "$name")" "$d"
+}
+
+canonical(){
+  field=$1; value=$2
+  case "$field" in
+    query)
+      case "$value" in 0|1) echo "$value" ;; on|yes|true) echo 1 ;; off|no|false) echo 0 ;; *) return 1 ;; esac ;;
+    surface)
+      case "$value" in base|map|instructioncard) echo "$value" ;; *) return 1 ;; esac ;;
+    eta|speed|compass)
+      case "$value" in yes|no|user) echo "$value" ;; *) return 1 ;; esac ;;
+    maneuver)
+      case "$value" in
+        none) echo none ;;
+        left|leftAligned) echo left ;;
+        right|rightAligned) echo right ;;
+        top|topAligned) echo top ;;
+        *) return 1 ;;
+      esac ;;
     *) return 1 ;;
   esac
 }
 
-canonical_maneuver(){
+name_for(){
   case "$1" in
-    none) echo "none" ;;
-    left|leftAligned) echo "left" ;;
-    right|rightAligned) echo "right" ;;
-    top|topAligned) echo "top" ;;
+    query) echo "$QUERY_NAME" ;;
+    surface) echo "$SURFACE_NAME" ;;
+    eta) echo "$ETA_NAME" ;;
+    speed) echo "$SPEED_NAME" ;;
+    compass) echo "$COMPASS_NAME" ;;
+    maneuver) echo "$MANEUVER_NAME" ;;
     *) return 1 ;;
   esac
 }
 
-effective_surface(){
-  if [ -r "$VOLATILE_SURFACE" ]; then
-    v=$(read_value "$VOLATILE_SURFACE" "")
-    case "$v" in base|map|instructioncard) echo "$v"; return ;; esac
-  fi
-  if [ -r "$SURFACE" ]; then
-    v=$(read_value "$SURFACE" "")
-    case "$v" in base|map|instructioncard) echo "$v"; return ;; esac
-  fi
-  [ -e "$LEGACY_MAP" ] && echo map || echo base
+write_setting(){
+  layer=$1; field=$2; raw=$3
+  name=$(name_for "$field") || usage
+  value=$(canonical "$field" "$raw") || usage
+  target=$(path_for "$layer" "$name")
+  [ "$layer" = persistent ] && app_rw
+  t="$target.tmp.$$"
+  echo "$value" > "$t" || { rm -f "$t" 2>/dev/null || true; echo "GEN2_NAV=FAIL_WRITE path=$target"; exit 11; }
+  mv "$t" "$target" || { rm -f "$t" 2>/dev/null || true; echo "GEN2_NAV=FAIL_RENAME path=$target"; exit 12; }
+  chmod 644 "$target" 2>/dev/null || true
+  [ "$layer" = persistent ] && app_ro
 }
+
+maneuver_wire(){
+  case "$1" in
+    left|leftAligned) echo leftAligned ;;
+    right|rightAligned) echo rightAligned ;;
+    top|topAligned) echo topAligned ;;
+    *) echo "" ;;
+  esac
+}
+
+effective_surface(){ read_setting "$SURFACE_NAME" base; }
 
 base_url(){
   case "$1" in
@@ -122,153 +156,84 @@ base_url(){
   esac
 }
 
-maneuver_wire(){
-  case "$1" in
-    left|leftAligned) echo "leftAligned" ;;
-    right|rightAligned) echo "rightAligned" ;;
-    top|topAligned) echo "topAligned" ;;
-    *) echo "" ;;
-  esac
-}
-
 effective_url(){
   s=$(effective_surface)
   b=$(base_url "$s")
-  if [ ! -e "$QUERY" ] || [ "$s" = "instructioncard" ]; then
-    echo "$b"
-    return
+  q=$(read_setting "$QUERY_NAME" 0)
+  if [ "$q" != 1 ] || [ "$s" = instructioncard ]; then
+    echo "$b"; return
   fi
-  speed=$(read_value "$SPEED" user)
-  compass=$(read_value "$COMPASS" user)
-  eta=$(read_value "$ETA" yes)
-  maneuver=$(maneuver_wire "$(read_value "$MANEUVER" none)")
+  speed=$(read_setting "$SPEED_NAME" user)
+  compass=$(read_setting "$COMPASS_NAME" user)
+  eta=$(read_setting "$ETA_NAME" yes)
+  maneuver=$(maneuver_wire "$(read_setting "$MANEUVER_NAME" none)")
   echo "$b?showSpeedLimit=$speed&showCompass=$compass&showETA=$eta&maneuverLayout=$maneuver"
 }
 
+show_one(){
+  label=$1; name=$2; def=$3
+  echo "$label=$(read_setting "$name" "$def") source=$(source_for "$name")"
+}
+
 show_status(){
-  s=$(effective_surface)
-  [ -e "$QUERY" ] && q=enabled || q=disabled
   echo "=== GEN2 NAV CONFIG ==="
-  echo "query=$q"
-  echo "surface=$s"
-  if [ -r "$VOLATILE_SURFACE" ]; then
-    echo "volatile_surface_override=$(read_value "$VOLATILE_SURFACE" invalid)"
-  else
-    echo "volatile_surface_override=none"
-  fi
-  echo "showETA=$(read_value "$ETA" yes)"
-  echo "showSpeedLimit=$(read_value "$SPEED" user)"
-  echo "showCompass=$(read_value "$COMPASS" user)"
-  echo "maneuverLayout=$(maneuver_wire "$(read_value "$MANEUVER" none)")"
+  show_one query "$QUERY_NAME" 0
+  show_one surface "$SURFACE_NAME" base
+  show_one showETA "$ETA_NAME" yes
+  show_one showSpeedLimit "$SPEED_NAME" user
+  show_one showCompass "$COMPASS_NAME" user
+  show_one maneuverLayout "$MANEUVER_NAME" none
   echo "effective_url=$(effective_url)"
-  if [ "$s" = "instructioncard" ] && [ -e "$QUERY" ]; then
-    echo "note=instructioncard_is_forced_bare"
-  fi
+  echo "temporary_root=$TMPROOT"
+  echo "persistent_root=$ROOT"
   if [ -r "$STATUS" ]; then
     grep -E '^(control_session|command_ready|nav_query_enabled|nav_url)=' "$STATUS" 2>/dev/null || true
   fi
 }
 
-clear_surface_overrides(){
-  rm -f "$VOLATILE_SURFACE" 2>/dev/null || true
-  rm -f "$LEGACY_MAP" 2>/dev/null || true
-}
-
-set_surface(){
-  case "$1" in base|map|instructioncard) ;; *) usage ;; esac
-  app_rw
-  write_value "$SURFACE" "$1"
-  clear_surface_overrides
-  app_ro
-}
-
-set_tristate(){
-  path=$1
-  val=$(canonical_tristate "$2") || usage
-  app_rw
-  write_value "$path" "$val"
-  app_ro
-}
-
-set_maneuver(){
-  val=$(canonical_maneuver "$1") || usage
-  app_rw
-  write_value "$MANEUVER" "$val"
-  app_ro
-}
-
 set_profile(){
-  p=$1
-  app_rw
-  clear_surface_overrides
+  layer=$1; p=$2
   case "$p" in
     stock)
-      write_value "$SURFACE" base
-      write_value "$ETA" yes
-      write_value "$SPEED" user
-      write_value "$COMPASS" user
-      write_value "$MANEUVER" none
-      rm -f "$QUERY"
-      ;;
+      q=0; surface=base; eta=yes; speed=user; compass=user; maneuver=none ;;
     base-rich)
-      write_value "$SURFACE" base
-      write_value "$ETA" yes
-      write_value "$SPEED" user
-      write_value "$COMPASS" user
-      write_value "$MANEUVER" none
-      : > "$QUERY"
-      ;;
+      q=1; surface=base; eta=yes; speed=user; compass=user; maneuver=none ;;
     base-right)
-      write_value "$SURFACE" base
-      write_value "$ETA" yes
-      write_value "$SPEED" user
-      write_value "$COMPASS" user
-      write_value "$MANEUVER" right
-      : > "$QUERY"
-      ;;
+      q=1; surface=base; eta=yes; speed=user; compass=user; maneuver=right ;;
     base-left)
-      write_value "$SURFACE" base
-      write_value "$ETA" yes
-      write_value "$SPEED" user
-      write_value "$COMPASS" user
-      write_value "$MANEUVER" left
-      : > "$QUERY"
-      ;;
+      q=1; surface=base; eta=yes; speed=user; compass=user; maneuver=left ;;
     base-top)
-      write_value "$SURFACE" base
-      write_value "$ETA" yes
-      write_value "$SPEED" user
-      write_value "$COMPASS" user
-      write_value "$MANEUVER" top
-      : > "$QUERY"
-      ;;
+      q=1; surface=base; eta=yes; speed=user; compass=user; maneuver=top ;;
     map-rich)
-      write_value "$SURFACE" map
-      write_value "$ETA" yes
-      write_value "$SPEED" user
-      write_value "$COMPASS" user
-      write_value "$MANEUVER" none
-      : > "$QUERY"
-      ;;
+      q=1; surface=map; eta=yes; speed=user; compass=user; maneuver=none ;;
     map-clean)
-      write_value "$SURFACE" map
-      write_value "$ETA" no
-      write_value "$SPEED" no
-      write_value "$COMPASS" no
-      write_value "$MANEUVER" none
-      : > "$QUERY"
-      ;;
+      q=1; surface=map; eta=no; speed=no; compass=no; maneuver=none ;;
     maneuver-only)
-      write_value "$SURFACE" instructioncard
-      write_value "$MANEUVER" none
-      : > "$QUERY"
-      ;;
-    *)
-      app_ro
-      usage
-      ;;
+      q=1; surface=instructioncard; eta=yes; speed=user; compass=user; maneuver=none ;;
+    *) usage ;;
   esac
-  app_ro
+  [ "$layer" = persistent ] && app_rw
+  for spec in "query:$q" "surface:$surface" "eta:$eta" "speed:$speed" "compass:$compass" "maneuver:$maneuver"; do
+    field=${spec%%:*}; value=${spec#*:}
+    name=$(name_for "$field")
+    target=$(path_for "$layer" "$name")
+    t="$target.tmp.$$"
+    echo "$value" > "$t" || { rm -f "$t" 2>/dev/null || true; echo "GEN2_NAV=FAIL_PROFILE_WRITE"; exit 13; }
+    mv "$t" "$target" || { rm -f "$t" 2>/dev/null || true; echo "GEN2_NAV=FAIL_PROFILE_RENAME"; exit 14; }
+    chmod 644 "$target" 2>/dev/null || true
+  done
+  [ "$layer" = persistent ] && app_ro
+  echo "GEN2_NAV_PROFILE=SET layer=$layer profile=$p"
+}
+
+clear_layer(){
+  layer=$1
+  [ "$layer" = persistent ] && app_rw
+  for name in "$QUERY_NAME" "$SURFACE_NAME" "$ETA_NAME" "$SPEED_NAME" "$COMPASS_NAME" "$MANEUVER_NAME"; do
+    rm -f "$(path_for "$layer" "$name")" 2>/dev/null || true
+  done
+  [ "$layer" = persistent ] && app_ro
+  echo "GEN2_NAV=CLEAR layer=$layer"
 }
 
 apply_live(){
@@ -365,95 +330,62 @@ apply_live(){
   fi
 }
 
-set_live(){
-  control=$1
-  value=$2
-  case "$control" in
-    surface) set_surface "$value" ;;
-    eta) set_tristate "$ETA" "$value" ;;
-    speed) set_tristate "$SPEED" "$value" ;;
-    compass) set_tristate "$COMPASS" "$value" ;;
-    maneuver) set_maneuver "$value" ;;
-    *) usage ;;
-  esac
-  show_status
-  apply_live
-}
-
-show_paths(){
-  echo "query_marker=$QUERY"
-  echo "surface_file=$SURFACE"
-  echo "eta_file=$ETA"
-  echo "speed_file=$SPEED"
-  echo "compass_file=$COMPASS"
-  echo "maneuver_file=$MANEUVER"
-  echo "apply_marker=$REACQUIRE"
-}
 
 cmd=${1:-status}
 case "$cmd" in
-  status)
+  status) show_status ;;
+  temp|persist)
+    [ "$#" -eq 3 ] || usage
+    write_setting "$cmd" "$2" "$3"
     show_status
     ;;
-  enable)
-    app_rw
-    : > "$QUERY" || { echo "GEN2_NAV=FAIL_ENABLE"; exit 13; }
-    app_ro
+  temp-profile|persist-profile)
+    [ "$#" -eq 2 ] || usage
+    [ "$cmd" = temp-profile ] && layer=temp || layer=persistent
+    set_profile "$layer" "$2"
     show_status
     ;;
-  disable)
-    app_rw
-    rm -f "$QUERY"
-    app_ro
+  use-temp|use-persist)
+    [ "$#" -eq 2 ] || usage
+    [ "$cmd" = use-temp ] && layer=temp || layer=persistent
+    set_profile "$layer" "$2"
+    show_status
+    apply_live
+    ;;
+  clear-temp) clear_layer temp; show_status ;;
+  clear-persist) clear_layer persistent; show_status ;;
+  apply) apply_live ;;
+  live)
+    [ "$#" -eq 3 ] || usage
+    write_setting temp "$2" "$3"
+    show_status
+    apply_live
+    ;;
+  enable|disable)
+    [ "$cmd" = enable ] && v=1 || v=0
+    write_setting persistent query "$v"
     show_status
     ;;
-  surface)
-    [ $# -eq 2 ] || usage
-    set_surface "$2"
-    show_status
-    ;;
-  eta)
-    [ $# -eq 2 ] || usage
-    set_tristate "$ETA" "$2"
-    show_status
-    ;;
-  speed)
-    [ $# -eq 2 ] || usage
-    set_tristate "$SPEED" "$2"
-    show_status
-    ;;
-  compass)
-    [ $# -eq 2 ] || usage
-    set_tristate "$COMPASS" "$2"
-    show_status
-    ;;
-  maneuver)
-    [ $# -eq 2 ] || usage
-    set_maneuver "$2"
+  surface|eta|speed|compass|maneuver)
+    [ "$#" -eq 2 ] || usage
+    write_setting persistent "$cmd" "$2"
     show_status
     ;;
   profile)
-    [ $# -eq 2 ] || usage
-    set_profile "$2"
+    [ "$#" -eq 2 ] || usage
+    set_profile persistent "$2"
     show_status
     ;;
   use)
-    [ $# -eq 2 ] || usage
-    set_profile "$2"
+    [ "$#" -eq 2 ] || usage
+    set_profile persistent "$2"
     show_status
     apply_live
     ;;
-  live)
-    [ $# -eq 3 ] || usage
-    set_live "$2" "$3"
-    ;;
-  apply)
-    apply_live
-    ;;
   paths)
-    show_paths
+    for name in "$QUERY_NAME" "$SURFACE_NAME" "$ETA_NAME" "$SPEED_NAME" "$COMPASS_NAME" "$MANEUVER_NAME"; do
+      echo "temporary=$TMPROOT/$name persistent=$ROOT/$name"
+    done
     ;;
-  *)
-    usage
-    ;;
+  *) usage ;;
 esac
