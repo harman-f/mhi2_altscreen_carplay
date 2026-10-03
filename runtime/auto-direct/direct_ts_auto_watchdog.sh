@@ -3,7 +3,6 @@
 . /mnt/app/root/altscreen-u2/scripts/common.sh
 runtime_init || exit 3
 
-ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
 PIDFILE=/tmp/mibr-direct-auto-watchdog.pid
 SUPHB=/tmp/mibr-direct-auto.heartbeat
 DIRECT=/tmp/mibr-isotx2-gate.direct
@@ -30,7 +29,7 @@ fi
 echo "$$" > "$PIDFILE" || exit 4
 watch_log "watchdog started pid=$$"
 
-while [ -e "$ENABLED" ]; do
+while [ "$(runtime_cfg_bool "$AUTODIRECT_CONFIG_NAME" 1)" = "1" ]; do
   if [ -e "$DIRECT" ]; then
     CUR=
     [ -r "$SUPHB" ] && CUR=$(cat "$SUPHB" 2>/dev/null)
@@ -55,5 +54,5 @@ while [ -e "$ENABLED" ]; do
 done
 
 rm -f "$DIRECT" 2>/dev/null || true
-watch_log "watchdog leaving: enable marker absent; STOCK requested"
+watch_log "watchdog leaving: Auto-Direct effective config disabled; STOCK requested"
 exit 0
