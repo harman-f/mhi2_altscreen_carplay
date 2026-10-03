@@ -3008,6 +3008,7 @@ static void gen2_publish_status(void)
     active_alt_url_copy(nav_url,sizeof(nav_url));
     n = snprintf(b,sizeof(b),
         "gen2=1\ncontrol_session=%llu\ncommand_ready=%u\nprojection_desired=%u\nshown_ack=%u\nreacquiring=%u\n"
+        "view_count=%u\ndesired_view=%u\nacknowledged_view=%d\n"
         "last_dispatched_request=%llu\nlast_completed_request=%llu\nlast_completion_status=%d\n"
         "nav_query_enabled=%u\nnav_url=%s\n"
         "stream_gen=%llu\ncodec_gen=%llu\nconsumer_gen=%llu\nconfig_valid=%u\n"
@@ -3028,6 +3029,7 @@ static void gen2_publish_status(void)
         "mode_valid=%u\nmode_sequence=%llu\nmode_screen=%d\nmode_main_audio=%d\n"
         "mode_speech=%d\nmode_speech_detail=%d\nmode_phone=%d\nmode_turns=%d\n",
         (unsigned long long)cs.session,command_ready,cs.desired,cs.shown_ack,cs.reacquiring,
+        cs.view_count,cs.desired_view,cs.acknowledged_view,
         (unsigned long long)last_dispatched,(unsigned long long)last_completed,last_completion_status,
         nav_query_enabled,nav_url,
         (unsigned long long)vs.stream,(unsigned long long)vs.codec,
