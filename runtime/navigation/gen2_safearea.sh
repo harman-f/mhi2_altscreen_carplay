@@ -3,8 +3,8 @@
 # Compatibility wrapper for the former single SafeArea helper.
 # It modifies ViewArea 0 only; use gen2_viewareas.sh for both areas.
 set -u
-H=/mnt/app/root/altscreen-u2/scripts/gen2_viewareas.sh
-[ -x "$H" ] || { echo "GEN2_SAFEAREA=FAIL_HELPER"; exit 3; }
+HELPER=/mnt/app/root/altscreen-u2/scripts/gen2_viewareas.sh
+[ -x "$HELPER" ] || { echo "GEN2_SAFEAREA=FAIL_HELPER"; exit 3; }
 FULL_W=1010
 FULL_H=376
 
@@ -19,16 +19,16 @@ usage(){
 is_uint(){ case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
 
 set_rect(){
-  L=$1; X=$2; Y=$3; W=$4; H=$5
-  for V in "$X" "$Y" "$W" "$H"; do is_uint "$V" || usage; done
-  [ "$W" -gt 0 ] && [ "$H" -gt 0 ] || usage
-  [ $((X+W)) -le "$FULL_W" ] && [ $((Y+H)) -le "$FULL_H" ] || usage
+  L=$1; X=$2; Y=$3; W=$4; HH=$5
+  for V in "$X" "$Y" "$W" "$HH"; do is_uint "$V" || usage; done
+  [ "$W" -gt 0 ] && [ "$HH" -gt 0 ] || usage
+  [ $((X+W)) -le "$FULL_W" ] && [ $((Y+HH)) -le "$FULL_H" ] || usage
   [ "$L" = temp ] && C=temp-set || C=persist-set
-  "$H" "$C" view0.safe.x "$X" >/dev/null || exit $?
-  "$H" "$C" view0.safe.y "$Y" >/dev/null || exit $?
-  "$H" "$C" view0.safe.w "$W" >/dev/null || exit $?
-  "$H" "$C" view0.safe.h "$H" >/dev/null || exit $?
-  "$H" status
+  "$HELPER" "$C" view0.safe.x "$X" >/dev/null || exit $?
+  "$HELPER" "$C" view0.safe.y "$Y" >/dev/null || exit $?
+  "$HELPER" "$C" view0.safe.w "$W" >/dev/null || exit $?
+  "$HELPER" "$C" view0.safe.h "$HH" >/dev/null || exit $?
+  "$HELPER" status
 }
 
 run(){
@@ -52,12 +52,12 @@ run(){
 }
 
 case "${1:-status}" in
-  status) exec "$H" status ;;
+  status) exec "$HELPER" status ;;
   temp|persist)
     L=$1; shift; [ "$#" -ge 1 ] || usage; run "$L" "$@" ;;
   full|set|bottom|inset)
     run temp "$@" ;;
-  clear-temp) exec "$H" clear-temp ;;
-  clear-persist) exec "$H" clear-persist ;;
+  clear-temp) exec "$HELPER" clear-temp ;;
+  clear-persist) exec "$HELPER" clear-persist ;;
   *) usage ;;
 esac
