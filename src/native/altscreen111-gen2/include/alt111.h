@@ -127,13 +127,16 @@ void alt111_resync_cancel(struct alt111_resync *r, unsigned reason);
 struct alt111_output_ticket {
     uint64_t stream, codec, consumer, sequence;
     size_t offset;
-    unsigned idr;
+    unsigned priming, idr;
+    /* Exact eight bytes from the Stream-111 header timestamp area. */
+    uint8_t source_ts_raw[8];
 };
 struct alt111_chunk {
     uint8_t *bytes;
     size_t length, offset;
     uint64_t sequence;
     unsigned priming, idr;
+    uint8_t source_ts_raw[8];
 };
 struct alt111_video {
     uint64_t session, stream, codec, consumer, sequence;
@@ -160,6 +163,12 @@ void alt111_video_detach(struct alt111_video *v);
  * Crypto and byte-stream/AU boundary recovery are intentionally external. */
 int alt111_video_submit(struct alt111_video *v, uint64_t stream,
                        const uint8_t *avcc, size_t size, unsigned complete_au);
+/* Metadata-preserving variant used by the MU1440 adapter. source_ts_raw is
+ * copied verbatim and deliberately has no assigned unit/endianness here. */
+int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
+                             const uint8_t *avcc, size_t size,
+                             unsigned complete_au,
+                             const uint8_t source_ts_raw[8]);
 /* Peek pointer valid only until the next mutating call. The adapter owns any
  * copy it needs across unlocked I/O. Advance only bytes successfully written. */
 int alt111_video_peek(const struct alt111_video *v, const uint8_t **bytes,

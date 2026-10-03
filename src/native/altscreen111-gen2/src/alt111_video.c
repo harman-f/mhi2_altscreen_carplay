@@ -178,8 +178,9 @@ static int invalid_au(struct alt111_video *v)
     return ALT111_INVALID;
 }
 
-int alt111_video_submit(struct alt111_video *v, uint64_t stream,
-                       const uint8_t *p, size_t n, unsigned complete_au)
+int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
+                             const uint8_t *p, size_t n, unsigned complete_au,
+                             const uint8_t source_ts_raw[8])
 {
     size_t pos = 0, len, bytes = 0, prefix, used;
     unsigned idr = 0, dependent = 0, type, index;
@@ -231,9 +232,17 @@ int alt111_video_submit(struct alt111_video *v, uint64_t stream,
     chunk = &v->queue[index];
     chunk->bytes = out; chunk->length = used; chunk->offset = 0;
     chunk->sequence = ++v->sequence; chunk->priming = prefix != 0; chunk->idr = idr;
+    if (source_ts_raw) memcpy(chunk->source_ts_raw, source_ts_raw, 8u);
+    else memset(chunk->source_ts_raw, 0, sizeof(chunk->source_ts_raw));
     if (chunk->priming) v->priming_queued = 1;
     ++v->count; v->queued_bytes += used;
     return ALT111_OK;
+}
+
+int alt111_video_submit(struct alt111_video *v, uint64_t stream,
+                       const uint8_t *p, size_t n, unsigned complete_au)
+{
+    return alt111_video_submit_timed(v, stream, p, n, complete_au, NULL);
 }
 
 int alt111_video_peek(const struct alt111_video *v, const uint8_t **bytes,
@@ -248,7 +257,9 @@ int alt111_video_peek(const struct alt111_video *v, const uint8_t **bytes,
     ticket->stream = v->stream; ticket->codec = v->codec;
     ticket->consumer = v->consumer; ticket->sequence = chunk->sequence;
     ticket->offset = chunk->offset;
+    ticket->priming = chunk->priming;
     ticket->idr = chunk->idr;
+    memcpy(ticket->source_ts_raw, chunk->source_ts_raw, sizeof(ticket->source_ts_raw));
     return ALT111_OK;
 }
 

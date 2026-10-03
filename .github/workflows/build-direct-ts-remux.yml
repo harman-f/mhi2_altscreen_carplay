@@ -102,6 +102,9 @@ jobs:
           strings "$BIN" | grep -q 'REMUX_START'
           strings "$BIN" | grep -q 'MOST strict write'
           strings "$BIN" | grep -q 'mpegts'
+          strings "$BIN" | grep -q 'M1AU_CONNECT_OK'
+          strings "$BIN" | grep -q 'm1au_sequence_gaps'
+          strings "$BIN" | grep -q 'input_mode=%s'
 
           cp "$BIN" "$OUTDIR/direct-ts-remux"
           chmod 755 "$OUTDIR/direct-ts-remux"

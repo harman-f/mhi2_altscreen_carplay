@@ -50,6 +50,7 @@ CARPLAY_HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
 CARPLAY_BACKDIR=/mnt/app/root/mibr-carplay111-backup
 DIRECT_FPS_OVERRIDE_FILE=/mnt/app/root/mibr-direct-output-fps
 SOURCE_FPS_OVERRIDE_FILE=/mnt/app/root/mibr-carplay111-fps
+DIRECT_SOURCE_FRAMING_OVERRIDE_FILE=/mnt/app/root/mibr-direct-source-framing
 BACKUP=$CARPLAY_BACKDIR/smartphone_integrator.json.stock
 BACKUP_SHA=$CARPLAY_BACKDIR/smartphone_integrator.json.stock.sha256
 
@@ -315,10 +316,11 @@ load_altscreen_config(){
   : ${ALTSCREEN111_TIMING_DEBUG:=1}
   : ${ALTSCREEN111_TIMING_INTERVAL_MS:=1000}
   : ${DIRECT_TELEMETRY:=1}
+  : ${DIRECT_SOURCE_FRAMING:=0}
   : ${ALTSCREEN111_AUTO_SHOW:=1}
   : ${ALTSCREEN111_URL:=maps:/car/instrumentcluster/map}
 
-  case "$ALTSCREEN111_PORT:$ALTSCREEN111_TEE_PORT:$ALTSCREEN111_WIDTH:$ALTSCREEN111_HEIGHT:$ALTSCREEN111_FPS:$ALTSCREEN111_AUTO_SHOW:$DIRECT_OUTPUT_FPS:$DIRECT_PACE:$DIRECT_PACE_BUFFER:$ALTSCREEN111_TIMING_DEBUG:$ALTSCREEN111_TIMING_INTERVAL_MS:$DIRECT_TELEMETRY" in
+  case "$ALTSCREEN111_PORT:$ALTSCREEN111_TEE_PORT:$ALTSCREEN111_WIDTH:$ALTSCREEN111_HEIGHT:$ALTSCREEN111_FPS:$ALTSCREEN111_AUTO_SHOW:$DIRECT_OUTPUT_FPS:$DIRECT_PACE:$DIRECT_PACE_BUFFER:$ALTSCREEN111_TIMING_DEBUG:$ALTSCREEN111_TIMING_INTERVAL_MS:$DIRECT_TELEMETRY:$DIRECT_SOURCE_FRAMING" in
     *[!0-9:]*|'') log "ERROR invalid numeric AltScreen/direct output config"; return 1 ;;
   esac
   case "$DIRECT_OUTPUT_FPS" in
@@ -337,6 +339,17 @@ load_altscreen_config(){
     0:0|0:1|1:0|1:1) ;;
     *) log "ERROR timing/debug switches must be 0 or 1"; return 1 ;;
   esac
+  case "$DIRECT_SOURCE_FRAMING" in
+    0|1) ;;
+    *) log "ERROR DIRECT_SOURCE_FRAMING must be 0 or 1"; return 1 ;;
+  esac
+  if [ -r "$DIRECT_SOURCE_FRAMING_OVERRIDE_FILE" ]; then
+    FRAMING_OVERRIDE=$(cat "$DIRECT_SOURCE_FRAMING_OVERRIDE_FILE" 2>/dev/null)
+    case "$FRAMING_OVERRIDE" in
+      0|1) DIRECT_SOURCE_FRAMING=$FRAMING_OVERRIDE ;;
+      *) log "WARN ignoring invalid source framing override: $FRAMING_OVERRIDE" ;;
+    esac
+  fi
   case "$ALTSCREEN111_TIMING_INTERVAL_MS" in
     250|500|1000|2000|5000) ;;
     *) log "ERROR ALTSCREEN111_TIMING_INTERVAL_MS must be 250, 500, 1000, 2000 or 5000"; return 1 ;;
