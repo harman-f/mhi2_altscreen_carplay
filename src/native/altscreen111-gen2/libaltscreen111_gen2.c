@@ -292,31 +292,21 @@ static int g_height = 376;
 static int g_width_mm = 200;
 static int g_height_mm = 74;
 static int g_fps = 30;
-static const char *g_fps_override_path = "/mnt/app/root/mibr-carplay111-fps";
 static int g_auto_show = 0;
 static int g_viewareas = 1;
-static const char *g_viewareas_marker = "/mnt/app/root/mibr-carplay111-viewareas.enabled";
-static const char *g_safearea_config_path = "/mnt/app/root/mibr-carplay111-safearea.conf";
-static const char *g_autoshow_disable_marker = "/mnt/app/root/mibr-carplay111-autoshow.disabled";
-static const char *g_url_map_marker = "/mnt/app/root/mibr-carplay111-url-map.enabled";
-static const char *g_url_mode_path = "/tmp/mibr-alt111-url-mode";
-/*
- * Runtime navigation composition controls.
- *
- * The master query marker keeps the historic bare-URL behaviour as the
- * fail-safe default.  Surface and appearance values live under /mnt/app/root
- * so the same switches can be used for one-off vehicle A/B tests and later
- * persistent operation.  instructioncard is intentionally kept query-free,
- * matching observed Apple Simulator behaviour.
- */
-static const char *g_nav_query_enable_marker = "/mnt/app/root/mibr-carplay111-nav-query.enabled";
-static const char *g_nav_surface_path = "/mnt/app/root/mibr-carplay111-nav.surface";
-static const char *g_nav_eta_path = "/mnt/app/root/mibr-carplay111-nav.showETA";
-static const char *g_nav_speed_path = "/mnt/app/root/mibr-carplay111-nav.showSpeedLimit";
-static const char *g_nav_compass_path = "/mnt/app/root/mibr-carplay111-nav.showCompass";
-static const char *g_nav_maneuver_path = "/mnt/app/root/mibr-carplay111-nav.maneuverLayout";
-static const char *g_bit26_on_marker = "/mnt/app/root/mibr-carplay111-bit26.force-on";
-static const char *g_bit26_off_marker = "/mnt/app/root/mibr-carplay111-bit26.force-off";
+
+/* User-facing settings: /tmp wins over /mnt/app/root, then code default. */
+#define MIBR_CFG_TEMP_ROOT "/tmp"
+#define MIBR_CFG_PERSIST_ROOT "/mnt/app/root"
+static const char *g_fps_config_name = "mibr-carplay111-fps";
+static const char *g_viewareas_config_name = "mibr-carplay111-viewareas";
+static const char *g_safearea_config_name = "mibr-carplay111-safearea.conf";
+static const char *g_nav_query_config_name = "mibr-carplay111-nav-query";
+static const char *g_nav_surface_config_name = "mibr-carplay111-nav.surface";
+static const char *g_nav_eta_config_name = "mibr-carplay111-nav.showETA";
+static const char *g_nav_speed_config_name = "mibr-carplay111-nav.showSpeedLimit";
+static const char *g_nav_compass_config_name = "mibr-carplay111-nav.showCompass";
+static const char *g_nav_maneuver_config_name = "mibr-carplay111-nav.maneuverLayout";
 static char g_alt_uuid[96] = ALT_UUID_DEFAULT;
 static char g_alt_url[160] = ALT_URL_DEFAULT;
 static const char *g_log_path = "/tmp/altscreen111.log";
@@ -359,10 +349,8 @@ static const char *g2_diag_show_marker = "/tmp/mibr-alt111-show-only";
 static const char *g2_diag_keyframe_marker = "/tmp/mibr-alt111-keyframe-only";
 static const char *g2_resync_enable_marker = "/tmp/mibr-alt111-resync.enabled";
 static const char *g2_resync_arm_marker = "/tmp/mibr-alt111-resync-arm";
-static const char *g2_d2_enable_marker = "/tmp/mibr-alt111-keyframe-policy.enabled";
-static const char *g2_d2_persist_marker = "/mnt/app/root/mibr-alt111-keyframe-policy.enabled";
-static const char *g2_d2_timing_config_path = "/mnt/app/root/mibr-carplay111-keyframes.conf";
-static const char *g_source_version_path = "/mnt/app/root/mibr-carplay111-sourceversion";
+static const char *g2_d2_config_name = "mibr-carplay111-keyframes.conf";
+static const char *g_source_version_config_name = "mibr-carplay111-sourceversion";
 
 #define G2_D2_EVENT_DELAY_DEFAULT_MS 250u
 #define G2_D2_MIN_GAP_DEFAULT_MS 1000u
@@ -375,10 +363,11 @@ static const char *g_source_version_path = "/mnt/app/root/mibr-carplay111-source
 #define G2_D2_SOURCE_SUGGEST_UI 0x02u
 
 struct gen2_d2_timing {
+    unsigned enabled;
     unsigned event_delay_ms;
     unsigned min_gap_ms;
     unsigned watchdog_ms;
-    unsigned from_file;
+    unsigned source_layer;
 };
 
 static unsigned g2_d2_was_enabled;
@@ -403,7 +392,7 @@ static void gen2_resync_poll(void);
 static void gen2_d2_timing_load(struct gen2_d2_timing *cfg);
 static void source_version_value(char *out, size_t cap,
                                  unsigned *preserve_stock,
-                                 unsigned *from_file);
+                                 unsigned *source_layer);
 static void gen2_d2_schedule(unsigned source, const char *label);
 static void tee_drop_client_locked(void);
 static void capture_drop_client_locked(void);
@@ -608,8 +597,9 @@ static void source_timing_finish(void)
 
 static unsigned gen2_d2_enabled(void)
 {
-    return (access(g2_d2_enable_marker,F_OK)==0 ||
-            access(g2_d2_persist_marker,F_OK)==0) ? 1u : 0u;
+    struct gen2_d2_timing cfg;
+    gen2_d2_timing_load(&cfg);
+    return cfg.enabled ? 1u : 0u;
 }
 
 static void gen2_d2_schedule(unsigned source, const char *label)
@@ -794,35 +784,73 @@ static int read_trimmed_value(const char *path, char *out, size_t cap)
     return n > 0 ? 0 : -1;
 }
 
+static const char *config_layer_name(unsigned layer)
+{
+    if(layer==2u)return "temp";
+    if(layer==1u)return "persistent";
+    return "default";
+}
+
+static int read_layered_value(const char *name, char *out, size_t cap,
+                              unsigned *source_layer)
+{
+    char path[192];
+    if(source_layer)*source_layer=0u;
+    if(!name||!out||cap<2u)return -1;
+    snprintf(path,sizeof(path),"%s/%s",MIBR_CFG_TEMP_ROOT,name);
+    if(read_trimmed_value(path,out,cap)==0){
+        if(source_layer)*source_layer=2u;
+        return 0;
+    }
+    snprintf(path,sizeof(path),"%s/%s",MIBR_CFG_PERSIST_ROOT,name);
+    if(read_trimmed_value(path,out,cap)==0){
+        if(source_layer)*source_layer=1u;
+        return 0;
+    }
+    return -1;
+}
+
+static unsigned read_layered_bool(const char *name, unsigned defv,
+                                  unsigned *source_layer)
+{
+    char b[24];
+    unsigned layer=0u;
+    if(read_layered_value(name,b,sizeof(b),&layer)!=0){
+        if(source_layer)*source_layer=0u;
+        return defv?1u:0u;
+    }
+    if(strcmp(b,"1")==0||strcmp(b,"on")==0||strcmp(b,"yes")==0||strcmp(b,"true")==0){
+        if(source_layer)*source_layer=layer;
+        return 1u;
+    }
+    if(strcmp(b,"0")==0||strcmp(b,"off")==0||strcmp(b,"no")==0||strcmp(b,"false")==0){
+        if(source_layer)*source_layer=layer;
+        return 0u;
+    }
+    if(source_layer)*source_layer=0u;
+    return defv?1u:0u;
+}
+
 static void gen2_d2_timing_load(struct gen2_d2_timing *cfg)
 {
-    char b[192];
-    int fd, n;
-    unsigned event_delay, min_gap, watchdog;
-
-    if(!cfg) return;
-    cfg->event_delay_ms = G2_D2_EVENT_DELAY_DEFAULT_MS;
-    cfg->min_gap_ms = G2_D2_MIN_GAP_DEFAULT_MS;
-    cfg->watchdog_ms = G2_D2_WATCHDOG_DEFAULT_MS;
-    cfg->from_file = 0u;
-
-    fd=open(g2_d2_timing_config_path,O_RDONLY);
-    if(fd<0) return;
-    n=(int)read(fd,b,sizeof(b)-1u);
-    close(fd);
-    if(n<=0) return;
-    b[n]='\0';
-
-    if(sscanf(b,"event_delay_ms=%u\nmin_gap_ms=%u\nwatchdog_ms=%u",
-              &event_delay,&min_gap,&watchdog)!=3) return;
-    if(event_delay>G2_D2_EVENT_DELAY_MAX_MS ||
-       min_gap>G2_D2_MIN_GAP_MAX_MS ||
-       watchdog>G2_D2_WATCHDOG_MAX_MS) return;
-
+    char b[224];
+    unsigned enabled,event_delay,min_gap,watchdog,layer=0u;
+    if(!cfg)return;
+    cfg->enabled=1u;
+    cfg->event_delay_ms=G2_D2_EVENT_DELAY_DEFAULT_MS;
+    cfg->min_gap_ms=G2_D2_MIN_GAP_DEFAULT_MS;
+    cfg->watchdog_ms=G2_D2_WATCHDOG_DEFAULT_MS;
+    cfg->source_layer=0u;
+    if(read_layered_value(g2_d2_config_name,b,sizeof(b),&layer)!=0)return;
+    if(sscanf(b,"enabled=%u\nevent_delay_ms=%u\nmin_gap_ms=%u\nwatchdog_ms=%u",
+              &enabled,&event_delay,&min_gap,&watchdog)!=4)return;
+    if(enabled>1u||event_delay>G2_D2_EVENT_DELAY_MAX_MS||
+       min_gap>G2_D2_MIN_GAP_MAX_MS||watchdog>G2_D2_WATCHDOG_MAX_MS)return;
+    cfg->enabled=enabled;
     cfg->event_delay_ms=event_delay;
     cfg->min_gap_ms=min_gap;
     cfg->watchdog_ms=watchdog;
-    cfg->from_file=1u;
+    cfg->source_layer=layer;
 }
 
 static int source_version_is_valid(const char *s)
@@ -848,45 +876,43 @@ static int source_version_is_valid(const char *s)
 
 static void source_version_value(char *out, size_t cap,
                                  unsigned *preserve_stock,
-                                 unsigned *from_file)
+                                 unsigned *source_layer)
 {
     char b[32];
+    unsigned layer=0u;
     if(!out || cap<2u) return;
     snprintf(out,cap,"%s",GEN2_SOURCE_VERSION_DEFAULT);
     if(preserve_stock) *preserve_stock=0u;
-    if(from_file) *from_file=0u;
-
-    if(read_trimmed_value(g_source_version_path,b,sizeof(b))!=0) return;
+    if(source_layer) *source_layer=0u;
+    if(read_layered_value(g_source_version_config_name,b,sizeof(b),&layer)!=0)return;
     if(strcmp(b,"stock")==0){
-        if(preserve_stock) *preserve_stock=1u;
-        if(from_file) *from_file=1u;
+        if(preserve_stock)*preserve_stock=1u;
+        if(source_layer)*source_layer=layer;
         snprintf(out,cap,"%s","stock");
         return;
     }
-    if(!source_version_is_valid(b)) return;
+    if(!source_version_is_valid(b))return;
     snprintf(out,cap,"%s",b);
-    if(from_file) *from_file=1u;
+    if(source_layer)*source_layer=layer;
 }
 
 static void load_safearea_config(int *x, int *y, int *w, int *h)
 {
     char b[192];
-    int fd, n;
+    int n;
     int tx=0, ty=0, tw=g_width, th=g_height;
 
     if(!x||!y||!w||!h) return;
     *x=0; *y=0; *w=g_width; *h=g_height;
 
-    fd=open(g_safearea_config_path,O_RDONLY);
-    if(fd<0) return;
-    n=(int)read(fd,b,sizeof(b)-1u);
-    close(fd);
-    if(n<=0) return;
-    b[n]='\0';
+    {
+        unsigned layer=0u;
+        if(read_layered_value(g_safearea_config_name,b,sizeof(b),&layer)!=0)return;
+        n=(int)strlen(b);
+    }
 
     if(sscanf(b,"x=%d\ny=%d\nw=%d\nh=%d",&tx,&ty,&tw,&th)!=4){
-        logf_u2("GEN2 SafeArea config invalid path=%s; using full canvas",
-                g_safearea_config_path);
+        logf_u2("GEN2 SafeArea config invalid; using full canvas");
         return;
     }
 
@@ -900,1250 +926,81 @@ static void load_safearea_config(int *x, int *y, int *w, int *h)
     *x=tx; *y=ty; *w=tw; *h=th;
 }
 
+static void nav_scalar_value(const char *name, char *out, size_t cap,
+                             const char *defv)
+{
+    char value[32];
+    if(read_layered_value(name,value,sizeof(value),NULL)==0){
+        snprintf(out,cap,"%s",value);
+        return;
+    }
+    snprintf(out,cap,"%s",defv);
+}
+
 static const char *nav_surface_url(char *surface, size_t surface_cap)
 {
     char mode[32];
-
-    /*
-     * Volatile vehicle-test override has highest priority for backwards
-     * compatibility with the existing A/B harness.
-     */
-    if (read_trimmed_value(g_url_mode_path, mode, sizeof(mode)) == 0) {
-        if (strcmp(mode, "base") == 0) {
-            snprintf(surface, surface_cap, "%s", "base");
-            return ALT_URL_DEFAULT;
-        }
-        if (strcmp(mode, "map") == 0) {
-            snprintf(surface, surface_cap, "%s", "map");
-            return ALT_URL_MAP;
-        }
-        if (strcmp(mode, "instructioncard") == 0) {
-            snprintf(surface, surface_cap, "%s", "instructioncard");
-            return ALT_URL_INSTRUCTIONCARD;
-        }
+    nav_scalar_value(g_nav_surface_config_name,mode,sizeof(mode),"base");
+    if(strcmp(mode,"map")==0){snprintf(surface,surface_cap,"%s","map");return ALT_URL_MAP;}
+    if(strcmp(mode,"instructioncard")==0){
+        snprintf(surface,surface_cap,"%s","instructioncard");
+        return ALT_URL_INSTRUCTIONCARD;
     }
-
-    if (read_trimmed_value(g_nav_surface_path, mode, sizeof(mode)) == 0) {
-        if (strcmp(mode, "base") == 0) {
-            snprintf(surface, surface_cap, "%s", "base");
-            return ALT_URL_DEFAULT;
-        }
-        if (strcmp(mode, "map") == 0) {
-            snprintf(surface, surface_cap, "%s", "map");
-            return ALT_URL_MAP;
-        }
-        if (strcmp(mode, "instructioncard") == 0) {
-            snprintf(surface, surface_cap, "%s", "instructioncard");
-            return ALT_URL_INSTRUCTIONCARD;
-        }
-    }
-
-    /* Preserve the earlier persistent base/map A/B marker as fallback. */
-    if (access(g_url_map_marker, F_OK) == 0) {
-        snprintf(surface, surface_cap, "%s", "map");
-        return ALT_URL_MAP;
-    }
-    snprintf(surface, surface_cap, "%s", "base");
-    return g_alt_url;
+    snprintf(surface,surface_cap,"%s","base");
+    return ALT_URL_DEFAULT;
 }
 
-static void nav_tristate_value(const char *path, char *out, size_t cap,
+static void nav_tristate_value(const char *name, char *out, size_t cap,
                                const char *defv)
 {
     char value[24];
-    if (read_trimmed_value(path, value, sizeof(value)) == 0 &&
-        (strcmp(value, "yes") == 0 || strcmp(value, "no") == 0 ||
-         strcmp(value, "user") == 0 || strcmp(value, "1") == 0 ||
-         strcmp(value, "0") == 0)) {
-        snprintf(out, cap, "%s", value);
+    nav_scalar_value(name,value,sizeof(value),defv);
+    if(strcmp(value,"yes")==0||strcmp(value,"no")==0||strcmp(value,"user")==0||
+       strcmp(value,"1")==0||strcmp(value,"0")==0){
+        snprintf(out,cap,"%s",value);
         return;
     }
-    snprintf(out, cap, "%s", defv);
+    snprintf(out,cap,"%s",defv);
 }
 
 static void nav_maneuver_value(char *out, size_t cap)
 {
     char value[32];
-    if (read_trimmed_value(g_nav_maneuver_path, value, sizeof(value)) != 0 ||
-        strcmp(value, "none") == 0 || value[0] == '\0') {
-        out[0] = '\0';
-        return;
+    nav_scalar_value(g_nav_maneuver_config_name,value,sizeof(value),"none");
+    if(strcmp(value,"left")==0||strcmp(value,"leftAligned")==0){
+        snprintf(out,cap,"%s","leftAligned");return;
     }
-    if (strcmp(value, "left") == 0 || strcmp(value, "leftAligned") == 0) {
-        snprintf(out, cap, "%s", "leftAligned");
-        return;
+    if(strcmp(value,"right")==0||strcmp(value,"rightAligned")==0){
+        snprintf(out,cap,"%s","rightAligned");return;
     }
-    if (strcmp(value, "right") == 0 || strcmp(value, "rightAligned") == 0) {
-        snprintf(out, cap, "%s", "rightAligned");
-        return;
+    if(strcmp(value,"top")==0||strcmp(value,"topAligned")==0){
+        snprintf(out,cap,"%s","topAligned");return;
     }
-    if (strcmp(value, "top") == 0 || strcmp(value, "topAligned") == 0) {
-        snprintf(out, cap, "%s", "topAligned");
-        return;
-    }
-    out[0] = '\0';
+    out[0]='\0';
+}
+
+static unsigned nav_query_is_enabled(void)
+{
+    return read_layered_bool(g_nav_query_config_name,0u,NULL);
 }
 
 static void active_alt_url_copy(char *out, size_t cap)
 {
-    char surface[24];
-    char eta[24], speed[24], compass[24], maneuver[32];
+    char surface[24],eta[24],speed[24],compass[24],maneuver[32];
     const char *base;
-
-    if (!out || cap == 0u) return;
-    out[0] = '\0';
-    base = nav_surface_url(surface, sizeof(surface));
-
-    /*
-     * Compatibility/default mode: keep the exact historical bare URL.
-     * Apple Simulator observations also keep instructioncard bare even when
-     * map/base appearance query parameters are in use.
-     */
-    if (access(g_nav_query_enable_marker, F_OK) != 0 ||
-        strcmp(surface, "instructioncard") == 0) {
-        snprintf(out, cap, "%s", base);
+    if(!out||cap==0u)return;
+    out[0]='\0';
+    base=nav_surface_url(surface,sizeof(surface));
+    if(!nav_query_is_enabled()||strcmp(surface,"instructioncard")==0){
+        snprintf(out,cap,"%s",base);
         return;
     }
-
-    nav_tristate_value(g_nav_speed_path, speed, sizeof(speed), "user");
-    nav_tristate_value(g_nav_compass_path, compass, sizeof(compass), "user");
-    nav_tristate_value(g_nav_eta_path, eta, sizeof(eta), "yes");
-    nav_maneuver_value(maneuver, sizeof(maneuver));
-
-    snprintf(out, cap,
-             "%s?showSpeedLimit=%s&showCompass=%s&showETA=%s&maneuverLayout=%s",
-             base, speed, compass, eta, maneuver);
-}
-
-/* 0 = preserve stock, +1 = force bit 26, -1 = clear bit 26. */
-static int airplay_bit26_mode(void)
-{
-    if (access(g_bit26_on_marker, F_OK) == 0) return 1;
-    if (access(g_bit26_off_marker, F_OK) == 0) return -1;
-    return 0;
-}
-
-static void apply_airplay_bit26_ab(CFMutableDictionaryRef info)
-{
-    CFStringRef k;
-    OSStatus err = 0;
-    int mode;
-    int64_t before, after;
-
-    if (!info) return;
-    mode = airplay_bit26_mode();
-    if (!mode) return;
-
-    k = s_cf("features");
-    if (!k) return;
-    before = p_CFDictionaryGetInt64(info, k, &err);
-    if (err) {
-        logf_u2("GEN2 A/B bit26 mode=%s root features unavailable; unchanged",
-                mode > 0 ? "force-on" : "force-off");
-        p_CFRelease(k);
-        return;
-    }
-
-    after = (int64_t)(mode > 0
-        ? ((uint64_t)before | AIRPLAY_FEATURE_BIT26)
-        : ((uint64_t)before & ~AIRPLAY_FEATURE_BIT26));
-    if (after != before) p_CFDictionarySetInt64(info, k, after);
-    logf_u2("GEN2 A/B bit26 mode=%s features=0x%llx->0x%llx",
-            mode > 0 ? "force-on" : "force-off",
-            (unsigned long long)(uint64_t)before,
-            (unsigned long long)(uint64_t)after);
-    p_CFRelease(k);
-}
-
-static void *sym_next(const char *name)
-{
-    void *p = dlsym(RTLD_NEXT, name);
-    if (!p) p = dlsym(RTLD_DEFAULT, name);
-    return p;
-}
-
-static int init_api(void)
-{
-#define RESOLVE(dst, name) do { dst = (void *)sym_next(name); if (!(dst)) { logf_u2("missing symbol %s", name); return -1; } } while (0)
-    RESOLVE(g_real_serverinfo, "AirPlayCopyServerInfo");
-    RESOLVE(g_sendcmd, "AirPlayReceiverSessionSendCommand");
-    RESOLVE(g_real_aes_cbc_init, "AES_CBCFrame_Init");
-    RESOLVE(g_aes_ctr_init, "AES_CTR_Init");
-    RESOLVE(g_aes_ctr_update, "AES_CTR_Update");
-    RESOLVE(g_aes_ctr_final, "AES_CTR_Final");
-    RESOLVE(g_derive_screen, "AirPlay_DeriveAESKeySHA512ForScreen");
-    RESOLVE(p_CFStringCreateWithCString, "CFStringCreateWithCString");
-    RESOLVE(p_CFStringGetCStringPtr, "CFStringGetCStringPtr");
-    RESOLVE(p_CFStringGetCString, "CFStringGetCString");
-    RESOLVE(p_CFGetTypeID, "CFGetTypeID");
-    RESOLVE(p_CFStringGetTypeID, "CFStringGetTypeID");
-    RESOLVE(p_CFDictionaryGetTypeID, "CFDictionaryGetTypeID");
-    RESOLVE(p_CFArrayGetTypeID, "CFArrayGetTypeID");
-    RESOLVE(p_CFNumberGetTypeID, "CFNumberGetTypeID");
-    RESOLVE(p_CFBooleanGetTypeID, "CFBooleanGetTypeID");
-    RESOLVE(p_CFDataGetTypeID, "CFDataGetTypeID");
-    RESOLVE(p_CFGetInt64, "CFGetInt64");
-    RESOLVE(p_CFBooleanGetValue, "CFBooleanGetValue");
-    RESOLVE(p_CFDataGetLength, "CFDataGetLength");
-    RESOLVE(p_CFDataGetBytePtr, "CFDataGetBytePtr");
-    RESOLVE(p_CFDictionaryGetCount, "CFDictionaryGetCount");
-    RESOLVE(p_CFDictionaryGetKeysAndValues, "CFDictionaryGetKeysAndValues");
-    RESOLVE(p_CFDictionaryGetValue, "CFDictionaryGetValue");
-    RESOLVE(p_CFDictionarySetValue, "CFDictionarySetValue");
-    RESOLVE(p_CFDictionaryRemoveValue, "CFDictionaryRemoveValue");
-    RESOLVE(p_CFDictionaryGetInt64, "CFDictionaryGetInt64");
-    RESOLVE(p_CFDictionarySetInt64, "CFDictionarySetInt64");
-    RESOLVE(p_CFDictionaryCreateMutable, "CFDictionaryCreateMutable");
-    RESOLVE(p_CFArrayGetCount, "CFArrayGetCount");
-    RESOLVE(p_CFArrayGetValueAtIndex, "CFArrayGetValueAtIndex");
-    RESOLVE(p_CFArrayAppendValue, "CFArrayAppendValue");
-    RESOLVE(p_CFArrayCreateMutable, "CFArrayCreateMutable");
-    RESOLVE(p_CFArrayCreateMutableCopy, "CFArrayCreateMutableCopy");
-    RESOLVE(p_CFRetain, "CFRetain");
-    RESOLVE(p_CFRelease, "CFRelease");
-    p_dict_key_callbacks = dlsym(RTLD_DEFAULT, "kCFLDictionaryKeyCallBacksCFLTypes");
-    p_dict_val_callbacks = dlsym(RTLD_DEFAULT, "kCFLDictionaryValueCallBacksCFLTypes");
-    p_array_callbacks = dlsym(RTLD_DEFAULT, "kCFLArrayCallBacksCFLTypes");
-    {
-        CFTypeRef *false_slot = (CFTypeRef *)dlsym(RTLD_DEFAULT, "kCFLBooleanFalse");
-        p_cfl_boolean_false = false_slot ? *false_slot : NULL;
-    }
-    if (!p_dict_key_callbacks || !p_dict_val_callbacks || !p_array_callbacks ||
-        !p_cfl_boolean_false) {
-        logf_u2("missing CFLite callback tables/boolean singleton");
-        return -1;
-    }
-    g_security_fn = (uintptr_t)sym_next("AirPlayReceiverSessionSetSecurityInfo");
-    if (!g_security_fn) { logf_u2("missing AirPlayReceiverSessionSetSecurityInfo"); return -1; }
-#undef RESOLVE
-    return 0;
-}
-
-static CFStringRef s_cf(const char *s)
-{
-    return p_CFStringCreateWithCString(NULL, s, CF_UTF8);
-}
-
-static CFMutableDictionaryRef dict_new(void)
-{
-    return p_CFDictionaryCreateMutable(NULL, 0, p_dict_key_callbacks, p_dict_val_callbacks);
-}
-
-static CFMutableDictionaryRef dict_clone(CFDictionaryRef src)
-{
-    CFMutableDictionaryRef dst;
-    CFIndex n, i;
-    const void **keys, **vals;
-    if (!src) return NULL;
-    dst = dict_new();
-    if (!dst) return NULL;
-    n = p_CFDictionaryGetCount(src);
-    if (n <= 0) return dst;
-    keys = calloc((size_t)n, sizeof(*keys));
-    vals = calloc((size_t)n, sizeof(*vals));
-    if (!keys || !vals) { free(keys); free(vals); p_CFRelease(dst); return NULL; }
-    p_CFDictionaryGetKeysAndValues(src, keys, vals);
-    for (i = 0; i < n; ++i) p_CFDictionarySetValue(dst, keys[i], vals[i]);
-    free(keys); free(vals);
-    return dst;
-}
-
-static int stream_type(CFDictionaryRef d)
-{
-    OSStatus e = 0;
-    CFStringRef k = s_cf("type");
-    int64_t v = p_CFDictionaryGetInt64(d, k, &e);
-    p_CFRelease(k);
-    return e ? -1 : (int)v;
-}
-
-static uint64_t stream_connection_id(CFDictionaryRef d)
-{
-    OSStatus e = 0;
-    CFStringRef k = s_cf("streamConnectionID");
-    int64_t v = p_CFDictionaryGetInt64(d, k, &e);
-    p_CFRelease(k);
-    return e ? 0 : (uint64_t)v;
-}
-
-static CFArrayRef get_streams(CFDictionaryRef d)
-{
-    CFStringRef k;
-    CFArrayRef a;
-    if (!d) return NULL;
-    k = s_cf("streams");
-    a = (CFArrayRef)p_CFDictionaryGetValue(d, k);
-    p_CFRelease(k);
-    return a;
-}
-
-static int contains_stream_type(CFDictionaryRef request, int wanted)
-{
-    CFArrayRef a = get_streams(request);
-    CFIndex i, n;
-    if (!a) return 0;
-    n = p_CFArrayGetCount(a);
-    for (i = 0; i < n; ++i) {
-        CFDictionaryRef sd = (CFDictionaryRef)p_CFArrayGetValueAtIndex(a, i);
-        if (stream_type(sd) == wanted) return 1;
-    }
-    return 0;
-}
-
-static int contains_stream111(CFDictionaryRef request, CFDictionaryRef *outDesc, int *outOtherCount)
-{
-    CFArrayRef a = get_streams(request);
-    CFIndex i, n;
-    int found = 0, other = 0;
-    if (outDesc) *outDesc = NULL;
-    if (!a) { if (outOtherCount) *outOtherCount = 0; return 0; }
-    n = p_CFArrayGetCount(a);
-    for (i = 0; i < n; ++i) {
-        CFDictionaryRef sd = (CFDictionaryRef)p_CFArrayGetValueAtIndex(a, i);
-        if (stream_type(sd) == K_STREAM_ALT) {
-            found = 1;
-            if (outDesc && !*outDesc) *outDesc = sd;
-        } else ++other;
-    }
-    if (outOtherCount) *outOtherCount = other;
-    return found;
-}
-
-static CFMutableDictionaryRef clone_without_111(CFDictionaryRef request)
-{
-    CFMutableDictionaryRef d = dict_clone(request);
-    CFArrayRef a = get_streams(request);
-    CFMutableArrayRef b;
-    CFStringRef k;
-    CFIndex i, n;
-    if (!d || !a) return d;
-    b = p_CFArrayCreateMutable(NULL, 0, p_array_callbacks);
-    if (!b) return d;
-    n = p_CFArrayGetCount(a);
-    for (i = 0; i < n; ++i) {
-        CFDictionaryRef sd = (CFDictionaryRef)p_CFArrayGetValueAtIndex(a, i);
-        if (stream_type(sd) != K_STREAM_ALT) p_CFArrayAppendValue(b, sd);
-    }
-    k = s_cf("streams");
-    p_CFDictionarySetValue(d, k, b);
-    p_CFRelease(k);
-    p_CFRelease(b);
-    return d;
-}
-
-/*
- * Recovered MHI2Q IRC behavior: every successful /info or SETUP response
- * advertises the AltScreen capability at the root before the peer has to
- * choose stream 111. The reference replaces enabledFeatures with
- * ["altScreen","viewAreas"] rather than waiting for a 111 request.
- */
-static int current_advertised_fps(void)
-{
-    char b[16];
-    int fd, v;
-    ssize_t n;
-
-    fd=open(g_fps_override_path,O_RDONLY);
-    if(fd<0)return g_fps;
-    n=read(fd,b,sizeof(b)-1);
-    close(fd);
-    if(n<=0)return g_fps;
-    b[n]='\0';
-    v=atoi(b);
-    if(v==20||v==25||v==30||v==40)return v;
-    return g_fps;
-}
-
-static void set_reference_enabled_features(CFMutableDictionaryRef response)
-{
-    CFStringRef k = NULL, alt = NULL, va = NULL;
-    CFMutableArrayRef a = NULL;
-    if(!response) return;
-
-    k = s_cf("enabledFeatures");
-    alt = s_cf("altScreen");
-    va = s_cf("viewAreas");
-    a = p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
-    if(a && alt) p_CFArrayAppendValue(a,alt);
-    if(a && va && g_viewareas) p_CFArrayAppendValue(a,va);
-    if(a && k) p_CFDictionarySetValue(response,k,a);
-
-    if(a) p_CFRelease(a);
-    if(va) p_CFRelease(va);
-    if(alt) p_CFRelease(alt);
-    if(k) p_CFRelease(k);
-}
-
-/* Clone the exact requested 111 descriptor and preserve unknown peer fields. */
-static void append_alt_setup_response(CFMutableDictionaryRef response,
-                                      CFDictionaryRef requested,
-                                      int data_port)
-{
-    CFStringRef kstreams = NULL, kport = NULL, kstreamid = NULL;
-    CFArrayRef old = NULL;
-    CFMutableArrayRef a = NULL;
-    CFMutableDictionaryRef sd = NULL;
-
-    if(!response || !requested) return;
-    kstreams = s_cf("streams");
-    old = (CFArrayRef)p_CFDictionaryGetValue(response,kstreams);
-    a = old ? p_CFArrayCreateMutableCopy(NULL,0,old)
-            : p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
-    sd = dict_clone(requested);
-    kport = s_cf("dataPort");
-    kstreamid = s_cf("streamID");
-
-    if(a && sd && kport && kstreamid) {
-        p_CFDictionarySetInt64(sd,kport,data_port);
-        p_CFDictionarySetInt64(sd,kstreamid,K_STREAM_ALT);
-        p_CFArrayAppendValue(a,sd);
-        p_CFDictionarySetValue(response,kstreams,a);
-    }
-
-    if(sd) p_CFRelease(sd);
-    if(a) p_CFRelease(a);
-    if(kstreamid) p_CFRelease(kstreamid);
-    if(kport) p_CFRelease(kport);
-    if(kstreams) p_CFRelease(kstreams);
-}
-
-/*
- * Two deliberately different network boundaries:
- *  - stream 111 is inbound from the iPhone and therefore must be reachable on
- *    the CarPlay link (INADDR_ANY / actual head-unit address);
- *  - the decoded H.264 tee is local-only and must never leave loopback.
- *
- * Only the iPhone-facing listener may fall back to an ephemeral port because
- * its actual dataPort is returned in SETUP. The renderer tee is configured by
- * URL and must fail closed if its fixed port is occupied.
- */
-static int bind_listener_ipv4(int preferred, int *out_port, int loopback, int allow_ephemeral)
-{
-    int fd, one = 1;
-    struct sockaddr_in sa;
-    socklen_t sl = sizeof(sa);
-    fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (fd < 0) return -1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
-    memset(&sa, 0, sizeof(sa));
-    sa.sin_family = AF_INET;
-    sa.sin_addr.s_addr = htonl(loopback ? INADDR_LOOPBACK : INADDR_ANY);
-    sa.sin_port = htons((uint16_t)preferred);
-    if (bind(fd, (struct sockaddr *)&sa, sizeof(sa)) < 0) {
-        if (!allow_ephemeral) { close(fd); return -1; }
-        sa.sin_port = 0;
-        if (bind(fd, (struct sockaddr *)&sa, sizeof(sa)) < 0) { close(fd); return -1; }
-    }
-    if (listen(fd, 2) < 0) { close(fd); return -1; }
-    if (getsockname(fd, (struct sockaddr *)&sa, &sl) == 0 && out_port) *out_port = ntohs(sa.sin_port);
-    return fd;
-}
-
-static int bind_listener_stream111(int preferred, int *out_port, int allow_ephemeral)
-{
-#ifdef AF_INET6
-    int fd,one=1,off=0;
-    struct sockaddr_in6 sa6;
-    socklen_t sl6=sizeof(sa6);
-    fd=socket(AF_INET6,SOCK_STREAM,IPPROTO_TCP);
-    if(fd>=0){
-        setsockopt(fd,SOL_SOCKET,SO_REUSEADDR,&one,sizeof(one));
-#ifdef IPV6_V6ONLY
-        (void)setsockopt(fd,IPPROTO_IPV6,IPV6_V6ONLY,&off,sizeof(off));
-#endif
-        memset(&sa6,0,sizeof(sa6));
-        sa6.sin6_family=AF_INET6;
-        sa6.sin6_port=htons((uint16_t)preferred);
-        if(bind(fd,(struct sockaddr *)&sa6,sizeof(sa6))<0){
-            if(allow_ephemeral){
-                sa6.sin6_port=0;
-                if(bind(fd,(struct sockaddr *)&sa6,sizeof(sa6))<0){close(fd);fd=-1;}
-            }else{
-                close(fd);
-                fd=-1;
-            }
-        }
-        if(fd>=0){
-            if(listen(fd,1)==0){
-                if(getsockname(fd,(struct sockaddr *)&sa6,&sl6)==0 && out_port)*out_port=ntohs(sa6.sin6_port);
-                g_alt_listener_ipv6=1;
-                return fd;
-            }
-            close(fd);
-        }
-    }
-#endif
-    g_alt_listener_ipv6=0;
-    return bind_listener_ipv4(preferred,out_port,0,allow_ephemeral);
-}
-
-static CFMutableDictionaryRef command_force_keyframe(void);
-
-static void set_active_session(AirPlayReceiverSessionRef s)
-{
-    AirPlayReceiverSessionRef old = NULL, keep = NULL;
-
-    if (s) keep = (AirPlayReceiverSessionRef)p_CFRetain(s);
-    pthread_mutex_lock(&g_lock);
-    if (g_active_session == s) {
-        pthread_mutex_unlock(&g_lock);
-        if (keep) p_CFRelease(keep);
-        return;
-    }
-    old = g_active_session;
-    g_active_session = keep;
-    pthread_mutex_unlock(&g_lock);
-    if (old) p_CFRelease(old);
-}
-
-static AirPlayReceiverSessionRef retain_active_session(void)
-{
-    AirPlayReceiverSessionRef s = NULL;
-    pthread_mutex_lock(&g_lock);
-    if (g_active_session) s = (AirPlayReceiverSessionRef)p_CFRetain(g_active_session);
-    pthread_mutex_unlock(&g_lock);
-    return s;
-}
-
-/* ---------------- Gen-2 video adapter ---------------- */
-
-static void gen2_close_consumer(void)
-{
-    pthread_mutex_lock(&g_lock);
-    tee_drop_client_locked();
-    pthread_mutex_unlock(&g_lock);
-
-    pthread_mutex_lock(&g2_core_lock);
-    alt111_video_detach(&g2_video);
-    alt111_resync_cancel(&g2_resync, ALT111_RESYNC_CANCEL_CONSUMER);
-    pthread_cond_broadcast(&g2_core_cv);
-    pthread_mutex_unlock(&g2_core_lock);
-}
-
-static void gen2_video_begin_current(void)
-{
-    uint64_t session;
-    gen2_close_consumer();
-    pthread_mutex_lock(&g2_core_lock);
-    alt111_resync_cancel(&g2_resync, ALT111_RESYNC_CANCEL_STREAM);
-    session = g2_control_session ? g2_control_session : (g2_control.session + 1u);
-    g2_video_stream = alt111_video_begin(&g2_video, session);
-    pthread_cond_broadcast(&g2_core_cv);
-    pthread_mutex_unlock(&g2_core_lock);
-    gen2_publish_status();
-}
-
-static void gen2_video_end_current(void)
-{
-    pthread_mutex_lock(&g2_core_lock);
-    alt111_resync_cancel(&g2_resync, ALT111_RESYNC_CANCEL_STREAM);
-    if (g2_video_stream) (void)alt111_video_end(&g2_video, g2_video_stream);
-    g2_video_stream = 0;
-    pthread_cond_broadcast(&g2_core_cv);
-    pthread_mutex_unlock(&g2_core_lock);
-
-    pthread_mutex_lock(&g_lock);
-    tee_drop_client_locked();
-    pthread_mutex_unlock(&g_lock);
-
-    pthread_mutex_lock(&g_capture_lock);
-    capture_drop_client_locked();
-    pthread_mutex_unlock(&g_capture_lock);
-    capture_publish_status("listening");
-    gen2_publish_status();
-}
-
-static int gen2_video_config(const uint8_t *p, size_t n)
-{
-    int rc;
-    pthread_mutex_lock(&g2_core_lock);
-    rc = g2_video_stream ? alt111_video_config(&g2_video, g2_video_stream, p, n) : ALT111_STALE;
-    pthread_cond_broadcast(&g2_core_cv);
-    pthread_mutex_unlock(&g2_core_lock);
-    if (rc == ALT111_RESTART_CONSUMER || rc < 0) {
-        logf_u2("gen2 VideoConfig rc=%d -> consumer reset", rc);
-        gen2_close_consumer();
-    }
-    gen2_publish_status();
-    return rc;
-}
-
-static int gen2_video_submit_au(const uint8_t *p, size_t n,
-                                const uint8_t source_ts_raw[8],
-                                int *accepted, int *consumer_attached)
-{
-    int rc;
-    uint64_t before, after_count;
-    if (accepted) *accepted = 0;
-    if (consumer_attached) *consumer_attached = 0;
-    pthread_mutex_lock(&g2_core_lock);
-    before = g2_video.source_aus;
-    rc = g2_video_stream ? alt111_video_submit_timed(&g2_video, g2_video_stream,
-                                                     p, n, 1, source_ts_raw)
-                         : ALT111_STALE;
-    after_count = g2_video.source_aus;
-    if (accepted && after_count > before) *accepted = 1;
-    if (consumer_attached) *consumer_attached = g2_video.attached ? 1 : 0;
-    pthread_cond_broadcast(&g2_core_cv);
-    pthread_mutex_unlock(&g2_core_lock);
-    if (rc == ALT111_RESTART_CONSUMER || rc < 0) {
-        logf_u2("gen2 video AU rc=%d body=%zu -> consumer reset", rc, n);
-        gen2_close_consumer();
-    }
-    return rc;
-}
-
-static void gen2_keyframe_intent(void)
-{
-    int rc = ALT111_WAIT;
-    pthread_mutex_lock(&g2_core_lock);
-    if (g2_control_session)
-        rc = alt111_control_keyframe(&g2_control, g2_control_session);
-    pthread_cond_broadcast(&g2_core_cv);
-    pthread_mutex_unlock(&g2_core_lock);
-    logf_u2("gen2 consumer keyframe intent rc=%d", rc);
-}
-
-static void gen2_consumer_attach(void)
-{
-    int rc;
-    uint64_t generation = 0;
-    pthread_mutex_lock(&g2_core_lock);
-    if (g2_video.attached) alt111_video_detach(&g2_video);
-    rc = alt111_video_attach(&g2_video);
-    if (rc == ALT111_OK) generation = g2_video.consumer;
-    pthread_cond_broadcast(&g2_core_cv);
-    pthread_mutex_unlock(&g2_core_lock);
-
-    if (rc == ALT111_OK) {
-        pthread_mutex_lock(&g_lock);
-        if (g_tee_client >= 0) g_tee_consumer_generation = generation;
-        pthread_mutex_unlock(&g_lock);
-    }
-    logf_u2("gen2 renderer consumer attach rc=%d generation=%llu",
-            rc,(unsigned long long)generation);
-    if (rc == ALT111_OK) gen2_keyframe_intent();
-    gen2_publish_status();
-}
-
-static void m1au_put_be16(uint8_t *p, uint16_t v)
-{
-    p[0]=(uint8_t)(v>>8); p[1]=(uint8_t)v;
-}
-
-static void m1au_put_be32(uint8_t *p, uint32_t v)
-{
-    p[0]=(uint8_t)(v>>24); p[1]=(uint8_t)(v>>16);
-    p[2]=(uint8_t)(v>>8); p[3]=(uint8_t)v;
-}
-
-static void m1au_put_be64(uint8_t *p, uint64_t v)
-{
-    unsigned i;
-    for(i=0;i<8u;++i)p[i]=(uint8_t)(v>>(56u-(i*8u)));
-}
-
-static void m1au_prepare_header_locked(const struct alt111_output_ticket *ticket,
-                                       size_t payload_bytes)
-{
-    uint32_t flags=0;
-    memset(g_tee_frame_header,0,sizeof(g_tee_frame_header));
-    memcpy(g_tee_frame_header,"M1AU",4u);
-    m1au_put_be16(g_tee_frame_header+4u,1u);
-    m1au_put_be16(g_tee_frame_header+6u,(uint16_t)M1AU_HEADER_BYTES);
-    if(ticket->idr)flags|=M1AU_FLAG_IDR;
-    if(ticket->priming)flags|=M1AU_FLAG_PRIMING;
-    m1au_put_be32(g_tee_frame_header+8u,flags);
-    m1au_put_be32(g_tee_frame_header+12u,(uint32_t)payload_bytes);
-    m1au_put_be64(g_tee_frame_header+16u,ticket->stream);
-    m1au_put_be64(g_tee_frame_header+24u,ticket->codec);
-    m1au_put_be64(g_tee_frame_header+32u,ticket->consumer);
-    m1au_put_be64(g_tee_frame_header+40u,ticket->sequence);
-    memcpy(g_tee_frame_header+48u,ticket->source_ts_raw,8u);
-    g_tee_frame_header_off=0;
-    g_tee_frame_header_sequence=ticket->sequence;
-}
-
-static void *gen2_output_worker(void *arg)
-{
-    uint8_t *copy = NULL;
-    size_t cap = 0;
-    (void)arg;
-
-    for (;;) {
-        const uint8_t *p = NULL;
-        size_t n = 0, chunk = 0;
-        struct alt111_output_ticket ticket;
-        int prc, fd, send_failed = 0, would_block = 0, stale_socket = 0;
-        int header_pending = 0;
-        int arc = ALT111_WAIT, primed_before = 0, primed_after = 0;
-        uint64_t delivered_before = 0, delivered_after = 0;
-        ssize_t sent = 0;
-
-        /*
-         * Keep the core generation stable from the final peek through the
-         * nonblocking socket write and advance. This closes the last race where
-         * a codec/consumer generation could be invalidated after bytes were
-         * copied but before they were sent.
-         *
-         * g_lock is nested only inside g2_core_lock here. All other adapter
-         * paths release g_lock before acquiring g2_core_lock, so there is no
-         * reverse nested order.
-         */
-        pthread_mutex_lock(&g2_core_lock);
-        prc = alt111_video_peek(&g2_video, &p, &n, &ticket);
-        if (prc != ALT111_OK || !n) {
-            pthread_mutex_unlock(&g2_core_lock);
-            usleep(5000);
-            continue;
-        }
-
-        chunk = n > 65536u ? 65536u : n;
-        if (cap < chunk) {
-            uint8_t *next = (uint8_t *)realloc(copy, chunk);
-            if (!next) {
-                pthread_mutex_unlock(&g2_core_lock);
-                usleep(10000);
-                continue;
-            }
-            copy = next;
-            cap = chunk;
-        }
-        memcpy(copy, p, chunk);
-
-        delivered_before = g2_video.delivered_aus;
-        primed_before = g2_video.consumer_primed;
-
-        pthread_mutex_lock(&g_lock);
-        fd = g_tee_client;
-        if (fd >= 0 && g_tee_consumer_generation != ticket.consumer) {
-            stale_socket = 1;
-        } else if (fd >= 0) {
-            if (g_tee_framed) {
-                if (g_tee_frame_header_sequence != ticket.sequence) {
-                    if (ticket.offset != 0) {
-                        logf_u2("M1AU invariant failure sequence=%llu offset=%zu; dropping renderer",
-                                (unsigned long long)ticket.sequence,ticket.offset);
-                        tee_drop_client_locked();
-                        send_failed = 1;
-                    } else {
-                        m1au_prepare_header_locked(&ticket,n);
-                    }
-                }
-                if (!send_failed && g_tee_frame_header_off < M1AU_HEADER_BYTES) {
-                    size_t remain=M1AU_HEADER_BYTES-g_tee_frame_header_off;
-                    do {
-                        sent=send(fd,g_tee_frame_header+g_tee_frame_header_off,
-                                  remain,MSG_NOSIGNAL);
-                    } while(sent<0 && errno==EINTR);
-                    if(sent>0) {
-                        g_tee_frame_header_off+=(size_t)sent;
-                        sent=0; /* header bytes never advance the AU payload */
-                        if(g_tee_frame_header_off<M1AU_HEADER_BYTES)header_pending=1;
-                    } else if(sent<0 && (errno==EAGAIN || errno==EWOULDBLOCK)) {
-                        would_block=1;
-                    } else {
-                        tee_drop_client_locked();
-                        send_failed=1;
-                    }
-                }
-            }
-
-            if (!send_failed && !would_block && !header_pending &&
-                (!g_tee_framed || g_tee_frame_header_off==M1AU_HEADER_BYTES)) {
-                do {
-                    sent = send(fd, copy, chunk, MSG_NOSIGNAL);
-                } while (sent < 0 && errno == EINTR);
-
-                if (sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                    would_block = 1;
-                } else if (sent <= 0) {
-                    tee_drop_client_locked();
-                    send_failed = 1;
-                }
-            }
-        } else {
-            send_failed = 1;
-        }
-        pthread_mutex_unlock(&g_lock);
-
-        if (stale_socket) {
-            pthread_mutex_unlock(&g2_core_lock);
-            usleep(1000);
-            continue;
-        }
-
-        if (would_block || header_pending) {
-            pthread_mutex_unlock(&g2_core_lock);
-            usleep(header_pending ? 1000 : 5000);
-            continue;
-        }
-
-        if (send_failed) {
-            alt111_video_detach(&g2_video);
-            pthread_cond_broadcast(&g2_core_cv);
-            pthread_mutex_unlock(&g2_core_lock);
-            gen2_publish_status();
-            usleep(10000);
-            continue;
-        }
-
-        /*
-         * Passive capture mirror: copy only bytes that the primary pre-TS
-         * consumer actually accepted. The mirror is nonblocking and may be
-         * dropped on any backpressure/partial write; it can never delay or
-         * detach the production consumer.
-         */
-        capture_mirror_send(copy, (size_t)sent, &ticket);
-
-        arc = alt111_video_advance(&g2_video, &ticket, (size_t)sent);
-        delivered_after = g2_video.delivered_aus;
-        primed_after = g2_video.consumer_primed;
-        pthread_mutex_unlock(&g2_core_lock);
-
-        if (arc == ALT111_OK && delivered_after > delivered_before) {
-            /*
-             * Before a consumer attaches the source heartbeat is enough to let
-             * Auto-Direct start the bridge. Once attached, only actual complete
-             * AU delivery advances the heartbeat, so DIRECT cannot be declared
-             * ready merely on non-IDR source traffic.
-             *
-             * The first priming AU bypasses the 250 ms throttle: a static map
-             * may emit no second frame.
-             */
-            if (!primed_before && primed_after)
-                publish_video_heartbeat_force();
-            else
-                publish_video_heartbeat();
-
-            if (!primed_before || primed_after != primed_before ||
-                (delivered_after & 7u) == 0u)
-                gen2_publish_status();
-        }
-    }
-    return NULL;
-}
-
-static int read_exact(int fd, void *buf, size_t len)
-{
-    uint8_t *p = (uint8_t *)buf;
-    while (len) {
-        ssize_t n = recv(fd, p, len, 0);
-        if (n == 0) return 0;
-        if (n < 0) { if (errno == EINTR) continue; return -1; }
-        p += n; len -= (size_t)n;
-    }
-    return 1;
-}
-
-static void tee_drop_client_locked(void)
-{
-    if (g_tee_client >= 0) close(g_tee_client);
-    g_tee_client = -1;
-    g_tee_consumer_generation = 0;
-    g_tee_framed = 0;
-    g_tee_frame_header_off = 0;
-    g_tee_frame_header_sequence = 0;
-    memset(g_tee_frame_header,0,sizeof(g_tee_frame_header));
-}
-
-static void capture_drop_client_locked(void)
-{
-    if (g_capture_client >= 0) close(g_capture_client);
-    g_capture_client = -1;
-    g_capture_wait_idr = 1;
-}
-
-static void capture_mirror_send(const uint8_t *p, size_t n,
-                                const struct alt111_output_ticket *ticket)
-{
-    ssize_t w;
-    int drop = 0, publish = 0;
-
-    if (!p || !n || !ticket) return;
-
-    pthread_mutex_lock(&g_capture_lock);
-    if (g_capture_client < 0) {
-        pthread_mutex_unlock(&g_capture_lock);
-        return;
-    }
-
-    if (g_capture_wait_idr) {
-        if (!ticket->idr || ticket->offset != 0) {
-            pthread_mutex_unlock(&g_capture_lock);
-            return;
-        }
-        g_capture_wait_idr = 0;
-        publish = 1;
-    }
-
-    do {
-        w = send(g_capture_client, p, n, MSG_NOSIGNAL);
-    } while (w < 0 && errno == EINTR);
-
-    if (w != (ssize_t)n) {
-        ++g_capture_drops;
-        capture_drop_client_locked();
-        drop = 1;
-        publish = 1;
-    } else {
-        g_capture_bytes += (uint64_t)n;
-        ++g_capture_chunks;
-        if ((g_capture_chunks & 63u) == 0u) publish = 1;
-    }
-    pthread_mutex_unlock(&g_capture_lock);
-
-    if (drop)
-        logf_u2("GEN2 capture mirror dropped: nonblocking write rc=%ld expected=%zu; production unaffected",
-                (long)w, n);
-    if (publish) capture_publish_status(drop ? "dropped" : "recording");
-}
-
-static void *tee_accept_thread(void *arg)
-{
-    (void)arg;
-    for (;;) {
-        int c = accept(g_tee_listen, NULL, NULL);
-        if (c < 0) { if (errno == EINTR) continue; sleep(1); continue; }
-        {
-            int flags = fcntl(c, F_GETFL, 0);
-            if (flags >= 0) (void)fcntl(c, F_SETFL, flags | O_NONBLOCK);
-        }
-        pthread_mutex_lock(&g_lock);
-        tee_drop_client_locked();
-        g_tee_client = c;
-        g_tee_framed = access(g_au_framing_marker,F_OK)==0 ? 1 : 0;
-        g_tee_frame_header_off = 0;
-        g_tee_frame_header_sequence = 0;
-        pthread_mutex_unlock(&g_lock);
-        logf_u2("gen2 renderer connected nonblocking on 127.0.0.1:%d mode=%s; waiting for config+complete IDR",
-                g_tee_port,g_tee_framed?"m1au-v1":"raw-annexb");
-        gen2_consumer_attach();
-    }
-    return NULL;
-}
-
-static int start_tee_server(void)
-{
-    int actual = 0;
-    if (g_tee_started) return 0;
-    g_tee_listen = bind_listener_ipv4(g_tee_port, &actual, 1, 0);
-    if (g_tee_listen < 0) { logf_u2("cannot bind renderer tee port %d: %s", g_tee_port, strerror(errno)); return -1; }
-    g_tee_port = actual;
-    if (pthread_create(&g_tee_thread, NULL, tee_accept_thread, NULL) != 0) { close(g_tee_listen); g_tee_listen=-1; return -1; }
-    pthread_detach(g_tee_thread);
-    g_tee_started = 1;
-    logf_u2("renderer tee listening on 127.0.0.1:%d", g_tee_port);
-    return 0;
-}
-
-static void *capture_accept_thread(void *arg)
-{
-    (void)arg;
-    for (;;) {
-        int c = accept(g_capture_listen, NULL, NULL);
-        uint8_t cfg[ALT111_CODEC_CAP];
-        size_t cfg_n = 0, off = 0;
-
-        if (c < 0) {
-            if (errno == EINTR) continue;
-            sleep(1);
-            continue;
-        }
-
-        pthread_mutex_lock(&g2_core_lock);
-        if (g2_video.config_valid && g2_video.config_length <= sizeof(cfg)) {
-            cfg_n = g2_video.config_length;
-            memcpy(cfg, g2_video.config, cfg_n);
-        }
-        pthread_mutex_unlock(&g2_core_lock);
-
-        /*
-         * Seed the standalone .h264 capture with current SPS/PPS when available.
-         * This happens only in the diagnostic accept thread, never on the media
-         * worker. A fresh forceKeyFrame is then requested and forwarding waits
-         * for that IDR before recording pictures.
-         */
-        while (off < cfg_n) {
-            ssize_t w = send(c, cfg + off, cfg_n - off, MSG_NOSIGNAL);
-            if (w > 0) {
-                off += (size_t)w;
-                continue;
-            }
-            if (w < 0 && errno == EINTR) continue;
-            break;
-        }
-        if (off != cfg_n) {
-            close(c);
-            logf_u2("GEN2 capture mirror seed failed bytes=%zu/%zu", off, cfg_n);
-            continue;
-        }
-
-        {
-            int flags = fcntl(c, F_GETFL, 0);
-            if (flags >= 0) (void)fcntl(c, F_SETFL, flags | O_NONBLOCK);
-        }
-
-        pthread_mutex_lock(&g_capture_lock);
-        capture_drop_client_locked();
-        g_capture_client = c;
-        g_capture_wait_idr = 1;
-        g_capture_bytes = (uint64_t)cfg_n;
-        g_capture_chunks = cfg_n ? 1u : 0u;
-        g_capture_drops = 0;
-        pthread_mutex_unlock(&g_capture_lock);
-
-        capture_publish_status("waiting_idr");
-        logf_u2("GEN2 capture mirror connected on 127.0.0.1:%d seed=%zu; requesting fresh IDR",
-                g_capture_port, cfg_n);
-        gen2_keyframe_intent();
-    }
-    return NULL;
-}
-
-static int start_capture_server(void)
-{
-    int actual = 0;
-    if (g_capture_started) return 0;
-    g_capture_listen = bind_listener_ipv4(g_capture_port, &actual, 1, 0);
-    if (g_capture_listen < 0) {
-        logf_u2("cannot bind diagnostic H264 capture port %d: %s",
-                g_capture_port, strerror(errno));
-        capture_publish_status("unavailable");
-        return -1;
-    }
-    g_capture_port = actual;
-    if (pthread_create(&g_capture_thread, NULL, capture_accept_thread, NULL) != 0) {
-        close(g_capture_listen);
-        g_capture_listen = -1;
-        capture_publish_status("unavailable");
-        return -1;
-    }
-    pthread_detach(g_capture_thread);
-    g_capture_started = 1;
-    capture_publish_status("listening");
-    logf_u2("diagnostic H264 capture mirror listening on 127.0.0.1:%d", g_capture_port);
-    return 0;
-}
-
-/*
- * Stop and join the previous stream-111 worker before its global AES/session
- * state can be reused. The worker owns the accepted client fd; stop only
- * shutdowns that fd to wake read_exact(), then joins the worker. This prevents
- * a late cleanup from an old CarPlay session finalising a newly-created AES
- * context after a fast reconnect.
- */
-static void stop_alt_receiver(void)
-{
-    pthread_t t;
-    int do_join = 0;
-
-    pthread_mutex_lock(&g_lock);
-    if (g_alt_client >= 0) (void)shutdown(g_alt_client, SHUT_RDWR);
-    if (g_alt_listen >= 0) {
-        (void)shutdown(g_alt_listen, SHUT_RDWR);
-        close(g_alt_listen);
-        g_alt_listen = -1;
-    }
-    if (g_alt_thread_started && !pthread_equal(pthread_self(), g_alt_thread)) {
-        t = g_alt_thread;
-        g_alt_thread_started = 0;
-        do_join = 1;
-    }
-    pthread_mutex_unlock(&g_lock);
-
-    if (do_join) (void)pthread_join(t, NULL);
-
-    pthread_mutex_lock(&g_lock);
-    if (!do_join && g_alt_client >= 0) {
-        /* Constructor/failure fallback: no worker owns this descriptor. */
-        close(g_alt_client);
-        g_alt_client = -1;
-    }
-    if (g_alt_aes_valid) {
-        g_aes_ctr_final(&g_alt_aes);
-        g_alt_aes_valid = 0;
-    }
-    pthread_mutex_unlock(&g_lock);
-    gen2_video_end_current();
-}
-
-static void *alt_receiver_thread(void *arg)
-{
-    int listen_fd = (int)(intptr_t)arg;
-    int c;
-    logf_u2("waiting for iPhone AltScreen connection on 0.0.0.0:%d", g_alt_port);
-    c = accept(listen_fd, NULL, NULL);
-    if (c < 0) { logf_u2("AltScreen accept failed: %s", strerror(errno)); return NULL; }
-    pthread_mutex_lock(&g_lock); g_alt_client = c; pthread_mutex_unlock(&g_lock);
-    logf_u2("AltScreen stream 111 connected");
-    publish_state("connected");
-    for (;;) {
-        AirPlayScreenHeaderCompat h;
-        uint8_t *body = NULL;
-        int rr = read_exact(c, &h, sizeof(h));
-        if (rr <= 0) break;
-        if (h.bodySize > MAX_SCREEN_BODY) { logf_u2("reject bodySize=%u", h.bodySize); break; }
-        if (h.bodySize) {
-            body = malloc(h.bodySize);
-            if (!body) break;
-            rr = read_exact(c, body, h.bodySize);
-            if (rr <= 0) { free(body); break; }
-        }
-        switch (h.opcode) {
-            case K_SCREEN_VIDEO_CONFIG:
-                if (body && h.bodySize) {
-                    float source_w = 0.0f, source_h = 0.0f;
-                    memcpy(&source_w, h.params + 8, sizeof(source_w));
-                    memcpy(&source_h, h.params + 12, sizeof(source_h));
-                    logf_u2("VideoConfig header source=%.1fx%.1f flags=0x%02x body=%u",
-                            (double)source_w, (double)source_h,
-                            (unsigned)h.smallParam[1], (unsigned)h.bodySize);
-                    {
-                        int vrc = gen2_video_config(body, h.bodySize);
-                        if (vrc == ALT111_OK || vrc == ALT111_RESTART_CONSUMER) {
-                            if (!g_video_config_seen) {
-                                g_video_config_seen = 1;
-                                publish_state("video_config");
-                                logf_u2("gen2: stream111 valid transactional video config received");
-                            }
-                        } else if (vrc == ALT111_INVALID) {
-                            g_video_config_seen = 0;
-                            g_streaming = 0;
-                            clear_video_heartbeat();
-                            publish_state("video_config_invalid");
-                            logf_u2("gen2: invalid VideoConfig revoked Stream111 readiness");
-                        }
-                    }
-                }
-                break;
-            case K_SCREEN_VIDEO_FRAME:
-                if (body && h.bodySize) {
-                    if (!g_alt_aes_valid || g_aes_ctr_update(&g_alt_aes, body, h.bodySize, body) != K_NO_ERR) {
-                        logf_u2("AES-CTR decrypt failed"); free(body); goto done;
-                    }
-                    if (!g_video_config_seen) {
-                        logf_u2("video frame ignored before valid avcC config body=%u", (unsigned)h.bodySize);
-                        break;
-                    }
-                    {
-                        int accepted = 0, consumer_attached = 0;
-                        int vrc = gen2_video_submit_au(body, h.bodySize, h.params,
-                                                       &accepted, &consumer_attached);
-                        if (accepted) {
-                            source_timing_note_frame(&h,h.bodySize);
-                            if (!g_streaming) {
-                                g_streaming = 1;
-                                publish_state("streaming");
-                                logf_u2("gen2: first complete Screen VIDEO_FRAME accepted as AU");
-                            }
-                            /* Source activity only creates the initial arm
-                             * heartbeat. It never advances that heartbeat while
-                             * no local consumer exists; otherwise Auto-Direct
-                             * could mistake pre-connect source traffic for
-                             * post-connect decoder-ready output. */
-                            if (!consumer_attached) publish_video_heartbeat_source_arm();
-                        }
-                        if (vrc == ALT111_INVALID) {
-                            g_streaming = 0;
-                            clear_video_heartbeat();
-                            publish_state("video_invalid");
-                            logf_u2("gen2: rejected VIDEO_FRAME body=%u as invalid complete AU; source readiness revoked",
-                                    (unsigned)h.bodySize);
-                        }
-                    }
-                }
-                break;
-            case K_SCREEN_KEEPALIVE:
-            case K_SCREEN_KEEPALIVE_BODY:
-            case K_SCREEN_IGNORE:
-            case K_SCREEN_FORCE_KEYFRAME:
-                break;
-            default:
-                logf_u2("unknown screen opcode=%u", h.opcode);
-                break;
-        }
-        free(body);
-    }
-done:
-    logf_u2("AltScreen stream 111 disconnected");
-    source_timing_finish();
-    clear_video_observer();
-    publish_state("disconnected");
-    pthread_mutex_lock(&g_lock);
-    if (g_alt_client == c) g_alt_client = -1;
-    close(c);
-    if (g_alt_listen == listen_fd) {
-        close(g_alt_listen);
-        g_alt_listen = -1;
-    }
-    if (g_alt_aes_valid) { g_aes_ctr_final(&g_alt_aes); g_alt_aes_valid=0; }
-    pthread_mutex_unlock(&g_lock);
-    gen2_video_end_current();
-    return NULL;
-}
-
-static int start_alt_receiver(uint64_t connection_id)
-{
-    uint8_t key[16], iv[16];
-    int actual = 0;
-    int allow_ephemeral = env_i("ALTSCREEN111_ALLOW_EPHEMERAL", 0);
-
-    /* Complete previous worker teardown before reusing global session state. */
-    stop_alt_receiver();
-    clear_video_observer();
-    source_timing_reset();
-
-    /* Start the core generation before taking g_lock: gen2_video_begin_current()
-     * deliberately closes/reset the local consumer and therefore takes g_lock. */
-    gen2_video_begin_current();
-
-    pthread_mutex_lock(&g_lock);
-    if (!g_master_valid) {
-        pthread_mutex_unlock(&g_lock);
-        gen2_video_end_current();
-        logf_u2("no captured session AES key; cannot start stream111");
-        return -1;
-    }
-
-    g_derive_screen(g_master_key, 16, connection_id, key, iv);
-    memset(&g_alt_aes, 0, sizeof(g_alt_aes));
-    if (g_aes_ctr_init(&g_alt_aes, key, iv) != K_NO_ERR) {
-        memset(key,0,sizeof(key)); memset(iv,0,sizeof(iv));
-        pthread_mutex_unlock(&g_lock);
-        gen2_video_end_current();
-        return -1;
-    }
-    memset(key,0,sizeof(key)); memset(iv,0,sizeof(iv));
-    g_alt_aes_valid = 1;
-
-    /* iPhone-facing listener: reachable from CarPlay link, not loopback. */
-    g_alt_listen = bind_listener_stream111(g_alt_port, &actual, allow_ephemeral);
-    if (g_alt_listen < 0) {
-        g_aes_ctr_final(&g_alt_aes);
-        g_alt_aes_valid=0;
-        pthread_mutex_unlock(&g_lock);
-        gen2_video_end_current();
-        logf_u2("cannot bind iPhone stream111 listener on port %d: %s", g_alt_port, strerror(errno));
-        return -1;
-    }
-    g_alt_port = actual;
-    if (pthread_create(&g_alt_thread, NULL, alt_receiver_thread, (void *)(intptr_t)g_alt_listen) != 0) {
-        close(g_alt_listen);
-        g_alt_listen=-1;
-        g_aes_ctr_final(&g_alt_aes);
-        g_alt_aes_valid=0;
-        pthread_mutex_unlock(&g_lock);
-        gen2_video_end_current();
-        return -1;
-    }
-    g_alt_thread_started = 1;
-    pthread_mutex_unlock(&g_lock);
-    publish_state("listening");
-    logf_u2("stream111 receiver ready: conn=%llu dataPort=%d transport=%s",
-            (unsigned long long)connection_id,g_alt_port,
-            g_alt_listener_ipv6?"IPv6-dualstack":"IPv4");
-    return g_alt_port;
+    nav_tristate_value(g_nav_speed_config_name,speed,sizeof(speed),"user");
+    nav_tristate_value(g_nav_compass_config_name,compass,sizeof(compass),"user");
+    nav_tristate_value(g_nav_eta_config_name,eta,sizeof(eta),"yes");
+    nav_maneuver_value(maneuver,sizeof(maneuver));
+    snprintf(out,cap,"%s?showSpeedLimit=%s&showCompass=%s&showETA=%s&maneuverLayout=%s",
+             base,speed,compass,eta,maneuver);
 }
 
 static void set_str(CFMutableDictionaryRef d, const char *key, const char *val)
@@ -2154,16 +1011,15 @@ static void set_str(CFMutableDictionaryRef d, const char *key, const char *val)
 static void apply_source_version_persona(CFMutableDictionaryRef info)
 {
     char version[32];
-    unsigned preserve_stock=0u, from_file=0u;
-    if(!info) return;
-    source_version_value(version,sizeof(version),&preserve_stock,&from_file);
+    unsigned preserve_stock=0u,source_layer=0u;
+    if(!info)return;
+    source_version_value(version,sizeof(version),&preserve_stock,&source_layer);
     if(preserve_stock){
-        logf_u2("GEN2 sourceVersion persona=stock source=file");
+        logf_u2("GEN2 sourceVersion persona=stock source=%s",config_layer_name(source_layer));
         return;
     }
     set_str(info,"sourceVersion",version);
-    logf_u2("GEN2 sourceVersion persona=%s source=%s",
-            version,from_file?"file":"default");
+    logf_u2("GEN2 sourceVersion persona=%s source=%s",version,config_layer_name(source_layer));
 }
 
 static void set_i64(CFMutableDictionaryRef d, const char *key, int64_t val)
@@ -2647,7 +1503,6 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
 
     /* Reference order: compatibility/root capability first, display transformation second. */
     apply_source_version_persona(info);
-    apply_airplay_bit26_ab(info);
     set_reference_enabled_features(info);
 
     kdisplays=s_cf("displays");
@@ -2799,7 +1654,7 @@ static void gen2_publish_status(void)
     struct gen2_d2_timing d2_timing;
     char nav_url[384];
     char source_version[32];
-    unsigned source_version_stock=0u, source_version_from_file=0u;
+    unsigned source_version_stock=0u, source_version_layer=0u;
     uint64_t d2_pending_due_ms, d2_last_request_ms, d2_last_idr_ms;
     uint64_t d2_event_triggers, d2_watchdog_triggers, d2_coalesced;
     pthread_mutex_lock(&g2_core_lock);
@@ -2822,10 +1677,10 @@ static void gen2_publish_status(void)
     d2_watchdog_triggers = g2_d2_watchdog_triggers;
     d2_coalesced = g2_d2_coalesced;
     pthread_mutex_unlock(&g2_core_lock);
-    nav_query_enabled = access(g_nav_query_enable_marker,F_OK)==0 ? 1u : 0u;
+    nav_query_enabled = nav_query_is_enabled();
     gen2_d2_timing_load(&d2_timing);
     source_version_value(source_version,sizeof(source_version),
-                         &source_version_stock,&source_version_from_file);
+                         &source_version_stock,&source_version_layer);
     active_alt_url_copy(nav_url,sizeof(nav_url));
     n = snprintf(b,sizeof(b),
         "gen2=1\ncontrol_session=%llu\ncommand_ready=%u\nprojection_desired=%u\nshown_ack=%u\nreacquiring=%u\n"
@@ -2841,7 +1696,7 @@ static void gen2_publish_status(void)
         "resync_last_request_ms=%llu\nresync_next_request_ms=%llu\nresync_completed_ms=%llu\n"
         "resync_retry_ms=%u\n"
         "d2_enabled=%u\nd2_event_delay_ms=%u\nd2_min_gap_ms=%u\nd2_watchdog_ms=%u\n"
-        "d2_watchdog_enabled=%u\nd2_timing_source=%s\nd2_timing_config=%s\n"
+        "d2_watchdog_enabled=%u\nd2_config_source=%s\nd2_config_name=%s\n"
         "source_version_persona=%s\nsource_version_source=%s\n"
         "d2_pending_sources=%u\nd2_pending_due_ms=%llu\n"
         "d2_last_request_ms=%llu\nd2_last_idr_ms=%llu\n"
@@ -2865,8 +1720,8 @@ static void gen2_publish_status(void)
         (unsigned long long)rs.last_request_ms,(unsigned long long)rs.next_request_ms,
         (unsigned long long)rs.completed_ms,rs.retry_ms,
         d2_enabled,d2_timing.event_delay_ms,d2_timing.min_gap_ms,d2_timing.watchdog_ms,
-        d2_timing.watchdog_ms?1u:0u,d2_timing.from_file?"file":"default",g2_d2_timing_config_path,
-        source_version,source_version_stock?"stock":(source_version_from_file?"file":"default"),
+        d2_timing.watchdog_ms?1u:0u,config_layer_name(d2_timing.source_layer),g2_d2_config_name,
+        source_version,source_version_stock?"stock":config_layer_name(source_version_layer),
         d2_pending_sources,(unsigned long long)d2_pending_due_ms,
         (unsigned long long)d2_last_request_ms,(unsigned long long)d2_last_idr_ms,
         (unsigned long long)d2_event_triggers,(unsigned long long)d2_watchdog_triggers,
@@ -3849,9 +2704,8 @@ static void altscreen111_init(void)
      * legacy AUTO_SHOW=1 package default unless parity-specific opt-in is set.
      */
     g_auto_show=0; /* Gen-2 control worker owns UI acquisition. */
-    if(access(g_autoshow_disable_marker,F_OK)==0)g_auto_show=0;
-    g_viewareas=env_i("ALTSCREEN111_PARITY_VIEWAREAS",1);
-    if(access(g_viewareas_marker,F_OK)==0)g_viewareas=1;
+    g_viewareas=(int)read_layered_bool(g_viewareas_config_name,
+                                      (unsigned)env_i("ALTSCREEN111_PARITY_VIEWAREAS",1),NULL);
     /* Do not inherit Run117/118 legacy UUID/URL env values in the parity build. */
     env_s("ALTSCREEN111_PARITY_UUID",g_alt_uuid,sizeof(g_alt_uuid),ALT_UUID_DEFAULT);
     env_s("ALTSCREEN111_PARITY_URL",g_alt_url,sizeof(g_alt_url),ALT_URL_DEFAULT);
@@ -3956,22 +2810,21 @@ static void altscreen111_init(void)
     }
     publish_state("ready");
     active_alt_url_copy(active_url,sizeof(active_url));
-    logf_u2("GEN2 candidate active: 111=%dx%d@%d physical=%dx%d altPort=%d tee=%d capture=%d URL=%s uuid=%s viewAreas=%d autoShow=%d bit26Mode=%d",
+    logf_u2("GEN2 candidate active: 111=%dx%d@%d physical=%dx%d altPort=%d tee=%d capture=%d URL=%s uuid=%s viewAreas=%d autoShow=%d",
             g_width,g_height,g_fps,g_width_mm,g_height_mm,g_alt_port,g_tee_port,g_capture_port,active_url,g_alt_uuid,
-            g_viewareas,g_auto_show,airplay_bit26_mode());
+            g_viewareas,g_auto_show);
     {
         struct gen2_d2_timing d2_timing;
         char source_version[32];
-        unsigned source_stock=0u, source_from_file=0u;
+        unsigned source_stock=0u, source_layer=0u;
         gen2_d2_timing_load(&d2_timing);
         source_version_value(source_version,sizeof(source_version),
-                             &source_stock,&source_from_file);
-        logf_u2("GEN2 Candidate-D manual=%s D2_keyframes=%s eventDelayMs=%u watchdogMs=%u minGapMs=%u timingSource=%s timingConfig=%s sourceVersion=%s sourceVersionSource=%s sessionMarker=%s persistentMarker=%s",
+                             &source_stock,&source_layer);
+        logf_u2("GEN2 Candidate-D manual=%s D2_keyframes=%s eventDelayMs=%u watchdogMs=%u minGapMs=%u configSource=%s configName=%s sourceVersion=%s sourceVersionSource=%s",
                 access(g2_resync_enable_marker,F_OK)==0 ? "enabled" : "disabled",
                 gen2_d2_enabled() ? "enabled" : "disabled",
                 d2_timing.event_delay_ms,d2_timing.watchdog_ms,d2_timing.min_gap_ms,
-                d2_timing.from_file?"file":"default",g2_d2_timing_config_path,
-                source_version,source_stock?"stock":(source_from_file?"file":"default"),
-                g2_d2_enable_marker,g2_d2_persist_marker);
+                config_layer_name(d2_timing.source_layer),g2_d2_config_name,
+                source_version,source_stock?"stock":config_layer_name(source_layer));
     }
 }
