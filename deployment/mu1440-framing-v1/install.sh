@@ -22,6 +22,8 @@ STATE_SOURCE=/mnt/app/root/mibr-direct-source-framing
 STATE_DIRECT_FPS=/mnt/app/root/mibr-direct-output-fps
 STATE_SOURCE_FPS=/mnt/app/root/mibr-carplay111-fps
 STATE_SAFEAREA=/mnt/app/root/mibr-carplay111-safearea.conf
+STATE_D2_TIMING=/mnt/app/root/mibr-carplay111-keyframes.conf
+STATE_SOURCE_VERSION=/mnt/app/root/mibr-carplay111-sourceversion
 APP_RW=0
 
 hashf(){
@@ -76,7 +78,7 @@ check_base(){
   [ "$AH" = "$EXPECTED_AIRPLAY" ] || fail "wrong_target_libairplay=$AH"
   grep -Fq "LD_PRELOAD=$HOOK" "$TARGET" 2>/dev/null ||
     fail "base_carplay_preload_not_active"
-  for F in     "$DST/bin/libaltscreen111.so"     "$DST/bin/direct-ts-remux"     "$DST/scripts/common.sh"     "$DST/scripts/direct_ts_auto_supervisor.sh"     "$DST/scripts/direct_ts_auto_status.sh"     "$DST/scripts/direct_fps.sh"     "$HOOK"; do
+  for F in     "$DST/bin/libaltscreen111.so"     "$DST/bin/direct-ts-remux"     "$DST/scripts/common.sh"     "$DST/scripts/direct_ts_auto_supervisor.sh"     "$DST/scripts/direct_ts_auto_status.sh"     "$DST/scripts/direct_fps.sh"     "$DST/scripts/gen2_keyframes.sh"     "$HOOK"; do
       [ -r "$F" ] || fail "base_file_missing=$F"
   done
 }
@@ -96,6 +98,8 @@ show_plan(){
   echo "candidate_gen2_sha256=$(candidate_hash gen2)"
   echo "candidate_remux_sha256=$(candidate_hash remux)"
   echo "default_source_fps=30"
+  echo "default_source_version=1005.8.1"
+  echo "default_d2_timing=250,1000,1000"
   echo "default_transport=raw-annexb"
   echo "optional_transport=m1au-v1"
   echo "safearea_helper=included"
@@ -162,7 +166,8 @@ if [ -e "$ACTIVE" ]; then
      same_as_package "$DST/scripts/direct_ts_auto_supervisor.sh" "$RUNTIME/auto-direct/direct_ts_auto_supervisor.sh" &&
      same_as_package "$DST/scripts/direct_ts_auto_status.sh" "$RUNTIME/auto-direct/direct_ts_auto_status.sh" &&
      same_as_package "$DST/scripts/direct_source_mode.sh" "$RUNTIME/auto-direct/direct_source_mode.sh" &&
-     same_as_package "$DST/scripts/gen2_safearea.sh" "$RUNTIME/navigation/gen2_safearea.sh"; then
+     same_as_package "$DST/scripts/gen2_safearea.sh" "$RUNTIME/navigation/gen2_safearea.sh" &&
+     same_as_package "$DST/scripts/gen2_keyframes.sh" "$RUNTIME/diagnostics/gen2_keyframes.sh"; then
     echo "MIBR_FRAMING_V1=ALREADY_INSTALLED"
     exit 0
   fi
@@ -189,10 +194,13 @@ backup_one "$DST/scripts/direct_ts_auto_supervisor.sh" scripts/direct_ts_auto_su
 backup_one "$DST/scripts/direct_ts_auto_status.sh" scripts/direct_ts_auto_status.sh
 backup_one "$DST/scripts/direct_source_mode.sh" scripts/direct_source_mode.sh
 backup_one "$DST/scripts/gen2_safearea.sh" scripts/gen2_safearea.sh
+backup_one "$DST/scripts/gen2_keyframes.sh" scripts/gen2_keyframes.sh
 backup_one "$STATE_SOURCE" state/mibr-direct-source-framing
 backup_one "$STATE_DIRECT_FPS" state/mibr-direct-output-fps
 backup_one "$STATE_SOURCE_FPS" state/mibr-carplay111-fps
 backup_one "$STATE_SAFEAREA" state/mibr-carplay111-safearea.conf
+backup_one "$STATE_D2_TIMING" state/mibr-carplay111-keyframes.conf
+backup_one "$STATE_SOURCE_VERSION" state/mibr-carplay111-sourceversion
 : > "$BACK/BACKUP_COMPLETE" || fail "backup_complete_marker"
 
 install_one "$PAYLOAD/libaltscreen111.so" "$DST/bin/libaltscreen111.so"
@@ -204,6 +212,7 @@ install_one "$RUNTIME/auto-direct/direct_ts_auto_supervisor.sh" "$DST/scripts/di
 install_one "$RUNTIME/auto-direct/direct_ts_auto_status.sh" "$DST/scripts/direct_ts_auto_status.sh"
 install_one "$RUNTIME/auto-direct/direct_source_mode.sh" "$DST/scripts/direct_source_mode.sh"
 install_one "$RUNTIME/navigation/gen2_safearea.sh" "$DST/scripts/gen2_safearea.sh"
+install_one "$RUNTIME/diagnostics/gen2_keyframes.sh" "$DST/scripts/gen2_keyframes.sh"
 
 {
   echo "candidate=framing-v1"
@@ -227,5 +236,7 @@ HH=$(hashf "$HOOK")
 echo "MIBR_FRAMING_V1=PASS"
 echo "transport_default=raw-annexb"
 echo "source_fps_default=30"
+echo "source_version_default=1005.8.1"
+echo "d2_timing_default=250,1000,1000"
 echo "REBOOT_REQUIRED=YES"
 echo "after_reboot=$DST/scripts/direct_source_mode.sh status"
