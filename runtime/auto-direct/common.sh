@@ -130,7 +130,7 @@ runtime_cfg_field(){
   DEF=$3
   V=$(runtime_cfg_get "$NAME" "")
   if [ -n "$V" ]; then
-    R=$(printf '%s\n' "$V" | awk -F= -v k="$FIELD" '$1==k {print substr($0,index($0,"=")+1); exit}')
+    R=$(echo "$V" | awk -F= -v k="$FIELD" '$1==k {print substr($0,index($0,"=")+1); exit}')
     [ -n "$R" ] && { echo "$R"; return; }
   fi
   echo "$DEF"
