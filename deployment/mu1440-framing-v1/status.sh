@@ -45,6 +45,23 @@ if [ -x "$DST/scripts/gen2_safearea.sh" ]; then
 fi
 
 echo
+if [ -x "$DST/scripts/gen2_keyframes.sh" ]; then
+  "$DST/scripts/gen2_keyframes.sh" status
+else
+  echo "gen2_keyframes=missing"
+fi
+
+echo
+if [ -r /mnt/app/root/mibr-carplay111-sourceversion ]; then
+  echo "source_version_override=$(cat /mnt/app/root/mibr-carplay111-sourceversion 2>/dev/null)"
+else
+  echo "source_version_override=none"
+fi
+if [ -r /tmp/mibr-alt111-gen2.status ]; then
+  grep '^source_version_' /tmp/mibr-alt111-gen2.status 2>/dev/null || true
+fi
+
+echo
 if [ -x "$DST/scripts/direct_ts_auto_status.sh" ]; then
   "$DST/scripts/direct_ts_auto_status.sh"
 fi
