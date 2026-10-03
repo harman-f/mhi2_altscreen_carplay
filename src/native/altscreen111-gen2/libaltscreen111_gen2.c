@@ -393,6 +393,7 @@ static void gen2_video_begin_current(void);
 static void gen2_video_end_current(void);
 static void gen2_close_consumer(void);
 static void gen2_resync_poll(void);
+static const char *config_layer_name(unsigned layer);
 static void gen2_d2_timing_load(struct gen2_d2_timing *cfg);
 static void source_version_value(char *out, size_t cap,
                                  unsigned *preserve_stock,
