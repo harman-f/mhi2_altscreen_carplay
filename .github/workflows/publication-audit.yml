@@ -146,11 +146,12 @@ jobs:
           grep -Fq 'echo "run-$$"' runtime/auto-direct/common.sh
           grep -Fq 'deployment_media_root' deployment/mu1440/install.sh
           grep -Fq 'mount -uw "$DEPLOY_MEDIA_ROOT"' runtime/auto-direct/common.sh
-          grep -Fq 'DIRECT_FPS_OVERRIDE_FILE=/mnt/app/root/mibr-direct-output-fps' runtime/auto-direct/common.sh
-          grep -Fq 'SOURCE_FPS_OVERRIDE_FILE=/mnt/app/root/mibr-carplay111-fps' runtime/auto-direct/common.sh
-          grep -Fq 'g_fps_override_path = "/mnt/app/root/mibr-carplay111-fps"' src/native/altscreen111-gen2/libaltscreen111_gen2.c
+          grep -Fq 'FPS_CONFIG_NAME=mibr-carplay111-fps' runtime/auto-direct/common.sh
+          grep -Fq 'FRAMING_CONFIG_NAME=mibr-carplay111-framing' runtime/auto-direct/common.sh
+          grep -Fq 'g_fps_config_name = "mibr-carplay111-fps"' src/native/altscreen111-gen2/libaltscreen111_gen2.c
+          grep -Fq 'MIBR_CFG_TEMP_ROOT "/tmp"' src/native/altscreen111-gen2/libaltscreen111_gen2.c
           grep -Fq 'MIBR_PACE="$DIRECT_PACE" MIBR_PACE_BUFFER="$DIRECT_PACE_BUFFER"' runtime/auto-direct/direct_ts_auto_supervisor.sh
-          grep -Fq 'DIRECT_FPS=SET fps=$FPS' runtime/auto-direct/direct_fps.sh
+          grep -Fq 'DIRECT_FPS=SET layer=temp fps=$1' runtime/auto-direct/direct_fps.sh
           grep -Fq '20|25|30|40' runtime/auto-direct/direct_fps.sh
           grep -Fq 'mibr-alt111-source-timing.status' src/native/altscreen111-gen2/libaltscreen111_gen2.c
           grep -Fq 'telemetry.tsv' runtime/auto-direct/direct_ts_auto_supervisor.sh
@@ -168,7 +169,8 @@ jobs:
           grep -Fq 'most20_state=PASS_EXACT' deployment/mu1440/status.sh
           grep -Fq 'most20_bootclasspath_refs=' deployment/mu1440/status.sh
           grep -Fq 'install_required_most20' deployment/mu1440/install.sh
-          grep -Fq '/mnt/app/root/mibr-alt111-keyframe-policy.enabled' deployment/mu1440/install.sh
+          grep -Fq 'D2_KEYFRAMES=DEFAULT enabled=1 event_delay_ms=250 watchdog_ms=1000 min_gap_ms=1000' deployment/mu1440/install.sh
+          ! grep -Fq '/mnt/app/root/mibr-alt111-keyframe-policy.enabled ||' deployment/mu1440/install.sh
           grep -Fq 'vehicle-tested-2026-09-27/libmibr_isotx2_gate.so' tools/prepare_mu1440_sd.sh
           grep -Fq 'runtime/deployment/session.sh' tools/prepare_mu1440_sd.sh
           grep -Fq 'mibr_run_logged "$0" "$@"' deployment/mu1440/install.sh
