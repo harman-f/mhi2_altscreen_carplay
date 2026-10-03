@@ -53,8 +53,8 @@ field(){
   echo "$D"
 }
 
-load_effective(){
-  F=$(source_file)
+load_from_file(){
+  F=$1
   E=$(field "$F" enabled "$DEFAULT_ENABLED")
   D=$(field "$F" event_delay_ms "$DEFAULT_EVENT_DELAY_MS")
   G=$(field "$F" min_gap_ms "$DEFAULT_MIN_GAP_MS")
@@ -66,6 +66,19 @@ load_effective(){
   [ "$D" -le 5000 ] || D=$DEFAULT_EVENT_DELAY_MS
   [ "$G" -le 60000 ] || G=$DEFAULT_MIN_GAP_MS
   [ "$W" -le 60000 ] || W=$DEFAULT_WATCHDOG_MS
+}
+
+load_effective(){
+  load_from_file "$(source_file)"
+}
+
+load_for_layer(){
+  L=$1
+  if [ "$L" = persistent ]; then
+    [ -r "$PERSIST" ] && load_from_file "$PERSIST" || load_from_file ""
+  else
+    load_effective
+  fi
 }
 
 validate_timing(){
@@ -190,13 +203,13 @@ case "$cmd" in
     case "$sub" in
       on|off)
         [ "$#" -eq 2 ] || usage
-        load_effective
+        load_for_layer "$L"
         [ "$sub" = on ] && E=1 || E=0
         write_file "$L" "$E" "$D" "$G" "$W"
         ;;
       timing)
         [ "$#" -eq 5 ] || usage
-        load_effective
+        load_for_layer "$L"
         write_file "$L" "$E" "$3" "$4" "$5"
         ;;
       *) usage ;;
