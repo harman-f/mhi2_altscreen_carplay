@@ -9,6 +9,8 @@ STATE_SOURCE=/mnt/app/root/mibr-direct-source-framing
 STATE_DIRECT_FPS=/mnt/app/root/mibr-direct-output-fps
 STATE_SOURCE_FPS=/mnt/app/root/mibr-carplay111-fps
 STATE_SAFEAREA=/mnt/app/root/mibr-carplay111-safearea.conf
+STATE_D2_TIMING=/mnt/app/root/mibr-carplay111-keyframes.conf
+STATE_SOURCE_VERSION=/mnt/app/root/mibr-carplay111-sourceversion
 APP_RW=0
 
 fail(){
@@ -61,10 +63,13 @@ restore_one scripts/direct_ts_auto_supervisor.sh "$DST/scripts/direct_ts_auto_su
 restore_one scripts/direct_ts_auto_status.sh "$DST/scripts/direct_ts_auto_status.sh"
 restore_one scripts/direct_source_mode.sh "$DST/scripts/direct_source_mode.sh"
 restore_one scripts/gen2_safearea.sh "$DST/scripts/gen2_safearea.sh"
+restore_one scripts/gen2_keyframes.sh "$DST/scripts/gen2_keyframes.sh"
 restore_one state/mibr-direct-source-framing "$STATE_SOURCE" 644
 restore_one state/mibr-direct-output-fps "$STATE_DIRECT_FPS" 644
 restore_one state/mibr-carplay111-fps "$STATE_SOURCE_FPS" 644
 restore_one state/mibr-carplay111-safearea.conf "$STATE_SAFEAREA" 644
+restore_one state/mibr-carplay111-keyframes.conf "$STATE_D2_TIMING" 644
+restore_one state/mibr-carplay111-sourceversion "$STATE_SOURCE_VERSION" 644
 rm -f "$ACTIVE" 2>/dev/null || true
 app_ro
 
