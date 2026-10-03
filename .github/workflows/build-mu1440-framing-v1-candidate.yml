@@ -8,8 +8,9 @@ on:
       - 'src/native/altscreen111-gen2/**'
       - 'src/native/direct-ts-remux/**'
       - 'runtime/auto-direct/**'
-      - 'runtime/navigation/gen2_safearea.sh'
-      - 'runtime/diagnostics/gen2_keyframes.sh'
+      - 'runtime/navigation/**'
+      - 'runtime/diagnostics/**'
+      - 'runtime/experimental/viewarea_mode.sh'
       - 'deployment/mu1440-framing-v1/**'
       - 'tools/build_altscreen111_gen2.sh'
       - 'tools/build_direct_ts_remux.sh'
@@ -105,6 +106,11 @@ jobs:
           strings "$GEN2" | grep -Fq 'mibr-alt111-source-timing.status'
           strings "$GEN2" | grep -Fq 'mibr-carplay111-keyframes.conf'
           strings "$GEN2" | grep -Fq 'mibr-carplay111-sourceversion'
+          strings "$GEN2" | grep -Fq 'mibr-carplay111-viewareas'
+          strings "$GEN2" | grep -Fq 'mibr-carplay111-nav-query'
+          strings "$GEN2" | grep -Fq '/tmp'
+          strings "$GEN2" | grep -Fq '/mnt/app/root'
+          ! strings "$GEN2" | grep -Fq 'mibr-carplay111-bit26.force-'
           strings "$GEN2" | grep -Fq '1005.8.1'
           strings "$REMUX" | grep -Fq 'M1AU_CONNECT_OK'
           strings "$REMUX" | grep -Fq 'm1au_sequence_gaps'
@@ -132,25 +138,32 @@ jobs:
           )
 
           grep -Fq 'pts_pcr=unchanged_cfr' build/framing-v1/package/CANDIDATE-MANIFEST.txt
-          grep -Fq 'transport_default=raw-annexb' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'runtime_config_precedence=/tmp_then_/mnt/app/root_then_default' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'fps_default=30' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'fps_config_name=mibr-carplay111-fps' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fq 'source_version_default=1005.8.1' build/framing-v1/package/CANDIDATE-MANIFEST.txt
-          grep -Fq 'keyframe_timing_default=250,1000,1000' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'keyframe_config_name=mibr-carplay111-keyframes.conf' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'framing_config_name=mibr-carplay111-framing' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fxq "source_head_commit=$SOURCE_HEAD_COMMIT" build/framing-v1/package/CANDIDATE-MANIFEST.txt
           if [[ -n "$CI_MERGE_COMMIT" ]]; then
             grep -Fxq "ci_merge_commit=$CI_MERGE_COMMIT" build/framing-v1/package/CANDIDATE-MANIFEST.txt
           fi
+
           grep -Fq 'MIBR_FRAMING_V1=PASS' deployment/mu1440-framing-v1/install.sh
           grep -Fq 'MIBR_FRAMING_V1_UNINSTALL=PASS' deployment/mu1440-framing-v1/uninstall.sh
-          grep -Fq 'TMP="$FILE.new.$$"' build/framing-v1/package/runtime/auto-direct/direct_fps.sh
-          grep -Fq 'TIMING_CONFIG=/mnt/app/root/mibr-carplay111-keyframes.conf' build/framing-v1/package/runtime/diagnostics/gen2_keyframes.sh
-          grep -Fq 'backup_one "$STATE_SOURCE" state/mibr-direct-source-framing' build/framing-v1/package/install.sh
-          grep -Fq 'backup_one "$STATE_SAFEAREA" state/mibr-carplay111-safearea.conf' build/framing-v1/package/install.sh
-          grep -Fq 'backup_one "$STATE_D2_TIMING" state/mibr-carplay111-keyframes.conf' build/framing-v1/package/install.sh
-          grep -Fq 'backup_one "$STATE_SOURCE_VERSION" state/mibr-carplay111-sourceversion' build/framing-v1/package/install.sh
-          grep -Fq 'restore_one state/mibr-direct-source-framing "$STATE_SOURCE" 644' build/framing-v1/package/uninstall.sh
-          grep -Fq 'restore_one state/mibr-carplay111-safearea.conf "$STATE_SAFEAREA" 644' build/framing-v1/package/uninstall.sh
-          grep -Fq 'restore_one state/mibr-carplay111-keyframes.conf "$STATE_D2_TIMING" 644' build/framing-v1/package/uninstall.sh
-          grep -Fq 'restore_one state/mibr-carplay111-sourceversion "$STATE_SOURCE_VERSION" 644' build/framing-v1/package/uninstall.sh
+          grep -Fq 'MIBR_CFG_TEMP_ROOT=/tmp' build/framing-v1/package/runtime/auto-direct/common.sh
+          grep -Fq 'FPS_CONFIG_NAME=mibr-carplay111-fps' build/framing-v1/package/runtime/auto-direct/common.sh
+          grep -Fq 'FRAMING_CONFIG_NAME=mibr-carplay111-framing' build/framing-v1/package/runtime/auto-direct/common.sh
+          grep -Fq 'NAME=mibr-carplay111-keyframes.conf' build/framing-v1/package/runtime/diagnostics/gen2_keyframes.sh
+          grep -Fq 'NAME=mibr-carplay111-sourceversion' build/framing-v1/package/runtime/diagnostics/gen2_sourceversion.sh
+          grep -Fq 'NAME=mibr-carplay111-safearea.conf' build/framing-v1/package/runtime/navigation/gen2_safearea.sh
+          grep -Fq 'QUERY_NAME=$PREFIX-query' build/framing-v1/package/runtime/navigation/gen2_nav_config.sh
+          grep -Fq 'NAME=mibr-carplay111-viewareas' build/framing-v1/package/runtime/experimental/viewarea_mode.sh
+          grep -Fq 'backup_one "$LSD" system/lsd.sh' build/framing-v1/package/install.sh
+          grep -Fq 'backup_one "$STATE_AUTODIRECT" state/mibr-carplay-autodirect' build/framing-v1/package/install.sh
+          grep -Fq 'restore_one system/lsd.sh "$LSD"' build/framing-v1/package/uninstall.sh
+          grep -Fq 'restore_one state/mibr-carplay-autodirect "$STATE_AUTODIRECT" 644' build/framing-v1/package/uninstall.sh
+
 
           (
             cd build/framing-v1/package
