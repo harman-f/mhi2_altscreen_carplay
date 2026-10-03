@@ -925,6 +925,36 @@ static void gen2_d2_timing_load(struct gen2_d2_timing *cfg)
     cfg->source_layer=layer;
 }
 
+static int current_advertised_fps(void)
+{
+    char b[16];
+    int v;
+    if(read_layered_value(g_fps_config_name,b,sizeof(b),NULL)!=0)return g_fps;
+    v=atoi(b);
+    if(v==20||v==25||v==30||v==40)return v;
+    return g_fps;
+}
+
+static void set_reference_enabled_features(CFMutableDictionaryRef response)
+{
+    CFStringRef k=NULL,alt=NULL,va=NULL;
+    CFMutableArrayRef a=NULL;
+    if(!response)return;
+
+    k=s_cf("enabledFeatures");
+    alt=s_cf("altScreen");
+    va=s_cf("viewAreas");
+    a=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
+    if(a&&alt)p_CFArrayAppendValue(a,alt);
+    if(a&&va&&g_viewareas)p_CFArrayAppendValue(a,va);
+    if(a&&k)p_CFDictionarySetValue(response,k,a);
+
+    if(a)p_CFRelease(a);
+    if(va)p_CFRelease(va);
+    if(alt)p_CFRelease(alt);
+    if(k)p_CFRelease(k);
+}
+
 static int source_version_is_valid(const char *s)
 {
     const char *p;
