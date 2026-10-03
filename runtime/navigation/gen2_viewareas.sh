@@ -85,9 +85,15 @@ set_key(){
   L=$1; K=$2; V=$3
   valid_key "$K" || usage
   case "$V" in ''|*[!0-9-]*) usage ;; esac
-  F=$(source_file)
-  [ "$L" = persistent ] && { mount -uw /mnt/app 2>/dev/null || exit 12; TGT=$PERSIST; } || TGT=$TEMP
-  BASE="$TGT.base.$$"
+  if [ "$L" = persistent ]; then
+    mount -uw /mnt/app 2>/dev/null || exit 12
+    TGT=$PERSIST
+    [ -r "$PERSIST" ] && F=$PERSIST || F=
+  else
+    TGT=$TEMP
+    F=$(source_file)
+  fi
+  BASE="$TGT.base.$"
   if [ -n "$F" ]; then cp "$F" "$BASE" || exit 13; else emit_default > "$BASE" || exit 13; fi
   T="$TGT.new.$$"
   awk -F= -v k="$K" -v v="$V" '
