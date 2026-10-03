@@ -52,11 +52,23 @@ else
 fi
 
 echo
-if [ -r /mnt/app/root/mibr-carplay111-sourceversion ]; then
-  echo "source_version_override=$(cat /mnt/app/root/mibr-carplay111-sourceversion 2>/dev/null)"
+if [ -x "$DST/scripts/gen2_sourceversion.sh" ]; then
+  "$DST/scripts/gen2_sourceversion.sh" status
 else
-  echo "source_version_override=none"
+  echo "gen2_sourceversion=missing"
 fi
+
+echo
+if [ -x "$DST/scripts/viewarea_mode.sh" ]; then
+  "$DST/scripts/viewarea_mode.sh" status
+fi
+
+echo
+if [ -x "$DST/scripts/gen2_nav_config.sh" ]; then
+  "$DST/scripts/gen2_nav_config.sh" status
+fi
+
+echo
 if [ -r /tmp/mibr-alt111-gen2.status ]; then
   grep '^source_version_' /tmp/mibr-alt111-gen2.status 2>/dev/null || true
 fi
