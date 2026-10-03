@@ -1721,7 +1721,7 @@ static void gen2_publish_status(void)
         (unsigned long long)rs.completed_ms,rs.retry_ms,
         d2_enabled,d2_timing.event_delay_ms,d2_timing.min_gap_ms,d2_timing.watchdog_ms,
         d2_timing.watchdog_ms?1u:0u,config_layer_name(d2_timing.source_layer),g2_d2_config_name,
-        source_version,source_version_stock?"stock":config_layer_name(source_version_layer),
+        source_version,config_layer_name(source_version_layer),
         d2_pending_sources,(unsigned long long)d2_pending_due_ms,
         (unsigned long long)d2_last_request_ms,(unsigned long long)d2_last_idr_ms,
         (unsigned long long)d2_event_triggers,(unsigned long long)d2_watchdog_triggers,
@@ -2825,6 +2825,6 @@ static void altscreen111_init(void)
                 gen2_d2_enabled() ? "enabled" : "disabled",
                 d2_timing.event_delay_ms,d2_timing.watchdog_ms,d2_timing.min_gap_ms,
                 config_layer_name(d2_timing.source_layer),g2_d2_config_name,
-                source_version,source_stock?"stock":config_layer_name(source_layer));
+                source_version,config_layer_name(source_layer));
     }
 }
