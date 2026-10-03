@@ -968,106 +968,198 @@ static void source_version_value(char *out, size_t cap,
     if(source_layer)*source_layer=layer;
 }
 
-static void load_safearea_config(int *x, int *y, int *w, int *h)
+static int mibr_rect_valid(int x,int y,int w,int h,int full_w,int full_h)
 {
-    char b[192];
-    int tx=0, ty=0, tw=g_width, th=g_height;
-
-    if(!x||!y||!w||!h) return;
-    *x=0; *y=0; *w=g_width; *h=g_height;
-
-    if(read_layered_value(g_safearea_config_name,b,sizeof(b),NULL)!=0)return;
-
-    if(sscanf(b,"x=%d\ny=%d\nw=%d\nh=%d",&tx,&ty,&tw,&th)!=4){
-        logf_u2("GEN2 SafeArea config invalid; using full canvas");
-        return;
-    }
-
-    if(tx<0||ty<0||tw<1||th<1||tx>=g_width||ty>=g_height||
-       tx+tw>g_width||ty+th>g_height){
-        logf_u2("GEN2 SafeArea config out-of-range x=%d y=%d w=%d h=%d full=%dx%d; using full canvas",
-                tx,ty,tw,th,g_width,g_height);
-        return;
-    }
-
-    *x=tx; *y=ty; *w=tw; *h=th;
+    return x>=0 && y>=0 && w>0 && h>0 &&
+           x<full_w && y<full_h && x+w<=full_w && y+h<=full_h;
 }
 
-static void nav_scalar_value(const char *name, char *out, size_t cap,
-                             const char *defv)
+static void load_nav_config(struct mibr_nav_config *cfg)
 {
-    char value[32];
-    if(read_layered_value(name,value,sizeof(value),NULL)==0){
-        snprintf(out,cap,"%s",value);
-        return;
-    }
-    snprintf(out,cap,"%s",defv);
+    char blob[1024],v[64];
+    unsigned layer=0u;
+    if(!cfg)return;
+    memset(cfg,0,sizeof(*cfg));
+    cfg->query=0u;
+    snprintf(cfg->surface,sizeof(cfg->surface),"%s","base");
+    snprintf(cfg->eta,sizeof(cfg->eta),"%s","yes");
+    snprintf(cfg->speed,sizeof(cfg->speed),"%s","user");
+    snprintf(cfg->compass,sizeof(cfg->compass),"%s","user");
+    snprintf(cfg->maneuver,sizeof(cfg->maneuver),"%s","none");
+    if(read_layered_value(g_nav_config_name,blob,sizeof(blob),&layer)!=0)return;
+    cfg->source_layer=layer;
+
+    if(config_line_value(blob,"query",v,sizeof(v))==0)
+        cfg->query=(strcmp(v,"1")==0||strcmp(v,"on")==0||strcmp(v,"yes")==0)?1u:0u;
+    if(config_line_value(blob,"surface",v,sizeof(v))==0 &&
+       (strcmp(v,"base")==0||strcmp(v,"map")==0||strcmp(v,"instructioncard")==0))
+        snprintf(cfg->surface,sizeof(cfg->surface),"%s",v);
+    if(config_line_value(blob,"showETA",v,sizeof(v))==0 &&
+       (strcmp(v,"yes")==0||strcmp(v,"no")==0||strcmp(v,"user")==0))
+        snprintf(cfg->eta,sizeof(cfg->eta),"%s",v);
+    if(config_line_value(blob,"showSpeedLimit",v,sizeof(v))==0 &&
+       (strcmp(v,"yes")==0||strcmp(v,"no")==0||strcmp(v,"user")==0))
+        snprintf(cfg->speed,sizeof(cfg->speed),"%s",v);
+    if(config_line_value(blob,"showCompass",v,sizeof(v))==0 &&
+       (strcmp(v,"yes")==0||strcmp(v,"no")==0||strcmp(v,"user")==0))
+        snprintf(cfg->compass,sizeof(cfg->compass),"%s",v);
+    if(config_line_value(blob,"maneuverLayout",v,sizeof(v))==0 &&
+       (strcmp(v,"none")==0||strcmp(v,"left")==0||strcmp(v,"right")==0||
+        strcmp(v,"top")==0||strcmp(v,"leftAligned")==0||
+        strcmp(v,"rightAligned")==0||strcmp(v,"topAligned")==0))
+        snprintf(cfg->maneuver,sizeof(cfg->maneuver),"%s",v);
 }
 
-static const char *nav_surface_url(char *surface, size_t surface_cap)
+static void load_display_config(struct mibr_display_config *cfg)
 {
-    char mode[32];
-    nav_scalar_value(g_nav_surface_config_name,mode,sizeof(mode),"base");
-    if(strcmp(mode,"map")==0){snprintf(surface,surface_cap,"%s","map");return ALT_URL_MAP;}
-    if(strcmp(mode,"instructioncard")==0){
-        snprintf(surface,surface_cap,"%s","instructioncard");
-        return ALT_URL_INSTRUCTIONCARD;
+    char blob[768],v[128];
+    unsigned layer=0u;
+    int n;
+    if(!cfg)return;
+    memset(cfg,0,sizeof(*cfg));
+    cfg->width=g_width;
+    cfg->height=g_height;
+    cfg->width_mm=g_width_mm;
+    cfg->height_mm=g_height_mm;
+    snprintf(cfg->uuid,sizeof(cfg->uuid),"%s",g_alt_uuid);
+    if(read_layered_value(g_display_config_name,blob,sizeof(blob),&layer)!=0)return;
+    cfg->source_layer=layer;
+
+    if(config_line_int(blob,"widthPixels",&n)==0 && n>0 && n<=4096)cfg->width=n;
+    if(config_line_int(blob,"heightPixels",&n)==0 && n>0 && n<=2160)cfg->height=n;
+    if(config_line_int(blob,"widthPhysical",&n)==0 && n>0 && n<=2000)cfg->width_mm=n;
+    if(config_line_int(blob,"heightPhysical",&n)==0 && n>0 && n<=2000)cfg->height_mm=n;
+    if(config_line_value(blob,"uuid",v,sizeof(v))==0 && strlen(v)==36u)
+        snprintf(cfg->uuid,sizeof(cfg->uuid),"%s",v);
+}
+
+static void viewareas_defaults(struct mibr_viewareas_config *cfg)
+{
+    memset(cfg,0,sizeof(*cfg));
+    cfg->enabled=1u;
+    cfg->count=2u;
+    cfg->initial=0u;
+    cfg->transition_ms=0u;
+
+    cfg->view[0].x=0; cfg->view[0].y=0;
+    cfg->view[0].w=g_width; cfg->view[0].h=g_height;
+    cfg->view[0].safe_x=0; cfg->view[0].safe_y=0;
+    cfg->view[0].safe_w=g_width; cfg->view[0].safe_h=g_height;
+    cfg->view[0].adjacent=1;
+
+    cfg->view[1].x=0; cfg->view[1].y=0;
+    cfg->view[1].w=g_width; cfg->view[1].h=g_height;
+    cfg->view[1].safe_x=0; cfg->view[1].safe_y=0;
+    cfg->view[1].safe_w=g_width; cfg->view[1].safe_h=g_height;
+    if(g_width==1010 && g_height==376){
+        cfg->view[1].safe_y=58;
+        cfg->view[1].safe_w=1010;
+        cfg->view[1].safe_h=248;
     }
-    snprintf(surface,surface_cap,"%s","base");
+    cfg->view[1].adjacent=0;
+}
+
+static void load_viewareas_config(struct mibr_viewareas_config *cfg)
+{
+    char blob[2048],key[64];
+    unsigned layer=0u;
+    int n,i;
+    if(!cfg)return;
+    viewareas_defaults(cfg);
+    if(read_layered_value(g_viewareas_config_name,blob,sizeof(blob),&layer)!=0)return;
+    cfg->source_layer=layer;
+
+    if(config_line_int(blob,"enabled",&n)==0 && (n==0||n==1))cfg->enabled=(unsigned)n;
+    if(config_line_int(blob,"count",&n)==0 && (n==1||n==2))cfg->count=(unsigned)n;
+    if(config_line_int(blob,"initial",&n)==0 && n>=0 && n<2)cfg->initial=(unsigned)n;
+    if(config_line_int(blob,"transition_ms",&n)==0 && n>=0 && n<=5000)cfg->transition_ms=(unsigned)n;
+
+    for(i=0;i<2;++i){
+#define GET_VA_INT(field,target) do { \
+        snprintf(key,sizeof(key),"view%d." field,i); \
+        if(config_line_int(blob,key,&n)==0)(target)=n; \
+    } while(0)
+        GET_VA_INT("x",cfg->view[i].x);
+        GET_VA_INT("y",cfg->view[i].y);
+        GET_VA_INT("w",cfg->view[i].w);
+        GET_VA_INT("h",cfg->view[i].h);
+        GET_VA_INT("safe.x",cfg->view[i].safe_x);
+        GET_VA_INT("safe.y",cfg->view[i].safe_y);
+        GET_VA_INT("safe.w",cfg->view[i].safe_w);
+        GET_VA_INT("safe.h",cfg->view[i].safe_h);
+        GET_VA_INT("adjacent",cfg->view[i].adjacent);
+#undef GET_VA_INT
+    }
+
+    if(cfg->count<1u||cfg->count>2u)cfg->count=2u;
+    if(cfg->initial>=cfg->count)cfg->initial=0u;
+    for(i=0;i<(int)cfg->count;++i){
+        if(!mibr_rect_valid(cfg->view[i].x,cfg->view[i].y,
+                            cfg->view[i].w,cfg->view[i].h,g_width,g_height)){
+            logf_u2("GEN2 ViewArea config invalid area=%d; falling back to defaults",i);
+            viewareas_defaults(cfg);
+            cfg->source_layer=0u;
+            return;
+        }
+        if(!mibr_rect_valid(cfg->view[i].safe_x,cfg->view[i].safe_y,
+                            cfg->view[i].safe_w,cfg->view[i].safe_h,
+                            cfg->view[i].w,cfg->view[i].h)){
+            logf_u2("GEN2 ViewArea config invalid safeArea=%d; falling back to defaults",i);
+            viewareas_defaults(cfg);
+            cfg->source_layer=0u;
+            return;
+        }
+        if(cfg->count==2u && cfg->view[i].adjacent!=(1-i))
+            cfg->view[i].adjacent=1-i;
+    }
+}
+
+static const char *nav_surface_url(const struct mibr_nav_config *cfg)
+{
+    if(cfg && strcmp(cfg->surface,"map")==0)return ALT_URL_MAP;
+    if(cfg && strcmp(cfg->surface,"instructioncard")==0)return ALT_URL_INSTRUCTIONCARD;
     return ALT_URL_DEFAULT;
 }
 
-static void nav_tristate_value(const char *name, char *out, size_t cap,
-                               const char *defv)
+static const char *nav_maneuver_wire(const char *v)
 {
-    char value[24];
-    nav_scalar_value(name,value,sizeof(value),defv);
-    if(strcmp(value,"yes")==0||strcmp(value,"no")==0||strcmp(value,"user")==0||
-       strcmp(value,"1")==0||strcmp(value,"0")==0){
-        snprintf(out,cap,"%s",value);
-        return;
-    }
-    snprintf(out,cap,"%s",defv);
-}
-
-static void nav_maneuver_value(char *out, size_t cap)
-{
-    char value[32];
-    nav_scalar_value(g_nav_maneuver_config_name,value,sizeof(value),"none");
-    if(strcmp(value,"left")==0||strcmp(value,"leftAligned")==0){
-        snprintf(out,cap,"%s","leftAligned");return;
-    }
-    if(strcmp(value,"right")==0||strcmp(value,"rightAligned")==0){
-        snprintf(out,cap,"%s","rightAligned");return;
-    }
-    if(strcmp(value,"top")==0||strcmp(value,"topAligned")==0){
-        snprintf(out,cap,"%s","topAligned");return;
-    }
-    out[0]='\0';
+    if(!v)return "";
+    if(strcmp(v,"left")==0||strcmp(v,"leftAligned")==0)return "leftAligned";
+    if(strcmp(v,"right")==0||strcmp(v,"rightAligned")==0)return "rightAligned";
+    if(strcmp(v,"top")==0||strcmp(v,"topAligned")==0)return "topAligned";
+    return "";
 }
 
 static unsigned nav_query_is_enabled(void)
 {
-    return read_layered_bool(g_nav_query_config_name,0u,NULL);
+    struct mibr_nav_config cfg;
+    load_nav_config(&cfg);
+    return cfg.query;
 }
 
 static void active_alt_url_copy(char *out, size_t cap)
 {
-    char surface[24],eta[24],speed[24],compass[24],maneuver[32];
-    const char *base;
+    struct mibr_nav_config cfg;
+    char raw[384];
+    const char *base,*maneuver;
     if(!out||cap==0u)return;
     out[0]='\0';
-    base=nav_surface_url(surface,sizeof(surface));
-    if(!nav_query_is_enabled()||strcmp(surface,"instructioncard")==0){
+
+    if(read_layered_value(g_url_config_name,raw,sizeof(raw),NULL)==0 &&
+       strcmp(raw,"auto")!=0 && strchr(raw,':')){
+        snprintf(out,cap,"%s",raw);
+        return;
+    }
+
+    load_nav_config(&cfg);
+    base=nav_surface_url(&cfg);
+    if(!cfg.query || strcmp(cfg.surface,"instructioncard")==0){
         snprintf(out,cap,"%s",base);
         return;
     }
-    nav_tristate_value(g_nav_speed_config_name,speed,sizeof(speed),"user");
-    nav_tristate_value(g_nav_compass_config_name,compass,sizeof(compass),"user");
-    nav_tristate_value(g_nav_eta_config_name,eta,sizeof(eta),"yes");
-    nav_maneuver_value(maneuver,sizeof(maneuver));
+    maneuver=nav_maneuver_wire(cfg.maneuver);
     snprintf(out,cap,"%s?showSpeedLimit=%s&showCompass=%s&showETA=%s&maneuverLayout=%s",
-             base,speed,compass,eta,maneuver);
+             base,cfg.speed,cfg.compass,cfg.eta,maneuver);
 }
 
 static void set_str(CFMutableDictionaryRef d, const char *key, const char *val)
