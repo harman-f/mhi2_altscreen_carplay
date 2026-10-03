@@ -82,11 +82,7 @@ telemetry_sample(){
   TELEMETRY_SEQ=$((TELEMETRY_SEQ+1))
   SCONF=$(status_value "$SOURCE_TIMING_STATUS" configured_max_fps)
   if [ -z "$SCONF" ]; then
-    SCONF=$ALTSCREEN111_FPS
-    if [ -r "$SOURCE_FPS_OVERRIDE_FILE" ]; then
-      V=$(cat "$SOURCE_FPS_OVERRIDE_FILE" 2>/dev/null)
-      case "$V" in 20|25|30|40) SCONF=$V ;; esac
-    fi
+    SCONF=$(runtime_cfg_get "$FPS_CONFIG_NAME" "$ALTSCREEN111_FPS")
   fi
   SSEQ=$(status_value "$SOURCE_TIMING_STATUS" sample_seq); SSEQ=${SSEQ:-0}
   if [ "$SSEQ" != "0" ] && [ "$SSEQ" = "$LAST_SOURCE_SAMPLE_SEQ" ]; then
