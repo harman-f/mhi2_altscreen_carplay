@@ -151,6 +151,7 @@ typedef Boolean (*fn_cfstr_cstr_t)(CFStringRef, char *, CFIndex, uint32_t);
 typedef CFTypeID (*fn_cfget_typeid_t)(CFTypeRef);
 typedef CFTypeID (*fn_cftypeid_t)(void);
 typedef int64_t (*fn_cfget_i64_t)(CFTypeRef, OSStatus *);
+typedef CFTypeRef (*fn_cfnumber_create_t)(void *, int, const void *);
 typedef Boolean (*fn_cfbool_get_t)(CFTypeRef);
 typedef CFIndex (*fn_cfdict_count_t)(CFDictionaryRef);
 typedef void (*fn_cfdict_keys_t)(CFDictionaryRef, const void **, const void **);
@@ -206,6 +207,7 @@ static fn_cftypeid_t p_CFNumberGetTypeID;
 static fn_cftypeid_t p_CFBooleanGetTypeID;
 static fn_cftypeid_t p_CFDataGetTypeID;
 static fn_cfget_i64_t p_CFGetInt64;
+static fn_cfnumber_create_t p_CFNumberCreate;
 static fn_cfbool_get_t p_CFBooleanGetValue;
 static fn_cfdata_len_t p_CFDataGetLength;
 static fn_cfdata_ptr_t p_CFDataGetBytePtr;
@@ -1230,6 +1232,9 @@ static int init_api(void)
     RESOLVE(p_CFBooleanGetTypeID, "CFBooleanGetTypeID");
     RESOLVE(p_CFDataGetTypeID, "CFDataGetTypeID");
     RESOLVE(p_CFGetInt64, "CFGetInt64");
+    p_CFNumberCreate=(fn_cfnumber_create_t)sym_next("CFNumberCreate");
+    if(!p_CFNumberCreate)
+        logf_u2("optional CFNumberCreate unavailable; adjacentViewAreas arrays omitted");
     RESOLVE(p_CFBooleanGetValue, "CFBooleanGetValue");
     RESOLVE(p_CFDataGetLength, "CFDataGetLength");
     RESOLVE(p_CFDataGetBytePtr, "CFDataGetBytePtr");
@@ -2282,6 +2287,25 @@ static void set_false(CFMutableDictionaryRef d, const char *key)
     if(k){p_CFDictionarySetValue(d,k,p_cfl_boolean_false);p_CFRelease(k);}
 }
 
+static void set_adjacent_view(CFMutableDictionaryRef d, int adjacent)
+{
+    CFMutableArrayRef a=NULL;
+    CFStringRef k=NULL;
+    CFTypeRef n=NULL;
+    int64_t value=(int64_t)adjacent;
+    if(!d||adjacent<0||!p_CFNumberCreate)return;
+    a=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
+    k=s_cf("adjacentViewAreas");
+    n=p_CFNumberCreate(NULL,4,&value);
+    if(a&&k&&n){
+        p_CFArrayAppendValue(a,n);
+        p_CFDictionarySetValue(d,k,a);
+    }
+    if(n)p_CFRelease(n);
+    if(k)p_CFRelease(k);
+    if(a)p_CFRelease(a);
+}
+
 static void remove_key(CFMutableDictionaryRef d, const char *name)
 {
     CFStringRef k;
@@ -2389,6 +2413,7 @@ static void add_reference_viewarea(CFMutableDictionaryRef alt)
 
         set_false(view,"drawUIOutsideSafeArea");
         set_false(view,"viewAreaTransitionControl");
+        if(cfg.count>1u)set_adjacent_view(view,cfg.view[i].adjacent);
 
         k=s_cf("safeArea");
         if(!k){p_CFRelease(safe);p_CFRelease(view);goto done;}
@@ -2917,6 +2942,7 @@ static CFMutableDictionaryRef command_update_view(unsigned view)
     set_str(params,"uuid",g_alt_uuid);
     set_i64(params,"viewAreaIndex",(int64_t)view);
     set_i64(params,"animationDurationMillis",(int64_t)cfg.transition_ms);
+    if(cfg.count>1u)set_adjacent_view(params,cfg.view[view].adjacent);
     { CFStringRef k=s_cf("params"); p_CFDictionarySetValue(req,k,params); p_CFRelease(k); }
     p_CFRelease(params); return req;
 }
