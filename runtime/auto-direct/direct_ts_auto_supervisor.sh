@@ -4,7 +4,6 @@
 runtime_init_durable || exit 3
 load_altscreen_config || exit 4
 
-ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
 PIDFILE=/tmp/mibr-direct-auto-supervisor.pid
 BRIDGEPID=/tmp/mibr-direct-auto-bridge.pid
 AUTOHB=/tmp/mibr-direct-auto.heartbeat
@@ -193,7 +192,7 @@ configure_source_timing
 
 auto_log "supervisor started pid=$$ source=tcp://127.0.0.1:$ALTSCREEN111_TEE_PORT output=/dev/mlb/isoTX2"
 
-while [ -e "$ENABLED" ]; do
+while [ "$(runtime_cfg_bool "$AUTODIRECT_CONFIG_NAME" 1)" = "1" ]; do
   publish_auto_hb
 
   if [ ! -r "$GATE_STATS" ] || ! grep -q '^loaded=1$' "$GATE_STATS" 2>/dev/null; then
@@ -330,7 +329,7 @@ while [ -e "$ENABLED" ]; do
   IDLE_SECONDS=0
   STOP_REASON=bridge_exit
 
-  while [ -e "$ENABLED" ] && kill -0 "$BRIDGE_PID" 2>/dev/null; do
+  while [ "$(runtime_cfg_bool "$AUTODIRECT_CONFIG_NAME" 1)" = "1" ] && kill -0 "$BRIDGE_PID" 2>/dev/null; do
     publish_auto_hb
     CUR=missing
     [ -r "$SOURCE_STATE" ] && CUR=$(cat "$SOURCE_STATE" 2>/dev/null)
@@ -358,7 +357,7 @@ while [ -e "$ENABLED" ]; do
     sleep 1
   done
 
-  if [ ! -e "$ENABLED" ]; then
+  if [ "$(runtime_cfg_bool "$AUTODIRECT_CONFIG_NAME" 1)" != "1" ]; then
     STOP_REASON=disabled
   elif ! kill -0 "$BRIDGE_PID" 2>/dev/null; then
     STOP_REASON=bridge_exit
@@ -416,5 +415,5 @@ while [ -e "$ENABLED" ]; do
   [ "$STOP_REASON" = "bridge_exit" ] && sleep 3
 done
 
-auto_log "supervisor leaving: enable marker absent"
+auto_log "supervisor leaving: Auto-Direct effective config disabled"
 exit 0
