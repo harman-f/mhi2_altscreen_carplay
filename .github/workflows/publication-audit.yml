@@ -43,8 +43,14 @@ jobs:
           grep -Fq 'TEMP=/tmp/$NAME' runtime/diagnostics/gen2_keyframes.sh
           grep -Fq 'PERSIST=/mnt/app/root/$NAME' runtime/diagnostics/gen2_keyframes.sh
           bash -n runtime/diagnostics/gen2_sourceversion.sh
+          bash -n runtime/diagnostics/gen2_display.sh
+          bash -n runtime/diagnostics/gen2_enabled.sh
           bash -n runtime/navigation/gen2_nav_config.sh
+          bash -n runtime/navigation/gen2_url.sh
+          bash -n runtime/navigation/gen2_ui_urls.sh
+          bash -n runtime/navigation/gen2_viewareas.sh
           bash -n runtime/navigation/gen2_safearea.sh
+          bash -n runtime/auto-direct/gen2_video.sh
           bash -n runtime/experimental/viewarea_mode.sh
           bash -n runtime/auto-direct/common.sh
           bash -n runtime/auto-direct/direct_fps.sh
@@ -83,11 +89,17 @@ jobs:
             runtime/isotx2-gate/restore_preload.sh \
             runtime/diagnostics/gen2_keyframes.sh \
             runtime/diagnostics/gen2_sourceversion.sh \
+            runtime/diagnostics/gen2_display.sh \
+            runtime/diagnostics/gen2_enabled.sh \
             runtime/diagnostics/gen2_resync.sh \
             runtime/diagnostics/gen2_status.sh \
             runtime/diagnostics/keypanel_trace_discovery.sh \
             runtime/navigation/gen2_nav_config.sh \
+            runtime/navigation/gen2_url.sh \
+            runtime/navigation/gen2_ui_urls.sh \
+            runtime/navigation/gen2_viewareas.sh \
             runtime/navigation/gen2_safearea.sh \
+            runtime/auto-direct/gen2_video.sh \
             runtime/experimental/viewarea_mode.sh
           do
             test -s "$f"
