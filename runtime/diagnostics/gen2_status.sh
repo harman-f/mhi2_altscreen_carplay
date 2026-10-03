@@ -39,16 +39,14 @@ echo "--- Candidate D resync ---"
 echo "auto_resync=OFF"
 echo
 
-echo "--- A/B controls ---"
-[ -r /mnt/app/root/mibr-carplay111-url-map.enabled ] && echo "url=maps:/car/instrumentcluster/map" || echo "url=maps:/car/instrumentcluster"
-if [ -r /mnt/app/root/mibr-carplay111-bit26.force-on ]; then
-  echo "bit26=force-on"
-elif [ -r /mnt/app/root/mibr-carplay111-bit26.force-off ]; then
-  echo "bit26=force-off"
-else
-  echo "bit26=stock"
-fi
-echo
+echo "--- runtime configuration ---"
+for helper in gen2_keyframes.sh gen2_sourceversion.sh gen2_nav_config.sh gen2_safearea.sh viewarea_mode.sh; do
+  H=/mnt/app/root/altscreen-u2/scripts/$helper
+  if [ -x "$H" ]; then
+    "$H" status 2>/dev/null || true
+    echo
+  fi
+done
 
 echo "--- Stream111 ---"
 [ -r /tmp/mibr-carplay111.state ] && echo "state=$(cat /tmp/mibr-carplay111.state 2>/dev/null)" || echo "state=NONE"
