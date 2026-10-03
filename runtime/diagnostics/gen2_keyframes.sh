@@ -105,17 +105,30 @@ case "${1:-status}" in
     fi
     ;;
   on)
-    touch "$PERSIST_MARKER" || exit 1
-    touch "$SESSION_MARKER" 2>/dev/null || true
+    mount -uw /mnt/app 2>/dev/null || { echo "GEN2_D2_KEYFRAMES=FAIL mount_rw"; exit 4; }
+    touch "$PERSIST_MARKER" || {
+      mount -ur /mnt/app 2>/dev/null || true
+      echo "GEN2_D2_KEYFRAMES=FAIL persistent_marker"
+      exit 5
+    }
     sync
+    mount -ur /mnt/app 2>/dev/null || true
+    touch "$SESSION_MARKER" 2>/dev/null || true
     echo "GEN2_D2_KEYFRAMES=ENABLED"
     echo "GEN2_D2_MODE=persistent"
     show_timing
     echo "Persistent across unit reboot. No reboot required for the current session."
     ;;
   off)
-    rm -f "$PERSIST_MARKER" "$SESSION_MARKER"
+    mount -uw /mnt/app 2>/dev/null || { echo "GEN2_D2_KEYFRAMES=FAIL mount_rw"; exit 4; }
+    rm -f "$PERSIST_MARKER" || {
+      mount -ur /mnt/app 2>/dev/null || true
+      echo "GEN2_D2_KEYFRAMES=FAIL persistent_marker_remove"
+      exit 5
+    }
     sync
+    mount -ur /mnt/app 2>/dev/null || true
+    rm -f "$SESSION_MARKER" 2>/dev/null || true
     echo "GEN2_D2_KEYFRAMES=DISABLED"
     echo "GEN2_D2_MODE=off"
     echo "No reboot required. Manual Candidate-D controls remain separate."
