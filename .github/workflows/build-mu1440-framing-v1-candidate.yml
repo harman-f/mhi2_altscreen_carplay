@@ -106,8 +106,12 @@ jobs:
           strings "$GEN2" | grep -Fq 'mibr-alt111-source-timing.status'
           strings "$GEN2" | grep -Fq 'mibr-carplay111-keyframes.conf'
           strings "$GEN2" | grep -Fq 'mibr-carplay111-sourceversion'
-          strings "$GEN2" | grep -Fq 'mibr-carplay111-viewareas'
-          strings "$GEN2" | grep -Fq 'mibr-carplay111-nav-query'
+          strings "$GEN2" | grep -Fq 'mibr-carplay111-enabled'
+          strings "$GEN2" | grep -Fq 'mibr-carplay111-url'
+          strings "$GEN2" | grep -Fq 'mibr-carplay111-ui-urls.conf'
+          strings "$GEN2" | grep -Fq 'mibr-carplay111-nav.conf'
+          strings "$GEN2" | grep -Fq 'mibr-carplay111-display.conf'
+          strings "$GEN2" | grep -Fq 'mibr-carplay111-viewareas.conf'
           strings "$GEN2" | grep -Fq '/tmp'
           strings "$GEN2" | grep -Fq '/mnt/app/root'
           ! strings "$GEN2" | grep -Fq 'mibr-carplay111-bit26.force-'
@@ -137,32 +141,50 @@ jobs:
             while IFS= read -r script; do bash -n "$script"; done < <(find . -type f -name '*.sh' -print | sort)
           )
 
+          grep -Fq 'candidate=classic111-runtime-contract-v1' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fq 'pts_pcr=unchanged_cfr' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'source_arrival_timing=clock_monotonic' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fq 'runtime_config_precedence=/tmp_then_/mnt/app/root_then_default' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fq 'fps_default=30' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fq 'fps_config_name=mibr-carplay111-fps' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'video_config_name=mibr-carplay111-video.conf' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fq 'source_version_default=1005.8.1' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'raw_url_config_name=mibr-carplay111-url' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'ui_urls_config_name=mibr-carplay111-ui-urls.conf' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'nav_config_name=mibr-carplay111-nav.conf' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'display_config_name=mibr-carplay111-display.conf' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'viewareas_config_name=mibr-carplay111-viewareas.conf' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'viewarea1_default=area:0,0,1010,376,safe:0,58,1010,248' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fq 'keyframe_config_name=mibr-carplay111-keyframes.conf' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fq 'framing_config_name=mibr-carplay111-framing' build/framing-v1/package/CANDIDATE-MANIFEST.txt
+          grep -Fq 'media_scope=excluded' build/framing-v1/package/CANDIDATE-MANIFEST.txt
           grep -Fxq "source_head_commit=$SOURCE_HEAD_COMMIT" build/framing-v1/package/CANDIDATE-MANIFEST.txt
           if [[ -n "$CI_MERGE_COMMIT" ]]; then
             grep -Fxq "ci_merge_commit=$CI_MERGE_COMMIT" build/framing-v1/package/CANDIDATE-MANIFEST.txt
           fi
 
-          grep -Fq 'MIBR_FRAMING_V1=PASS' deployment/mu1440-framing-v1/install.sh
-          grep -Fq 'MIBR_FRAMING_V1_UNINSTALL=PASS' deployment/mu1440-framing-v1/uninstall.sh
+          grep -Fq 'MIBR_CLASSIC111=PASS' deployment/mu1440-framing-v1/install.sh
+          grep -Fq 'MIBR_CLASSIC111_UNINSTALL=PASS' deployment/mu1440-framing-v1/uninstall.sh
           grep -Fq 'MIBR_CFG_TEMP_ROOT=/tmp' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'FPS_CONFIG_NAME=mibr-carplay111-fps' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'FRAMING_CONFIG_NAME=mibr-carplay111-framing' build/framing-v1/package/runtime/auto-direct/common.sh
+          grep -Fq 'VIDEO_CONFIG_NAME=mibr-carplay111-video.conf' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'NAME=mibr-carplay111-keyframes.conf' build/framing-v1/package/runtime/diagnostics/gen2_keyframes.sh
           grep -Fq 'NAME=mibr-carplay111-sourceversion' build/framing-v1/package/runtime/diagnostics/gen2_sourceversion.sh
-          grep -Fq 'NAME=mibr-carplay111-safearea.conf' build/framing-v1/package/runtime/navigation/gen2_safearea.sh
-          grep -Fq 'QUERY_NAME=$PREFIX-query' build/framing-v1/package/runtime/navigation/gen2_nav_config.sh
-          grep -Fq 'NAME=mibr-carplay111-viewareas' build/framing-v1/package/runtime/experimental/viewarea_mode.sh
-          grep -Fq 'backup_one "$LSD" system/lsd.sh' build/framing-v1/package/install.sh
-          grep -Fq 'backup_one "$STATE_AUTODIRECT" state/mibr-carplay-autodirect' build/framing-v1/package/install.sh
-          grep -Fq 'restore_one system/lsd.sh "$LSD"' build/framing-v1/package/uninstall.sh
-          grep -Fq 'restore_one state/mibr-carplay-autodirect "$STATE_AUTODIRECT" 644' build/framing-v1/package/uninstall.sh
+          grep -Fq 'NAME=mibr-carplay111-enabled' build/framing-v1/package/runtime/diagnostics/gen2_enabled.sh
+          grep -Fq 'NAME=mibr-carplay111-display.conf' build/framing-v1/package/runtime/diagnostics/gen2_display.sh
+          grep -Fq 'NAME=mibr-carplay111-url' build/framing-v1/package/runtime/navigation/gen2_url.sh
+          grep -Fq 'NAME=mibr-carplay111-ui-urls.conf' build/framing-v1/package/runtime/navigation/gen2_ui_urls.sh
+          grep -Fq 'NAME=mibr-carplay111-nav.conf' build/framing-v1/package/runtime/navigation/gen2_nav_config.sh
+          grep -Fq 'NAME=mibr-carplay111-viewareas.conf' build/framing-v1/package/runtime/navigation/gen2_viewareas.sh
+          grep -Fq 'REQUEST=/tmp/mibr-alt111-viewarea-request' build/framing-v1/package/runtime/navigation/gen2_viewareas.sh
+          grep -Fq 'compatibility_scope=view0.safe' build/framing-v1/package/runtime/navigation/gen2_safearea.sh
+          grep -Fq '"$LSD:system/lsd.sh"' build/framing-v1/package/install.sh
+          grep -Fq '"$STATE_AUTODIRECT:state/mibr-carplay-autodirect"' build/framing-v1/package/install.sh
+          grep -Fq '"system/lsd.sh:$LSD:755"' build/framing-v1/package/uninstall.sh
+          grep -Fq '"state/mibr-carplay-autodirect:$STATE_AUTODIRECT:644"' build/framing-v1/package/uninstall.sh
+          grep -Fq 'source_timestamp_policy=raw_8_bytes_preserved_in_m1au_not_used_for_pts_pcr' build/framing-v1/package/status.sh
+
 
 
           (
