@@ -2243,7 +2243,7 @@ static void gen2_resync_poll(void)
                 (unsigned long long)epoch,auto_reason,auto_sources,
                 (unsigned long long)idr_at_arm,(unsigned long long)source_idrs,
                 d2_timing.event_delay_ms,d2_timing.watchdog_ms,
-                d2_timing.min_gap_ms,d2_timing.from_file?"file":"default");
+                d2_timing.min_gap_ms,config_layer_name(d2_timing.source_layer));
     }else if(auto_reason!=ALT111_RESYNC_REASON_NONE && auto_arm_rc!=ALT111_WAIT){
         logf_u2("GEN2 D2 ARM rejected rc=%d reason=%u sources=0x%x projection=%u config=%u primed=%u",
                 auto_arm_rc,auto_reason,auto_sources,
