@@ -4,7 +4,8 @@
 runtime_init_durable || { echo "AUTO_DIRECT_ENABLE=FAIL_RUNTIME"; exit 3; }
 
 DSTBASE=/mnt/app/root/altscreen-u2
-ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
+CONFIG=/mnt/app/root/mibr-carplay-autodirect
+LEGACY_ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
 LSD=/mnt/app/eso/hmi/lsd/lsd.sh
 TMP=/tmp/lsd.sh.mibr-autodirect.$$
 MARKER_BEGIN="# MIBR AUTO-DIRECT BEGIN"
@@ -64,26 +65,32 @@ if [ ! -r "$DSTBASE/backup/lsd.sh.pre-autodirect" ]; then
   cp "$LSD" "$DSTBASE/backup/lsd.sh.pre-autodirect" || fail 29 "backup_lsd"
 fi
 
-if ! grep -Fq "$MARKER_BEGIN" "$LSD" 2>/dev/null; then
+if grep -Fq "$MARKER_BEGIN" "$LSD" 2>/dev/null; then
+  awk -v cmd="$BOOTCMD" -v begin="$MARKER_BEGIN" -v end="$MARKER_END" '
+    BEGIN { skip=0; done=0 }
+    $0 == begin { print begin; print cmd; skip=1; done=1; next }
+    skip { if ($0 == end) { print end; skip=0 }; next }
+    { print }
+    END { if (!done || skip) exit 42 }
+  ' "$LSD" > "$TMP" || fail 30 "boot_patch_replace"
+else
   awk -v cmd="$BOOTCMD" -v begin="$MARKER_BEGIN" -v end="$MARKER_END" '
     BEGIN { done=0 }
-    !done && /^\$J9/ {
-      print begin
-      print "if [ -e /mnt/app/root/mibr-carplay-autodirect.enabled ]; then"
-      print "  " cmd
-      print "fi"
-      print end
-      done=1
-    }
+    !done && /^\$J9/ { print begin; print cmd; print end; done=1 }
     { print }
     END { if (!done) exit 42 }
-  ' "$LSD" > "$TMP" || fail 30 "boot_patch"
-  chmod 755 "$TMP" 2>/dev/null || true
-  mv "$TMP" "$LSD" || fail 31 "boot_install"
+  ' "$LSD" > "$TMP" || fail 30 "boot_patch_insert"
 fi
+chmod 755 "$TMP" 2>/dev/null || true
+mv "$TMP" "$LSD" || fail 31 "boot_install"
 
-touch "$ENABLED" || fail 32 "enable_marker"
+CFG_TMP="$CONFIG.new.$$"
+echo 1 > "$CFG_TMP" || fail 32 "enable_config_write"
+mv "$CFG_TMP" "$CONFIG" || fail 33 "enable_config_install"
+chmod 644 "$CONFIG" 2>/dev/null || true
+rm -f "$LEGACY_ENABLED" 2>/dev/null || true
 sync
+
 mount -ur /mnt/app 2>/dev/null || true
 APP_RW=0
 
@@ -91,7 +98,7 @@ if [ "${MIBR_PREPARE_ONLY:-0}" = "1" ]; then
   echo "AUTO_DIRECT_ENABLE=PREPARED"
   echo "runtime_start=SKIPPED_UNTIL_REBOOT"
   echo "boot_hook=present"
-  echo "enabled_marker=$ENABLED"
+  echo "persistent_config=$CONFIG value=1"
   exit 0
 fi
 
@@ -103,5 +110,5 @@ else
   echo "AUTO_DIRECT_ENABLE=PREPARED_START_RC_$RC"
 fi
 echo "boot_hook=present"
-echo "enabled_marker=$ENABLED"
+echo "persistent_config=$CONFIG value=1"
 exit 0
