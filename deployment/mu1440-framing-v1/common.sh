@@ -17,13 +17,9 @@ export GEM=1
 # BASICS/GLOBALS or depending on an apps/ tree.
 VOLUME="$BASE"
 SHA256="$BASE/bin/sha256sum"
-TEE="$BASE/bin/tee"
 TIMESTAMP="/net/rcc/usr/bin/date +%Y_%m_%d_%H_%M_%S"
 TMP="/net/rcc/dev/shmem"
-DEPLOY_MEDIA_FILE="$BASE/config/deployment_media_root"
-DEPLOY_MEDIA_ROOT=""
 U2_STORAGE_READY=0
-U2_LOG_ON_MEDIA=0
 
 set_log_root(){
   BACKUPFOLDER=$1
@@ -32,19 +28,11 @@ set_log_root(){
   DIRECT_MASTER_LOG="$DIRECT_LOG_ROOT/DIRECT-TS.log"
 }
 
+# Runtime logging is intentionally RAM-first. The running projection path never
+# remounts removable media writable. Durable evidence is exported explicitly by
+# the package-local collect-logs.sh, which performs the proven M.I.B./U2
+# removable-media bootstrap and a real write test first.
 set_log_root /tmp/mibr-altscreen-logs
-if [ -r "$DEPLOY_MEDIA_FILE" ]; then
-  DEPLOY_MEDIA_ROOT=$(cat "$DEPLOY_MEDIA_FILE" 2>/dev/null)
-  case "$DEPLOY_MEDIA_ROOT" in
-    /net/mmx/fs/*)
-      U2_LOG_ON_MEDIA=1
-      set_log_root "$DEPLOY_MEDIA_ROOT/mhi2-altscreen-logs"
-      ;;
-    *)
-      DEPLOY_MEDIA_ROOT=""
-      ;;
-  esac
-fi
 
 CARPLAY_HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
 CARPLAY_BACKDIR=/mnt/app/root/mibr-carplay111-backup
@@ -78,14 +66,9 @@ runtime_find_cmd(){
 
 runtime_emit(){
   MSG="$*"
-  if [ -x "${TEE:-}" ] && [ -n "${LOG:-}" ] && [ -n "${BACKUPFOLDER:-}" ] && [ -d "$BACKUPFOLDER" ]; then
-    echo "$MSG" | "$TEE" -a "$LOG" 2>/dev/null || {
-      echo "$MSG"
-      echo "$MSG" >> "$LOG" 2>/dev/null || true
-    }
-  else
-    echo "$MSG"
-    [ -n "${LOG:-}" ] && echo "$MSG" >> "$LOG" 2>/dev/null || true
+  echo "$MSG"
+  if [ -n "${LOG:-}" ] && [ -n "${BACKUPFOLDER:-}" ] && [ -d "$BACKUPFOLDER" ]; then
+    echo "$MSG" >> "$LOG" 2>/dev/null || true
   fi
 }
 
@@ -178,45 +161,16 @@ prepare_log_storage(){
     return 0
   fi
 
-  if [ "$U2_LOG_ON_MEDIA" = "1" ]; then
-    if ! mount -uw "$DEPLOY_MEDIA_ROOT" 2>/dev/null; then
-      runtime_emit "WARN deployment media unavailable for logging; using /tmp"
-      U2_LOG_ON_MEDIA=0
-      set_log_root /tmp/mibr-altscreen-logs
-    fi
-  fi
-
-  if ! mkdir -p "$BACKUPFOLDER" 2>/dev/null; then
-    if [ "$U2_LOG_ON_MEDIA" = "1" ]; then
-      runtime_emit "WARN deployment media log directory unavailable; using /tmp"
-      U2_LOG_ON_MEDIA=0
-      set_log_root /tmp/mibr-altscreen-logs
-      mkdir -p "$BACKUPFOLDER" 2>/dev/null || return 1
-    else
-      return 1
-    fi
-  fi
-
-  TEST="$BACKUPFOLDER/.write-test-$$"
-  if ! touch "$TEST" 2>/dev/null || [ ! -f "$TEST" ]; then
-    rm -f "$TEST" 2>/dev/null || true
-    if [ "$U2_LOG_ON_MEDIA" = "1" ]; then
-      runtime_emit "WARN deployment media is not writable; using /tmp"
-      U2_LOG_ON_MEDIA=0
-      set_log_root /tmp/mibr-altscreen-logs
-      mkdir -p "$BACKUPFOLDER" 2>/dev/null || return 1
-      TEST="$BACKUPFOLDER/.write-test-$$"
-      touch "$TEST" 2>/dev/null || return 1
-      [ -f "$TEST" ] || return 1
-    else
-      return 1
-    fi
-  fi
+  mkdir -p "$BACKUPFOLDER" 2>/dev/null || return 1
+  TEST="$BACKUPFOLDER/.write-test-$"
+  touch "$TEST" 2>/dev/null || return 1
+  [ -f "$TEST" ] || return 1
   rm -f "$TEST" 2>/dev/null || true
+
   [ -f "$LOG" ] || echo "MU1440 AltScreen runtime" > "$LOG" 2>/dev/null || true
   mkdir -p "$DIRECT_LOG_ROOT" 2>/dev/null || true
   U2_STORAGE_READY=1
-  export U2_STORAGE_READY U2_LOG_ON_MEDIA
+  export U2_STORAGE_READY
   return 0
 }
 
@@ -225,10 +179,6 @@ runtime_init(){
   [ -x "$SHA256" ] || {
     runtime_emit "ERROR bundled SHA-256 helper missing/not executable: $SHA256"
     return 2
-  }
-  [ -x "$TEE" ] || {
-    runtime_emit "ERROR bundled tee helper missing/not executable: $TEE"
-    return 3
   }
   return 0
 }
@@ -266,17 +216,9 @@ emit_to_file(){
   OUT=$1
   shift
   MSG="$*"
-  if [ -x "$TEE" ]; then
-    if [ -n "${LOG:-}" ]; then
-      echo "$MSG" | "$TEE" -a "$OUT" "$LOG" 2>/dev/null || true
-    else
-      echo "$MSG" | "$TEE" -a "$OUT" 2>/dev/null || true
-    fi
-  else
-    echo "$MSG"
-    echo "$MSG" >> "$OUT" 2>/dev/null || true
-    [ -n "${LOG:-}" ] && echo "$MSG" >> "$LOG" 2>/dev/null || true
-  fi
+  echo "$MSG"
+  echo "$MSG" >> "$OUT" 2>/dev/null || true
+  [ -n "${LOG:-}" ] && echo "$MSG" >> "$LOG" 2>/dev/null || true
 }
 
 hash256(){
@@ -414,13 +356,9 @@ load_altscreen_config(){
 direct_log(){
   mkdir -p "$DIRECT_LOG_ROOT" 2>/dev/null || true
   MSG="$(timestamp_now) $*"
-  if [ -x "$TEE" ]; then
-    echo "$MSG" | "$TEE" -a "$LOG" "$DIRECT_MASTER_LOG" 2>/dev/null || true
-  else
-    echo "$MSG"
-    [ -n "${LOG:-}" ] && echo "$MSG" >> "$LOG" 2>/dev/null || true
-    echo "$MSG" >> "$DIRECT_MASTER_LOG" 2>/dev/null || true
-  fi
+  echo "$MSG"
+  [ -n "${LOG:-}" ] && echo "$MSG" >> "$LOG" 2>/dev/null || true
+  echo "$MSG" >> "$DIRECT_MASTER_LOG" 2>/dev/null || true
 }
 
 direct_new_run(){

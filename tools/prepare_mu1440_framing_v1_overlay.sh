@@ -26,8 +26,9 @@ cp "$ROOT/deployment/mu1440-framing-v1/collect-logs.sh" "$DEST/collect-logs.sh"
 cp "$GEN2" "$DEST/payload/libaltscreen111.so"
 cp "$REMUX" "$DEST/payload/direct-ts-remux"
 cp "$SHAHELP" "$DEST/payload/sha256sum"
+cp "$ROOT/deployment/mu1440-framing-v1/common.sh" "$DEST/runtime/auto-direct/common.sh"
 
-for f in   common.sh direct_fps.sh direct_source_mode.sh direct_autodirect.sh gen2_video.sh   direct_ts_auto_supervisor.sh direct_ts_auto_status.sh   direct_ts_auto_start.sh direct_ts_auto_watchdog.sh   direct_ts_auto_enable.sh direct_ts_auto_disable.sh
+for f in   direct_fps.sh direct_source_mode.sh direct_autodirect.sh gen2_video.sh   direct_ts_auto_supervisor.sh direct_ts_auto_status.sh   direct_ts_auto_start.sh direct_ts_auto_watchdog.sh   direct_ts_auto_enable.sh direct_ts_auto_disable.sh
 do
   cp "$ROOT/runtime/auto-direct/$f" "$DEST/runtime/auto-direct/$f"
 done
