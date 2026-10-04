@@ -126,6 +126,10 @@ void alt111_resync_cancel(struct alt111_resync *r, unsigned reason);
 
 struct alt111_output_ticket {
     uint64_t stream, codec, consumer, sequence;
+    /* Source-side complete-AU ordinal. Unlike sequence, this advances before
+     * consumer attachment/drop decisions and therefore exposes predictive
+     * chain gaps to downstream parity transport. */
+    uint64_t source_ordinal;
     size_t offset;
     unsigned priming, idr;
     /* Exact eight bytes from the Stream-111 header timestamp area. */
@@ -135,6 +139,7 @@ struct alt111_chunk {
     uint8_t *bytes;
     size_t length, offset;
     uint64_t sequence;
+    uint64_t source_ordinal;
     unsigned priming, idr;
     uint8_t source_ts_raw[8];
 };
