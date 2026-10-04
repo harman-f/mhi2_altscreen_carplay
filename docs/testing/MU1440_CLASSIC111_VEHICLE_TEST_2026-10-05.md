@@ -42,31 +42,77 @@ The installer checks the expected MU1440 `libairplay.so` hash before mutation. I
 does not return PASS, do not apply.
 
 Do not hard-restart `smartphone_integrator` or `dio_manager` to apply a reconnect-class setting.
-Disconnect/reconnect CarPlay. If the projection stack becomes stale, use a normal MHI reboot and, if
-required, a complete vehicle bus-sleep boundary.
+Disconnect/reconnect CarPlay. If the projection stack becomes stale, use the audited normal MU reboot
+path documented below and, only if required, a complete vehicle bus-sleep boundary.
 
 The candidate is vehicle-test ready, not merge/production ready.
 
 ## SD layout and install
 
-Extract the complete vehicle ZIP to one folder on the SD card. The folder root must contain:
+For the reference vehicle, the SD1 card is already a combined M.I.B./U2 runtime. Do not overwrite
+its root `apps/`, `config/`, `esd/`, `lib/` trees and do not replace
+`esd/Launcher-sda0.esd`.
+
+Extract the complete audited vehicle ZIP into exactly:
+
+```text
+/net/mmx/fs/sda0/esd/carplay-test/classic111-framing-v1/
+```
+
+The folder root must contain:
 
 ```text
 install.sh
 uninstall.sh
 status.sh
 CANDIDATE-MANIFEST.txt
+README-FIRST.txt
 PAYLOAD.sha256
 PACKAGE-SHA256SUMS.txt
 payload/
 runtime/
 ```
 
-SSH to the unit and `cd` into that folder.
+The installer resolves `payload/` and `runtime/` relative to its own location, so no
+`FRAMING_V1` root directory or other parallel SD layout is required.
 
-Preflight:
+### Read-only environment gate
+
+SSH is expected to be the established MMX QNX shell. Before applying, run:
 
 ```sh
+CARD=/net/mmx/fs/sda0
+PKG=$CARD/esd/carplay-test/classic111-framing-v1
+[ -d "$CARD/apps" ] && echo "MIB_APPS=PASS" || echo "MIB_APPS=FAIL"
+[ -d "$CARD/config" ] && echo "MIB_CONFIG=PASS" || echo "MIB_CONFIG=FAIL"
+[ -r "$CARD/esd/Launcher-sda0.esd" ] && echo "MIB_LAUNCHER=PASS" || echo "MIB_LAUNCHER=FAIL"
+[ -r "$PKG/install.sh" ] && echo "PKG_INSTALL=PASS" || echo "PKG_INSTALL=FAIL"
+[ -x "$PKG/payload/sha256sum" ] && echo "PKG_SHA=PASS" || echo "PKG_SHA=FAIL"
+[ -x /mnt/app/root/altscreen-u2/bin/sha256sum ] && echo "BASE_SHA=PASS" || echo "BASE_SHA=FAIL"
+[ -x /mnt/app/root/altscreen-u2/bin/tee ] && echo "BASE_TEE=PASS" || echo "BASE_TEE=FAIL"
+```
+
+Any `FAIL` is a stop condition.
+
+The last two checks are deliberate: the installed candidate `common.sh` requires those pre-existing
+base-runtime helpers, while this frozen candidate's `install.sh --check` does not itself verify them.
+
+### Candidate identity
+
+Use the package-local QNX SHA helper; do not assume firmware `sha256sum` exists:
+
+```sh
+"$PKG/payload/sha256sum" "$PKG/payload/libaltscreen111.so"
+"$PKG/payload/sha256sum" "$PKG/payload/direct-ts-remux"
+cat "$PKG/CANDIDATE-MANIFEST.txt"
+```
+
+Expected binary hashes are the values in the Candidate identity section above.
+
+### Preflight and apply
+
+```sh
+cd "$PKG"
 ksh ./install.sh --check
 ```
 
@@ -77,7 +123,7 @@ MIBR_CLASSIC111_CHECK=PASS
 next=./install.sh --apply
 ```
 
-Apply:
+Then:
 
 ```sh
 ksh ./install.sh --apply
@@ -98,15 +144,25 @@ pts_pcr=UNCHANGED_CFR
 REBOOT_REQUIRED=YES
 ```
 
-Then:
+### Normal MU reboot
+
+Do not use bare shell `reboot` for this procedure and do not substitute the diagnostic
+`fastReboot` variant.
+
+Use the normal M.I.B.-conformant IOC reboot path:
 
 ```sh
-reboot
+sync; sync; sync; on -f rcc /usr/apps/mib2_ioc_flash reboot
 ```
+
+SSH should disconnect while the unit reboots.
 
 After the unit is back, preferably before connecting the iPhone:
 
 ```sh
+CARD=/net/mmx/fs/sda0
+PKG=$CARD/esd/carplay-test/classic111-framing-v1
+cd "$PKG"
 ksh ./status.sh
 ```
 
@@ -289,11 +345,11 @@ A reboot also clears every `/tmp` setting and returns to the persistent/default 
 
 ## Rollback
 
-From the extracted candidate folder:
+From the same canonical candidate folder:
 
 ```sh
+cd "$PKG"
 ksh ./uninstall.sh
-reboot
 ```
 
 Expected before reboot:
@@ -301,6 +357,12 @@ Expected before reboot:
 ```text
 MIBR_CLASSIC111_UNINSTALL=PASS
 REBOOT_REQUIRED=YES
+```
+
+Then use the same normal IOC reboot:
+
+```sh
+sync; sync; sync; on -f rcc /usr/apps/mib2_ioc_flash reboot
 ```
 
 Rollback restores exactly the pre-install state captured under:
