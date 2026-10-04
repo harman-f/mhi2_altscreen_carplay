@@ -39,6 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
 
@@ -126,7 +127,7 @@ jobs:
         shell: bash
         env:
           SOURCE_HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-          CI_MERGE_COMMIT: ${{ github.event_name == 'pull_request' && github.sha || '' }}
+          CI_MERGE_COMMIT: ''
         run: |
           set -euxo pipefail
           chmod +x tools/prepare_mu1440_framing_v1_overlay.sh
