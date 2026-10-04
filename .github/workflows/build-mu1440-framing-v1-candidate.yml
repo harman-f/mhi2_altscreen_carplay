@@ -168,6 +168,8 @@ jobs:
           grep -Fq 'MIBR_CLASSIC111_UNINSTALL=PASS' deployment/mu1440-framing-v1/uninstall.sh
           grep -Fq 'MIBR_CFG_TEMP_ROOT=/tmp' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'set_log_root /tmp/mibr-altscreen-logs' build/framing-v1/package/runtime/auto-direct/common.sh
+          grep -Fq 'TEST="$BACKUPFOLDER/.write-test-$"' build/framing-v1/package/runtime/auto-direct/common.sh
+          grep -Fq 'temporary runtime log storage is not writable: $BACKUPFOLDER' build/framing-v1/package/runtime/auto-direct/common.sh
           ! grep -Fq 'DEPLOY_MEDIA_FILE=' build/framing-v1/package/runtime/auto-direct/common.sh
           ! grep -Fq 'TEE="$BASE/bin/tee"' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq '"$DST/bin/sha256sum"' build/framing-v1/package/install.sh
