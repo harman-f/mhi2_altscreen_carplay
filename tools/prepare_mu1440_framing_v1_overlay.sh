@@ -23,6 +23,8 @@ cp "$ROOT/deployment/mu1440-framing-v1/install.sh" "$DEST/install.sh"
 cp "$ROOT/deployment/mu1440-framing-v1/uninstall.sh" "$DEST/uninstall.sh"
 cp "$ROOT/deployment/mu1440-framing-v1/status.sh" "$DEST/status.sh"
 cp "$ROOT/deployment/mu1440-framing-v1/collect-logs.sh" "$DEST/collect-logs.sh"
+cp "$ROOT/deployment/mu1440-framing-v1/vehicle-install.sh" "$DEST/vehicle-install.sh"
+cp "$ROOT/deployment/mu1440-framing-v1/vehicle-rollback.sh" "$DEST/vehicle-rollback.sh"
 cp "$GEN2" "$DEST/payload/libaltscreen111.so"
 cp "$REMUX" "$DEST/payload/direct-ts-remux"
 cp "$SHAHELP" "$DEST/payload/sha256sum"
@@ -47,7 +49,7 @@ chmod +x "$DEST/"*.sh "$DEST/payload/"*   "$DEST/runtime/auto-direct/"*.sh   "$D
 
 (
   cd "$DEST"
-  sha256sum     payload/libaltscreen111.so     payload/direct-ts-remux     payload/sha256sum     collect-logs.sh     runtime/auto-direct/common.sh     runtime/auto-direct/direct_fps.sh     runtime/auto-direct/direct_source_mode.sh     runtime/auto-direct/direct_autodirect.sh     runtime/auto-direct/gen2_video.sh     runtime/auto-direct/direct_ts_auto_supervisor.sh     runtime/auto-direct/direct_ts_auto_status.sh     runtime/auto-direct/direct_ts_auto_start.sh     runtime/auto-direct/direct_ts_auto_watchdog.sh     runtime/auto-direct/direct_ts_auto_enable.sh     runtime/auto-direct/direct_ts_auto_disable.sh     runtime/navigation/gen2_nav_config.sh     runtime/navigation/gen2_url.sh     runtime/navigation/gen2_ui_urls.sh     runtime/navigation/gen2_viewareas.sh     runtime/navigation/gen2_safearea.sh     runtime/diagnostics/gen2_keyframes.sh     runtime/diagnostics/gen2_sourceversion.sh     runtime/diagnostics/gen2_display.sh     runtime/diagnostics/gen2_enabled.sh     runtime/experimental/viewarea_mode.sh     > PAYLOAD.sha256
+  sha256sum     payload/libaltscreen111.so     payload/direct-ts-remux     payload/sha256sum     collect-logs.sh     vehicle-install.sh     vehicle-rollback.sh     runtime/auto-direct/common.sh     runtime/auto-direct/direct_fps.sh     runtime/auto-direct/direct_source_mode.sh     runtime/auto-direct/direct_autodirect.sh     runtime/auto-direct/gen2_video.sh     runtime/auto-direct/direct_ts_auto_supervisor.sh     runtime/auto-direct/direct_ts_auto_status.sh     runtime/auto-direct/direct_ts_auto_start.sh     runtime/auto-direct/direct_ts_auto_watchdog.sh     runtime/auto-direct/direct_ts_auto_enable.sh     runtime/auto-direct/direct_ts_auto_disable.sh     runtime/navigation/gen2_nav_config.sh     runtime/navigation/gen2_url.sh     runtime/navigation/gen2_ui_urls.sh     runtime/navigation/gen2_viewareas.sh     runtime/navigation/gen2_safearea.sh     runtime/diagnostics/gen2_keyframes.sh     runtime/diagnostics/gen2_sourceversion.sh     runtime/diagnostics/gen2_display.sh     runtime/diagnostics/gen2_enabled.sh     runtime/experimental/viewarea_mode.sh     > PAYLOAD.sha256
 )
 
 GEN2_SHA=$(sha256sum "$GEN2" | awk '{print $1}')
@@ -164,15 +166,16 @@ Runtime evidence:
   performs a real SD write test, then copies the /tmp evidence into:
     /net/mmx/fs/sda0/esd/carplay-test/logs/classic111/<timestamp>/
 
-Install:
-  ksh ./install.sh --check
-  ksh ./install.sh --apply
-  sync; sync; sync; on -f rcc /usr/apps/mib2_ioc_flash reboot
+Vehicle one-shot:
+  ksh ./vehicle-install.sh
+  # runs preflight -> apply -> normal IOC reboot, and stops before reboot on error
+
+After reconnect:
   ksh ./status.sh
 
-Rollback:
-  ksh ./uninstall.sh
-  sync; sync; sync; on -f rcc /usr/apps/mib2_ioc_flash reboot
+Rollback one-shot:
+  ksh ./vehicle-rollback.sh
+  # runs audited uninstall -> normal IOC reboot
 EOF
 
 (

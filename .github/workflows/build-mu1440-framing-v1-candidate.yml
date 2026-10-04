@@ -178,6 +178,12 @@ jobs:
           grep -Fq '"$MOUNTER" -usb' build/framing-v1/package/collect-logs.sh
           grep -Fq 'mibr-classic111-write-test' build/framing-v1/package/collect-logs.sh
           grep -Fq 'LOGROOT=$WORK/logs/classic111' build/framing-v1/package/collect-logs.sh
+          grep -Fq 'ksh ./install.sh --check' build/framing-v1/package/vehicle-install.sh
+          grep -Fq 'ksh ./install.sh --apply' build/framing-v1/package/vehicle-install.sh
+          grep -Fq 'ksh ./uninstall.sh' build/framing-v1/package/vehicle-rollback.sh
+          grep -Fq 'on -f rcc /usr/apps/mib2_ioc_flash reboot' build/framing-v1/package/vehicle-install.sh
+          grep -Fq 'on -f rcc /usr/apps/mib2_ioc_flash reboot' build/framing-v1/package/vehicle-rollback.sh
+          ! grep -Fq 'fastReboot' build/framing-v1/package/vehicle-install.sh
           grep -Fq 'FPS_CONFIG_NAME=mibr-carplay111-fps' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'FRAMING_CONFIG_NAME=mibr-carplay111-framing' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'VIDEO_CONFIG_NAME=mibr-carplay111-video.conf' build/framing-v1/package/runtime/auto-direct/common.sh
