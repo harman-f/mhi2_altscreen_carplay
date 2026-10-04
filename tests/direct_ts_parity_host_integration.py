@@ -144,6 +144,9 @@ def main():
         video = [p for p in packets if pid(p) == 0x0011]
         starts = [i for i, p in enumerate(video) if p[1] & 0x40]
         assert len(starts) == len(aus), (len(starts), len(aus))
+        assert all(
+            ((video[i][3] >> 4) & 3) == 3 for i in starts
+        ), "PES-start TS packet must carry an adaptation field"
 
         pts = []
         pes_payloads = []
