@@ -310,6 +310,7 @@ static const char *g_ui_urls_config_name = "mibr-carplay111-ui-urls.conf";
 static const char *g_nav_config_name = "mibr-carplay111-nav.conf";
 static const char *g_display_config_name = "mibr-carplay111-display.conf";
 static const char *g_viewareas_config_name = "mibr-carplay111-viewareas.conf";
+static const char *g_compat_profile_config_name = "mibr-carplay111-compat-profile";
 static char g_alt_uuid[96] = ALT_UUID_DEFAULT;
 static char g_alt_url[160] = ALT_URL_DEFAULT;
 static const char *g_log_path = "/tmp/altscreen111.log";
@@ -842,6 +843,14 @@ static unsigned master_enabled(void)
 }
 
 
+static int compat_profile_omonob790(void)
+{
+    char b[48];
+    return read_layered_value(g_compat_profile_config_name,b,sizeof(b),NULL)==0 &&
+           strcmp(b,"omonob790")==0;
+}
+
+
 static int config_line_value(const char *blob, const char *key,
                              char *out, size_t cap)
 {
@@ -950,19 +959,23 @@ static int current_advertised_fps(void)
 
 static void set_reference_enabled_features(CFMutableDictionaryRef response)
 {
-    CFStringRef k=NULL,alt=NULL,va=NULL;
+    CFStringRef k=NULL,alt=NULL,va=NULL,iap=NULL;
     CFMutableArrayRef a=NULL;
+    int omonob790=compat_profile_omonob790();
     if(!response)return;
 
     k=s_cf("enabledFeatures");
     alt=s_cf("altScreen");
     va=s_cf("viewAreas");
+    if(omonob790)iap=s_cf("iAPChannel");
     a=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
-    if(a&&alt)p_CFArrayAppendValue(a,alt);
+    if(a&&iap)p_CFArrayAppendValue(a,iap);
     if(a&&va&&g_viewareas)p_CFArrayAppendValue(a,va);
+    if(a&&alt)p_CFArrayAppendValue(a,alt);
     if(a&&k)p_CFDictionarySetValue(response,k,a);
 
     if(a)p_CFRelease(a);
+    if(iap)p_CFRelease(iap);
     if(va)p_CFRelease(va);
     if(alt)p_CFRelease(alt);
     if(k)p_CFRelease(k);
@@ -2852,8 +2865,12 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
     if(displays&&alt){
         char active_url[384];
         active_alt_url_copy(active_url,sizeof(active_url));
-        /* Exact reference removal set before AltScreen-specific overrides. */
-        remove_key(alt,"primaryInputDevice");
+        /* Exact reference removal set before AltScreen-specific overrides.
+         * The Omonob790 parity profile advertises primaryInputDevice=3 exactly
+         * like the audited Free790/Paid lineage; the default M.I.B. profile
+         * remains no-HID. */
+        if(compat_profile_omonob790())set_i64(alt,"primaryInputDevice",3);
+        else remove_key(alt,"primaryInputDevice");
         remove_key(alt,"edid");
         remove_key(alt,"platformLayer");
         remove_key(alt,"avcc");
@@ -2869,21 +2886,26 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
          */
         set_i64(alt,"type",(int64_t)g2_profile.type);
         set_i64(alt,"maxFPS",(int64_t)advertised_fps);
-        set_i64(alt,"features",(int64_t)g2_profile.features);
+        set_i64(alt,"features",(int64_t)(compat_profile_omonob790()?10u:g2_profile.features));
         set_i64(alt,"widthPixels",(int64_t)g_width);
         set_i64(alt,"heightPixels",(int64_t)g_height);
         set_i64(alt,"widthPhysical",(int64_t)g_width_mm);
         set_i64(alt,"heightPhysical",(int64_t)g_height_mm);
         set_str(alt,"uuid",g_alt_uuid);
         set_str(alt,"initialURL",active_url);
-        add_alt_suggest_ui_urls(alt);
+        /* Free790 does not advertise altScreenSuggestUIURLs. Keep the M.I.B.
+         * extension available outside the strict parity profile. */
+        if(!compat_profile_omonob790())add_alt_suggest_ui_urls(alt);
         if(g_viewareas)add_reference_viewarea(alt);
 
         p_CFArrayAppendValue(displays,alt);
         p_CFDictionarySetValue(info,kdisplays,displays);
-        logf_u2("GEN2 /info ready: root=altScreen%s type=%u maxFPS=%u features=%u input=none geometry=%ux%u physical=%ux%u uuid=%s url=%s",
+        logf_u2("GEN2 /info ready: profile=%s root=altScreen%s type=%u maxFPS=%u features=%u primaryInput=%s geometry=%ux%u physical=%ux%u uuid=%s url=%s",
+                compat_profile_omonob790()?"omonob790":"mibr",
                 g_viewareas?"+viewAreas":"",
-                g2_profile.type,(unsigned)advertised_fps,g2_profile.features,
+                g2_profile.type,(unsigned)advertised_fps,
+                compat_profile_omonob790()?10u:g2_profile.features,
+                compat_profile_omonob790()?"3":"none",
                 g_width,g_height,g_width_mm,g_height_mm,
                 g_alt_uuid,active_url);
     }else{
