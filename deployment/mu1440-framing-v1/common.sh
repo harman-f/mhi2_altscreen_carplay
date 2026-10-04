@@ -12,9 +12,9 @@ unset LD_PRELOAD
 export GEM=1
 
 # Installed runtime is self-contained under /mnt/app/root/altscreen-u2.
-# Persistent logs prefer the deployment SD/USB medium when available. This
-# preserves the proven M.I.B. writable-media behavior without importing its
-# BASICS/GLOBALS or depending on an apps/ tree.
+# Runtime logging is RAM-first under /tmp. The projection/runtime path never
+# remounts removable media writable. SD persistence is an explicit collection
+# action performed by the package-local collect-logs.sh.
 VOLUME="$BASE"
 SHA256="$BASE/bin/sha256sum"
 TIMESTAMP="/net/rcc/usr/bin/date +%Y_%m_%d_%H_%M_%S"
@@ -162,7 +162,7 @@ prepare_log_storage(){
   fi
 
   mkdir -p "$BACKUPFOLDER" 2>/dev/null || return 1
-  TEST="$BACKUPFOLDER/.write-test-$"
+  TEST="$BACKUPFOLDER/.write-test-$$"
   touch "$TEST" 2>/dev/null || return 1
   [ -f "$TEST" ] || return 1
   rm -f "$TEST" 2>/dev/null || true
@@ -191,7 +191,7 @@ runtime_init_durable(){
     return "$RC"
   fi
   prepare_log_storage || {
-    runtime_emit "ERROR durable log storage is not writable: $BASE/logs"
+    runtime_emit "ERROR temporary runtime log storage is not writable: $BACKUPFOLDER"
     runtime_emit "ERROR runtime/log bootstrap failed rc=4"
     return 4
   }
