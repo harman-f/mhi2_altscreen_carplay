@@ -125,8 +125,8 @@ select_view(){
     }
   fi
 
-  echo "$IDX" > "$REQUEST.new.$" || exit 20
-  mv "$REQUEST.new.$" "$REQUEST" || exit 21
+  echo "$IDX" > "$REQUEST.new.$$" || exit 20
+  mv "$REQUEST.new.$$" "$REQUEST" || exit 21
   echo "GEN2_VIEWAREA_SELECT=REQUESTED index=$IDX"
 
   I=0
