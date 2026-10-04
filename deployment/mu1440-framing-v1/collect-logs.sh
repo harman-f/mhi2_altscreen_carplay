@@ -7,16 +7,29 @@ PKG=$WORK/classic111-framing-v1
 LOGROOT=$WORK/logs/classic111
 TMPROOT=/tmp/mibr-altscreen-logs
 MOUNTER=$CARD/apps/mounts
+CARD_RW=0
+
+card_ro(){
+  if [ "$CARD_RW" -eq 1 ]; then
+    sync 2>/dev/null || true
+    mount -ur "$CARD" 2>/dev/null || true
+    CARD_RW=0
+  fi
+}
 
 fail(){
   echo "CLASSIC111_LOG_EXPORT=FAIL $*"
+  card_ro
   exit 20
 }
+
+trap card_ro 0 1 2 15
 
 [ -x "$MOUNTER" ] || fail "missing_mount_helper=$MOUNTER"
 [ -r "$PKG/status.sh" ] || fail "missing_status_script=$PKG/status.sh"
 
 "$MOUNTER" -usb >/dev/null 2>&1 || fail "sd_mount_rw"
+CARD_RW=1
 
 TEST=$CARD/.mibr-classic111-write-test-$$
 touch "$TEST" 2>/dev/null || fail "sd_write_test_create"
@@ -62,8 +75,8 @@ if [ -d "$TMPROOT/direct-ts" ]; then
   done
 fi
 
-sync
-mount -ur "$CARD" 2>/dev/null || true
+card_ro
+trap - 0 1 2 15
 
 echo "CLASSIC111_LOG_EXPORT=PASS"
 echo "path=$OUT"
