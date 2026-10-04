@@ -6,6 +6,56 @@ Scope: classic CarPlay auxiliary display / ScreenAlt / stream type 111.
 Media/Now Playing, CarPlay Ultra/NextGen, PassengerDisplay, GaugeCluster, HEVC, Enhanced Siri,
 raw AirPlay feature-bit experiments, HID/input and appearance experiments are explicitly out of scope.
 
+
+## Validated vehicle-test candidate
+
+Final audited source:
+
+```text
+repository=harman-f/mhi2_altscreen_carplay
+branch=work/source-timestamp-framing-v1
+HEAD=bbfa20cb11c574d14b3cb607731ea20ccfb9fef8
+PR=#10 (draft; not for merge before vehicle validation)
+```
+
+All four required workflows are green on that exact HEAD:
+
+```text
+Publication integrity audit              37183996901  success
+Build experimental GEN2 AltScreen        37183996904  success
+Build unstripped MU1440 direct-ts-remux  37183996910  success
+Build MU1440 framing-v1 candidate overlay 37183996909 success
+```
+
+Vehicle artifact:
+
+```text
+Actions artifact ID=11296122415
+artifact name=mu1440-framing-v1-candidate
+Actions archive digest=sha256:db352311fa0e0dc89b5f8ada06c801b1878466c75cefeabc24e8a1ad01119465
+
+inner vehicle ZIP=MHI2_AltScreen_MU1440_FRAMING_V1_CANDIDATE.zip
+inner vehicle ZIP SHA256=2a09a8c2c03045f36db6e5e71fc9f03c3c6728fc764623190c35c1ed2b95de21
+GEN2 libaltscreen111.so SHA256=8cccf1cb1764952acd973cbb4f881cfd70f3312e7f6a29cdef7fec930c83d25c
+direct-ts-remux SHA256=3f0e730523bd290608dc13e186baa962eeb9c46f117d4d4976be523c0cd94c09
+```
+
+Final package audit additionally verified:
+
+- outer and inner ZIP digests;
+- `PAYLOAD.sha256` and `PACKAGE-SHA256SUMS.txt` completely;
+- every shipped shell script with `bash -n`;
+- no ZIP path traversal;
+- ARM/QNX ELF identity for GEN2, remux and bundled SHA helper;
+- required Classic111 strings in the compiled GEN2 binary;
+- absence of the retired bit26, old nav-query marker and old D2 marker from the GEN2 binary;
+- installer exact-target guard on the MU1440 `libairplay.so` SHA;
+- backup-before-mutation, orphan-backup refusal and active-candidate mismatch refusal;
+- exact one-to-one rollback coverage for all 41 backed-up binaries, helpers, settings and legacy-state files.
+
+The only legacy marker names still present in the vehicle package are explicit installer cleanup lines
+for stale `/tmp` state; they are not active configuration.
+
 ## 1. One configuration model
 
 All user-facing settings use the same two-layer precedence:
