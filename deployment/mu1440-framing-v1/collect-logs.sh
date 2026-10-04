@@ -1,11 +1,14 @@
 #!/bin/ksh
 set -u
 
+SELF=$0
+case "$SELF" in */*) ROOT=${SELF%/*} ;; *) ROOT=. ;; esac
+ROOT=$(cd "$ROOT" 2>/dev/null && pwd) || exit 2
+
 CARD=/net/mmx/fs/sda0
 WORK=$CARD/esd/carplay-test
-PKG=$WORK/classic111-framing-v1
+PKG=$ROOT
 LOGROOT=$WORK/logs/classic111
-TMPROOT=/tmp/mibr-altscreen-logs
 MOUNTER=$CARD/apps/mounts
 CARD_RW=0
 
@@ -49,31 +52,20 @@ for SPEC in \
   "/tmp/mibr-alt111-source-timing.status:source-timing.status" \
   "/tmp/mibr-direct-remux.status:direct-remux.status" \
   "/tmp/altscreen111.log:altscreen111.log" \
-  "$TMPROOT/U2-LOG.txt:runtime.log"
+  "/tmp/mibr-alt111-runtime.log:runtime.log" \
+  "/tmp/mibr-alt111-direct-ts.log:direct-ts.log" \
+  "/tmp/mibr-alt111-dmdt.log:dmdt.log"
 do
   SRC=${SPEC%%:*}
   NAME=${SPEC#*:}
   [ -r "$SRC" ] && cp "$SRC" "$OUT/$NAME" 2>/dev/null || true
 done
 
-if [ -d "$TMPROOT/direct-ts" ]; then
-  for F in "$TMPROOT/direct-ts/"*; do
-    [ -f "$F" ] || continue
-    NAME=${F##*/}
-    cp "$F" "$OUT/direct-ts/$NAME" 2>/dev/null || true
-  done
-
-  for D in "$TMPROOT/direct-ts/"*; do
-    [ -d "$D" ] || continue
-    DNAME=${D##*/}
-    mkdir -p "$OUT/direct-ts/$DNAME" 2>/dev/null || continue
-    for F in "$D/"*; do
-      [ -f "$F" ] || continue
-      NAME=${F##*/}
-      cp "$F" "$OUT/direct-ts/$DNAME/$NAME" 2>/dev/null || true
-    done
-  done
-fi
+for F in /tmp/mibr-alt111-run-*; do
+  [ -f "$F" ] || continue
+  NAME=${F##*/}
+  cp "$F" "$OUT/direct-ts/$NAME" 2>/dev/null || true
+done
 
 card_ro
 trap - 0 1 2 15

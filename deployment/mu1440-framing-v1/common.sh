@@ -6,7 +6,7 @@ TARGET=/mnt/system/etc/eso/production/smartphone_integrator.json
 EXPECTED_AIRPLAY=193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5
 EXPECTED_SMARTPHONE=dd925b8a85ad1acc9d88dd5e7aedabc3118c1c8299e107bbaa99b4c145c807be
 
-export PATH=.:/proc/boot:/bin:/usr/bin:/usr/sbin:/sbin:/mnt/app/media/gracenote/bin:/mnt/app/armle/bin:/mnt/app/armle/sbin:/mnt/app/armle/usr/bin:/mnt/app/armle/usr/sbin
+export PATH=.:/proc/boot:/sbin:/bin:/usr/bin:/usr/sbin:/net/mmx/bin:/net/mmx/usr/bin:/net/mmx/usr/sbin:/net/mmx/sbin:/mnt/app/media/gracenote/bin:/mnt/app/armle/bin:/mnt/app/armle/sbin:/mnt/app/armle/usr/bin:/mnt/app/armle/usr/sbin:/net/mmx/mnt/app/armle/bin:/net/mmx/mnt/app/armle/sbin:/net/mmx/mnt/app/armle/usr/bin:/net/mmx/mnt/app/armle/usr/sbin
 export LD_LIBRARY_PATH=/lib:/mnt/app/root/lib-target:/eso/lib:/mnt/app/usr/lib:/mnt/app/armle/lib:/mnt/app/armle/lib/dll:/mnt/app/armle/usr/lib
 unset LD_PRELOAD
 export GEM=1
@@ -21,18 +21,17 @@ TIMESTAMP="/net/rcc/usr/bin/date +%Y_%m_%d_%H_%M_%S"
 TMP="/net/rcc/dev/shmem"
 U2_STORAGE_READY=0
 
-set_log_root(){
-  BACKUPFOLDER=$1
-  LOG="$BACKUPFOLDER/U2-LOG.txt"
-  DIRECT_LOG_ROOT="$BACKUPFOLDER/direct-ts"
-  DIRECT_MASTER_LOG="$DIRECT_LOG_ROOT/DIRECT-TS.log"
-}
+# MU1440 /tmp is a shared-memory pseudo filesystem. Vehicle evidence shows
+# nested directory semantics are not reliable enough for target-critical state.
+# Keep all volatile runtime evidence as flat, prefixed files directly in /tmp.
+BACKUPFOLDER=/tmp
+LOG=/tmp/mibr-alt111-runtime.log
+DIRECT_MASTER_LOG=/tmp/mibr-alt111-direct-ts.log
+DMDT_LOG=/tmp/mibr-alt111-dmdt.log
+DIRECT_RUN_PREFIX=/tmp/mibr-alt111-run
 
-# Runtime logging is intentionally RAM-first. The running projection path never
-# remounts removable media writable. Durable evidence is exported explicitly by
-# the package-local collect-logs.sh, which performs the proven M.I.B./U2
-# removable-media bootstrap and a real write test first.
-set_log_root /tmp/mibr-altscreen-logs
+# The running projection path never remounts removable media writable.
+# Durable evidence is exported explicitly by the package-local collect-logs.sh.
 
 CARPLAY_HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
 CARPLAY_BACKDIR=/mnt/app/root/mibr-carplay111-backup
@@ -67,7 +66,7 @@ runtime_find_cmd(){
 runtime_emit(){
   MSG="$*"
   echo "$MSG"
-  if [ -n "${LOG:-}" ] && [ -n "${BACKUPFOLDER:-}" ] && [ -d "$BACKUPFOLDER" ]; then
+  if [ -n "${LOG:-}" ]; then
     echo "$MSG" >> "$LOG" 2>/dev/null || true
   fi
 }
@@ -157,18 +156,17 @@ carplay_stack_health(){
 
 prepare_log_storage(){
   if [ "$U2_STORAGE_READY" = "1" ]; then
-    [ -d "$BACKUPFOLDER" ] || return 1
     return 0
   fi
 
-  mkdir -p "$BACKUPFOLDER" 2>/dev/null || return 1
-  TEST="$BACKUPFOLDER/.write-test-$$"
+  TEST=/tmp/mibr-alt111-write-test-$
+  rm -f "$TEST" 2>/dev/null || true
   touch "$TEST" 2>/dev/null || return 1
   [ -f "$TEST" ] || return 1
   rm -f "$TEST" 2>/dev/null || true
 
-  [ -f "$LOG" ] || echo "MU1440 AltScreen runtime" > "$LOG" 2>/dev/null || true
-  mkdir -p "$DIRECT_LOG_ROOT" 2>/dev/null || true
+  [ -f "$LOG" ] || echo "MU1440 AltScreen runtime" > "$LOG" 2>/dev/null || return 1
+  [ -f "$DIRECT_MASTER_LOG" ] || : > "$DIRECT_MASTER_LOG" 2>/dev/null || return 1
   U2_STORAGE_READY=1
   export U2_STORAGE_READY
   return 0
@@ -191,7 +189,7 @@ runtime_init_durable(){
     return "$RC"
   fi
   prepare_log_storage || {
-    runtime_emit "ERROR temporary runtime log storage is not writable: $BACKUPFOLDER"
+    runtime_emit "ERROR temporary flat runtime log storage is not writable: /tmp"
     runtime_emit "ERROR runtime/log bootstrap failed rc=4"
     return 4
   }
@@ -238,9 +236,9 @@ run_dmdt(){ (cd /eso 2>/dev/null && IPL_CONFIG_DIR=/etc/eso/production LD_LIBRAR
 route(){
   C=$1; D=$2; V=${3:-4}
   log "DMDT route: context=$C displayable=$D display=$V"
-  run_dmdt dc "$C" "$D" >> "$BACKUPFOLDER/dmdt.log" 2>&1
+  run_dmdt dc "$C" "$D" >> "$DMDT_LOG" 2>&1
   R1=$?
-  run_dmdt sc "$V" "$C" >> "$BACKUPFOLDER/dmdt.log" 2>&1
+  run_dmdt sc "$V" "$C" >> "$DMDT_LOG" 2>&1
   R2=$?
   [ $R1 -eq 0 ] && [ $R2 -eq 0 ]
 }
@@ -354,7 +352,6 @@ load_altscreen_config(){
 }
 
 direct_log(){
-  mkdir -p "$DIRECT_LOG_ROOT" 2>/dev/null || true
   MSG="$(timestamp_now) $*"
   echo "$MSG"
   [ -n "${LOG:-}" ] && echo "$MSG" >> "$LOG" 2>/dev/null || true
@@ -364,24 +361,21 @@ direct_log(){
 direct_new_run(){
   STAGE=$1
   runtime_init_durable || return 1
-  mkdir -p "$DIRECT_LOG_ROOT" 2>/dev/null || return 1
-  DIRECT_RUN=$DIRECT_LOG_ROOT/$(stamp)-$STAGE
-  mkdir -p "$DIRECT_RUN" 2>/dev/null || return 1
+  DIRECT_RUN=$DIRECT_RUN_PREFIX-$(stamp)-$STAGE
   echo "$DIRECT_RUN"
 }
 
 direct_snapshot(){
-  OUTDIR=$1
-  mkdir -p "$OUTDIR" 2>/dev/null || return 1
-  timestamp_now > "$OUTDIR/date.txt" 2>/dev/null || true
-  uname -a > "$OUTDIR/uname.txt" 2>/dev/null || true
-  pidin ar > "$OUTDIR/pidin.txt" 2>/dev/null || true
-  pidin fds > "$OUTDIR/pidin-fds.txt" 2>/dev/null || true
-  pidin -p displaymanagementProc fds > "$OUTDIR/displaymanager-fds.txt" 2>/dev/null ||
-    pidin -p displaymanager fds > "$OUTDIR/displaymanager-fds.txt" 2>/dev/null || true
-  run_dmdt gs > "$OUTDIR/dmdt-gs.txt" 2>&1 || true
-  ls -l /dev/mlb/isoTX2 /net/rcc/dev/name/local/inic/isoTX2 > "$OUTDIR/isoTX2-ls.txt" 2>&1 || true
+  OUTBASE=$1
+  timestamp_now > "$OUTBASE.date.txt" 2>/dev/null || true
+  uname -a > "$OUTBASE.uname.txt" 2>/dev/null || true
+  pidin ar > "$OUTBASE.pidin.txt" 2>/dev/null || true
+  pidin fds > "$OUTBASE.pidin-fds.txt" 2>/dev/null || true
+  pidin -p displaymanagementProc fds > "$OUTBASE.displaymanager-fds.txt" 2>/dev/null ||
+    pidin -p displaymanager fds > "$OUTBASE.displaymanager-fds.txt" 2>/dev/null || true
+  run_dmdt gs > "$OUTBASE.dmdt-gs.txt" 2>&1 || true
+  ls -l /dev/mlb/isoTX2 /net/rcc/dev/name/local/inic/isoTX2 > "$OUTBASE.isoTX2-ls.txt" 2>&1 || true
   DMCONF=$(find_displaymanager_config 2>/dev/null)
-  [ -n "$DMCONF" ] && cp "$DMCONF" "$OUTDIR/displaymanager.json" 2>/dev/null || true
-  [ -r /tmp/altscreen111.log ] && cp /tmp/altscreen111.log "$OUTDIR/altscreen111.log" 2>/dev/null || true
+  [ -n "$DMCONF" ] && cp "$DMCONF" "$OUTBASE.displaymanager.json" 2>/dev/null || true
+  [ -r /tmp/altscreen111.log ] && cp /tmp/altscreen111.log "$OUTBASE.altscreen111.log" 2>/dev/null || true
 }

@@ -66,8 +66,8 @@ configure_source_framing(){
 }
 
 telemetry_init(){
-  TELEMETRY=$RUN/telemetry.tsv
-  TELEMETRY_EVENTS=$RUN/telemetry-events.log
+  TELEMETRY=$RUN.telemetry.tsv
+  TELEMETRY_EVENTS=$RUN.telemetry-events.log
   TELEMETRY_SEQ=0
   LAST_SOURCE_BUCKET=0
   LAST_SOURCE_SAMPLE_SEQ=0
@@ -236,12 +236,12 @@ while [ "$(runtime_cfg_bool "$AUTODIRECT_CONFIG_NAME" 1)" = "1" ]; do
 
   SESSION=$((SESSION+1))
   RUN=$(direct_new_run auto-direct-$SESSION) || {
-    auto_log "FAIL cannot allocate session log directory"
+    auto_log "FAIL cannot allocate flat session log prefix"
     sleep 2
     continue
   }
-  BRIDGELOG=$RUN/bridge.log
-  SUMMARY=$RUN/SUMMARY.txt
+  BRIDGELOG=$RUN.bridge.log
+  SUMMARY=$RUN.summary.txt
   telemetry_init
   DM_BEFORE=$(pidin ar 2>/dev/null | awk '/pps\/displaymanager/ && !/awk/ {print $1; exit}')
   if [ -z "${DM_BEFORE:-}" ]; then
@@ -364,8 +364,8 @@ while [ "$(runtime_cfg_bool "$AUTODIRECT_CONFIG_NAME" 1)" = "1" ]; do
   gate_stock
   publish_auto_state "stock"
   sleep 1
-  [ -r "$SOURCE_TIMING_STATUS" ] && cp "$SOURCE_TIMING_STATUS" "$RUN/source-timing-final.status" 2>/dev/null || true
-  [ -r "$REMUX_STATUS" ] && cp "$REMUX_STATUS" "$RUN/remux-final.status" 2>/dev/null || true
+  [ -r "$SOURCE_TIMING_STATUS" ] && cp "$SOURCE_TIMING_STATUS" "$RUN.source-timing-final.status" 2>/dev/null || true
+  [ -r "$REMUX_STATUS" ] && cp "$REMUX_STATUS" "$RUN.remux-final.status" 2>/dev/null || true
 
   DM_AFTER=$(pidin ar 2>/dev/null | awk '/pps\/displaymanager/ && !/awk/ {print $1; exit}')
   BLOCKS=$(awk '

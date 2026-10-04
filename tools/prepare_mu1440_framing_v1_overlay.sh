@@ -103,7 +103,10 @@ apply_reconnect=enabled,fps,sourceversion,ui_urls,display,viewarea_definition
 media_scope=excluded
 ultra_scope=excluded
 install_type=reversible_overlay
-runtime_log_root=/tmp/mibr-altscreen-logs
+runtime_log_mode=flat_tmp_files
+runtime_log_file=/tmp/mibr-alt111-runtime.log
+direct_log_file=/tmp/mibr-alt111-direct-ts.log
+direct_run_prefix=/tmp/mibr-alt111-run
 sd_log_export=/net/mmx/fs/sda0/esd/carplay-test/logs/classic111
 sd_write_bootstrap=apps/mounts_-usb_plus_write_test
 EOF
@@ -158,12 +161,14 @@ Media/Now Playing, Ultra/NextGen, PassengerDisplay, GaugeCluster, HEVC,
 Enhanced Siri, bit26, bit37, HID/input and appearance experiments are excluded.
 
 Runtime evidence:
-  live logs/status remain in /tmp while the projection path is running.
+  live logs/status are flat prefixed files directly below /tmp.
+  Do not create runtime-critical /tmp subdirectories on MU1440.
   Nothing in the running runtime remounts SD writable for logging.
   Export evidence explicitly with:
     ksh ./collect-logs.sh
-  The collector uses the existing M.I.B./U2 apps/mounts -usb helper,
-  performs a real SD write test, then copies the /tmp evidence into:
+  The collector derives its package root from $0, uses the existing
+  M.I.B./U2 apps/mounts -usb helper, performs a real SD write test,
+  then copies the flat /tmp evidence into:
     /net/mmx/fs/sda0/esd/carplay-test/logs/classic111/<timestamp>/
 
 Vehicle one-shot:
