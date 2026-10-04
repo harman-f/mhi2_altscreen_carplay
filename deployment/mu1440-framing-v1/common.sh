@@ -159,7 +159,7 @@ prepare_log_storage(){
     return 0
   fi
 
-  TEST=/tmp/mibr-alt111-write-test-$
+  TEST=/tmp/mibr-alt111-write-test
   rm -f "$TEST" 2>/dev/null || true
   touch "$TEST" 2>/dev/null || return 1
   [ -f "$TEST" ] || return 1
