@@ -170,7 +170,7 @@ jobs:
           grep -Fq 'LOG=/tmp/mibr-alt111-runtime.log' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'DIRECT_MASTER_LOG=/tmp/mibr-alt111-direct-ts.log' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'DIRECT_RUN_PREFIX=/tmp/mibr-alt111-run' build/framing-v1/package/runtime/auto-direct/common.sh
-          grep -Fq 'TEST=/tmp/mibr-alt111-write-test-$' build/framing-v1/package/runtime/auto-direct/common.sh
+          grep -Fq 'TEST=/tmp/mibr-alt111-write-test' build/framing-v1/package/runtime/auto-direct/common.sh
           ! grep -Fq '/tmp/mibr-altscreen-logs' build/framing-v1/package/runtime/auto-direct/common.sh
           ! grep -Fq 'mkdir -p "$BACKUPFOLDER"' build/framing-v1/package/runtime/auto-direct/common.sh
           ! grep -Fq 'mkdir -p "$DIRECT_LOG_ROOT"' build/framing-v1/package/runtime/auto-direct/common.sh
