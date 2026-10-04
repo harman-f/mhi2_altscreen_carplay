@@ -91,7 +91,7 @@ check_base(){
   AH=$(hashf "$AIRPLAY") || fail "libairplay_hash_failed"
   [ "$AH" = "$EXPECTED_AIRPLAY" ] || fail "wrong_target_libairplay=$AH"
   grep -Fq "LD_PRELOAD=$HOOK" "$TARGET" 2>/dev/null || fail "base_carplay_preload_not_active"
-  for F in     "$DST/bin/libaltscreen111.so"     "$DST/bin/direct-ts-remux"     "$DST/scripts/common.sh"     "$DST/scripts/direct_ts_auto_supervisor.sh"     "$DST/scripts/direct_ts_auto_status.sh"     "$DST/scripts/direct_ts_auto_stop.sh"     "$DST/scripts/writev_gate.sh"     "$DST/scripts/direct_fps.sh"     "$HOOK"
+  for F in     "$DST/bin/libaltscreen111.so"     "$DST/bin/direct-ts-remux"     "$DST/bin/sha256sum"     "$DST/scripts/common.sh"     "$DST/scripts/direct_ts_auto_supervisor.sh"     "$DST/scripts/direct_ts_auto_status.sh"     "$DST/scripts/direct_ts_auto_stop.sh"     "$DST/scripts/writev_gate.sh"     "$HOOK"
   do
     [ -r "$F" ] || fail "base_file_missing=$F"
   done
@@ -103,6 +103,13 @@ candidate_hash(){
     remux) hashf "$PAYLOAD/direct-ts-remux" ;;
     *) return 1 ;;
   esac
+}
+
+check_tmp_log_root(){
+  T=/tmp/mibr-framing-v1-write-test-$
+  touch "$T" 2>/dev/null || fail "tmp_log_root_not_writable"
+  [ -f "$T" ] || fail "tmp_log_root_write_test_missing"
+  rm -f "$T" 2>/dev/null || true
 }
 
 show_plan(){
@@ -161,6 +168,7 @@ same_as_package(){
 
 verify_manifest
 check_base
+check_tmp_log_root
 show_plan
 
 case "${1:---check}" in

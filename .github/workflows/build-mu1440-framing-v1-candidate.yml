@@ -28,7 +28,7 @@ env:
   TOOLCHAIN_COMMIT: 56a66557245af14077678cd28a83ce3a337d9e2d
   TOOLCHAIN_DOCKERFILE_SHA256: 9a867a7ae70f2c0222a241b80232856526ccec0db2cfe013f8991ca31c74bcb1
   IMAGE: mhi2-qnx65-armv7-public:4.9
-  ZIP_NAME: MHI2_AltScreen_MU1440_FRAMING_V1_CANDIDATE.zip
+  ZIP_NAME: MHI2_AltScreen_MU1440_FRAMING_V1_ENVFIX1.zip
 
 jobs:
   build:
@@ -167,6 +167,15 @@ jobs:
           grep -Fq 'MIBR_CLASSIC111=PASS' deployment/mu1440-framing-v1/install.sh
           grep -Fq 'MIBR_CLASSIC111_UNINSTALL=PASS' deployment/mu1440-framing-v1/uninstall.sh
           grep -Fq 'MIBR_CFG_TEMP_ROOT=/tmp' build/framing-v1/package/runtime/auto-direct/common.sh
+          grep -Fq 'set_log_root /tmp/mibr-altscreen-logs' build/framing-v1/package/runtime/auto-direct/common.sh
+          ! grep -Fq 'DEPLOY_MEDIA_FILE=' build/framing-v1/package/runtime/auto-direct/common.sh
+          ! grep -Fq 'TEE="$BASE/bin/tee"' build/framing-v1/package/runtime/auto-direct/common.sh
+          grep -Fq '"$DST/bin/sha256sum"' build/framing-v1/package/install.sh
+          ! awk '/check_base\(\)/,/^}/' build/framing-v1/package/install.sh | grep -Fq '$DST/scripts/direct_fps.sh'
+          grep -Fq 'CARD=/net/mmx/fs/sda0' build/framing-v1/package/collect-logs.sh
+          grep -Fq '"$MOUNTER" -usb' build/framing-v1/package/collect-logs.sh
+          grep -Fq 'mibr-classic111-write-test' build/framing-v1/package/collect-logs.sh
+          grep -Fq 'LOGROOT=$WORK/logs/classic111' build/framing-v1/package/collect-logs.sh
           grep -Fq 'FPS_CONFIG_NAME=mibr-carplay111-fps' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'FRAMING_CONFIG_NAME=mibr-carplay111-framing' build/framing-v1/package/runtime/auto-direct/common.sh
           grep -Fq 'VIDEO_CONFIG_NAME=mibr-carplay111-video.conf' build/framing-v1/package/runtime/auto-direct/common.sh

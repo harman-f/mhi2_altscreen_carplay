@@ -22,6 +22,7 @@ mkdir -p "$DEST/payload" "$DEST/runtime/auto-direct" "$DEST/runtime/navigation" 
 cp "$ROOT/deployment/mu1440-framing-v1/install.sh" "$DEST/install.sh"
 cp "$ROOT/deployment/mu1440-framing-v1/uninstall.sh" "$DEST/uninstall.sh"
 cp "$ROOT/deployment/mu1440-framing-v1/status.sh" "$DEST/status.sh"
+cp "$ROOT/deployment/mu1440-framing-v1/collect-logs.sh" "$DEST/collect-logs.sh"
 cp "$GEN2" "$DEST/payload/libaltscreen111.so"
 cp "$REMUX" "$DEST/payload/direct-ts-remux"
 cp "$SHAHELP" "$DEST/payload/sha256sum"
@@ -45,7 +46,7 @@ chmod +x "$DEST/"*.sh "$DEST/payload/"*   "$DEST/runtime/auto-direct/"*.sh   "$D
 
 (
   cd "$DEST"
-  sha256sum     payload/libaltscreen111.so     payload/direct-ts-remux     payload/sha256sum     runtime/auto-direct/common.sh     runtime/auto-direct/direct_fps.sh     runtime/auto-direct/direct_source_mode.sh     runtime/auto-direct/direct_autodirect.sh     runtime/auto-direct/gen2_video.sh     runtime/auto-direct/direct_ts_auto_supervisor.sh     runtime/auto-direct/direct_ts_auto_status.sh     runtime/auto-direct/direct_ts_auto_start.sh     runtime/auto-direct/direct_ts_auto_watchdog.sh     runtime/auto-direct/direct_ts_auto_enable.sh     runtime/auto-direct/direct_ts_auto_disable.sh     runtime/navigation/gen2_nav_config.sh     runtime/navigation/gen2_url.sh     runtime/navigation/gen2_ui_urls.sh     runtime/navigation/gen2_viewareas.sh     runtime/navigation/gen2_safearea.sh     runtime/diagnostics/gen2_keyframes.sh     runtime/diagnostics/gen2_sourceversion.sh     runtime/diagnostics/gen2_display.sh     runtime/diagnostics/gen2_enabled.sh     runtime/experimental/viewarea_mode.sh     > PAYLOAD.sha256
+  sha256sum     payload/libaltscreen111.so     payload/direct-ts-remux     payload/sha256sum     collect-logs.sh     runtime/auto-direct/common.sh     runtime/auto-direct/direct_fps.sh     runtime/auto-direct/direct_source_mode.sh     runtime/auto-direct/direct_autodirect.sh     runtime/auto-direct/gen2_video.sh     runtime/auto-direct/direct_ts_auto_supervisor.sh     runtime/auto-direct/direct_ts_auto_status.sh     runtime/auto-direct/direct_ts_auto_start.sh     runtime/auto-direct/direct_ts_auto_watchdog.sh     runtime/auto-direct/direct_ts_auto_enable.sh     runtime/auto-direct/direct_ts_auto_disable.sh     runtime/navigation/gen2_nav_config.sh     runtime/navigation/gen2_url.sh     runtime/navigation/gen2_ui_urls.sh     runtime/navigation/gen2_viewareas.sh     runtime/navigation/gen2_safearea.sh     runtime/diagnostics/gen2_keyframes.sh     runtime/diagnostics/gen2_sourceversion.sh     runtime/diagnostics/gen2_display.sh     runtime/diagnostics/gen2_enabled.sh     runtime/experimental/viewarea_mode.sh     > PAYLOAD.sha256
 )
 
 GEN2_SHA=$(sha256sum "$GEN2" | awk '{print $1}')
@@ -99,6 +100,9 @@ apply_reconnect=enabled,fps,sourceversion,ui_urls,display,viewarea_definition
 media_scope=excluded
 ultra_scope=excluded
 install_type=reversible_overlay
+runtime_log_root=/tmp/mibr-altscreen-logs
+sd_log_export=/net/mmx/fs/sda0/esd/carplay-test/logs/classic111
+sd_write_bootstrap=apps/mounts_-usb_plus_write_test
 EOF
 
 if [[ -n "$CI_MERGE_COMMIT_VALUE" ]]; then
@@ -150,15 +154,24 @@ Source timing:
 Media/Now Playing, Ultra/NextGen, PassengerDisplay, GaugeCluster, HEVC,
 Enhanced Siri, bit26, bit37, HID/input and appearance experiments are excluded.
 
+Runtime evidence:
+  live logs/status remain in /tmp while the projection path is running.
+  Nothing in the running runtime remounts SD writable for logging.
+  Export evidence explicitly with:
+    ksh ./collect-logs.sh
+  The collector uses the existing M.I.B./U2 apps/mounts -usb helper,
+  performs a real SD write test, then copies the /tmp evidence into:
+    /net/mmx/fs/sda0/esd/carplay-test/logs/classic111/<timestamp>/
+
 Install:
   ksh ./install.sh --check
   ksh ./install.sh --apply
-  reboot
+  sync; sync; sync; on -f rcc /usr/apps/mib2_ioc_flash reboot
   ksh ./status.sh
 
 Rollback:
   ksh ./uninstall.sh
-  reboot
+  sync; sync; sync; on -f rcc /usr/apps/mib2_ioc_flash reboot
 EOF
 
 (
