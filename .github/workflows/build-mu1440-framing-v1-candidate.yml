@@ -180,6 +180,9 @@ jobs:
           grep -Fq 'LOGROOT=$WORK/logs/classic111' build/framing-v1/package/collect-logs.sh
           grep -Fq 'ksh ./install.sh --check' build/framing-v1/package/vehicle-install.sh
           grep -Fq 'ksh ./install.sh --apply' build/framing-v1/package/vehicle-install.sh
+          grep -Fq 'phase=automatic_recovery' build/framing-v1/package/vehicle-install.sh
+          grep -Fq 'ksh ./uninstall.sh' build/framing-v1/package/vehicle-install.sh
+          grep -Fq 'VEHICLE_INSTALL=RECOVERY_PASS' build/framing-v1/package/vehicle-install.sh
           grep -Fq 'ksh ./uninstall.sh' build/framing-v1/package/vehicle-rollback.sh
           grep -Fq 'on -f rcc /usr/apps/mib2_ioc_flash reboot' build/framing-v1/package/vehicle-install.sh
           grep -Fq 'on -f rcc /usr/apps/mib2_ioc_flash reboot' build/framing-v1/package/vehicle-rollback.sh
