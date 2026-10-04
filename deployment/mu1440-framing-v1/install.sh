@@ -106,7 +106,8 @@ candidate_hash(){
 }
 
 check_tmp_log_root(){
-  T=/tmp/mibr-framing-v1-write-test-$
+  T=/tmp/mibr-framing-v1-write-test
+  rm -f "$T" 2>/dev/null || true
   touch "$T" 2>/dev/null || fail "tmp_log_root_not_writable"
   [ -f "$T" ] || fail "tmp_log_root_write_test_missing"
   rm -f "$T" 2>/dev/null || true
