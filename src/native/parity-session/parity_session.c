@@ -82,18 +82,14 @@ static int pid_alive_from_file(const char *path) {
     return kill((pid_t)pid, 0) == 0 || errno == EPERM;
 }
 
-static int file_is_one(const char *path) {
-    char b[16];
-    return read_trimmed(path, b, sizeof(b)) == 0 && !strcmp(b, "1");
-}
-
 static int old_autodirect_enabled(void) {
     char b[16];
     if (read_trimmed(OLD_AUTO_TEMP, b, sizeof(b)) == 0)
-        return !strcmp(b, "1");
+        return strcmp(b, "0") != 0;
     if (read_trimmed(OLD_AUTO_PERSIST, b, sizeof(b)) == 0)
-        return !strcmp(b, "1");
-    return 0;
+        return strcmp(b, "0") != 0;
+    /* Legacy Auto-Direct defaults enabled when no explicit override exists. */
+    return 1;
 }
 
 static int run_argv(char *const argv[]) {
@@ -283,14 +279,23 @@ int main(int argc, char **argv) {
     if (write_text(BRIDGE_PID_PATH, b) != 0) goto done;
     (void)write_text(STATE_PATH, "direct\n");
 
+    rc = 0;
     while (!g_stop && elapsed_ms < (uint64_t)max_seconds * 1000ull) {
         pid_t w = waitpid(bridge_pid, &st, WNOHANG);
-        if (w == bridge_pid) { bridge_pid = -1; break; }
-        if (w < 0 && errno != EINTR) { bridge_pid = -1; break; }
+        if (w == bridge_pid) {
+            bridge_pid = -1;
+            if (!WIFEXITED(st) || WEXITSTATUS(st) != 0) rc = 15;
+            break;
+        }
+        if (w < 0 && errno != EINTR) {
+            bridge_pid = -1;
+            rc = 16;
+            break;
+        }
         usleep(100000);
         elapsed_ms += 100u;
     }
-    rc = 0;
+    if (g_stop && rc == 0) rc = 130;
 
 done:
     if (bridge_pid > 1) stop_bridge(bridge_pid);
