@@ -184,6 +184,7 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
 {
     size_t pos = 0, len, bytes = 0, prefix, used;
     unsigned idr = 0, dependent = 0, type, index;
+    uint64_t source_ordinal;
     uint8_t *out;
     struct alt111_chunk *chunk;
     if (!v->active || stream != v->stream) return ALT111_STALE;
@@ -204,7 +205,7 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
         bytes += 4 + len; pos += len;
     }
     if ((!idr && !dependent) || (idr && dependent)) return invalid_au(v);
-    ++v->source_aus; v->source_idrs += idr;
+    source_ordinal = ++v->source_aus; v->source_idrs += idr;
     if (!v->attached) return ALT111_WAIT;
     if (!v->consumer_primed && !v->priming_queued && !idr) {
         ++v->dropped_aus;
@@ -231,7 +232,9 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
     index = (v->head + v->count) % ALT111_QUEUE_CAP;
     chunk = &v->queue[index];
     chunk->bytes = out; chunk->length = used; chunk->offset = 0;
-    chunk->sequence = ++v->sequence; chunk->priming = prefix != 0; chunk->idr = idr;
+    chunk->sequence = ++v->sequence;
+    chunk->source_ordinal = source_ordinal;
+    chunk->priming = prefix != 0; chunk->idr = idr;
     if (source_ts_raw) memcpy(chunk->source_ts_raw, source_ts_raw, 8u);
     else memset(chunk->source_ts_raw, 0, sizeof(chunk->source_ts_raw));
     if (chunk->priming) v->priming_queued = 1;
@@ -256,6 +259,7 @@ int alt111_video_peek(const struct alt111_video *v, const uint8_t **bytes,
     *bytes = chunk->bytes + chunk->offset; *size = chunk->length - chunk->offset;
     ticket->stream = v->stream; ticket->codec = v->codec;
     ticket->consumer = v->consumer; ticket->sequence = chunk->sequence;
+    ticket->source_ordinal = chunk->source_ordinal;
     ticket->offset = chunk->offset;
     ticket->priming = chunk->priming;
     ticket->idr = chunk->idr;
