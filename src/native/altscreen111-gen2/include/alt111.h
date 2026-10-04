@@ -144,7 +144,7 @@ struct alt111_chunk {
     uint8_t source_ts_raw[8];
 };
 struct alt111_video {
-    uint64_t session, stream, codec, consumer, sequence;
+    uint64_t session, stream, codec, consumer, sequence, source_ordinal;
     unsigned active, attached, config_valid, config_blocked, nal_length_size;
     unsigned priming_queued, consumer_primed, keyframe_needed;
     uint8_t config[ALT111_CODEC_CAP];
