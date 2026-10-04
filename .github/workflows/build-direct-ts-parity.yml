@@ -50,6 +50,9 @@ jobs:
             -o /tmp/direct-ts-parity-host
           /tmp/direct-ts-parity-host --self-test | tee /tmp/parity-selftest.txt
           grep -Fxq 'PARITY_SELFTEST=PASS' /tmp/parity-selftest.txt
+          python3 tests/direct_ts_parity_host_integration.py /tmp/direct-ts-parity-host \
+            | tee /tmp/parity-integration.txt
+          grep -Fq 'PARITY_INTEGRATION=PASS' /tmp/parity-integration.txt
 
       - name: Build pinned QNX 6.5 ARMv7 toolchain image
         shell: bash
