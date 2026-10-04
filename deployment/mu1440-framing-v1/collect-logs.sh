@@ -28,7 +28,7 @@ trap card_ro 0 1 2 15
 [ -x "$MOUNTER" ] || fail "missing_mount_helper=$MOUNTER"
 [ -r "$PKG/status.sh" ] || fail "missing_status_script=$PKG/status.sh"
 
-"$MOUNTER" -usb >/dev/null 2>&1 || fail "sd_mount_rw"
+. "$MOUNTER" -usb >/dev/null 2>&1 || fail "sd_mount_rw"
 CARD_RW=1
 
 TEST=$CARD/.mibr-classic111-write-test-$$
