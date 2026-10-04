@@ -34,6 +34,7 @@ uint64_t alt111_video_begin(struct alt111_video *v, uint64_t session)
 {
     alt111_video_detach(v);
     ++v->stream; ++v->codec;
+    v->source_ordinal = 0;
     v->session = session; v->active = session != 0;
     v->config_valid = v->config_blocked = v->nal_length_size = 0; v->config_length = 0;
     memset(v->config, 0, sizeof(v->config));
@@ -205,7 +206,7 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
         bytes += 4 + len; pos += len;
     }
     if ((!idr && !dependent) || (idr && dependent)) return invalid_au(v);
-    source_ordinal = ++v->source_aus; v->source_idrs += idr;
+    ++v->source_aus; source_ordinal = ++v->source_ordinal; v->source_idrs += idr;
     if (!v->attached) return ALT111_WAIT;
     if (!v->consumer_primed && !v->priming_queued && !idr) {
         ++v->dropped_aus;
