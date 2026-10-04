@@ -474,6 +474,22 @@ static int queue_take_packet(struct au_queue *q, uint8_t p[TS_SIZE]) {
     return 1;
 }
 
+static int queue_wait_empty(struct au_queue *q, unsigned max_ms) {
+    unsigned waited = 0;
+    for (;;) {
+        unsigned count;
+        size_t packets;
+        pthread_mutex_lock(&q->lock);
+        count = q->count;
+        packets = q->packets_queued;
+        pthread_mutex_unlock(&q->lock);
+        if (!count && !packets) return 0;
+        if (g_stop || waited >= max_ms) return -1;
+        usleep(1000);
+        ++waited;
+    }
+}
+
 static void stats_add_u64(uint64_t *v, pthread_mutex_t *m, uint64_t add) {
     pthread_mutex_lock(m); *v += add; pthread_mutex_unlock(m);
 }
@@ -685,6 +701,12 @@ int main(int argc,char **argv) {
         publish_status(&stats,&clock,&queue,"running");
     }
     rc=0;
+    /* A clean input EOF must not discard complete AUs that are already queued.
+     * Drain the AU/PES queue before stopping the continuous writer. */
+    if (!g_stop && queue_wait_empty(&queue, 10000u) != 0) {
+        fprintf(stderr,"ERROR graceful queue drain timeout\n");
+        rc=1;
+    }
 
 done:
     g_stop=1;
