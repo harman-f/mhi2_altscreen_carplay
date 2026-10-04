@@ -267,7 +267,7 @@ static int g_tee_started;
  *   0x10  u64      stream generation
  *   0x18  u64      codec generation
  *   0x20  u64      consumer generation
- *   0x28  u64      AU sequence/ordinal
+ *   0x28  u64      source complete-AU ordinal (pre-consumer/drop decisions)
  *   0x30  u8[8]    raw Stream-111 timestamp bytes, unchanged
  */
 #define M1AU_HEADER_BYTES 56u
@@ -1681,7 +1681,7 @@ static void m1au_prepare_header_locked(const struct alt111_output_ticket *ticket
     m1au_put_be64(g_tee_frame_header+16u,ticket->stream);
     m1au_put_be64(g_tee_frame_header+24u,ticket->codec);
     m1au_put_be64(g_tee_frame_header+32u,ticket->consumer);
-    m1au_put_be64(g_tee_frame_header+40u,ticket->sequence);
+    m1au_put_be64(g_tee_frame_header+40u,ticket->source_ordinal);
     memcpy(g_tee_frame_header+48u,ticket->source_ts_raw,8u);
     g_tee_frame_header_off=0;
     g_tee_frame_header_sequence=ticket->sequence;
