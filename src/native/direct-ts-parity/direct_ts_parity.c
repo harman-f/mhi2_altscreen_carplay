@@ -98,7 +98,9 @@ struct clock_state {
     uint64_t last_pts90k;
     uint32_t origin_frac;
     uint32_t origin_sec;
+    uint64_t local_origin_us;
     int have_origin;
+    int origin_is_source;
     uint64_t pts_rebases;
     uint64_t source_rebases;
 };
@@ -269,22 +271,36 @@ static uint64_t clock_pcr_now(struct clock_state *c) {
     return v;
 }
 
+static uint64_t monotonic_us(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
+    return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull;
+}
+
 static uint64_t assign_pts(struct clock_state *c, uint32_t frac, uint32_t sec,
                            int *rebased) {
-    uint64_t pcr, pts, floor, target, shift;
+    uint64_t pcr, pts, floor, target, shift, now_us;
+    int source_valid = (frac != 0u || sec != 0u);
     *rebased = 0;
+    now_us = monotonic_us();
     pthread_mutex_lock(&c->lock);
     pcr = c->transport_pcr90k;
-    if (!c->have_origin || sec < c->origin_sec ||
-        (sec == c->origin_sec && frac < c->origin_frac)) {
+    if (!c->have_origin || c->origin_is_source != source_valid ||
+        (source_valid && (sec < c->origin_sec ||
+         (sec == c->origin_sec && frac < c->origin_frac)))) {
         c->origin_frac = frac;
         c->origin_sec = sec;
+        c->local_origin_us = now_us;
         c->pts_origin90k = pcr + PTS_LEAD_90K;
         if (c->pts_origin90k <= c->last_pts90k) c->pts_origin90k = c->last_pts90k + 1u;
         if (c->have_origin) ++c->source_rebases;
         c->have_origin = 1;
+        c->origin_is_source = source_valid;
     }
-    pts = c->pts_origin90k + source_delta_90k(c->origin_frac, c->origin_sec, frac, sec);
+    if (source_valid)
+        pts = c->pts_origin90k + source_delta_90k(c->origin_frac, c->origin_sec, frac, sec);
+    else
+        pts = c->pts_origin90k + ((now_us - c->local_origin_us) * 90ull) / 1000ull;
     floor = pcr + PTS_MIN_LEAD_90K;
     if (pts < floor) {
         target = pcr + PTS_LEAD_90K;
@@ -395,16 +411,17 @@ static int packetize_pes(const uint8_t *au, size_t au_n, uint64_t pts90k, int id
         uint8_t *p = pkts + idx * TS_SIZE;
         size_t rem = pes_n - off, payload_cap = 184u, payload, adapt_len = 0;
         int first = idx == 0;
-        int need_flags = first && (idr || discontinuity);
         memset(p, 0xff, TS_SIZE);
         p[0] = 0x47;
         p[1] = (uint8_t)((first ? 0x40u : 0u) | ((PID_VIDEO >> 8) & 0x1fu));
         p[2] = (uint8_t)PID_VIDEO;
-        if (need_flags) payload_cap = 182u;
+        /* Omonob parity: every PES-start TS packet has an adaptation field,
+         * even when neither discontinuity nor random-access is asserted. */
+        if (first) payload_cap = 182u;
         payload = rem < payload_cap ? rem : payload_cap;
-        if (need_flags || payload < 184u) {
+        if (first || payload < 184u) {
             adapt_len = 183u - payload;
-            if (need_flags && adapt_len < 1u) { payload = 182u; adapt_len = 1u; }
+            if (first && adapt_len < 1u) { payload = 182u; adapt_len = 1u; }
             p[3] = (uint8_t)(0x30u | (*cc_video & 0x0fu));
             p[4] = (uint8_t)adapt_len;
             if (adapt_len) {
