@@ -6,7 +6,11 @@ on:
     paths:
       - '.github/workflows/build-direct-ts-parity.yml'
       - 'src/native/direct-ts-parity/**'
+      - 'src/native/parity-session/**'
+      - 'runtime/parity/**'
+      - 'runtime/diagnostics/gen2_compat_profile.sh'
       - 'tools/build_direct_ts_parity.sh'
+      - 'tools/build_parity_session.sh'
   push:
     branches: [ main ]
     paths:
@@ -53,6 +57,15 @@ jobs:
           python3 tests/direct_ts_parity_host_integration.py /tmp/direct-ts-parity-host \
             | tee /tmp/parity-integration.txt
           grep -Fq 'PARITY_INTEGRATION=PASS' /tmp/parity-integration.txt
+          cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
+            src/native/parity-session/parity_session.c \
+            -o /tmp/parity-session-host
+          /tmp/parity-session-host --self-test | tee /tmp/parity-session-selftest.txt
+          grep -Fxq 'PARITY_SESSION_SELFTEST=PASS' /tmp/parity-session-selftest.txt
+          grep -Fq 'release=/eso/bin/apps/dmdt dc 72 ; /eso/bin/apps/dmdt sc 4 72' /tmp/parity-session-selftest.txt
+          grep -Fq 'restore=/eso/bin/apps/dmdt dc 70 33 ; /eso/bin/apps/dmdt sc 4 70' /tmp/parity-session-selftest.txt
+          bash -n runtime/parity/omonob790_profile.sh
+          bash -n runtime/diagnostics/gen2_compat_profile.sh
 
       - name: Build pinned QNX 6.5 ARMv7 toolchain image
         shell: bash
@@ -92,6 +105,9 @@ jobs:
           docker run --rm --platform=linux/amd64 \
             -v "$PWD:/src" -w /src "$IMAGE" \
             bash -c 'bash ./tools/build_direct_ts_parity.sh src/native/direct-ts-parity/direct_ts_parity.c build/ci-direct-ts-parity/direct-ts-parity'
+          docker run --rm --platform=linux/amd64 \
+            -v "$PWD:/src" -w /src "$IMAGE" \
+            bash -c 'bash ./tools/build_parity_session.sh src/native/parity-session/parity_session.c build/ci-direct-ts-parity/parity-session'
           sudo chown -R "$(id -u):$(id -g)" "$OUTDIR"
 
       - name: Binary and contract audit
@@ -99,14 +115,19 @@ jobs:
         run: |
           set -euxo pipefail
           BIN="$OUTDIR/direct-ts-parity"
+          SESSION="$OUTDIR/parity-session"
           docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
             arm-unknown-nto-qnx6.5.0eabi-readelf -h "$BIN" > "$OUTDIR/ELF_HEADER.txt"
           docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
             arm-unknown-nto-qnx6.5.0eabi-readelf -d "$BIN" > "$OUTDIR/DYNAMIC.txt"
           docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
             arm-unknown-nto-qnx6.5.0eabi-readelf -Ws "$BIN" > "$OUTDIR/SYMBOLS.txt"
+          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h "$SESSION" > "$OUTDIR/SESSION_ELF_HEADER.txt"
           file "$BIN" | tee "$OUTDIR/FILE.txt"
+          file "$SESSION" | tee "$OUTDIR/SESSION_FILE.txt"
           grep -q 'Machine:.*ARM' "$OUTDIR/ELF_HEADER.txt"
+          grep -q 'Machine:.*ARM' "$OUTDIR/SESSION_ELF_HEADER.txt"
           strings "$BIN" | grep -Fq 'architecture=omonob790-functional-parity-cleanroom'
           strings "$BIN" | grep -Fq 'source_clock=stream111-32.32'
           strings "$BIN" | grep -Fq 'pts_clock=source-derived-90khz'
@@ -116,7 +137,11 @@ jobs:
           strings "$BIN" | grep -Fq '/tmp/mibr-alt111-keyframe-only'
           ! strings "$BIN" | grep -Fq 'avformat_'
           ! strings "$BIN" | grep -Fq 'libavformat'
+          strings "$SESSION" | grep -Fq '/eso/bin/apps/dmdt'
+          strings "$SESSION" | grep -Fq '/tmp/mibr-alt111-au-framing.enabled'
+          strings "$SESSION" | grep -Fq 'PARITY_SESSION_SELFTEST=PASS'
           sha256sum "$BIN" | tee "$OUTDIR/direct-ts-parity.sha256"
+          sha256sum "$SESSION" | tee "$OUTDIR/parity-session.sha256"
           cat > "$OUTDIR/BUILDINFO.txt" <<INFO
           artifact=direct-ts-parity
           architecture=omonob790-functional-parity-cleanroom
@@ -144,6 +169,10 @@ jobs:
           path: |
             ${{ env.OUTDIR }}/direct-ts-parity
             ${{ env.OUTDIR }}/direct-ts-parity.sha256
+            ${{ env.OUTDIR }}/parity-session
+            ${{ env.OUTDIR }}/parity-session.sha256
+            ${{ env.OUTDIR }}/SESSION_FILE.txt
+            ${{ env.OUTDIR }}/SESSION_ELF_HEADER.txt
             ${{ env.OUTDIR }}/BUILDINFO.txt
             ${{ env.OUTDIR }}/FILE.txt
             ${{ env.OUTDIR }}/ELF_HEADER.txt
