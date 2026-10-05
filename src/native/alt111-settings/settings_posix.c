@@ -426,7 +426,7 @@ static int transaction_locked(const struct alt111_settings_paths *p,
         }
     }
     if (journal_path(p, journal)) return fail(error, cap, "APPLY_FAILED journal_path");
-    used = snprintf(record, sizeof(record), "schema=1\nmask=%u\nabsent=%u\n", mask, absent);
+    used = snprintf(record, sizeof(record), "schema=2\nmask=%u\nabsent=%u\n", mask, absent);
     for (group = 0; group < ALTSET_GROUP_COUNT; ++group) {
         if (!(mask & (1u << group)) || (absent & (1u << group))) continue;
         length = snprintf(record + used, sizeof(record) - (size_t)used, "%u:%s\n", group, hashes[group]);
@@ -545,7 +545,7 @@ int alt111_settings_reconcile(const struct alt111_settings_paths *p,
 {
     char journal[512], armed[512], blob[2049];
     size_t size;
-    unsigned mask = 0, absent = 0;
+    unsigned schema = 0, mask = 0, absent = 0;
     unsigned group, hash_mask = 0;
     char hashes[ALTSET_GROUP_COUNT][65];
     int fd = lock_settings(p, 1, error, cap), rc, consumed = 0;
@@ -568,18 +568,8 @@ int alt111_settings_reconcile(const struct alt111_settings_paths *p,
     }
 
     /*
-     * Journal exists but is not armed: the process died while preparing the
-     * journal. Active settings were not yet eligible for mutation.
-     */
-    if (have_journal && !have_armed) {
-        rc = unlink(journal);
-        unlock_settings(p, fd);
-        return rc ? fail(error, cap, "ROLLBACK_FAILED unarmed_journal_cleanup") : 0;
-    }
-
-    /*
-     * Armed exists but journal is gone: journal removal was the commit point;
-     * only marker cleanup was interrupted.
+     * Armed without journal means schema-2 journal removal already crossed
+     * the commit point; only marker cleanup was interrupted.
      */
     if (!have_journal && have_armed) {
         rc = unlink(armed);
@@ -588,13 +578,28 @@ int alt111_settings_reconcile(const struct alt111_settings_paths *p,
     }
 
     rc = read_file(journal, blob, sizeof(blob), &size);
-    memset(hashes, 0, sizeof(hashes));
-    if (rc || sscanf(blob, "schema=1\nmask=%u\nabsent=%u\n%n",
-                     &mask, &absent, &consumed) != 2 ||
+    if (rc || sscanf(blob, "schema=%u\nmask=%u\nabsent=%u\n%n",
+                     &schema, &mask, &absent, &consumed) != 3 ||
+        (schema != 1u && schema != 2u) ||
         !mask || mask >= (1u << ALTSET_GROUP_COUNT) || (absent & ~mask)) {
         unlock_settings(p, fd);
         return fail(error, cap, "ROLLBACK_FAILED malformed_journal");
     }
+
+    /*
+     * schema=2 introduced the armed barrier. Without armed, no active setting
+     * was eligible for mutation, so this is an interrupted preparation only.
+     *
+     * schema=1 predates the armed barrier and may already have mutated active
+     * settings; it must always follow the legacy backup-restore path.
+     */
+    if (schema == 2u && !have_armed) {
+        rc = unlink(journal);
+        unlock_settings(p, fd);
+        return rc ? fail(error, cap, "ROLLBACK_FAILED unarmed_journal_cleanup") : 0;
+    }
+
+    memset(hashes, 0, sizeof(hashes));
     while (consumed < (int)size) {
         int n = 0;
         char hash[65];
