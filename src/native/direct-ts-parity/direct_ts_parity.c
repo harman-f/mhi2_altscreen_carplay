@@ -837,6 +837,7 @@ int main(int argc,char **argv) {
             queue_recover_au_boundary(&queue,&da,&dp,&pp);
             record_safe_recovery(&stats,"generation",da,dp,pp);
             pthread_mutex_lock(&clock.lock); clock.have_origin=0; ++clock.source_rebases; pthread_mutex_unlock(&clock.lock);
+            prev_seq=0;
             waiting_idr=1; discontinuity=1; request_keyframe();
             pthread_mutex_lock(&stats.lock); stats.waiting_idr=1; pthread_mutex_unlock(&stats.lock);
         }
