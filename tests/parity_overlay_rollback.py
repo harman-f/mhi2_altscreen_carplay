@@ -33,7 +33,13 @@ for scenario in ("normal","interrupted"):
             (pkg/"runtime"/name).write_text("#!/bin/sh\nexit 0\n")
         for name in ("install.sh","uninstall.sh"):
             text=Path("deployment/mu1440-omonob790-parity-v1",name).read_text()
-            for old,new in (("/mnt/app",str(app)),("/mnt/system",str(system)),("/tmp/",str(state)+"/")):text=text.replace(old,new)
+            for old,new in (("/tmp/",str(state)+"/"),("/mnt/app",str(app)),("/mnt/system",str(system))):text=text.replace(old,new)
+            assert f"DST={dst}" in text,(name,"DST rewrite",dst)
+            if name=="install.sh":
+                expected_airplay=app/"eso/lib/libairplay.so"
+                expected_target=system/"etc/eso/production/smartphone_integrator.json"
+                assert f"AIRPLAY={expected_airplay}" in text,(name,"AIRPLAY rewrite",expected_airplay)
+                assert f"TARGET={expected_target}" in text,(name,"TARGET rewrite",expected_target)
             for macro,data in (("EXPECTED_AIRPLAY",airplay),("EXPECTED_BASE_GEN2",old_gen),("EXPECTED_BASE_REMUX",old_remux),("EXPECTED_GATE",gate)):
                 text=re.sub(r"^"+macro+r"=.+$",macro+"="+sha(data),text,flags=re.M)
             (pkg/name).write_text(text)
