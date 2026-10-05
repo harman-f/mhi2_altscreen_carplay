@@ -37,6 +37,18 @@ cp "$ROOT/runtime/parity/omonob790_profile.sh" "$DEST/runtime/omonob790_profile.
 cp "$ROOT/runtime/parity/omonob790_session.sh" "$DEST/runtime/omonob790_session.sh"
 cp "$ROOT/runtime/parity/omonob790_status.sh" "$DEST/runtime/omonob790_status.sh"
 cp "$ROOT/runtime/diagnostics/gen2_compat_profile.sh" "$DEST/runtime/gen2_compat_profile.sh"
+cp "$ROOT/runtime/diagnostics/master_settings.sh" "$DEST/runtime/master_settings.sh"
+cp "$ROOT/runtime/auto-direct/direct_fps.sh" "$DEST/runtime/direct_fps.sh"
+cp "$ROOT/runtime/diagnostics/gen2_sourceversion.sh" "$DEST/runtime/gen2_sourceversion.sh"
+cp "$ROOT/runtime/diagnostics/gen2_enabled.sh" "$DEST/runtime/gen2_enabled.sh"
+cp "$ROOT/runtime/diagnostics/gen2_display.sh" "$DEST/runtime/gen2_display.sh"
+cp "$ROOT/runtime/diagnostics/gen2_keyframes.sh" "$DEST/runtime/gen2_keyframes.sh"
+cp "$ROOT/runtime/navigation/gen2_viewareas.sh" "$DEST/runtime/gen2_viewareas.sh"
+cp "$ROOT/runtime/navigation/gen2_safearea.sh" "$DEST/runtime/gen2_safearea.sh"
+cp "$ROOT/runtime/navigation/gen2_nav_config.sh" "$DEST/runtime/gen2_nav_config.sh"
+cp "$ROOT/runtime/navigation/gen2_url.sh" "$DEST/runtime/gen2_url.sh"
+cp "$ROOT/runtime/navigation/gen2_ui_urls.sh" "$DEST/runtime/gen2_ui_urls.sh"
+cp "$ROOT/runtime/parity/master-script-basenames.sh" "$DEST/runtime/master-script-basenames.sh"
 cp "$ROOT/settings/runtime-basenames.generated.sh" "$DEST/runtime/settings-basenames.sh"
 cp "$ROOT/settings/hmi-bindings.generated.json" "$DEST/HMI-BINDINGS.json"
 
@@ -44,7 +56,7 @@ chmod +x "$DEST/"*.sh "$DEST/payload/"* "$DEST/runtime/"*.sh
 
 (
   cd "$DEST"
-  sha256sum     payload/libaltscreen111.so     payload/direct-ts-parity     payload/parity-session     payload/alt111-settings     payload/libmibr_isotx2_guard.so     payload/sha256sum     install.sh     uninstall.sh     status.sh     collect-logs.sh     vehicle-install.sh     vehicle-rollback.sh     runtime/omonob790_profile.sh     runtime/omonob790_session.sh     runtime/omonob790_status.sh     runtime/gen2_compat_profile.sh     runtime/settings-basenames.sh     HMI-BINDINGS.json     > PAYLOAD.sha256
+  sha256sum     payload/libaltscreen111.so     payload/direct-ts-parity     payload/parity-session     payload/alt111-settings     payload/libmibr_isotx2_guard.so     payload/sha256sum     install.sh     uninstall.sh     status.sh     collect-logs.sh     vehicle-install.sh     vehicle-rollback.sh     runtime/omonob790_profile.sh     runtime/omonob790_session.sh     runtime/omonob790_status.sh     runtime/gen2_compat_profile.sh     runtime/settings-basenames.sh     runtime/master-script-basenames.sh     runtime/master_settings.sh runtime/direct_fps.sh runtime/gen2_sourceversion.sh runtime/gen2_enabled.sh runtime/gen2_display.sh runtime/gen2_keyframes.sh runtime/gen2_viewareas.sh runtime/gen2_safearea.sh runtime/gen2_nav_config.sh runtime/gen2_url.sh runtime/gen2_ui_urls.sh     HMI-BINDINGS.json     > PAYLOAD.sha256
 )
 
 GEN2_SHA=$(sha256sum "$GEN2" | awk '{print $1}')
@@ -84,7 +96,7 @@ profile_primary_input=3
 profile_initial_url=maps:/car/instrumentcluster/map
 profile_viewarea=1010x376@0,0
 profile_safearea=606x344@202,16
-profile_legacy_d2=disabled
+profile_keyframe_policy=source_frames_20_legacy_timer_removed
 input=m1au_complete_au
 source_clock=stream111_32.32
 pts_clock=source_derived_90khz
@@ -104,7 +116,7 @@ pat_pmt_interval_packets=327
 pcr_interval_packets=327
 most_write_bytes=12032
 device_open_mode=write_only_nonblock
-ownership=dmdt_dc72_sc4_72_restore_dc70_33_sc4_70
+ownership=validated_shared_settings_snapshot_writev_gate_initial
 dmdt_timeout_ms=5000
 session_watchdog_margin_seconds=20
 reference_producer_payload_limit=262144
@@ -121,7 +133,7 @@ if [[ -n "$CI_MERGE_COMMIT_VALUE" ]]; then
 fi
 
 cat > "$DEST/README-FIRST.txt" <<'EOF'
-MHI2 AltScreen — MU1440 master candidate
+MHI2 AltScreen â€” MU1440 master candidate
 ========================================
 
 Target: MHI2_ER_SKG13_P4526_MU1440 / AID10-class Virtual Cockpit.

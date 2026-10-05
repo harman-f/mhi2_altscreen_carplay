@@ -123,7 +123,9 @@ int main(int argc, char **argv)
             FILE *file;
             size_t size;
             char *p;
-            if (!input || !(file = fopen(input, "rb"))) { rc = error_result("INVALID_VALUE input"); goto done; }
+            if (!input || !(file = !strcmp(input, "-") ? stdin : fopen(input, "rb"))) {
+                rc = error_result("INVALID_VALUE input"); goto done;
+            }
             batch = malloc(ALT111_SETTING_BATCH_CAP + 2u);
             if (!batch) { fclose(file); rc = error_result("APPLY_FAILED allocation"); goto done; }
             size = fread(batch, 1, ALT111_SETTING_BATCH_CAP + 1u, file);

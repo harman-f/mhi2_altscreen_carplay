@@ -37,6 +37,12 @@ for scenario in ("normal","interrupted"):
         for path in (pkg/"payload").iterdir():path.chmod(0o755)
         for name in ("omonob790_profile.sh","omonob790_session.sh","omonob790_status.sh","gen2_compat_profile.sh"):
             (pkg/"runtime"/name).write_text("#!/bin/sh\nexit 0\n")
+        script_inventory=Path("runtime/parity/master-script-basenames.sh").read_text()
+        (pkg/"runtime/master-script-basenames.sh").write_text(script_inventory)
+        for name in script_inventory.split("'")[1].split():
+            (pkg/"runtime"/name).write_text("#!/bin/sh\nexit 0\n")
+            fixtures[dst/"scripts"/name]=("exact old wrapper "+name+"\n").encode()
+            (dst/"scripts"/name).write_bytes(fixtures[dst/"scripts"/name])
         (pkg/"runtime/settings-basenames.sh").write_text(Path("settings/runtime-basenames.generated.sh").read_text())
         for name in ("install.sh","uninstall.sh"):
             text=Path("deployment/mu1440-omonob790-parity-v1",name).read_text()

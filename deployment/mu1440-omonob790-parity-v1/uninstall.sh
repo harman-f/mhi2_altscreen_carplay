@@ -101,6 +101,7 @@ system_ro || fail "mount_system_ro"
 while read EXPECT REL; do
   case "$REL" in
     temp/*) restore_one "$REL" "/tmp/${REL#temp/}" 644 ;;
+    scripts/*) restore_one "$REL" "$DST/$REL" 755 ;;
   esac
 done < "$BACK/BACKUP.sha256"
 

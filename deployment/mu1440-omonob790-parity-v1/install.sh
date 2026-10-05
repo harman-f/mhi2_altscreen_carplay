@@ -10,6 +10,7 @@ RUNTIME=$ROOT/runtime
 SHA=$PAYLOAD/sha256sum
 MANIFEST=$ROOT/PAYLOAD.sha256
 . "$ROOT/runtime/settings-basenames.sh" || exit 20
+. "$ROOT/runtime/master-script-basenames.sh" || exit 20
 
 DST=/mnt/app/root/altscreen-u2
 HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
@@ -224,6 +225,9 @@ if [ -e "$ACTIVE" ]; then
      same_as_package "$DST/scripts/omonob790_status.sh" "$RUNTIME/omonob790_status.sh" &&
      same_as_package "$DST/scripts/gen2_compat_profile.sh" "$RUNTIME/gen2_compat_profile.sh"; then
     [ "$(awk -v line="$NEW_GATE_LINE" '$0==line {n++} END {print n+0}' "$STARTUP")" = 1 ] || fail "active_startup_guard_missing"
+    for SCRIPT in $ALT111_MASTER_SCRIPTS; do
+      same_as_package "$DST/scripts/$SCRIPT" "$RUNTIME/$SCRIPT" || fail "active_script_mismatch=$SCRIPT"
+    done
     echo "MIBR_OMONOB790_PARITY=ALREADY_INSTALLED"
     exit 0
   fi
@@ -260,6 +264,9 @@ do
   REL=${SPEC#*:}
   backup_one "$SRC" "$REL"
 done
+for SCRIPT in $ALT111_MASTER_SCRIPTS; do
+  backup_one "$DST/scripts/$SCRIPT" "scripts/$SCRIPT"
+done
 for NAME in $ALT111_CONFIG_BASENAMES; do
   backup_one "/tmp/$NAME" "temp/$NAME"
 done
@@ -276,6 +283,10 @@ install_one "$RUNTIME/omonob790_profile.sh" "$DST/scripts/omonob790_profile.sh"
 install_one "$RUNTIME/omonob790_session.sh" "$DST/scripts/omonob790_session.sh"
 install_one "$RUNTIME/omonob790_status.sh" "$DST/scripts/omonob790_status.sh"
 install_one "$RUNTIME/gen2_compat_profile.sh" "$DST/scripts/gen2_compat_profile.sh"
+
+for SCRIPT in $ALT111_MASTER_SCRIPTS; do
+  install_one "$RUNTIME/$SCRIPT" "$DST/scripts/$SCRIPT"
+done
 
 # Configuration and the exact DisplayManager boot command are both backed up.
 echo 0 > "$STATE_AUTODIRECT.new.$$" || fail "autodirect_disable_write"

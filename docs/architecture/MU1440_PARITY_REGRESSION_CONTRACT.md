@@ -101,8 +101,11 @@ directory until a separately reviewed archival/retirement action.
 
 CI runs the original integration/recovery checks plus actual-C boundary vectors,
 large-PES immediate EOF/deadline tests, malformed records, POSIX lifecycle fault
-injection and sandboxed installer/restore fault injection. It builds all three
-QNX ARM binaries and verifies the complete generated package.
+injection, shared-wrapper transactions and sandboxed installer/restore fault injection.
+A real moving H.264 source with IDR and predictive pictures is decoded before
+and after transport; all 40 decoded frame hashes must match, including motion
+between IDRs. This is host evidence, not a vehicle decoder qualification. It builds all five
+QNX ARM native components and verifies the complete generated package.
 
 These tests do not prove the physical MOST drain, exact device buffer delay,
 loaded in-memory target identities, visible predictive pictures or target DMDT
