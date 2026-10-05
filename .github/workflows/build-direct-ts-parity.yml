@@ -15,6 +15,10 @@ on:
       - 'tests/parity_session_lifecycle.py'
       - 'tests/parity_overlay_rollback.py'
       - 'src/native/altscreen111-gen2/**'
+      - 'src/native/alt111-settings/**'
+      - 'settings/**'
+      - 'tools/generate_alt111_settings.py'
+      - 'tests/alt111_*'
       - 'deployment/mu1440-omonob790-parity-v1/**'
       - 'tools/prepare_mu1440_omonob790_parity_v1_overlay.sh'
   push:
@@ -31,6 +35,10 @@ on:
       - 'tests/parity_session_lifecycle.py'
       - 'tests/parity_overlay_rollback.py'
       - 'src/native/altscreen111-gen2/**'
+      - 'src/native/alt111-settings/**'
+      - 'settings/**'
+      - 'tools/generate_alt111_settings.py'
+      - 'tests/alt111_*'
       - 'deployment/mu1440-omonob790-parity-v1/**'
       - 'tools/prepare_mu1440_omonob790_parity_v1_overlay.sh'
 
@@ -65,6 +73,17 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          python3 tools/generate_alt111_settings.py --check
+          cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
+            -Isrc/native/altscreen111-gen2/include \
+            tests/alt111_policy_test.c src/native/altscreen111-gen2/src/alt111_policy.c \
+            src/native/altscreen111-gen2/src/alt111_control.c -o /tmp/alt111-policy-test
+          /tmp/alt111-policy-test
+          cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
+            -Isrc/native/altscreen111-gen2/include -Isrc/native/alt111-settings/include \
+            tests/alt111_settings_core_test.c src/native/alt111-settings/settings_core.c \
+            src/native/altscreen111-gen2/src/alt111_policy.c -o /tmp/alt111-settings-core-test
+          /tmp/alt111-settings-core-test
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
             src/native/direct-ts-parity/direct_ts_parity.c -pthread \
             -o /tmp/direct-ts-parity-host

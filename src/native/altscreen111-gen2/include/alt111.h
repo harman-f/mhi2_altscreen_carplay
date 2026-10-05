@@ -6,6 +6,7 @@
  * Core commands are intents, not evidence that iOS/VC executed them. */
 #include <stddef.h>
 #include <stdint.h>
+#include "alt111_policy.h"
 
 #define ALT111_MAX_VIEWS 3
 #define ALT111_CODEC_CAP 4096
@@ -46,13 +47,18 @@ struct alt111_command {
     uint64_t session, request, keyframe_demand;
     enum alt111_command_type type;
     unsigned view;
+    unsigned keyframe_reasons;
 };
 struct alt111_control {
     uint64_t session, sequence, deadline_ms, retry_at_ms;
     uint64_t keyframe_wanted, keyframe_done;
+    uint64_t keyframe_demands[8], keyframe_dispatched, keyframe_coalesced;
+    unsigned keyframe_reasons, showui_keyframe;
     unsigned active, desired, desired_view, view_count;
     unsigned shown_ack, may_be_visible, reacquiring;
     unsigned failures, exhausted;
+    unsigned view_failures, view_exhausted;
+    uint64_t view_retry_at_ms;
     int acknowledged_view;
     struct alt111_command pending;
 };
@@ -61,6 +67,8 @@ uint64_t alt111_control_begin(struct alt111_control *c);
 int alt111_control_end(struct alt111_control *c, uint64_t session);
 int alt111_control_intent(struct alt111_control *c, unsigned visible, unsigned view);
 int alt111_control_keyframe(struct alt111_control *c, uint64_t session);
+int alt111_control_keyframe_reason(struct alt111_control *c, uint64_t session,
+                                  unsigned reasons);
 /* Explicit operator/validated ownership event only; never video-idle polling. */
 int alt111_control_reacquire(struct alt111_control *c, uint64_t session);
 int alt111_control_next(struct alt111_control *c, uint64_t now_ms,

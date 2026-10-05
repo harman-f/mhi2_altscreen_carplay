@@ -11,6 +11,7 @@ static void cancel(struct alt111_control *c)
     memset(&c->pending, 0, sizeof(c->pending));
     c->deadline_ms = c->retry_at_ms = 0;
     c->failures = c->exhausted = 0;
+    c->view_failures = c->view_exhausted = 0; c->view_retry_at_ms = 0;
 }
 
 int alt111_control_init(struct alt111_control *c, unsigned view_count)
@@ -18,6 +19,7 @@ int alt111_control_init(struct alt111_control *c, unsigned view_count)
     if (!c || !view_count || view_count > ALT111_MAX_VIEWS) return ALT111_INVALID;
     memset(c, 0, sizeof(*c));
     c->view_count = view_count;
+    c->showui_keyframe = 1;
     c->acknowledged_view = -1;
     return ALT111_OK;
 }
@@ -29,6 +31,7 @@ uint64_t alt111_control_begin(struct alt111_control *c)
     c->active = 1; c->shown_ack = c->may_be_visible = c->reacquiring = 0;
     c->acknowledged_view = -1;
     c->keyframe_wanted = c->keyframe_done = 0;
+    c->keyframe_reasons = 0;
     return c->session;
 }
 
@@ -54,14 +57,29 @@ int alt111_control_intent(struct alt111_control *c, unsigned visible, unsigned v
     } else if (c->exhausted) {
         cancel(c);
     }
+    if (c->desired_view != view) {
+        c->view_failures = c->view_exhausted = 0; c->view_retry_at_ms = 0;
+    }
     c->desired = visible; c->desired_view = view;
     return ALT111_OK;
 }
 
 int alt111_control_keyframe(struct alt111_control *c, uint64_t session)
 {
+    return alt111_control_keyframe_reason(c, session, ALT111_KF_MANUAL);
+}
+
+int alt111_control_keyframe_reason(struct alt111_control *c, uint64_t session,
+                                  unsigned reasons)
+{
+    unsigned i;
     if (!c->active || session != c->session) return ALT111_STALE;
     if (!c->desired) return ALT111_WAIT;
+    if (!reasons || (reasons & ~ALT111_KF_ALL)) return ALT111_INVALID;
+    if (c->keyframe_wanted != c->keyframe_done) ++c->keyframe_coalesced;
+    for (i = 0; i < 8; ++i)
+        if (reasons & (1u << i)) ++c->keyframe_demands[i];
+    c->keyframe_reasons |= reasons;
     ++c->keyframe_wanted;
     return ALT111_OK;
 }
@@ -90,6 +108,15 @@ int alt111_control_complete(struct alt111_control *c, uint64_t session,
     memset(&c->pending, 0, sizeof(c->pending));
     if (now_ms >= c->deadline_ms) success = 0;
     if (!success) {
+        /* A failed optional VIEW never exhausts SHOW/KEYFRAME recovery. */
+        if (cmd.type == ALT111_CMD_VIEW) {
+            ++c->view_failures;
+            c->view_exhausted = c->view_failures >= ALT111_ATTEMPTS;
+            c->view_retry_at_ms = after(now_ms, ALT111_RETRY_MS);
+            return ALT111_OK;
+        }
+        if (cmd.type == ALT111_CMD_KEYFRAME)
+            c->keyframe_reasons |= cmd.keyframe_reasons;
         ++c->failures;
         c->exhausted = c->failures >= ALT111_ATTEMPTS;
         c->retry_at_ms = after(now_ms, ALT111_RETRY_MS);
@@ -107,14 +134,18 @@ int alt111_control_complete(struct alt111_control *c, uint64_t session,
          * view acknowledgement after SHOW.
          */
         c->acknowledged_view = c->view_count == 1 ? (int)c->desired_view : -1;
-        ++c->keyframe_wanted;
+        if (c->showui_keyframe)
+            (void)alt111_control_keyframe_reason(c, c->session, ALT111_KF_SHOWUI);
         break;
     case ALT111_CMD_STOP:
         c->shown_ack = c->may_be_visible = 0;
         c->acknowledged_view = -1;
         if (c->reacquiring == 1) c->reacquiring = 2;
         break;
-    case ALT111_CMD_VIEW: c->acknowledged_view = (int)cmd.view; break;
+    case ALT111_CMD_VIEW:
+        c->acknowledged_view = (int)cmd.view;
+        c->view_failures = c->view_exhausted = 0; c->view_retry_at_ms = 0;
+        break;
     case ALT111_CMD_KEYFRAME: c->keyframe_done = cmd.keyframe_demand; break;
     default: break;
     }
@@ -137,14 +168,20 @@ int alt111_control_next(struct alt111_control *c, uint64_t now_ms,
         if (c->may_be_visible) type = ALT111_CMD_STOP;
     } else if (c->reacquiring == 1) type = ALT111_CMD_STOP;
     else if (!c->shown_ack) type = ALT111_CMD_SHOW;
-    else if (c->acknowledged_view != (int)c->desired_view) type = ALT111_CMD_VIEW;
     else if (c->keyframe_done != c->keyframe_wanted) type = ALT111_CMD_KEYFRAME;
+    else if (c->acknowledged_view != (int)c->desired_view && !c->view_exhausted &&
+             now_ms >= c->view_retry_at_ms) type = ALT111_CMD_VIEW;
     if (type == ALT111_CMD_NONE) return ALT111_WAIT;
     c->pending.type = type;
     c->pending.session = c->session;
     c->pending.request = ++c->sequence;
     c->pending.view = c->desired_view;
     c->pending.keyframe_demand = c->keyframe_wanted;
+    if (type == ALT111_CMD_KEYFRAME) {
+        c->pending.keyframe_reasons = c->keyframe_reasons;
+        c->keyframe_reasons = 0;
+        ++c->keyframe_dispatched;
+    }
     c->deadline_ms = after(now_ms, ALT111_COMMAND_TIMEOUT_MS);
     if (type == ALT111_CMD_SHOW) c->may_be_visible = 1;
     *out = c->pending;

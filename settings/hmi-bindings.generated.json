@@ -1,0 +1,852 @@
+{
+  "schema": 2,
+  "authority": "settings/registry.json",
+  "layer_order": [
+    "temp",
+    "persistent",
+    "profile",
+    "compiled"
+  ],
+  "settings": [
+    {
+      "key": "preset.id",
+      "basename": "mibr-carplay111-compat-profile",
+      "field": "",
+      "type": "enum",
+      "default": {
+        "omonob790": "omonob790",
+        "mibr_dual_view": "mibr_dual_view",
+        "mibr_legacy": "mibr_legacy"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "allowed": [
+        "omonob790",
+        "mibr_dual_view",
+        "mibr_legacy",
+        "mibr"
+      ]
+    },
+    {
+      "key": "carplay.enabled",
+      "basename": "mibr-carplay111-enabled",
+      "field": "",
+      "type": "integer",
+      "default": {
+        "omonob790": "1",
+        "mibr_dual_view": "1",
+        "mibr_legacy": "1"
+      },
+      "apply": "session",
+      "hmi": "normal",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "key": "maxFPS",
+      "basename": "mibr-carplay111-fps",
+      "field": "",
+      "type": "enum",
+      "default": {
+        "omonob790": "40",
+        "mibr_dual_view": "40",
+        "mibr_legacy": "30"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "allowed": [
+        "20",
+        "25",
+        "30",
+        "40"
+      ]
+    },
+    {
+      "key": "sourceVersion",
+      "basename": "mibr-carplay111-sourceversion",
+      "field": "",
+      "type": "version",
+      "default": {
+        "omonob790": "950.7.1",
+        "mibr_dual_view": "950.7.1",
+        "mibr_legacy": "1005.8.1"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible"
+    },
+    {
+      "key": "keyframe.mode",
+      "basename": "mibr-carplay111-keyframes.conf",
+      "field": "mode",
+      "type": "enum",
+      "default": {
+        "omonob790": "source_frames",
+        "mibr_dual_view": "source_frames",
+        "mibr_legacy": "source_frames"
+      },
+      "apply": "live",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "allowed": [
+        "source_frames",
+        "source_time",
+        "event_only",
+        "off"
+      ]
+    },
+    {
+      "key": "keyframe.interval_frames",
+      "basename": "mibr-carplay111-keyframes.conf",
+      "field": "interval_frames",
+      "type": "integer",
+      "default": {
+        "omonob790": "20",
+        "mibr_dual_view": "20",
+        "mibr_legacy": "20"
+      },
+      "apply": "live",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 1000
+    },
+    {
+      "key": "keyframe.interval_ms",
+      "basename": "mibr-carplay111-keyframes.conf",
+      "field": "interval_ms",
+      "type": "integer",
+      "default": {
+        "omonob790": "2000",
+        "mibr_dual_view": "2000",
+        "mibr_legacy": "2000"
+      },
+      "apply": "live",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 100,
+      "max": 60000
+    },
+    {
+      "key": "keyframe.showui",
+      "basename": "mibr-carplay111-keyframes.conf",
+      "field": "showui",
+      "type": "integer",
+      "default": {
+        "omonob790": "1",
+        "mibr_dual_view": "1",
+        "mibr_legacy": "1"
+      },
+      "apply": "live",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "key": "keyframe.gap_recovery",
+      "basename": "mibr-carplay111-keyframes.conf",
+      "field": "gap_recovery",
+      "type": "integer",
+      "default": {
+        "omonob790": "1",
+        "mibr_dual_view": "1",
+        "mibr_legacy": "1"
+      },
+      "apply": "live",
+      "hmi": "developer",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "key": "keyframe.latency_recovery",
+      "basename": "mibr-carplay111-keyframes.conf",
+      "field": "latency_recovery",
+      "type": "integer",
+      "default": {
+        "omonob790": "1",
+        "mibr_dual_view": "1",
+        "mibr_legacy": "1"
+      },
+      "apply": "live",
+      "hmi": "developer",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "key": "ownership.backend",
+      "basename": "mibr-carplay111-ownership.conf",
+      "field": "backend",
+      "type": "enum",
+      "default": {
+        "omonob790": "writev_gate",
+        "mibr_dual_view": "writev_gate",
+        "mibr_legacy": "writev_gate"
+      },
+      "apply": "session",
+      "hmi": "developer",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "allowed": [
+        "writev_gate",
+        "dmdt_reference"
+      ]
+    },
+    {
+      "key": "viewarea.selected",
+      "basename": "mibr-carplay111-viewarea-selected",
+      "field": "",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "live",
+      "hmi": "normal",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "key": "viewareas.enabled",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "enabled",
+      "type": "integer",
+      "default": {
+        "omonob790": "1",
+        "mibr_dual_view": "1",
+        "mibr_legacy": "1"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 1
+    },
+    {
+      "key": "viewareas.count",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "count",
+      "type": "integer",
+      "default": {
+        "omonob790": "1",
+        "mibr_dual_view": "2",
+        "mibr_legacy": "2"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 2
+    },
+    {
+      "key": "viewareas.initial",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "initial",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "key": "viewareas.transition_ms",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "transition_ms",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "live",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 5000
+    },
+    {
+      "key": "viewarea.0.x",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view0.x",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.0.y",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view0.y",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.0.w",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view0.w",
+      "type": "integer",
+      "default": {
+        "omonob790": "1010",
+        "mibr_dual_view": "1010",
+        "mibr_legacy": "1010"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.0.h",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view0.h",
+      "type": "integer",
+      "default": {
+        "omonob790": "376",
+        "mibr_dual_view": "376",
+        "mibr_legacy": "376"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.0.safe.x",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view0.safe.x",
+      "type": "integer",
+      "default": {
+        "omonob790": "202",
+        "mibr_dual_view": "202",
+        "mibr_legacy": "0"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.0.safe.y",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view0.safe.y",
+      "type": "integer",
+      "default": {
+        "omonob790": "16",
+        "mibr_dual_view": "16",
+        "mibr_legacy": "0"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.0.safe.w",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view0.safe.w",
+      "type": "integer",
+      "default": {
+        "omonob790": "606",
+        "mibr_dual_view": "606",
+        "mibr_legacy": "1010"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.0.safe.h",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view0.safe.h",
+      "type": "integer",
+      "default": {
+        "omonob790": "344",
+        "mibr_dual_view": "344",
+        "mibr_legacy": "376"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.0.adjacent",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view0.adjacent",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "1",
+        "mibr_legacy": "1"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "key": "viewarea.1.x",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view1.x",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.1.y",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view1.y",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.1.w",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view1.w",
+      "type": "integer",
+      "default": {
+        "omonob790": "1010",
+        "mibr_dual_view": "1010",
+        "mibr_legacy": "1010"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.1.h",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view1.h",
+      "type": "integer",
+      "default": {
+        "omonob790": "376",
+        "mibr_dual_view": "376",
+        "mibr_legacy": "376"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.1.safe.x",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view1.safe.x",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.1.safe.y",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view1.safe.y",
+      "type": "integer",
+      "default": {
+        "omonob790": "58",
+        "mibr_dual_view": "58",
+        "mibr_legacy": "58"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.1.safe.w",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view1.safe.w",
+      "type": "integer",
+      "default": {
+        "omonob790": "1010",
+        "mibr_dual_view": "1010",
+        "mibr_legacy": "1010"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.1.safe.h",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view1.safe.h",
+      "type": "integer",
+      "default": {
+        "omonob790": "248",
+        "mibr_dual_view": "248",
+        "mibr_legacy": "248"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 1010
+    },
+    {
+      "key": "viewarea.1.adjacent",
+      "basename": "mibr-carplay111-viewareas.conf",
+      "field": "view1.adjacent",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "reconnect",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "key": "display.widthPixels",
+      "basename": "mibr-carplay111-display.conf",
+      "field": "widthPixels",
+      "type": "integer",
+      "default": {
+        "omonob790": "1010",
+        "mibr_dual_view": "1010",
+        "mibr_legacy": "1010"
+      },
+      "apply": "reconnect",
+      "hmi": "developer",
+      "read_only": true,
+      "reference_override": "deviation_visible",
+      "min": 1010,
+      "max": 1010
+    },
+    {
+      "key": "display.heightPixels",
+      "basename": "mibr-carplay111-display.conf",
+      "field": "heightPixels",
+      "type": "integer",
+      "default": {
+        "omonob790": "376",
+        "mibr_dual_view": "376",
+        "mibr_legacy": "376"
+      },
+      "apply": "reconnect",
+      "hmi": "developer",
+      "read_only": true,
+      "reference_override": "deviation_visible",
+      "min": 376,
+      "max": 376
+    },
+    {
+      "key": "display.widthPhysical",
+      "basename": "mibr-carplay111-display.conf",
+      "field": "widthPhysical",
+      "type": "integer",
+      "default": {
+        "omonob790": "202",
+        "mibr_dual_view": "202",
+        "mibr_legacy": "200"
+      },
+      "apply": "reconnect",
+      "hmi": "developer",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 2000
+    },
+    {
+      "key": "display.heightPhysical",
+      "basename": "mibr-carplay111-display.conf",
+      "field": "heightPhysical",
+      "type": "integer",
+      "default": {
+        "omonob790": "75",
+        "mibr_dual_view": "75",
+        "mibr_legacy": "74"
+      },
+      "apply": "reconnect",
+      "hmi": "developer",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "min": 1,
+      "max": 2000
+    },
+    {
+      "key": "display.uuid",
+      "basename": "mibr-carplay111-display.conf",
+      "field": "uuid",
+      "type": "uuid",
+      "default": {
+        "omonob790": "b7e6c5a0-2222-4000-8000-000000000002",
+        "mibr_dual_view": "b7e6c5a0-2222-4000-8000-000000000002",
+        "mibr_legacy": "b7e6c5a0-2222-4000-8000-000000000002"
+      },
+      "apply": "reconnect",
+      "hmi": "developer",
+      "read_only": false,
+      "reference_override": "deviation_visible"
+    },
+    {
+      "key": "navigation.url",
+      "basename": "mibr-carplay111-url",
+      "field": "",
+      "type": "url",
+      "default": {
+        "omonob790": "maps:/car/instrumentcluster/map",
+        "mibr_dual_view": "auto",
+        "mibr_legacy": "auto"
+      },
+      "apply": "presentation",
+      "hmi": "advanced",
+      "read_only": false,
+      "reference_override": "deviation_visible"
+    },
+    {
+      "key": "navigation.query",
+      "basename": "mibr-carplay111-nav.conf",
+      "field": "query",
+      "type": "enum",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "presentation",
+      "hmi": "normal",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "allowed": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "key": "navigation.surface",
+      "basename": "mibr-carplay111-nav.conf",
+      "field": "surface",
+      "type": "enum",
+      "default": {
+        "omonob790": "map",
+        "mibr_dual_view": "map",
+        "mibr_legacy": "base"
+      },
+      "apply": "presentation",
+      "hmi": "normal",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "allowed": [
+        "base",
+        "map",
+        "instructioncard"
+      ]
+    },
+    {
+      "key": "navigation.ETA",
+      "basename": "mibr-carplay111-nav.conf",
+      "field": "showETA",
+      "type": "enum",
+      "default": {
+        "omonob790": "yes",
+        "mibr_dual_view": "yes",
+        "mibr_legacy": "yes"
+      },
+      "apply": "presentation",
+      "hmi": "normal",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "allowed": [
+        "yes",
+        "no",
+        "user"
+      ]
+    },
+    {
+      "key": "navigation.speedLimit",
+      "basename": "mibr-carplay111-nav.conf",
+      "field": "showSpeedLimit",
+      "type": "enum",
+      "default": {
+        "omonob790": "user",
+        "mibr_dual_view": "user",
+        "mibr_legacy": "user"
+      },
+      "apply": "presentation",
+      "hmi": "normal",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "allowed": [
+        "yes",
+        "no",
+        "user"
+      ]
+    },
+    {
+      "key": "navigation.compass",
+      "basename": "mibr-carplay111-nav.conf",
+      "field": "showCompass",
+      "type": "enum",
+      "default": {
+        "omonob790": "user",
+        "mibr_dual_view": "user",
+        "mibr_legacy": "user"
+      },
+      "apply": "presentation",
+      "hmi": "normal",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "allowed": [
+        "yes",
+        "no",
+        "user"
+      ]
+    },
+    {
+      "key": "navigation.maneuver",
+      "basename": "mibr-carplay111-nav.conf",
+      "field": "maneuverLayout",
+      "type": "enum",
+      "default": {
+        "omonob790": "none",
+        "mibr_dual_view": "none",
+        "mibr_legacy": "none"
+      },
+      "apply": "presentation",
+      "hmi": "normal",
+      "read_only": false,
+      "reference_override": "deviation_visible",
+      "allowed": [
+        "none",
+        "left",
+        "right",
+        "top"
+      ]
+    },
+    {
+      "key": "presentation.suggested_urls",
+      "basename": "mibr-carplay111-ui-urls.conf",
+      "field": "urls",
+      "type": "urls",
+      "default": {
+        "omonob790": "maps:/car/instrumentcluster/map",
+        "mibr_dual_view": "maps:/car/instrumentcluster|maps:/car/instrumentcluster/map|maps:/car/instrumentcluster/instructioncard",
+        "mibr_legacy": "maps:/car/instrumentcluster/map"
+      },
+      "apply": "reconnect",
+      "hmi": "developer",
+      "read_only": false,
+      "reference_override": "deviation_visible"
+    },
+    {
+      "key": "legacy.autodirect",
+      "basename": "mibr-carplay-autodirect",
+      "field": "",
+      "type": "integer",
+      "default": {
+        "omonob790": "0",
+        "mibr_dual_view": "0",
+        "mibr_legacy": "0"
+      },
+      "apply": "session",
+      "hmi": "developer",
+      "read_only": true,
+      "reference_override": "deviation_visible",
+      "min": 0,
+      "max": 0
+    }
+  ]
+}
