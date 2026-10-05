@@ -18,6 +18,7 @@ on:
       - 'src/native/alt111-settings/**'
       - 'settings/**'
       - 'tools/generate_alt111_settings.py'
+      - 'tools/build_alt111_settings.sh'
       - 'tests/alt111_*'
       - 'deployment/mu1440-omonob790-parity-v1/**'
       - 'tools/prepare_mu1440_omonob790_parity_v1_overlay.sh'
@@ -38,6 +39,7 @@ on:
       - 'src/native/alt111-settings/**'
       - 'settings/**'
       - 'tools/generate_alt111_settings.py'
+      - 'tools/build_alt111_settings.sh'
       - 'tests/alt111_*'
       - 'deployment/mu1440-omonob790-parity-v1/**'
       - 'tools/prepare_mu1440_omonob790_parity_v1_overlay.sh'
@@ -84,6 +86,7 @@ jobs:
             tests/alt111_settings_core_test.c src/native/alt111-settings/settings_core.c \
             src/native/altscreen111-gen2/src/alt111_policy.c -o /tmp/alt111-settings-core-test
           /tmp/alt111-settings-core-test
+          python3 tests/alt111_settings_integration.py
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
             src/native/direct-ts-parity/direct_ts_parity.c -pthread \
             -o /tmp/direct-ts-parity-host
@@ -167,6 +170,9 @@ jobs:
           docker run --rm --platform=linux/amd64 \
             -v "$PWD:/src" -w /src "$IMAGE" \
             bash -c 'bash ./tools/build_altscreen111_gen2.sh build/ci-direct-ts-parity/libaltscreen111.so'
+          docker run --rm --platform=linux/amd64 \
+            -v "$PWD:/src" -w /src "$IMAGE" \
+            bash -c 'bash ./tools/build_alt111_settings.sh build/ci-direct-ts-parity/alt111-settings'
           sudo chown -R "$(id -u):$(id -g)" "$OUTDIR"
 
       - name: Binary and contract audit
@@ -189,6 +195,9 @@ jobs:
           file "$SESSION" | tee "$OUTDIR/SESSION_FILE.txt"
           grep -q 'Machine:.*ARM' "$OUTDIR/ELF_HEADER.txt"
           grep -q 'Machine:.*ARM' "$OUTDIR/SESSION_ELF_HEADER.txt"
+          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h "$OUTDIR/alt111-settings" > "$OUTDIR/SETTINGS_ELF_HEADER.txt"
+          grep -q 'Machine:.*ARM' "$OUTDIR/SETTINGS_ELF_HEADER.txt"
           grep -Fq 'architecture=omonob790-functional-parity-cleanroom' "$OUTDIR/STRINGS.txt"
           grep -Fq 'source_clock=stream111-32.32' "$OUTDIR/STRINGS.txt"
           grep -Fq 'pts_clock=source-derived-90khz' "$OUTDIR/STRINGS.txt"
@@ -257,4 +266,6 @@ jobs:
             ${{ env.OUTDIR }}/DYNAMIC.txt
             ${{ env.OUTDIR }}/SYMBOLS.txt
             ${{ env.OUTDIR }}/libaltscreen111.so
+            ${{ env.OUTDIR }}/alt111-settings
+            ${{ env.OUTDIR }}/SETTINGS_ELF_HEADER.txt
             ${{ env.OUTDIR }}/omonob790-hardened-candidate.tar.gz

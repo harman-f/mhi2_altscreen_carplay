@@ -8,6 +8,7 @@
 #define ALT111_SETTING_VALUE_CAP 192u
 #define ALT111_SETTING_GROUP_CAP 2048u
 #define ALT111_SETTING_BATCH_CAP 8192u
+void mibr_sha256_bytes(const void *data, size_t size, char hex[65]);
 enum alt111_settings_layer { ALT111_PROFILE, ALT111_PERSISTENT, ALT111_TEMP };
 struct alt111_setting_descriptor {
     const char *key, *basename, *field, *type, *allowed;
@@ -52,4 +53,7 @@ int alt111_settings_clear(const struct alt111_settings_paths *paths,
                           struct alt111_settings *out, char *error, size_t cap);
 int alt111_settings_reconcile(const struct alt111_settings_paths *paths,
                               char *error, size_t cap);
+int alt111_settings_preset(const struct alt111_settings_paths *paths,
+                           const char *preset, uint64_t expected_revision,
+                           struct alt111_settings *out, char *error, size_t cap);
 #endif
