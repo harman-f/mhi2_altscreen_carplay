@@ -137,15 +137,20 @@ The replacement transaction design uses only target-proven flat-file primitives:
 - `unlink()` for marker cleanup;
 - no native `rename()` below `/tmp`.
 
-Crash recovery uses two flat markers. The journal is written completely first. Then
-`mibr-alt111-settings.journal-armed` is created exclusively. Active settings may only be rewritten
-after the armed marker exists.
+Crash recovery uses two flat markers. New transactions write a `schema=2` journal completely
+first. Then `mibr-alt111-settings.journal-armed` is created exclusively. Active settings may only
+be rewritten after the armed marker exists.
 
-This yields three recoverable states:
+This yields three recoverable schema-2 states:
 
 - journal without armed: transaction died before active mutation; discard the unarmed journal;
 - journal plus armed: active mutation may have started; restore every affected group from validated backups;
 - armed without journal: journal removal already crossed the commit point; only remove the stale armed marker.
+
+Upgrade compatibility is intentionally fail-safe. The previous rename-based implementation wrote
+`schema=1` journals and had no armed marker. A schema-1 journal without armed therefore **cannot**
+be treated as pre-mutation; it follows the legacy validated-backup rollback path. This prevents an
+upgrade from discarding recovery state left by an older binary.
 
 This preserves explicit crash recovery without relying on filesystem semantics the MU1440 target
 does not provide.
