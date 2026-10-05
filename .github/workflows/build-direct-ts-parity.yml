@@ -16,7 +16,11 @@ on:
     paths:
       - '.github/workflows/build-direct-ts-parity.yml'
       - 'src/native/direct-ts-parity/**'
+      - 'src/native/parity-session/**'
+      - 'runtime/parity/**'
+      - 'runtime/diagnostics/gen2_compat_profile.sh'
       - 'tools/build_direct_ts_parity.sh'
+      - 'tools/build_parity_session.sh'
 
 permissions:
   contents: read
@@ -64,8 +68,18 @@ jobs:
           grep -Fxq 'PARITY_SESSION_SELFTEST=PASS' /tmp/parity-session-selftest.txt
           grep -Fq 'release=/eso/bin/apps/dmdt dc 72 ; /eso/bin/apps/dmdt sc 4 72' /tmp/parity-session-selftest.txt
           grep -Fq 'restore=/eso/bin/apps/dmdt dc 70 33 ; /eso/bin/apps/dmdt sc 4 70' /tmp/parity-session-selftest.txt
+          grep -Fq 'dmdt_timeout_ms=5000' /tmp/parity-session-selftest.txt
+          grep -Fq 'watchdog_margin_seconds=20' /tmp/parity-session-selftest.txt
           bash -n runtime/parity/omonob790_profile.sh
+          bash -n runtime/parity/omonob790_session.sh
+          bash -n runtime/parity/omonob790_status.sh
           bash -n runtime/diagnostics/gen2_compat_profile.sh
+          grep -Fq 'mibr-carplay-autodirect 0' runtime/parity/omonob790_profile.sh
+          grep -Fq 'seq % PARITY_IDR_INTERVAL' src/native/direct-ts-parity/direct_ts_parity.c
+          grep -Fq 'O_WRONLY|O_NONBLOCK' src/native/direct-ts-parity/direct_ts_parity.c
+          grep -Fq 'DRIVER_DCMD_GET_INTERFACE 0x4004050c' src/native/direct-ts-parity/direct_ts_parity.c
+          grep -Fq 'DRIVER_DCMD_GET_PACKET_SIZE 0x4004050d' src/native/direct-ts-parity/direct_ts_parity.c
+          grep -Fq 'DRIVER_DCMD_GET_BLOCK_COUNT 0x40040510' src/native/direct-ts-parity/direct_ts_parity.c
 
       - name: Build pinned QNX 6.5 ARMv7 toolchain image
         shell: bash
@@ -135,6 +149,9 @@ jobs:
           strings "$BIN" | grep -Fq 'PARITY_START'
           strings "$BIN" | grep -Fq 'PARITY_PTS_REBASE'
           strings "$BIN" | grep -Fq '/tmp/mibr-alt111-keyframe-only'
+          strings "$BIN" | grep -Fq 'PARITY_DRIVER interface'
+          strings "$BIN" | grep -Fq 'device_open_mode=write_only_nonblock'
+          strings "$BIN" | grep -Fq 'reference_producer_payload_limit=262144'
           ! strings "$BIN" | grep -Fq 'avformat_'
           ! strings "$BIN" | grep -Fq 'libavformat'
           strings "$SESSION" | grep -Fq '/eso/bin/apps/dmdt'
