@@ -113,10 +113,15 @@ Cross-process settings synchronization must therefore avoid both:
 - directory-lock schemes below `/tmp`.
 
 The current replacement candidate uses an atomic flat lock-file create with
-`open(..., O_CREAT|O_EXCL, 0600)` on a new `mibr-alt111-settings.lock-v2` path. This is deliberately
-documented as a **candidate until vehicle-qualified**; successful compilation or host testing is not
-sufficient evidence that the exact MU1440 `/dev/shmem` implementation provides the required
-exclusive-create semantics.
+`open(..., O_CREAT|O_EXCL, 0600)` on a new `mibr-alt111-settings.lock-v2` path. The file records the
+owner PID. A pre-existing V2 lock is reclaimed only when `kill(pid, 0)` proves the recorded owner is
+gone with `ESRCH`; success, `EPERM`, malformed/empty owner data and all other errors remain
+fail-closed. This is required so a process killed in the middle of a settings transaction does not
+permanently block the explicit journal-reconciliation path.
+
+The exclusive-create behavior is deliberately documented as a **candidate until vehicle-qualified**;
+successful compilation or host testing is not sufficient evidence that the exact MU1440
+`/dev/shmem` implementation provides the required semantics.
 
 The old `mibr-alt111-settings.lock` file may remain present from the record-lock implementation.
 Its mere existence is not proof that a process owns a lock and it must not be used as a stale-lock
