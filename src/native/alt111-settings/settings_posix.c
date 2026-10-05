@@ -105,8 +105,11 @@ static int write_file_direct(const char *path, const char *data, size_t size)
         (void)close(fd);
         return -1;
     }
-    if (write_full_fd(fd, data, size) || sync_volatile_fd(fd) || close(fd))
+    if (write_full_fd(fd, data, size) || sync_volatile_fd(fd)) {
+        (void)close(fd);
         return -1;
+    }
+    if (close(fd)) return -1;
 
 #ifdef ALT111_SETTINGS_TEST
     {
@@ -125,7 +128,12 @@ static int create_file_exclusive(const char *path, const char *data, size_t size
 {
     int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
     if (fd < 0) return -1;
-    if (write_full_fd(fd, data, size) || sync_volatile_fd(fd) || close(fd)) {
+    if (write_full_fd(fd, data, size) || sync_volatile_fd(fd)) {
+        (void)close(fd);
+        (void)unlink(path);
+        return -1;
+    }
+    if (close(fd)) {
         (void)unlink(path);
         return -1;
     }
