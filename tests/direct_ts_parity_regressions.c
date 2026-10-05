@@ -31,6 +31,10 @@ int main(void) {
     next=assign_pts(&c,0x40000000u,0u,&rb);
     assert(next-first==45000u);assert(c.source_rebases==0);
     c.have_origin=0;c.have_previous_source=0;
+    first=assign_pts(&c,0xe0000000u,0xffffffffu,&rb);
+    next=assign_pts(&c,0u,0u,&rb);
+    assert(next-first==11250u); /* exact zero is valid at rollover */
+    c.have_origin=0;c.have_previous_source=0;
     (void)assign_pts(&c,0,100,&rb);
     (void)assign_pts(&c,0x40000000u,100,&rb);
     rebases=c.source_rebases;

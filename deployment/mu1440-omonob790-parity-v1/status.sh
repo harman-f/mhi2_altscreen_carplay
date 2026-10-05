@@ -40,6 +40,10 @@ compare gen2 "$DST/bin/libaltscreen111.so" "$ROOT/payload/libaltscreen111.so"
 compare hook "$HOOK" "$ROOT/payload/libaltscreen111.so"
 compare parity_bridge "$DST/bin/direct-ts-parity" "$ROOT/payload/direct-ts-parity"
 compare parity_session "$DST/bin/parity-session" "$ROOT/payload/parity-session"
+echo "base_gate_live_sha256=$(hashf /mnt/app/eso/lib/libmibr_isotx2_gate.so 2>/dev/null)"
+echo "base_gate_expected_sha256=05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957"
+echo "base_libairplay_live_sha256=$(hashf /mnt/app/eso/lib/libairplay.so 2>/dev/null)"
+echo "smartphone_integrator_live_sha256=$(hashf /mnt/system/etc/eso/production/smartphone_integrator.json 2>/dev/null)"
 
 if [ -r "$DST/bin/direct-ts-remux" ]; then
   RH=$(hashf "$DST/bin/direct-ts-remux" 2>/dev/null)

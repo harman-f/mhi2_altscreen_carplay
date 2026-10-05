@@ -311,10 +311,12 @@ static uint64_t assign_pts(struct clock_state *c, uint32_t frac, uint32_t sec,
     uint64_t pcr, pts, floor, target, shift, now_us;
     uint64_t raw = ((uint64_t)sec << 32) | frac;
     int discontinuous = 0;
-    int source_valid = (frac != 0u || sec != 0u);
+    int source_valid;
     *rebased = 0;
     now_us = monotonic_us();
     pthread_mutex_lock(&c->lock);
+    /* Exact zero at a 32.32 rollover is still a valid source timestamp. */
+    source_valid = frac != 0u || sec != 0u || c->have_previous_source;
     pcr = c->transport_pcr90k;
     if (source_valid && c->have_previous_source) {
         /* Unsigned 64-bit subtraction followed by signed interpretation also
@@ -544,10 +546,14 @@ static void queue_destroy(struct au_queue *q) {
     pthread_mutex_destroy(&q->lock);
 }
 
-static size_t queue_packet_depth(struct au_queue *q) {
+static size_t queue_backlog_packets(struct au_queue *q) {
     size_t packets;
     pthread_mutex_lock(&q->lock);
     packets=q->packets_queued;
+    /* One head AU has a legitimate, explicitly budgeted transfer duration.
+     * Count backlog behind it, rather than turning a large IDR itself into
+     * repeated latency recovery / IDR-only output. */
+    if(q->count)packets-=q->q[q->head].packet_count-q->q[q->head].packet_pos;
     pthread_mutex_unlock(&q->lock);
     return packets;
 }
@@ -748,6 +754,7 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
     size_t off=0;
     uint64_t deadline = monotonic_us() + WRITE_TIMEOUT_US;
     while(off<n) {
+        if(monotonic_us()>=deadline) { stats_add_u64(&s->write_errors,&s->lock,1); return -1; }
         ssize_t w=write(fd,p+off,n-off);
         if(w>0) {
             /* An isoTX2 short acceptance breaks the 64-packet syscall
@@ -979,7 +986,7 @@ int main(int argc,char **argv) {
             waiting_idr=1;discontinuity=1;request_keyframe();
         }
         prev_seq=seq;
-        if(!waiting_idr && queue_packet_depth(&queue)>LOW_LATENCY_PACKET_LIMIT) {
+        if(!waiting_idr && queue_backlog_packets(&queue)>LOW_LATENCY_PACKET_LIMIT) {
             uint64_t da=0,dp=0,pp=0;
             queue_recover_au_boundary(&queue,&da,&dp,&pp);
             record_safe_recovery(&stats,"latency",da,dp,pp);

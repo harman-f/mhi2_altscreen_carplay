@@ -18,6 +18,7 @@ TARGET=/mnt/system/etc/eso/production/smartphone_integrator.json
 EXPECTED_AIRPLAY=193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5
 EXPECTED_BASE_GEN2=8cccf1cb1764952acd973cbb4f881cfd70f3312e7f6a29cdef7fec930c83d25c
 EXPECTED_BASE_REMUX=3f0e730523bd290608dc13e186baa962eeb9c46f117d4d4976be523c0cd94c09
+EXPECTED_GATE=05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957
 BASE_ACTIVE=/mnt/app/root/mibr-framing-v1-active
 
 BACK=/mnt/app/root/mibr-omonob790-parity-v1-backup
@@ -144,6 +145,7 @@ backup_one(){
     echo "$EXPECT $REL" >> "$BACK/BACKUP.sha256" || fail "backup_manifest=$REL"
   else
     : > "$DSTB.ABSENT" || fail "backup_absent_marker=$REL"
+    echo "ABSENT $REL" >> "$BACK/BACKUP.sha256" || fail "backup_manifest=$REL"
   fi
 }
 
@@ -165,7 +167,17 @@ same_as_package(){
   [ "$LH" = "$PH" ]
 }
 
+check_environment(){
+  AH=$(hashf "$AIRPLAY") || fail "libairplay_hash_failed"
+  [ "$AH" = "$EXPECTED_AIRPLAY" ] || fail "wrong_target_libairplay=$AH"
+  RH=$(hashf "$DST/bin/direct-ts-remux") || fail "base_remux_hash_failed"
+  [ "$RH" = "$EXPECTED_BASE_REMUX" ] || fail "wrong_base_remux=$RH"
+  GH=$(hashf /mnt/app/eso/lib/libmibr_isotx2_gate.so) || fail "gate_hash_failed"
+  [ "$GH" = "$EXPECTED_GATE" ] || fail "unidentified_gate=$GH"
+}
+
 verify_manifest
+check_environment
 check_tmp_root
 show_plan
 
@@ -239,6 +251,7 @@ chmod 644 "$STATE_AUTODIRECT" 2>/dev/null || true
   echo "bridge_sha256=$(candidate_hash bridge)"
   echo "session_sha256=$(candidate_hash session)"
   echo "base_remux_sha256=$EXPECTED_BASE_REMUX"
+  echo "base_gate_sha256=$EXPECTED_GATE"
   echo "installed_from=$ROOT"
 } > "$ACTIVE" || fail "active_marker_write"
 

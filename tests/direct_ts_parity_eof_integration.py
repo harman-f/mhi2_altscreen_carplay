@@ -26,6 +26,11 @@ def run(binary, record):
 
 binary=sys.argv[1]
 large=SPS+PPS+sc(b"\x65"+b"\x55"*250000+b"\x7b\x7c\x7d")
+cp,data,_=run(binary,m1au(1,large,idr=True)+m1au(2,sc(b"\x41\x91"))+m1au(3,sc(b"\x41\x92")))
+assert cp.returncode==0,cp.stderr.decode()
+video=[data[i:i+188] for i in range(0,len(data),188) if pid(data[i:i+188])==0x11]
+assert sum(bool(p[1]&0x40) for p in video)==3,"large IDR incorrectly triggered IDR-only recovery"
+assert b"PARITY_SAFE_RECOVERY reason=latency" not in cp.stderr
 for i in range(12):
     cp,data,elapsed=run(binary,m1au(1,large,idr=True))
     assert cp.returncode==0,cp.stderr.decode()
@@ -45,4 +50,4 @@ valid=m1au(1,SPS+PPS+sc(b"\x65\x88"),idr=True)
 for invalid in (valid[:20],valid[:-2],b"BAD!"+valid[4:]):
     cp,_,_=run(binary,invalid)
     assert cp.returncode!=0,"malformed/partial input was reported successful"
-print("PARITY_EOF_INTEGRATION=PASS immediate_eof=12 large_pes_deadline malformed_input=3 paced_output")
+print("PARITY_EOF_INTEGRATION=PASS immediate_eof=12 large_idr_then_predictive large_pes_deadline malformed_input=3 paced_output")

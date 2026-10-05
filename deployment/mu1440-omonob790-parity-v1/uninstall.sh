@@ -50,8 +50,13 @@ fi
 [ -e "$ACTIVE" ] || echo "MIBR_OMONOB790_PARITY_UNINSTALL=RECOVERY_FROM_INTERRUPTED_INSTALL"
 [ -x "$SHA" ] && [ -r "$BACK/BACKUP.sha256" ] || fail "backup_verification_missing"
 while read EXPECT REL; do
-  GOT=$(hashf "$BACK/$REL") || fail "backup_hash_failed=$REL"
-  [ "$GOT" = "$EXPECT" ] || fail "backup_corrupt=$REL"
+  if [ "$EXPECT" = ABSENT ]; then
+    [ -e "$BACK/$REL.ABSENT" ] && [ ! -e "$BACK/$REL" ] || fail "backup_absence_corrupt=$REL"
+  else
+    [ ! -e "$BACK/$REL.ABSENT" ] || fail "backup_conflicting_absence=$REL"
+    GOT=$(hashf "$BACK/$REL") || fail "backup_hash_failed=$REL"
+    [ "$GOT" = "$EXPECT" ] || fail "backup_corrupt=$REL"
+  fi
 done < "$BACK/BACKUP.sha256"
 
 # Stop only parity-owned processes. The session parent owns graceful bridge
@@ -96,8 +101,12 @@ while read EXPECT REL; do
     state/*) LIVE=$STATE_AUTODIRECT ;;
     *) LIVE=$DST/$REL ;;
   esac
-  GOT=$(hashf "$LIVE") || fail "restored_hash_failed=$REL"
-  [ "$GOT" = "$EXPECT" ] || fail "restored_hash_mismatch=$REL"
+  if [ "$EXPECT" = ABSENT ]; then
+    [ ! -e "$LIVE" ] || fail "restored_absence_failed=$REL"
+  else
+    GOT=$(hashf "$LIVE") || fail "restored_hash_failed=$REL"
+    [ "$GOT" = "$EXPECT" ] || fail "restored_hash_mismatch=$REL"
+  fi
 done < "$BACK/BACKUP.sha256"
 rm -f "$ACTIVE" 2>/dev/null || fail "active_marker_remove"
 # Retain verified backups and restoration evidence. A later install refuses

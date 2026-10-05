@@ -13,6 +13,7 @@ on:
       - 'tools/build_parity_session.sh'
       - 'tests/direct_ts_parity*'
       - 'tests/parity_session_lifecycle.py'
+      - 'tests/parity_overlay_rollback.py'
       - 'src/native/altscreen111-gen2/**'
       - 'deployment/mu1440-omonob790-parity-v1/**'
       - 'tools/prepare_mu1440_omonob790_parity_v1_overlay.sh'
@@ -28,6 +29,7 @@ on:
       - 'tools/build_parity_session.sh'
       - 'tests/direct_ts_parity*'
       - 'tests/parity_session_lifecycle.py'
+      - 'tests/parity_overlay_rollback.py'
       - 'src/native/altscreen111-gen2/**'
       - 'deployment/mu1440-omonob790-parity-v1/**'
       - 'tools/prepare_mu1440_omonob790_parity_v1_overlay.sh'
@@ -78,6 +80,7 @@ jobs:
           /tmp/parity-regressions
           python3 tests/direct_ts_parity_eof_integration.py /tmp/direct-ts-parity-host
           python3 tests/parity_session_lifecycle.py
+          python3 tests/parity_overlay_rollback.py
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
             src/native/parity-session/parity_session.c \
             -o /tmp/parity-session-host
@@ -213,7 +216,7 @@ jobs:
           SOURCE_HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          tools/prepare_mu1440_omonob790_parity_v1_overlay.sh "$OUTDIR/package" "$OUTDIR/libaltscreen111.so" "$OUTDIR/direct-ts-parity" "$OUTDIR/parity-session"
+          bash tools/prepare_mu1440_omonob790_parity_v1_overlay.sh "$OUTDIR/package" "$OUTDIR/libaltscreen111.so" "$OUTDIR/direct-ts-parity" "$OUTDIR/parity-session"
           (cd "$OUTDIR/package"; sha256sum -c PACKAGE-SHA256SUMS.txt)
           while IFS= read -r script; do bash -n "$script"; done < <(find "$OUTDIR/package" -name '*.sh' -type f)
           grep -Fxq "source_head_commit=$SOURCE_HEAD_COMMIT" "$OUTDIR/package/CANDIDATE-MANIFEST.txt"
