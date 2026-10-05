@@ -246,6 +246,7 @@ fi
 check_base
 prepare_startup
 [ ! -e /tmp/mibr-alt111-settings.journal ] || fail "settings_transaction_reconcile_required"
+[ ! -e /tmp/mibr-alt111-settings.journal-armed ] || fail "settings_transaction_reconcile_required"
 [ ! -e /tmp/mibr-parity-rollback.pending ] || fail "rollback_requires_canonical_reboot"
 [ ! -e /tmp/mibr-parity-session.lock ] || fail "parity_owner_requires_confirmed_stop"
 
