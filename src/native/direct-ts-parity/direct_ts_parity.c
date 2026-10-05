@@ -762,6 +762,10 @@ static int host_self_test(void) {
     uint8_t au[]={0,0,0,1,0x65,0x88,0x84};
     uint8_t *pkts=NULL;size_t n=0;uint8_t ccv=0;
     struct clock_state c; int rb=0; uint64_t p1,p2;
+    struct au_queue tq;
+    struct ts_au qa,qb;
+    uint8_t one[TS_SIZE];
+    uint64_t da=0,dp=0,pp=0;
     d=source_delta_90k(0,100,0x40000000u,100);if(d!=22500u){fprintf(stderr,"SELFTEST delta quarter=%llu\n",(unsigned long long)d);return 1;}
     d=source_delta_90k(0xc0000000u,100,0x40000000u,101);if(d!=45000u){fprintf(stderr,"SELFTEST borrow=%llu\n",(unsigned long long)d);return 2;}
     if(((uint64_t)MOST_BLOCK_BYTES*8u*90000u)/TRANSPORT_BPS!=705u){fprintf(stderr,"SELFTEST transport\n");return 3;}
@@ -776,6 +780,17 @@ static int host_self_test(void) {
     c.transport_pcr90k=45705; p2=assign_pts(&c,0xc0000000u,100,&rb); if(p2-p1!=22500u)return 10;
     c.transport_pcr90k=90000; p2=assign_pts(&c,0x10000000u,99,&rb); if(!rb && c.source_rebases==0)return 11;
     pthread_mutex_destroy(&c.lock);
+
+    memset(&qa,0,sizeof(qa)); memset(&qb,0,sizeof(qb)); queue_init(&tq);
+    qa.packet_count=4u; qa.packets=(uint8_t*)calloc(qa.packet_count,TS_SIZE);
+    qb.packet_count=3u; qb.packets=(uint8_t*)calloc(qb.packet_count,TS_SIZE);
+    if(!qa.packets || !qb.packets){ free(qa.packets); free(qb.packets); queue_destroy(&tq); return 12; }
+    if(queue_push(&tq,&qa)!=0 || queue_push(&tq,&qb)!=0){ free(qa.packets); free(qb.packets); queue_destroy(&tq); return 13; }
+    if(!queue_take_packet(&tq,one)){ queue_destroy(&tq); return 14; }
+    queue_recover_au_boundary(&tq,&da,&dp,&pp);
+    if(tq.count!=1u || tq.packets_queued!=3u || da!=1u || dp!=3u || pp!=3u){ queue_destroy(&tq); return 15; }
+    queue_destroy(&tq);
+
     fprintf(stdout,"PARITY_SELFTEST=PASS\n");return 0;
 }
 
