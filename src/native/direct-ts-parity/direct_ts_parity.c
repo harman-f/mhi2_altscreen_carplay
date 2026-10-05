@@ -68,7 +68,11 @@
 #define KEYFRAME_MARKER "/tmp/mibr-alt111-keyframe-only"
 #define DRIVER_DCMD_FLUSH 0x40040506
 #define DRIVER_DCMD_START 0x80040509
+#define DRIVER_DCMD_GET_INTERFACE 0x4004050c
+#define DRIVER_DCMD_GET_PACKET_SIZE 0x4004050d
+#define DRIVER_DCMD_GET_BLOCK_COUNT 0x40040510
 #define PARITY_IDR_INTERVAL 20u
+#define REFERENCE_PRODUCER_PAYLOAD_LIMIT 0x40000u
 
 struct ts_au {
     uint8_t *packets;
@@ -127,6 +131,14 @@ struct bridge_stats {
     uint32_t last_sec;
     uint64_t last_pts;
     int waiting_idr;
+    int driver_interface_rc;
+    uint32_t driver_interface_value;
+    int driver_packet_size_rc;
+    uint32_t driver_packet_size_value;
+    int driver_block_count_rc;
+    uint32_t driver_block_count_value;
+    int driver_flush_rc;
+    int driver_start_rc;
 };
 
 struct writer_ctx {
@@ -529,6 +541,13 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"transport_bps=%u\n",TRANSPORT_BPS);
     fprintf(f,"pat_pid=0x%04x\npmt_pid=0x%04x\npcr_pid=0x%04x\nvideo_pid=0x%04x\n",PID_PAT,PID_PMT,PID_PCR,PID_VIDEO);
     fprintf(f,"most_block_bytes=%u\n",MOST_BLOCK_BYTES);
+    fprintf(f,"device_open_mode=write_only_nonblock\n");
+    fprintf(f,"reference_producer_payload_limit=%u\n",REFERENCE_PRODUCER_PAYLOAD_LIMIT);
+    fprintf(f,"bridge_safety_payload_limit=%u\n",M1AU_MAX_PAYLOAD);
+    fprintf(f,"driver_interface_rc=%d\ndriver_interface_value=%u\n",snap.driver_interface_rc,snap.driver_interface_value);
+    fprintf(f,"driver_packet_size_rc=%d\ndriver_packet_size_value=%u\n",snap.driver_packet_size_rc,snap.driver_packet_size_value);
+    fprintf(f,"driver_block_count_rc=%d\ndriver_block_count_value=%u\n",snap.driver_block_count_rc,snap.driver_block_count_value);
+    fprintf(f,"driver_flush_rc=%d\ndriver_start_rc=%d\n",snap.driver_flush_rc,snap.driver_start_rc);
     fprintf(f,"transport_pcr90k=%llu\n",(unsigned long long)pcr);
     fprintf(f,"pts_rebases=%llu\nsource_rebases=%llu\n",(unsigned long long)rebase,(unsigned long long)source_rebase);
     fprintf(f,"input_records=%llu\ninput_bytes=%llu\ninput_idrs=%llu\nsequence_gaps=%llu\n",
@@ -622,14 +641,37 @@ static void request_keyframe(void) {
     int fd=open(KEYFRAME_MARKER,O_WRONLY|O_CREAT|O_TRUNC,0644);if(fd>=0)close(fd);
 }
 
-static int driver_init(int fd, int regular_file) {
+static int driver_init(int fd, int regular_file, struct bridge_stats *s) {
 #ifdef __QNXNTO__
-    uint32_t packets=MOST_BLOCK_PACKETS;
+    uint32_t value=0, packets=MOST_BLOCK_PACKETS;
+    int irc, prc, brc, frc, src;
     if(regular_file)return 0;
-    (void)devctl(fd,DRIVER_DCMD_FLUSH,NULL,0,NULL);
-    if(devctl(fd,DRIVER_DCMD_START,&packets,sizeof(packets),NULL)!=0)return -1;
+
+    value=0;
+    irc=devctl(fd,DRIVER_DCMD_GET_INTERFACE,&value,sizeof(value),NULL);
+    pthread_mutex_lock(&s->lock); s->driver_interface_rc=irc; s->driver_interface_value=value; pthread_mutex_unlock(&s->lock);
+    fprintf(stderr,"PARITY_DRIVER interface status=%d value=%u\n",irc,value);
+
+    value=0;
+    prc=devctl(fd,DRIVER_DCMD_GET_PACKET_SIZE,&value,sizeof(value),NULL);
+    pthread_mutex_lock(&s->lock); s->driver_packet_size_rc=prc; s->driver_packet_size_value=value; pthread_mutex_unlock(&s->lock);
+    fprintf(stderr,"PARITY_DRIVER packet_size status=%d value=%u\n",prc,value);
+
+    value=0;
+    brc=devctl(fd,DRIVER_DCMD_GET_BLOCK_COUNT,&value,sizeof(value),NULL);
+    pthread_mutex_lock(&s->lock); s->driver_block_count_rc=brc; s->driver_block_count_value=value; pthread_mutex_unlock(&s->lock);
+    fprintf(stderr,"PARITY_DRIVER block_count status=%d value=%u\n",brc,value);
+
+    frc=devctl(fd,DRIVER_DCMD_FLUSH,NULL,0,NULL);
+    pthread_mutex_lock(&s->lock); s->driver_flush_rc=frc; pthread_mutex_unlock(&s->lock);
+    fprintf(stderr,"PARITY_DRIVER queue_flush status=%d\n",frc);
+
+    src=devctl(fd,DRIVER_DCMD_START,&packets,sizeof(packets),NULL);
+    pthread_mutex_lock(&s->lock); s->driver_start_rc=src; pthread_mutex_unlock(&s->lock);
+    fprintf(stderr,"PARITY_DRIVER start status=%d packets=%u\n",src,packets);
+    if(src!=0)return -1;
 #else
-    (void)fd; (void)regular_file;
+    (void)fd; (void)regular_file; (void)s;
 #endif
     return 0;
 }
@@ -663,7 +705,6 @@ int main(int argc,char **argv) {
     struct au_queue queue;struct clock_state clock;struct bridge_stats stats;struct writer_ctx wctx;
     uint8_t *param_cache=NULL;size_t param_cache_n=0;uint64_t prev_seq=0;
     uint64_t prev_stream=0,prev_codec=0,prev_consumer=0;
-    uint64_t parity_frame_count=0;
     int waiting_idr=1;int discontinuity=1;
     uint8_t cc_video=0;
 
@@ -674,11 +715,11 @@ int main(int argc,char **argv) {
     memset(&clock,0,sizeof(clock));pthread_mutex_init(&clock.lock,NULL);clock.transport_pcr90k=TRANSPORT_PCR_BASE;
     memset(&stats,0,sizeof(stats));pthread_mutex_init(&stats.lock,NULL);stats.waiting_idr=1;
     queue_init(&queue);
-    if (!strncmp(output, "/dev/", 5)) out_fd=open(output,O_WRONLY);
+    if (!strncmp(output, "/dev/", 5)) out_fd=open(output,O_WRONLY|O_NONBLOCK);
     else out_fd=open(output,O_WRONLY|O_CREAT|O_TRUNC,0644);
     if(out_fd<0){perror("open output");goto done;}
     if(fstat(out_fd,&st)==0 && S_ISREG(st.st_mode))regular_file=1;
-    if(driver_init(out_fd,regular_file)!=0){fprintf(stderr,"ERROR driver start failed errno=%d\n",errno);goto done;}
+    if(driver_init(out_fd,regular_file,&stats)!=0){fprintf(stderr,"ERROR driver start failed errno=%d\n",errno);goto done;}
     in_fd=connect_input(input);if(in_fd<0){fprintf(stderr,"ERROR cannot connect input %s\n",input);goto done;}
     memset(&wctx,0,sizeof(wctx));wctx.fd=out_fd;wctx.regular_file=regular_file;wctx.queue=&queue;wctx.clock=&clock;wctx.stats=&stats;
     if(pthread_create(&writer,NULL,writer_main,&wctx)!=0){fprintf(stderr,"ERROR writer thread\n");goto done;}writer_started=1;
@@ -704,8 +745,9 @@ int main(int argc,char **argv) {
         prev_stream=stream; prev_codec=codec; prev_consumer=consumer;
         if(prev_seq && seq!=prev_seq+1u){pthread_mutex_lock(&stats.lock);++stats.sequence_gaps;stats.waiting_idr=1;pthread_mutex_unlock(&stats.lock);waiting_idr=1;discontinuity=1;request_keyframe();}
         prev_seq=seq;
-        ++parity_frame_count;
-        if ((parity_frame_count % PARITY_IDR_INTERVAL) == 0u) request_keyframe();
+        /* Omonob's producer cadence is keyed to the source frame ordinal,
+         * not to how many records this bridge happened to receive. */
+        if (seq && (seq % PARITY_IDR_INTERVAL) == 0u) request_keyframe();
         if(waiting_idr&&!idr){pthread_mutex_lock(&stats.lock);++stats.dropped_wait_idr;pthread_mutex_unlock(&stats.lock);free(payload);publish_status(&stats,&clock,&queue,"waiting_idr");continue;}
         if(idr&&waiting_idr){waiting_idr=0;pthread_mutex_lock(&stats.lock);stats.waiting_idr=0;pthread_mutex_unlock(&stats.lock);}
         if(normalize_au(payload,payload_n,idr,&param_cache,&param_cache_n,&norm,&norm_n)!=0){free(payload);break;}free(payload);
