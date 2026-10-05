@@ -101,6 +101,7 @@ static uint64_t read_request(unsigned *exists)
 {
     char data[32];ssize_t n;uint64_t value=0;unsigned i;int fd;struct stat before,after;
     *exists=lstat(request_path(),&before)==0;
+    if(!*exists && errno!=ENOENT){*exists=1u;return 0;}
     if(!*exists)return 0;
     if(!S_ISREG(before.st_mode)||before.st_size<2||before.st_size>21)return 0;
     fd=next_open(request_path(),O_RDONLY|O_NONBLOCK);if(fd<0)return 0;
@@ -260,7 +261,10 @@ static void native_gate_init(void)
 {
     pthread_t worker;unsigned exists;
     resolve_real();
-    if(!next_open||!next_close||!next_write)return;
+    if(!next_open||!next_close||!next_write||!next_writev||!next_dup||!next_dup2)return;
+#ifdef __QNXNTO__
+    if(!next_devctl)return;
+#endif
     request_token=read_request(&exists);suppression=exists;
     if(!pthread_create(&worker,NULL,gate_worker,NULL))pthread_detach(worker);
 }

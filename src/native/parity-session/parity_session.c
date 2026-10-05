@@ -1,8 +1,8 @@
 /*
  * Bounded MU1440 parity-session owner.
  *
- * Owns only the DMDT release/restore lifecycle around direct-ts-parity.
- * An independent watchdog process restores stock routing if the parent dies.
+ * Snapshots the selected backend and owns a bounded start/stop/restore.
+ * DMDT remains a routing-only probe until independent target ownership proof.
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -20,6 +20,8 @@
 #include <time.h>
 #include <unistd.h>
 #include "bound_process.h"
+#include "alt111_native_gate.h"
+#include "alt111_settings.h"
 
 #define DMDT "/eso/bin/apps/dmdt"
 #define IPL_CONFIG "/etc/eso/production"
@@ -35,6 +37,12 @@
 #define OLD_AUTO_PID "/tmp/mibr-direct-auto-supervisor.pid"
 #define OLD_AUTO_TEMP "/tmp/mibr-carplay-autodirect"
 #define OLD_AUTO_PERSIST "/mnt/app/root/mibr-carplay-autodirect"
+#define SETTINGS_TEMP_ROOT "/tmp"
+#define SETTINGS_PERSIST_ROOT "/mnt/app/root"
+#define GATE_STATUS_PATH "/tmp/mibr-alt111-native-gate.status"
+#define BACKEND_STATE_PATH "/tmp/mibr-parity-session.backend"
+#define OWNER_TICKET_PATH "/tmp/mibr-parity-session.ticket"
+#define STOP_REQUEST_PATH "/tmp/mibr-parity-session.stop"
 #define DMDT_TIMEOUT_MS 5000u
 #define DMDT_TERM_GRACE_MS 500u
 #define WATCHDOG_MARGIN_SECONDS 20u
@@ -42,6 +50,26 @@
 static volatile sig_atomic_t g_stop;
 static int session_lock_fd=-1;
 static int bridge_handle=-1;
+static unsigned gate_backend,bridge_created;
+static uint64_t gate_token,native_process,gate_dropped_before,gate_request_ms;
+static uint64_t owner_token;
+static uint64_t monotonic_ms(void);
+static int route_restore(void);
+
+static int gate_snapshot(struct alt111_native_gate_status *out)
+{
+    char data[ALT111_NATIVE_GATE_CAP];struct stat before,after;ssize_t n;int fd;
+    uint64_t now=monotonic_ms();
+    if(lstat(GATE_STATUS_PATH,&before)||!S_ISREG(before.st_mode)||
+       before.st_size<=0||before.st_size>=(off_t)sizeof(data))return -1;
+    fd=open(GATE_STATUS_PATH,O_RDONLY|O_NONBLOCK);if(fd<0)return -1;
+    if(fstat(fd,&after)||!S_ISREG(after.st_mode)||before.st_dev!=after.st_dev||
+       before.st_ino!=after.st_ino){close(fd);return -1;}
+    n=read(fd,data,sizeof(data));close(fd);
+    if(n<=0||alt111_native_gate_parse(data,(size_t)n,out)||
+       !out->heartbeat||out->heartbeat>now||now-out->heartbeat>250u)return -1;
+    return 0;
+}
 
 static uint64_t monotonic_ms(void) {
     struct timespec ts;
@@ -99,6 +127,39 @@ static int read_trimmed(const char *path, char *out, size_t cap) {
     return n > 0 ? 0 : -1;
 }
 
+static uint64_t read_ticket(const char *path) {
+    char data[24],*end;struct stat st;ssize_t n;uint64_t value;int fd;
+    if(lstat(path,&st)||!S_ISREG(st.st_mode)||st.st_size<2||st.st_size>21)return 0;
+    fd=open(path,O_RDONLY|O_NONBLOCK);if(fd<0)return 0;
+    if(fstat(fd,&st)||!S_ISREG(st.st_mode)){close(fd);return 0;}
+    n=read(fd,data,sizeof(data));close(fd);
+    if(n<2||n>21||data[n-1]!='\n'||data[0]<'1'||data[0]>'9'||memchr(data,0,(size_t)n))return 0;
+    data[n-1]=0;errno=0;value=strtoull(data,&end,10);
+    return errno || *end ? 0 : value;
+}
+
+static int request_stop(void) {
+    uint64_t ticket,until;char text[48];
+    if(access(LOCK_PATH,F_OK)!=0) {
+        if(access(BRIDGE_PID_PATH,F_OK)==0 || access(OLD_DIRECT_MARKER,F_OK)==0)return 19;
+        puts("owner_result=NO_ACTIVE_OWNER");return 0;
+    }
+    ticket=read_ticket(OWNER_TICKET_PATH);if(!ticket)return 19;
+    snprintf(text,sizeof(text),"%llu\n",(unsigned long long)ticket);
+    if(write_text(STOP_REQUEST_PATH,text))return 19;
+    until=monotonic_ms()+15000u;
+    do {
+        if(access(LOCK_PATH,F_OK)!=0 && access(BRIDGE_PID_PATH,F_OK)!=0 &&
+           access(OLD_DIRECT_MARKER,F_OK)!=0) {
+            puts("owner_result=STOPPED_AND_HAND_BACK_CONFIRMED");return 0;
+        }
+        if(read_ticket(OWNER_TICKET_PATH)!=ticket)return 19;
+        usleep(100000);
+    } while(monotonic_ms()<until);
+    fprintf(stderr,"ERROR stop remains unconfirmed/quarantined; no PID-file signal issued\n");
+    return 19;
+}
+
 static int pid_alive_from_file(const char *path) {
     char b[48], *end = NULL;
     long pid;
@@ -109,14 +170,64 @@ static int pid_alive_from_file(const char *path) {
     return kill((pid_t)pid, 0) == 0 || errno == EPERM;
 }
 
-static int old_autodirect_enabled(void) {
-    char b[16];
-    if (read_trimmed(OLD_AUTO_TEMP, b, sizeof(b)) == 0)
-        return strcmp(b, "0") != 0;
-    if (read_trimmed(OLD_AUTO_PERSIST, b, sizeof(b)) == 0)
-        return strcmp(b, "0") != 0;
-    /* Legacy Auto-Direct defaults enabled when no explicit override exists. */
-    return 1;
+static int settings_backend(void) {
+    struct alt111_settings_paths paths={SETTINGS_TEMP_ROOT,SETTINGS_PERSIST_ROOT};
+    struct alt111_settings *settings=malloc(sizeof(*settings));char error[192];
+    int rc=-1;
+    if(!settings)return -1;
+    if(alt111_settings_load(&paths,settings,error,sizeof(error))) {
+        fprintf(stderr,"ERROR settings preflight: %s\n",error);goto done;
+    }
+    if(alt111_setting_integer(settings,ALTSET_LEGACY_AUTODIRECT)) {
+        fprintf(stderr,"ERROR legacy Auto-Direct must be disabled\n");goto done;
+    }
+    gate_backend=!strcmp(settings->value[ALTSET_OWNERSHIP_BACKEND],"writev_gate");
+    printf("ownership_backend=%s\nsettings_revision=%llu\n",
+        settings->value[ALTSET_OWNERSHIP_BACKEND],(unsigned long long)settings->revision);
+    rc=0;
+done:
+    free(settings);return rc;
+}
+
+static int gate_take(void) {
+    struct alt111_native_gate_status status;char text[48];uint64_t until;
+    if(access(OLD_DIRECT_MARKER,F_OK)==0 || gate_snapshot(&status) ||
+       status.state!=0u || !status.tracked)return -1;
+    native_process=status.process;gate_dropped_before=status.dropped;
+    gate_request_ms=monotonic_ms();
+    gate_token=((gate_request_ms<<20)^((uint64_t)getpid()<<3))|1u;
+    snprintf(text,sizeof(text),"%llu\n",(unsigned long long)gate_token);
+    if(write_text(OLD_DIRECT_MARKER,text))return -1;
+    until=gate_request_ms+5000u;
+    do {
+        if(!gate_snapshot(&status) && status.token==gate_token &&
+           status.process==native_process && status.heartbeat>=gate_request_ms &&
+           status.state==2u && status.tracked && !status.inflight &&
+           status.dropped>gate_dropped_before)return 0;
+        if(g_stop)break;
+        usleep(10000);
+    } while(monotonic_ms()<until);
+    return -1;
+}
+
+static int gate_owned(void) {
+    struct alt111_native_gate_status status;
+    return !gate_snapshot(&status) && status.token==gate_token &&
+        status.process==native_process && status.state==2u && status.tracked &&
+        !status.inflight && status.dropped>=gate_dropped_before;
+}
+
+static int backend_restore(void) {
+    uint64_t until;struct alt111_native_gate_status status;
+    if(!gate_backend)return route_restore();
+    if(unlink(OLD_DIRECT_MARKER) && errno!=ENOENT)return -1;
+    until=monotonic_ms()+2000u;
+    do {
+        if(!gate_snapshot(&status) && status.state==0u && !status.token &&
+           (!native_process || status.process==native_process))return 0;
+        usleep(10000);
+    } while(monotonic_ms()<until);
+    return -1;
 }
 
 static int wait_child_bounded(pid_t p, unsigned timeout_ms, int *status) {
@@ -202,6 +313,7 @@ static int route_restore(void) {
 
 static int stop_bound_bridge(void) {
     unsigned i;
+    if(!bridge_created)return 0;
     if(bound_process_dead(bridge_handle))return 0;
     if(bridge_handle<0)return -1;
     (void)bound_process_signal(bridge_handle,SIGTERM);
@@ -224,8 +336,7 @@ static int emergency_restore(void) {
         return -1; /* Keep markers/lock; never restore over an unknown writer. */
     }
     unlink(AU_MARKER);
-    unlink(OLD_DIRECT_MARKER);
-    restored=route_restore()==0;
+    restored=backend_restore()==0;
     (void)write_text(STATE_PATH,restored ? "emergency_restored\n" : "emergency_restore_failed\n");
     unlink(BRIDGE_PID_PATH);
     if(!pid_alive_from_file(PID_PATH))unlink(PID_PATH);
@@ -280,6 +391,31 @@ static int source_ready(void) {
     if (read_trimmed(SOURCE_STATE, b, sizeof(b)) != 0 || strcmp(b, "streaming"))
         return 0;
     return access(SOURCE_HB, R_OK) == 0;
+}
+
+static int bridge_identity(const char *path) {
+#ifdef ALT111_SESSION_TEST
+    /* Lifecycle fixtures exercise fork/exec/signals without shipping an OEM
+     * or native bridge. This bypass is never compiled into target builds. */
+    (void)path;return 0;
+#elif defined(MIBR_EXPECTED_BRIDGE_SHA256)
+    struct stat st;char hash[65];uint8_t *bytes;size_t used=0;int fd,rc=-1;
+    fd=open(path,O_RDONLY|O_NONBLOCK);if(fd<0)return -1;
+    if(fstat(fd,&st)||!S_ISREG(st.st_mode)||st.st_size<=0||st.st_size>4*1024*1024){close(fd);return -1;}
+    bytes=malloc((size_t)st.st_size);if(!bytes){close(fd);return -1;}
+    while(used<(size_t)st.st_size) {
+        ssize_t n=read(fd,bytes+used,(size_t)st.st_size-used);
+        if(n<0&&errno==EINTR)continue;
+        if(n<=0)goto done;
+        used+=(size_t)n;
+    }
+    mibr_sha256_bytes(bytes,used,hash);
+    rc=strcmp(hash,MIBR_EXPECTED_BRIDGE_SHA256) ? -1 : 0;
+done:
+    free(bytes);close(fd);return rc;
+#else
+    (void)path;return -1; /* A build without an exact bridge identity cannot run. */
+#endif
 }
 
 static int bridge_spawn(const char *bridge, const char *input, const char *output,
@@ -397,9 +533,12 @@ int main(int argc, char **argv) {
 
     if (argc == 2 && !strcmp(argv[1], "--self-test")) return self_test();
     if (argc == 2 && !strcmp(argv[1], "--identity-self-test")) return identity_self_test();
+    if (argc == 2 && !strcmp(argv[1], "--stop")) return request_stop();
     if (argc == 2 && !strcmp(argv[1], "--restore-stock")) {
         int rr;
         struct flock lk;
+        if(access(LOCK_PATH,F_OK)!=0 && access(BRIDGE_PID_PATH,F_OK)!=0 &&
+           access(OLD_DIRECT_MARKER,F_OK)!=0) {puts("owner_result=NO_ACTIVE_OWNER");return 0;}
         if(pid_alive_from_file(PID_PATH) || pid_alive_from_file(WATCHDOG_PID_PATH)) {
             fprintf(stderr,"ERROR active parity owner; stop it before restoring\n"); return 18;
         }
@@ -411,10 +550,15 @@ int main(int argc, char **argv) {
             fprintf(stderr,"ERROR unconfirmed writer identity; reboot/reconcile required\n");
             close(session_lock_fd);return 19;
         }
-        (void)write_text(STATE_PATH, "manual_restoring_dmdt\n");
-        rr=route_restore();
+        if(read_trimmed(BACKEND_STATE_PATH,b,sizeof(b)) ||
+           (strcmp(b,"writev_gate") && strcmp(b,"dmdt_reference"))) {
+            fprintf(stderr,"ERROR missing/invalid original ownership backend; reconcile required\n");
+            close(session_lock_fd);return 21;
+        }
+        gate_backend=!strcmp(b,"writev_gate");
+        (void)write_text(STATE_PATH, "manual_restoring_backend\n");
+        rr=backend_restore();
         unlink(AU_MARKER);
-        unlink(OLD_DIRECT_MARKER);
         (void)write_text(STATE_PATH, rr==0 ? "manual_stock\n" : "manual_restore_failed\n");
         if(rr==0) { unlink(LOCK_PATH); unlink(BRIDGE_PID_PATH); unlink(PID_PATH); }
         close(session_lock_fd);
@@ -429,14 +573,21 @@ int main(int argc, char **argv) {
     if (errno || end == argv[4] || *end || max_seconds < 5 || max_seconds > 600)
         return 65;
 
-    if (access(DMDT, X_OK) != 0) { fprintf(stderr, "ERROR missing dmdt\n"); return 10; }
+    if(settings_backend())return 13;
+    if (!gate_backend && access(DMDT, X_OK) != 0) { fprintf(stderr, "ERROR missing dmdt\n"); return 10; }
     if (access(bridge, X_OK) != 0) { fprintf(stderr, "ERROR missing bridge\n"); return 11; }
+    if(bridge_identity(bridge)) {
+        fprintf(stderr,"ERROR bridge does not match this owner build; no ownership mutation\n");return 11;
+    }
     if (!source_ready()) { fprintf(stderr, "ERROR stream111 not ready\n"); return 12; }
-    if (old_autodirect_enabled() || pid_alive_from_file(OLD_AUTO_PID) ||
+    if (pid_alive_from_file(OLD_AUTO_PID) ||
         pid_alive_from_file("/tmp/mibr-direct-auto-watchdog.pid") ||
         pid_alive_from_file("/tmp/mibr-direct-auto-bridge.pid")) {
         fprintf(stderr, "ERROR legacy Auto-Direct must be disabled/stopped\n");
         return 13;
+    }
+    if(access(OLD_DIRECT_MARKER,F_OK)==0) {
+        fprintf(stderr,"ERROR existing native gate request; reconcile its owner first\n");return 18;
     }
     if(identity_self_test()){
         fprintf(stderr,"ERROR bound process-handle target qualification failed\n");return 19;
@@ -444,25 +595,30 @@ int main(int argc, char **argv) {
 
     if(acquire_lock()!=0) { fprintf(stderr,"ERROR parity owner lock exists; reconcile stock first\n"); return 18; }
     lock_owned=1;
+    owner_token=((monotonic_ms()<<20)^((uint64_t)getpid()<<3))|1u;
 
     signal(SIGINT, on_signal); signal(SIGTERM, on_signal); signal(SIGHUP, on_signal); signal(SIGPIPE,SIG_IGN);
     snprintf(b, sizeof(b), "%ld\n", (long)getpid());
     if (write_text(PID_PATH, b) != 0) {unlink(LOCK_PATH);return 14;}
+    snprintf(b,sizeof(b),"%llu\n",(unsigned long long)owner_token);
+    if(write_text(OWNER_TICKET_PATH,b))goto done;
+    if(write_text(BACKEND_STATE_PATH,gate_backend ? "writev_gate\n" : "dmdt_reference\n"))goto done;
     (void)write_text(STATE_PATH, "preflight\n");
-    unlink(OLD_DIRECT_MARKER);
 
     if (pipe(pipefd) != 0) goto done;
     if(fcntl(pipefd[0],F_SETFD,FD_CLOEXEC)!=0 || fcntl(pipefd[1],F_SETFD,FD_CLOEXEC)!=0)goto done;
-    if(bridge_spawn(bridge,input,output,&bridge_pid,&exec_gate)){
-        if(bridge_pid>1)bridge_stopped=0;
-        goto done;
+    if(gate_backend) {
+        if(bridge_spawn(bridge,input,output,&bridge_pid,&exec_gate)){
+            if(bridge_pid>1)bridge_stopped=0;
+            goto done;
+        }
+        bridge_stopped=0;bridge_created=1u;
     }
-    bridge_stopped=0;
     watchdog = fork();
     if (watchdog < 0) goto done;
     if (watchdog == 0) {
         close(pipefd[1]);
-        close(exec_gate);
+        if(exec_gate>=0)close(exec_gate);
         watchdog_main(pipefd[0], (unsigned)max_seconds + WATCHDOG_MARGIN_SECONDS);
     }
     close(pipefd[0]); pipefd[0] = -1;
@@ -477,20 +633,31 @@ int main(int argc, char **argv) {
         if(read_trimmed(WATCHDOG_PID_PATH,actual,sizeof(actual))!=0 || strcmp(actual,expected))goto done;
     }
 
-    if (touch_file(AU_MARKER) != 0) {
+    if (gate_backend && touch_file(AU_MARKER) != 0) {
         fprintf(stderr, "ERROR cannot arm M1AU marker\n");
         goto done;
     }
 
-    (void)write_text(STATE_PATH, "releasing_dmdt\n");
     if(g_stop)goto done;
-    if (route_release() != 0) {
-        fprintf(stderr, "ERROR DMDT release failed\n");
-        goto done;
+    if(!gate_backend) {
+        struct alt111_native_gate_status before,after;
+        int observed=!gate_snapshot(&before) && before.state==0u && before.tracked;
+        (void)write_text(STATE_PATH,"probing_dmdt_no_custom_payload\n");
+        if(route_release()) { fprintf(stderr,"ERROR DMDT release failed\n");goto done; }
+        route_owned=1;
+        usleep(500000);
+        observed=observed && !gate_snapshot(&after) && after.process==before.process &&
+            after.state==0u && !after.inflight;
+        printf("ownership_result=OWNERSHIP_UNPROVEN\nnative_probe_snapshot=%s\ncustom_payload=NEVER_STARTED\n",
+            observed ? "QUIET_SNAPSHOT_NOT_EXCLUSIVITY_PROOF" : "ACTIVE_OR_UNKNOWN");
+        rc=21;goto done;
     }
-    route_owned = 1;
-
-    usleep(500000);
+    (void)write_text(STATE_PATH,"waiting_native_gate_drain\n");
+    if(gate_take()) {
+        fprintf(stderr,"ERROR native gate ownership unproven; custom payload not started\n");
+        rc=21;goto done;
+    }
+    route_owned=1;
     if(g_stop)goto done;
 
     (void)write_text(STATE_PATH, "starting_bridge\n");
@@ -507,6 +674,8 @@ int main(int argc, char **argv) {
     rc = 0;
     deadline=monotonic_ms()+(uint64_t)max_seconds*1000u;
     while (!g_stop && monotonic_ms() < deadline) {
+        if(read_ticket(STOP_REQUEST_PATH)==owner_token){g_stop=1;break;}
+        if(!gate_owned()) {fprintf(stderr,"ERROR native gate proof lost; stopping custom writer\n");rc=23;break;}
         pid_t ww=waitpid(watchdog,&st,WNOHANG);
         if(ww==watchdog || (ww<0&&errno!=EINTR)) {watchdog_reaped=1;rc=17;break;}
         pid_t w = waitpid(bridge_pid, &st, WNOHANG);
@@ -532,16 +701,16 @@ done:
         (void)write_text(STATE_PATH,"blocked_stop_unconfirmed\n");
         rc=19;
     }else if (route_owned) {
-        (void)write_text(STATE_PATH, "restoring_dmdt\n");
-        restore_ok = route_restore() == 0;
+        (void)write_text(STATE_PATH, "restoring_backend\n");
+        restore_ok = backend_restore() == 0;
     } else {
         /* A partial release can still leave routing inconsistent. */
-        restore_ok = route_restore() == 0;
+        restore_ok = backend_restore() == 0;
     }
-    if(bridge_stopped){unlink(AU_MARKER);unlink(OLD_DIRECT_MARKER);}
+    if(bridge_stopped)unlink(AU_MARKER);
 
     if (restore_ok) {
-        (void)write_text(STATE_PATH, rc == 0 ? "complete_stock\n" : "failed_stock\n");
+        (void)write_text(STATE_PATH, rc == 0 ? "complete_stock\n" : rc==21 ? "ownership_unproven_stock\n" : "failed_stock\n");
         if (pipefd[1] >= 0) {
             char token = 'R';
             if (write(pipefd[1], &token, 1) != 1) {

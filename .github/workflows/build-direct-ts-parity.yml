@@ -11,6 +11,7 @@ on:
       - 'runtime/diagnostics/gen2_compat_profile.sh'
       - 'tools/build_direct_ts_parity.sh'
       - 'tools/build_parity_session.sh'
+      - 'tools/build_native_isotx2_guard.sh'
       - 'tests/direct_ts_parity*'
       - 'tests/parity_session_lifecycle.py'
       - 'tests/parity_overlay_rollback.py'
@@ -32,6 +33,7 @@ on:
       - 'runtime/diagnostics/gen2_compat_profile.sh'
       - 'tools/build_direct_ts_parity.sh'
       - 'tools/build_parity_session.sh'
+      - 'tools/build_native_isotx2_guard.sh'
       - 'tests/direct_ts_parity*'
       - 'tests/parity_session_lifecycle.py'
       - 'tests/parity_overlay_rollback.py'
@@ -114,7 +116,11 @@ jobs:
           python3 tests/parity_session_lifecycle.py
           python3 tests/parity_overlay_rollback.py
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
-            src/native/parity-session/parity_session.c \
+            -DMIBR_SHA256_LIBRARY_ONLY \
+            -Isrc/native/altscreen111-gen2/include -Isrc/native/alt111-settings/include \
+            src/native/parity-session/parity_session.c src/native/alt111-settings/settings_{core,posix}.c \
+            src/native/altscreen111-gen2/src/alt111_policy.c \
+            src/native/sha256sum-compat/sha256sum_compat.c \
             -o /tmp/parity-session-host
           /tmp/parity-session-host --self-test | tee /tmp/parity-session-selftest.txt
           /tmp/parity-session-host --identity-self-test
@@ -184,6 +190,9 @@ jobs:
           docker run --rm --platform=linux/amd64 \
             -v "$PWD:/src" -w /src "$IMAGE" \
             bash -c 'bash ./tools/build_alt111_settings.sh build/ci-direct-ts-parity/alt111-settings'
+          docker run --rm --platform=linux/amd64 \
+            -v "$PWD:/src" -w /src "$IMAGE" \
+            bash -c 'bash ./tools/build_native_isotx2_guard.sh build/ci-direct-ts-parity/libmibr_isotx2_guard.so'
           sudo chown -R "$(id -u):$(id -g)" "$OUTDIR"
 
       - name: Binary and contract audit
