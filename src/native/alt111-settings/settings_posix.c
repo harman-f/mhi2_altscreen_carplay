@@ -109,12 +109,14 @@ static int journal_path(const struct alt111_settings_paths *p, char out[512])
 }
 
 static int read_layer(const struct alt111_settings_paths *p, unsigned group,
-                       char blob[2049], size_t *size, unsigned *layer)
+                       char blob[2049], size_t *size, unsigned *layer,unsigned skip_temp)
 {
     char path[512]; int rc;
-    if (path_for(path, sizeof(path), p->temp, group_name(group))) return -1;
-    rc = read_file(path, blob, 2049, size);
-    if (rc != 1) { *layer = ALT111_TEMP; return rc; }
+    if(!skip_temp){
+        if (path_for(path, sizeof(path), p->temp, group_name(group))) return -1;
+        rc = read_file(path, blob, 2049, size);
+        if (rc != 1) { *layer = ALT111_TEMP; return rc; }
+    }
     if (path_for(path, sizeof(path), p->persistent, group_name(group))) return -1;
     rc = read_file(path, blob, 2049, size);
     *layer = rc == 1 ? ALT111_PROFILE : ALT111_PERSISTENT;
@@ -134,8 +136,8 @@ static uint64_t revision_of(const struct alt111_settings *s)
     return v ? v : 1;
 }
 
-static int load_locked(const struct alt111_settings_paths *p,
-                        struct alt111_settings *out, char *error, size_t cap)
+static int load_selected_locked(const struct alt111_settings_paths *p,
+                        struct alt111_settings *out, char *error, size_t cap,unsigned skip_temp)
 {
     char blob[2049], journal[512], preset[192];
     size_t size = 0;
@@ -145,14 +147,14 @@ static int load_locked(const struct alt111_settings_paths *p,
     if (access(journal, F_OK) == 0) return fail(error, cap, "BUSY interrupted_transaction_reconcile_required");
     if (!alt111_settings_defaults(out, "mibr_legacy")) {
         group = alt111_setting(ALTSET_PRESET_ID)->group;
-        rc = read_layer(p, group, blob, &size, &layer);
+        rc = read_layer(p, group, blob, &size, &layer,skip_temp);
         if (rc < 0 || (rc == 0 && alt111_settings_parse_group(out, group, blob, size, layer, 0, error, cap)))
             return fail(error, cap, "INVALID_VALUE basename=%s layer=%u", group_name(group), layer);
         strcpy(preset, out->value[ALTSET_PRESET_ID]);
         if (alt111_settings_defaults(out, preset)) return fail(error, cap, "INVALID_VALUE preset");
     } else return fail(error, cap, "APPLY_FAILED defaults");
     for (group = 0; group < ALTSET_GROUP_COUNT; ++group) {
-        rc = read_layer(p, group, blob, &size, &layer);
+        rc = read_layer(p, group, blob, &size, &layer,skip_temp);
         if (rc < 0) return fail(error, cap, "INVALID_VALUE basename=%s layer=%u file_read_or_type", group_name(group), layer);
         if (rc == 1) continue;
         /* Exact old Free790 D2 file disabled the unrelated timer. Its known
@@ -169,6 +171,12 @@ static int load_locked(const struct alt111_settings_paths *p,
     if (alt111_settings_validate(out, error, cap)) return -1;
     out->revision = revision_of(out);
     return 0;
+}
+
+static int load_locked(const struct alt111_settings_paths *p,
+                        struct alt111_settings *out,char *error,size_t cap)
+{
+    return load_selected_locked(p,out,error,cap,0u);
 }
 
 int alt111_settings_load(const struct alt111_settings_paths *p,
@@ -376,6 +384,26 @@ int alt111_settings_reconcile(const struct alt111_settings_paths *p,
     }
     if (hash_mask != (mask & ~absent)) { close(fd); return fail(error, cap, "ROLLBACK_FAILED incomplete_journal_hashes"); }
     rc = restore_locked(p, mask, absent, hashes, error, cap); close(fd); return rc;
+}
+
+int alt111_settings_clear_temp(const struct alt111_settings_paths *p,
+                               uint64_t expected,struct alt111_settings *out,
+                               char *error,size_t cap)
+{
+    struct alt111_settings *lower;
+    int fd,rc=-1;
+    unsigned all=(1u<<ALTSET_GROUP_COUNT)-1u;
+    fd=lock_settings(p,1,error,cap);if(fd<0)return -1;
+    lower=malloc(sizeof(*lower));
+    if(!lower){close(fd);return fail(error,cap,"APPLY_FAILED allocation");}
+    if(expected && (load_locked(p,lower,error,cap)||lower->revision!=expected)){
+        fail(error,cap,"STALE_REVISION");goto done;
+    }
+    /* No mutation until the entire newly exposed lower layer is valid. */
+    if(load_selected_locked(p,lower,error,cap,1u))goto done;
+    rc=transaction_locked(p,lower,all,all,out,error,cap);
+done:
+    free(lower);close(fd);return rc;
 }
 
 int alt111_settings_preset(const struct alt111_settings_paths *p,

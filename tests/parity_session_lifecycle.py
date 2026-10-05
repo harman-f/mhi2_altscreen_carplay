@@ -24,6 +24,7 @@ with tempfile.TemporaryDirectory() as td:
         assert count==1,name
     source=source.replace("#define DMDT_TIMEOUT_MS 5000u","#define DMDT_TIMEOUT_MS 500u")
     (root/"session.c").write_text(source)
+    (root/"bound_process.h").write_text(Path("src/native/parity-session/bound_process.h").read_text())
     binary=root/"session"
     subprocess.run(["cc","-std=gnu99","-Wall","-Wextra","-Werror",str(root/"session.c"),"-o",str(binary)],check=True)
     log=root/"commands"
@@ -96,6 +97,21 @@ sys.exit(1 if mode and cmd==mode else 0)
     restored()
     paths["WATCHDOG_PID_PATH"].unlink(missing_ok=True)
 
+    # A planted/reused PID hint never authorizes signalling an unrelated process.
+    unrelated=subprocess.Popen(["sleep","30"])
+    try:
+        log.write_text("")
+        paths["LOCK_PATH"].touch()
+        paths["BRIDGE_PID_PATH"].write_text(str(unrelated.pid)+"\n")
+        cp=subprocess.run([str(binary),"--restore-stock"],capture_output=True,timeout=3)
+        assert cp.returncode==19,cp.stderr
+        assert unrelated.poll() is None and not log.read_text()
+        paths["BRIDGE_PID_PATH"].unlink()
+        cp=subprocess.run([str(binary),"--restore-stock"],capture_output=True,timeout=4)
+        assert cp.returncode==0,cp.stderr
+    finally:
+        unrelated.terminate();unrelated.wait(timeout=3)
+
     # Partial release and restore failures never report success.
     bridge_delay(0.1)
     for failure in ("sc 4 72","dc 70 33","timeout"):
@@ -106,4 +122,4 @@ sys.exit(1 if mode and cmd==mode else 0)
         fail.unlink()
         cp=subprocess.run([str(binary),"--restore-stock"],capture_output=True,timeout=5)
         assert cp.returncode==0,cp.stderr
-print("PARITY_SESSION_LIFECYCLE=PASS normal parallel manual_busy parent_kill watchdog_kill partial_release restore_failure timeout")
+print("PARITY_SESSION_LIFECYCLE=PASS normal parallel manual_busy parent_kill watchdog_kill pid_hint_not_authority partial_release restore_failure timeout")

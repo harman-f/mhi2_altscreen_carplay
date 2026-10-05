@@ -102,6 +102,10 @@ int main(int argc, char **argv)
         if (!preset || alt111_settings_preset(&paths, preset, expected, s, error, sizeof(error)))
             rc = error_result(error[0] ? error : "INVALID_VALUE preset");
         else printf("result=RECONNECT_REQUIRED\nrevision=%" PRIu64 "\npreset=%s\n", s->revision, preset);
+    } else if (!strcmp(argv[1], "clear-temp")) {
+        if(layer!=ALT111_TEMP)rc=error_result("POLICY_BLOCKED persistent_backup_powerloss_gate");
+        else if(alt111_settings_clear_temp(&paths,expected,s,error,sizeof(error)))rc=error_result(error);
+        else printf("result=RECONNECT_REQUIRED\nrevision=%" PRIu64 "\nclear_scope=complete_temp_layer\n",s->revision);
     } else if (!strcmp(argv[1], "clear")) {
         id = alt111_setting_find(key);
         if (id < 0) { rc = error_result("INVALID_VALUE key"); goto done; }

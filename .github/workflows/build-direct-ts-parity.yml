@@ -116,6 +116,7 @@ jobs:
             src/native/parity-session/parity_session.c \
             -o /tmp/parity-session-host
           /tmp/parity-session-host --self-test | tee /tmp/parity-session-selftest.txt
+          /tmp/parity-session-host --identity-self-test
           grep -Fxq 'PARITY_SESSION_SELFTEST=PASS' /tmp/parity-session-selftest.txt
           grep -Fq 'release=/eso/bin/apps/dmdt dc 72 ; /eso/bin/apps/dmdt sc 4 72' /tmp/parity-session-selftest.txt
           grep -Fq 'restore=/eso/bin/apps/dmdt dc 70 33 ; /eso/bin/apps/dmdt sc 4 70' /tmp/parity-session-selftest.txt
@@ -213,7 +214,8 @@ jobs:
           grep -Fq 'frame_pacer=none' "$OUTDIR/STRINGS.txt"
           grep -Fq 'PARITY_START' "$OUTDIR/STRINGS.txt"
           grep -Fq 'PARITY_PTS_REBASE' "$OUTDIR/STRINGS.txt"
-          grep -Fq '/tmp/mibr-alt111-keyframe-only' "$OUTDIR/STRINGS.txt"
+          grep -Fq '/tmp/mibr-alt111-recovery.request' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'M1KF1 ' "$OUTDIR/STRINGS.txt"
           grep -Fq 'PARITY_DRIVER interface' "$OUTDIR/STRINGS.txt"
           grep -Fq 'device_open_mode=write_only_nonblock' "$OUTDIR/STRINGS.txt"
           grep -Fq 'reference_producer_payload_limit=%u' "$OUTDIR/STRINGS.txt"

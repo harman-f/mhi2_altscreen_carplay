@@ -57,6 +57,9 @@ int alt111_settings_mutate(const struct alt111_settings_paths *paths,
 int alt111_settings_clear(const struct alt111_settings_paths *paths,
                           unsigned layer, unsigned id, uint64_t expected_revision,
                           struct alt111_settings *out, char *error, size_t cap);
+int alt111_settings_clear_temp(const struct alt111_settings_paths *paths,
+                               uint64_t expected_revision,
+                               struct alt111_settings *out,char *error,size_t cap);
 int alt111_settings_reconcile(const struct alt111_settings_paths *paths,
                               char *error, size_t cap);
 int alt111_settings_preset(const struct alt111_settings_paths *paths,

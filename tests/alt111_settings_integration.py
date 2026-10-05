@@ -125,4 +125,14 @@ int rename(const char *a, const char *b) {
     assert snapshot() == before and journal.exists()
     backup.write_bytes(original)
     run('reconcile')
+    # Clearing the full temporary layer validates every lower value first.
+    before = snapshot()
+    (persistent / 'mibr-carplay111-fps').write_text('invalid\n')
+    assert 'INVALID_VALUE' in run('clear-temp', success=False).stdout
+    assert snapshot() == before
+    (persistent / 'mibr-carplay111-fps').write_text('25\n')
+    run('clear-temp')
+    assert all(value is None for value in snapshot().values())
+    assert 'maxFPS.value=25' in run('status').stdout
+    assert 'preset.id.value=mibr_legacy' in run('status').stdout
     print('ALT111_SETTINGS_INTEGRATION=PASS crash_points=' + str(len(basenames)))

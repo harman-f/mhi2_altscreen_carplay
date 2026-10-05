@@ -19,6 +19,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include "bound_process.h"
 
 #define DMDT "/eso/bin/apps/dmdt"
 #define IPL_CONFIG "/etc/eso/production"
@@ -40,6 +41,7 @@
 
 static volatile sig_atomic_t g_stop;
 static int session_lock_fd=-1;
+static int bridge_handle=-1;
 
 static uint64_t monotonic_ms(void) {
     struct timespec ts;
@@ -198,21 +200,29 @@ static int route_restore(void) {
     return (a == 0 && b == 0) ? 0 : -1;
 }
 
-static void kill_pid_from_file(const char *path) {
-    char b[48], *end = NULL;
-    long v;
-    if (read_trimmed(path, b, sizeof(b)) != 0) return;
-    errno = 0;
-    v = strtol(b, &end, 10);
-    if (errno || end == b || *end || v <= 1) return;
-    kill((pid_t)v, SIGTERM);
-    usleep(300000);
-    if (kill((pid_t)v, 0) == 0 || errno == EPERM) kill((pid_t)v, SIGKILL);
+static int stop_bound_bridge(void) {
+    unsigned i;
+    if(bound_process_dead(bridge_handle))return 0;
+    if(bridge_handle<0)return -1;
+    (void)bound_process_signal(bridge_handle,SIGTERM);
+    for(i=0;i<20u;++i){
+        if(bound_process_dead(bridge_handle))return 0;
+        usleep(100000);
+    }
+    (void)bound_process_signal(bridge_handle,SIGKILL);
+    for(i=0;i<5u;++i){
+        if(bound_process_dead(bridge_handle))return 0;
+        usleep(100000);
+    }
+    return -1;
 }
 
 static int emergency_restore(void) {
     int restored;
-    kill_pid_from_file(BRIDGE_PID_PATH);
+    if(stop_bound_bridge()){
+        (void)write_text(STATE_PATH,"blocked_stop_unconfirmed\n");
+        return -1; /* Keep markers/lock; never restore over an unknown writer. */
+    }
     unlink(AU_MARKER);
     unlink(OLD_DIRECT_MARKER);
     restored=route_restore()==0;
@@ -273,7 +283,7 @@ static int source_ready(void) {
 }
 
 static int bridge_spawn(const char *bridge, const char *input, const char *output,
-                        pid_t *out_pid) {
+                        pid_t *out_pid,int *exec_gate) {
     int gate[2];
     char token='G', b[48];
     if(pipe(gate)!=0)return -1;
@@ -291,30 +301,75 @@ static int bridge_spawn(const char *bridge, const char *input, const char *outpu
     *out_pid = p;
     close(gate[0]);
     snprintf(b,sizeof(b),"%ld\n",(long)p);
-    if(write_text(BRIDGE_PID_PATH,b)!=0 || write(gate[1],&token,1)!=1) {
+    bridge_handle=bound_process_open(p);
+    if(bridge_handle<0 || write_text(BRIDGE_PID_PATH,b)!=0) {
         close(gate[1]); return -1;
     }
-    close(gate[1]);
+    *exec_gate=gate[1]; /* Parent/watchdog must bind before releasing this. */
     return 0;
 }
 
-static void stop_bridge(pid_t p) {
-    int i, st;
-    if (p <= 1) return;
-    if (waitpid(p, &st, WNOHANG) == p) return;
-    kill(p, SIGTERM);
+static int stop_bridge(pid_t p) {
+    int i, st;pid_t first;
+    if (p <= 1) return -1;
+    first=waitpid(p,&st,WNOHANG);
+    if(first==p)return 0;
+    if(first<0 && errno!=EINTR)return bound_process_dead(bridge_handle) ? 0 : -1;
+    if(bridge_handle>=0)(void)bound_process_signal(bridge_handle,SIGTERM);
+    else (void)kill(p,SIGTERM); /* Still our unreaped direct child. */
     for (i = 0; i < 20; ++i) {
         pid_t w = waitpid(p, &st, WNOHANG);
-        if (w == p) return;
-        if (w < 0 && errno == ECHILD) return;
+        if (w == p) return 0;
+        if (w < 0 && errno == ECHILD) return bound_process_dead(bridge_handle) ? 0 : -1;
         usleep(100000);
     }
-    kill(p, SIGKILL);
+    if(bridge_handle>=0)(void)bound_process_signal(bridge_handle,SIGKILL);
+    else (void)kill(p,SIGKILL);
     for(i=0;i<5;++i) {
         pid_t w=waitpid(p,&st,WNOHANG);
-        if(w==p || (w<0&&errno==ECHILD))return;
+        if(w==p)return 0;
+        if(w<0&&errno==ECHILD)return bound_process_dead(bridge_handle) ? 0 : -1;
         usleep(100000);
     }
+    return -1;
+}
+
+static int identity_self_test(void) {
+    pid_t child,observer;int fd,st=0,observer_status=0,ok,child_rc,observer_rc;
+    int ready[2];char token=0;
+    if(pipe(ready))return 1;
+    child=fork();if(child<0){close(ready[0]);close(ready[1]);return 1;}
+    if(!child){
+        close(ready[0]);signal(SIGTERM,SIG_DFL);
+        token='R';if(write(ready[1],&token,1)!=1)_exit(1);
+        close(ready[1]);for(;;)pause();
+    }
+    close(ready[1]);
+    {
+        fd_set rfds;struct timeval timeout={2,0};
+        FD_ZERO(&rfds);FD_SET(ready[0],&rfds);
+        ok=select(ready[0]+1,&rfds,NULL,NULL,&timeout)>0 && read(ready[0],&token,1)==1 && token=='R';
+    }
+    close(ready[0]);
+    if(!ok){kill(child,SIGKILL);waitpid(child,&st,0);return 1;}
+    fd=bound_process_open(child);
+    if(fd<0){kill(child,SIGKILL);waitpid(child,&st,0);return 1;}
+    observer=fork();
+    if(!observer){
+        unsigned i;
+        if(bound_process_signal(fd,SIGTERM))_exit(1);
+        for(i=0;i<30u;++i){if(bound_process_dead(fd))_exit(0);usleep(100000);}
+        _exit(2);
+    }
+    if(observer<0){kill(child,SIGKILL);waitpid(child,&st,0);close(fd);return 1;}
+    observer_rc=wait_child_bounded(observer,4000u,&observer_status);
+    child_rc=wait_child_bounded(child,3000u,&st);
+    ok=!child_rc && !observer_rc &&
+       WIFSIGNALED(st) && WTERMSIG(st)==SIGTERM &&
+       WIFEXITED(observer_status) && WEXITSTATUS(observer_status)==0;
+    close(fd);
+    if(ok)puts("PARITY_PROCESS_IDENTITY_SELFTEST=PASS inherited_handle_signal_and_exit no_most_io");
+    return ok ? 0 : 1;
 }
 
 static int self_test(void) {
@@ -335,11 +390,13 @@ int main(int argc, char **argv) {
     long max_seconds;
     char *end = NULL, b[64];
     int pipefd[2] = {-1,-1}, st = 0, rc = 1, route_owned = 0, restore_ok = 0;
+    int exec_gate=-1,bridge_stopped=1;
     pid_t watchdog = -1, bridge_pid = -1;
     uint64_t deadline = 0;
     int watchdog_reaped=0, lock_owned=0;
 
     if (argc == 2 && !strcmp(argv[1], "--self-test")) return self_test();
+    if (argc == 2 && !strcmp(argv[1], "--identity-self-test")) return identity_self_test();
     if (argc == 2 && !strcmp(argv[1], "--restore-stock")) {
         int rr;
         struct flock lk;
@@ -350,7 +407,10 @@ int main(int argc, char **argv) {
         if(session_lock_fd<0)session_lock_fd=open(LOCK_PATH,O_RDWR);
         memset(&lk,0,sizeof(lk));lk.l_type=F_WRLCK;lk.l_whence=SEEK_SET;
         if(session_lock_fd<0 || fcntl(session_lock_fd,F_SETLK,&lk)!=0)return 18;
-        kill_pid_from_file(BRIDGE_PID_PATH);
+        if(access(BRIDGE_PID_PATH,F_OK)==0){
+            fprintf(stderr,"ERROR unconfirmed writer identity; reboot/reconcile required\n");
+            close(session_lock_fd);return 19;
+        }
         (void)write_text(STATE_PATH, "manual_restoring_dmdt\n");
         rr=route_restore();
         unlink(AU_MARKER);
@@ -378,6 +438,9 @@ int main(int argc, char **argv) {
         fprintf(stderr, "ERROR legacy Auto-Direct must be disabled/stopped\n");
         return 13;
     }
+    if(identity_self_test()){
+        fprintf(stderr,"ERROR bound process-handle target qualification failed\n");return 19;
+    }
 
     if(acquire_lock()!=0) { fprintf(stderr,"ERROR parity owner lock exists; reconcile stock first\n"); return 18; }
     lock_owned=1;
@@ -390,10 +453,16 @@ int main(int argc, char **argv) {
 
     if (pipe(pipefd) != 0) goto done;
     if(fcntl(pipefd[0],F_SETFD,FD_CLOEXEC)!=0 || fcntl(pipefd[1],F_SETFD,FD_CLOEXEC)!=0)goto done;
+    if(bridge_spawn(bridge,input,output,&bridge_pid,&exec_gate)){
+        if(bridge_pid>1)bridge_stopped=0;
+        goto done;
+    }
+    bridge_stopped=0;
     watchdog = fork();
     if (watchdog < 0) goto done;
     if (watchdog == 0) {
         close(pipefd[1]);
+        close(exec_gate);
         watchdog_main(pipefd[0], (unsigned)max_seconds + WATCHDOG_MARGIN_SECONDS);
     }
     close(pipefd[0]); pipefd[0] = -1;
@@ -425,9 +494,13 @@ int main(int argc, char **argv) {
     if(g_stop)goto done;
 
     (void)write_text(STATE_PATH, "starting_bridge\n");
-    if (bridge_spawn(bridge, input, output, &bridge_pid) != 0) {
+    {
+        char token='G';
+        if(write(exec_gate,&token,1)!=1){
         fprintf(stderr, "ERROR bridge spawn failed\n");
         goto done;
+        }
+        close(exec_gate);exec_gate=-1;
     }
     (void)write_text(STATE_PATH, "direct\n");
 
@@ -438,12 +511,12 @@ int main(int argc, char **argv) {
         if(ww==watchdog || (ww<0&&errno!=EINTR)) {watchdog_reaped=1;rc=17;break;}
         pid_t w = waitpid(bridge_pid, &st, WNOHANG);
         if (w == bridge_pid) {
+            bridge_stopped=1;
             bridge_pid = -1;
             if (!WIFEXITED(st) || WEXITSTATUS(st) != 0) rc = 15;
             break;
         }
         if (w < 0 && errno != EINTR) {
-            bridge_pid = -1;
             rc = 16;
             break;
         }
@@ -452,17 +525,20 @@ int main(int argc, char **argv) {
     if (g_stop && rc == 0) rc = 130;
 
 done:
-    if (bridge_pid > 1) stop_bridge(bridge_pid);
-    unlink(BRIDGE_PID_PATH);
-    if (route_owned) {
+    if(exec_gate>=0){close(exec_gate);exec_gate=-1;}
+    if (bridge_pid > 1) bridge_stopped=stop_bridge(bridge_pid)==0;
+    if(bridge_stopped)unlink(BRIDGE_PID_PATH);
+    if(!bridge_stopped){
+        (void)write_text(STATE_PATH,"blocked_stop_unconfirmed\n");
+        rc=19;
+    }else if (route_owned) {
         (void)write_text(STATE_PATH, "restoring_dmdt\n");
         restore_ok = route_restore() == 0;
     } else {
         /* A partial release can still leave routing inconsistent. */
         restore_ok = route_restore() == 0;
     }
-    unlink(AU_MARKER);
-    unlink(OLD_DIRECT_MARKER);
+    if(bridge_stopped){unlink(AU_MARKER);unlink(OLD_DIRECT_MARKER);}
 
     if (restore_ok) {
         (void)write_text(STATE_PATH, rc == 0 ? "complete_stock\n" : "failed_stock\n");
@@ -492,9 +568,10 @@ done:
         if(!watchdog_reaped)rc=20;
     }
     unlink(PID_PATH);
-    unlink(BRIDGE_PID_PATH);
+    if(bridge_stopped)unlink(BRIDGE_PID_PATH);
     if(watchdog_reaped)unlink(WATCHDOG_PID_PATH);
     if(restore_ok && (watchdog<=1 || watchdog_reaped) && lock_owned)unlink(LOCK_PATH);
     if(session_lock_fd>=0)close(session_lock_fd);
+    if(bridge_handle>=0)close(bridge_handle);
     return rc;
 }
