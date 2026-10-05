@@ -1562,15 +1562,6 @@ static void set_active_session(AirPlayReceiverSessionRef s)
     if (old) p_CFRelease(old);
 }
 
-static AirPlayReceiverSessionRef retain_active_session(void)
-{
-    AirPlayReceiverSessionRef s = NULL;
-    pthread_mutex_lock(&g_lock);
-    if (g_active_session) s = (AirPlayReceiverSessionRef)p_CFRetain(g_active_session);
-    pthread_mutex_unlock(&g_lock);
-    return s;
-}
-
 /* ---------------- Gen-2 video adapter ---------------- */
 
 static void gen2_close_consumer(void)
@@ -2994,11 +2985,15 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
     if(pthread_setspecific(g_settings_scope_key,scope)!=0){free(scope);return NULL;}
     result=gen2_serverinfo_scoped(session,properties,mac,outErr);
     if(scope->descriptor_complete){
+        AirPlayReceiverSessionRef previous_advertised;
         pthread_mutex_lock(&g_settings_lock);
+        previous_advertised=g_settings_advertised_session;
         g_settings_advertised=scope->settings;
-        g_settings_have_advertised=1u;g_settings_advertised_session=session;
+        g_settings_have_advertised=1u;
+        g_settings_advertised_session=session ? (AirPlayReceiverSessionRef)p_CFRetain(session) : NULL;
         snprintf(g_settings_advertised_version,sizeof(g_settings_advertised_version),"%s",scope->actual_source_version);
         pthread_mutex_unlock(&g_settings_lock);
+        if(previous_advertised)p_CFRelease(previous_advertised);
     }
     (void)pthread_setspecific(g_settings_scope_key,previous);
     free(scope);
@@ -3238,6 +3233,11 @@ static int gen2_control_projection_on(AirPlayReceiverSessionRef session)
     struct gen2_settings_scope *scope=calloc(1,sizeof(*scope)),*previous=settings_scope();
     if(!scope || !g_settings_scope_ready){free(scope);return 0;}
     pthread_mutex_lock(&g_settings_lock);
+    if(g_settings_have_active && session!=g_settings_active_session){
+        pthread_mutex_unlock(&g_settings_lock);free(scope);
+        logf_u2("GEN2 SETUP rejected: another private session still owns the active descriptor");
+        return 0;
+    }
     if(g_settings_have_active && session==g_settings_active_session){
         scope->settings=g_settings_active;
     }else if(!g_settings_have_advertised ||
@@ -3253,7 +3253,7 @@ static int gen2_control_projection_on(AirPlayReceiverSessionRef session)
     pthread_mutex_lock(&g_settings_lock);
     if(!g_settings_have_active || session!=g_settings_active_session){
         g_settings_active=scope->settings;g_settings_have_active=1u;
-        g_settings_active_session=session;
+        g_settings_active_session=session ? (AirPlayReceiverSessionRef)p_CFRetain(session) : NULL;
         g_settings_active_confirmed=session && session==g_settings_advertised_session;
         snprintf(g_settings_active_version,sizeof(g_settings_active_version),"%s",g_settings_advertised_version);
     }
@@ -3291,6 +3291,7 @@ static int gen2_control_projection_on(AirPlayReceiverSessionRef session)
 static void gen2_control_release(void)
 {
     uint64_t s;
+    AirPlayReceiverSessionRef previous_active=NULL,previous_advertised=NULL;
     int stop_handed_off = 0;
     pthread_mutex_lock(&g2_core_lock);
     s=g2_control_session;
@@ -3332,8 +3333,15 @@ static void gen2_control_release(void)
     g2_control_session=0;
     pthread_mutex_unlock(&g2_core_lock);
     pthread_mutex_lock(&g_settings_lock);
+    previous_active=g_settings_active_session;
+    if(!g_settings_advertised_session || g_settings_advertised_session==previous_active){
+        previous_advertised=g_settings_advertised_session;
+        g_settings_advertised_session=NULL;g_settings_have_advertised=0u;
+    }
     g_settings_have_active=0u;g_settings_active_confirmed=0u;g_settings_active_session=NULL;
     pthread_mutex_unlock(&g_settings_lock);
+    if(previous_active)p_CFRelease(previous_active);
+    if(previous_advertised)p_CFRelease(previous_advertised);
     gen2_publish_status();
 }
 
@@ -3702,7 +3710,10 @@ static void *gen2_control_worker(void *arg)
             if(ctx)ctx->settings=scope->settings;
         }
         free(scope);
-        s=retain_active_session();
+        pthread_mutex_lock(&g_settings_lock);
+        if(g_settings_have_active && g_settings_active_control_generation==cmd.session && g_settings_active_session)
+            s=(AirPlayReceiverSessionRef)p_CFRetain(g_settings_active_session);
+        pthread_mutex_unlock(&g_settings_lock);
         if(ctx){
             ctx->session=cmd.session;
             ctx->request=cmd.request;

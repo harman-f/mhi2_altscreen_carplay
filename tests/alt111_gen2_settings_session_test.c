@@ -4,6 +4,8 @@ static char recovery_path[192];
 #define ALT111_RECOVERY_PATH recovery_path
 #include "../src/native/altscreen111-gen2/libaltscreen111_gen2.c"
 #include <assert.h>
+static CFTypeRef test_retain(CFTypeRef object){return object;}
+static void test_release(CFTypeRef object){(void)object;}
 
 int main(void)
 {
@@ -16,6 +18,7 @@ int main(void)
     uint64_t demand;
     AirPlayReceiverSessionRef session=(void *)(uintptr_t)1;
     assert(mkdtemp(root));
+    p_CFRetain=test_retain;p_CFRelease=test_release;
     snprintf(status,sizeof(status),"%s/status",root);g2_status_path=status;
     snprintf(log,sizeof(log),"%s/log",root);g_log_path=log;
     snprintf(recovery_path,sizeof(recovery_path),"%s/recovery",root);
@@ -31,6 +34,8 @@ int main(void)
     assert(gen2_control_projection_on(session));
     assert(g_settings_have_active && g_settings_active_confirmed);
     assert(g2_control.view_count==1);
+    assert(!gen2_control_projection_on((void *)(uintptr_t)2));
+    assert(g_settings_active_session==session);
     assert(!alt111_settings_defaults(&g_settings_desired,"mibr_dual_view"));
     assert(!alt111_settings_set(&g_settings_desired,ALTSET_DISPLAY_UUID,
                                "11111111-2222-4000-8000-000000000002",ALT111_TEMP));
@@ -49,7 +54,9 @@ int main(void)
     assert(!pthread_setspecific(g_settings_scope_key,NULL));
     gen2_control_release();
     assert(!g_settings_have_active && !g_settings_active_confirmed);
+    assert(!gen2_control_projection_on(session)); /* Teardown invalidates old /info. */
     g_settings_advertised_session=NULL;
+    g_settings_have_advertised=1u; /* New /info after teardown. */
     assert(gen2_control_projection_on(session));
     assert(g2_control.view_count==2 && !g_settings_active_confirmed);
     g2_video.stream=7;g2_video.codec=8;g2_video.consumer=9;g2_video.source_ordinal=10;
