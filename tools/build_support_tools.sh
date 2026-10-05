@@ -25,3 +25,10 @@ mkdir -p "$OUTDIR"
   -O2 -g -std=gnu99 -Wall -Wextra \
   src/native/qnx-shmem-probe/shmem_fs_probe.c \
   -o "$OUTDIR/shmem-fs-probe"
+
+
+"$QCC" \
+  -mfloat-abi=softfp \
+  -O2 -g -std=gnu99 -Wall -Wextra \
+  src/native/qnx-bound-process-probe/bound_process_probe.c \
+  -o "$OUTDIR/bound-process-probe"
