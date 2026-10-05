@@ -818,13 +818,29 @@ int main(int argc,char **argv) {
         pthread_mutex_lock(&stats.lock);++stats.input_records;stats.input_bytes+=payload_n;stats.input_idrs+=idr;stats.last_sequence=seq;stats.last_frac=frac;stats.last_sec=sec;pthread_mutex_unlock(&stats.lock);
         if ((prev_stream && stream != prev_stream) || (prev_codec && codec != prev_codec) ||
             (prev_consumer && consumer != prev_consumer)) {
+            uint64_t da=0,dp=0,pp=0;
+            queue_recover_au_boundary(&queue,&da,&dp,&pp);
+            record_safe_recovery(&stats,"generation",da,dp,pp);
             pthread_mutex_lock(&clock.lock); clock.have_origin=0; ++clock.source_rebases; pthread_mutex_unlock(&clock.lock);
             waiting_idr=1; discontinuity=1; request_keyframe();
             pthread_mutex_lock(&stats.lock); stats.waiting_idr=1; pthread_mutex_unlock(&stats.lock);
         }
         prev_stream=stream; prev_codec=codec; prev_consumer=consumer;
-        if(prev_seq && seq!=prev_seq+1u){pthread_mutex_lock(&stats.lock);++stats.sequence_gaps;stats.waiting_idr=1;pthread_mutex_unlock(&stats.lock);waiting_idr=1;discontinuity=1;request_keyframe();}
+        if(prev_seq && seq!=prev_seq+1u){
+            uint64_t da=0,dp=0,pp=0;
+            pthread_mutex_lock(&stats.lock);++stats.sequence_gaps;stats.waiting_idr=1;pthread_mutex_unlock(&stats.lock);
+            queue_recover_au_boundary(&queue,&da,&dp,&pp);
+            record_safe_recovery(&stats,"sequence",da,dp,pp);
+            waiting_idr=1;discontinuity=1;request_keyframe();
+        }
         prev_seq=seq;
+        if(!waiting_idr && queue_packet_depth(&queue)>LOW_LATENCY_PACKET_LIMIT) {
+            uint64_t da=0,dp=0,pp=0;
+            queue_recover_au_boundary(&queue,&da,&dp,&pp);
+            record_safe_recovery(&stats,"latency",da,dp,pp);
+            waiting_idr=1;discontinuity=1;request_keyframe();
+            pthread_mutex_lock(&stats.lock);stats.waiting_idr=1;pthread_mutex_unlock(&stats.lock);
+        }
         /* Omonob's producer cadence is keyed to the source frame ordinal,
          * not to how many records this bridge happened to receive. */
         if (seq && (seq % PARITY_IDR_INTERVAL) == 0u) request_keyframe();
