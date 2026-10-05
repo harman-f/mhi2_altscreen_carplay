@@ -61,6 +61,9 @@ jobs:
           python3 tests/direct_ts_parity_host_integration.py /tmp/direct-ts-parity-host \
             | tee /tmp/parity-integration.txt
           grep -Fq 'PARITY_INTEGRATION=PASS' /tmp/parity-integration.txt
+          python3 tests/direct_ts_parity_recovery_integration.py /tmp/direct-ts-parity-host \
+            | tee /tmp/parity-recovery.txt
+          grep -Fq 'PARITY_RECOVERY_INTEGRATION=PASS' /tmp/parity-recovery.txt
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
             src/native/parity-session/parity_session.c \
             -o /tmp/parity-session-host
@@ -80,6 +83,9 @@ jobs:
           grep -Fq 'DRIVER_DCMD_GET_INTERFACE 0x4004050c' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'DRIVER_DCMD_GET_PACKET_SIZE 0x4004050d' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'DRIVER_DCMD_GET_BLOCK_COUNT 0x40040510' src/native/direct-ts-parity/direct_ts_parity.c
+          grep -Fq 'LOW_LATENCY_PACKET_LIMIT 1024u' src/native/direct-ts-parity/direct_ts_parity.c
+          grep -Fq 'PARITY_SAFE_RECOVERY' src/native/direct-ts-parity/direct_ts_parity.c
+          grep -Fq 'queue_recover_au_boundary' src/native/direct-ts-parity/direct_ts_parity.c
 
       - name: Build pinned QNX 6.5 ARMv7 toolchain image
         shell: bash
@@ -152,6 +158,8 @@ jobs:
           strings "$BIN" | grep -Fq 'PARITY_DRIVER interface'
           strings "$BIN" | grep -Fq 'device_open_mode=write_only_nonblock'
           strings "$BIN" | grep -Fq 'reference_producer_payload_limit=262144'
+          strings "$BIN" | grep -Fq 'PARITY_SAFE_RECOVERY'
+          strings "$BIN" | grep -Fq 'latency_packet_limit=1024'
           ! strings "$BIN" | grep -Fq 'avformat_'
           ! strings "$BIN" | grep -Fq 'libavformat'
           strings "$SESSION" | grep -Fq '/eso/bin/apps/dmdt'
