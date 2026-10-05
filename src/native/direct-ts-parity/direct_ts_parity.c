@@ -39,6 +39,8 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#define ALT111_RECOVERY_POSIX 1
+#include "../altscreen111-gen2/include/alt111_recovery.h"
 
 #ifdef __QNXNTO__
 #include <devctl.h>
@@ -843,8 +845,16 @@ static int recv_exact(int fd, void *buf, size_t n) {
     return off==n?1:-1;
 }
 
-static void request_keyframe(void) {
-    int fd=open(KEYFRAME_MARKER,O_WRONLY|O_CREAT|O_TRUNC,0644);if(fd>=0)close(fd);
+static void request_keyframe(unsigned reasons,uint64_t stream,uint64_t codec,
+                             uint64_t consumer,uint64_t ordinal) {
+    static uint64_t sequence;
+    struct alt111_recovery_request request;
+    if(!stream||!codec||!consumer||!ordinal)return;
+    request.reasons=reasons;request.stream=stream;request.codec=codec;
+    request.consumer=consumer;request.ordinal=ordinal;request.sequence=++sequence;
+    if(alt111_recovery_publish(ALT111_RECOVERY_PATH,&request))
+        fprintf(stderr,"PARITY_RECOVERY_REQUEST_FAILED sequence=%llu reasons=%u\n",
+                (unsigned long long)sequence,reasons);
 }
 
 static int driver_init(int fd, int regular_file, struct bridge_stats *s) {
@@ -948,7 +958,6 @@ int main(int argc,char **argv) {
     }
     memset(&wctx,0,sizeof(wctx));wctx.fd=out_fd;wctx.input_fd=in_fd;wctx.regular_file=regular_file;wctx.queue=&queue;wctx.clock=&clock;wctx.stats=&stats;
     if(pthread_create(&writer,NULL,writer_main,&wctx)!=0){fprintf(stderr,"ERROR writer thread\n");goto done;}writer_started=1;
-    request_keyframe();
     publish_status(&stats,&clock,&queue,"running");
     fprintf(stderr,"PARITY_START input=%s output=%s transport_bps=%u block=%u pids=pat:0x0,pmt:0x10,pcr:0x1000,video:0x11\n",input,output,TRANSPORT_BPS,MOST_BLOCK_BYTES);
 
@@ -960,8 +969,10 @@ int main(int argc,char **argv) {
         if(!payload_n||payload_n>M1AU_MAX_PAYLOAD){fprintf(stderr,"ERROR invalid M1AU payload=%u\n",payload_n);break;}
         payload=(uint8_t*)malloc(payload_n);if(!payload)break;
         rr=recv_exact(in_fd,payload,payload_n);if(rr<=0){free(payload);break;}
+        if(!prev_stream)request_keyframe(ALT111_KF_BRIDGE_READY,stream,codec,consumer,seq);
         if(payload_n>REFERENCE_PRODUCER_PAYLOAD_LIMIT) {
-            free(payload); waiting_idr=1; discontinuity=1; request_keyframe();
+            free(payload); waiting_idr=1; discontinuity=1;
+            request_keyframe(ALT111_KF_SOURCE_GAP,stream,codec,consumer,seq);
             fprintf(stderr,"PARITY_DROP oversized AU bytes=%u\n",payload_n);
             continue;
         }
@@ -974,7 +985,8 @@ int main(int argc,char **argv) {
             pthread_mutex_lock(&clock.lock); clock.have_origin=0; clock.have_previous_source=0; ++clock.source_rebases; pthread_mutex_unlock(&clock.lock);
             free(param_cache); param_cache=NULL; param_cache_n=0;
             prev_seq=0;
-            waiting_idr=1; discontinuity=1; request_keyframe();
+            waiting_idr=1; discontinuity=1;
+            request_keyframe(ALT111_KF_LIFECYCLE_RESET,stream,codec,consumer,seq);
             pthread_mutex_lock(&stats.lock); stats.waiting_idr=1; pthread_mutex_unlock(&stats.lock);
         }
         prev_stream=stream; prev_codec=codec; prev_consumer=consumer;
@@ -983,14 +995,16 @@ int main(int argc,char **argv) {
             pthread_mutex_lock(&stats.lock);++stats.sequence_gaps;stats.waiting_idr=1;pthread_mutex_unlock(&stats.lock);
             queue_recover_au_boundary(&queue,&da,&dp,&pp);
             record_safe_recovery(&stats,"sequence",da,dp,pp);
-            waiting_idr=1;discontinuity=1;request_keyframe();
+            waiting_idr=1;discontinuity=1;
+            request_keyframe(ALT111_KF_SOURCE_GAP,stream,codec,consumer,seq);
         }
         prev_seq=seq;
         if(!waiting_idr && queue_backlog_packets(&queue)>LOW_LATENCY_PACKET_LIMIT) {
             uint64_t da=0,dp=0,pp=0;
             queue_recover_au_boundary(&queue,&da,&dp,&pp);
             record_safe_recovery(&stats,"latency",da,dp,pp);
-            waiting_idr=1;discontinuity=1;request_keyframe();
+            waiting_idr=1;discontinuity=1;
+            request_keyframe(ALT111_KF_LATENCY_RECOVERY,stream,codec,consumer,seq);
             pthread_mutex_lock(&stats.lock);stats.waiting_idr=1;pthread_mutex_unlock(&stats.lock);
         }
         /* Periodic reference requests are made in GEN2 before consumer/drop
@@ -1028,7 +1042,6 @@ done:
     queue_destroy(&queue);
     pthread_mutex_destroy(&clock.lock);
     pthread_mutex_destroy(&stats.lock);
-    unlink(KEYFRAME_MARKER);
     fprintf(stderr,"PARITY_DONE rc=%d\n",rc);
     return rc;
 }

@@ -18,6 +18,8 @@
 #include <unistd.h>
 #include "alt111.h"
 #include "alt111_settings.h"
+#define ALT111_RECOVERY_POSIX 1
+#include "alt111_recovery.h"
 
 #ifndef MAP_ANON
 #define MAP_ANON MAP_ANONYMOUS
@@ -349,6 +351,7 @@ static struct alt111_control g2_control;
 static struct alt111_video g2_video;
 static struct alt111_resync g2_resync;
 static struct alt111_policy g2_policy;
+static struct alt111_recovery_request g2_last_recovery;
 static mibr_mode_state_t g2_last_mode_state;
 static unsigned g2_last_mode_valid;
 static uint64_t g2_mode_sequence;
@@ -3554,6 +3557,26 @@ static void gen2_resync_poll(void)
 
 static void gen2_process_diag_markers(void)
 {
+    struct alt111_recovery_request recovery;
+    int recovery_rc=alt111_recovery_take(ALT111_RECOVERY_PATH,&recovery);
+    if(recovery_rc==0){
+        unsigned reasons=0u;
+        pthread_mutex_lock(&g2_core_lock);
+        if(recovery.stream==g2_video.stream && recovery.codec==g2_video.codec &&
+           recovery.consumer==g2_video.consumer && recovery.ordinal<=g2_video.source_ordinal &&
+           (g2_last_recovery.stream!=recovery.stream || g2_last_recovery.codec!=recovery.codec ||
+            g2_last_recovery.consumer!=recovery.consumer || recovery.sequence>g2_last_recovery.sequence)){
+            g2_last_recovery=recovery;
+            reasons=alt111_policy_event(&g2_policy.config,recovery.reasons);
+            if(reasons && g2_control_session)
+                (void)alt111_control_keyframe_reason(&g2_control,g2_control_session,reasons);
+        }
+        pthread_mutex_unlock(&g2_core_lock);
+        logf_u2("GEN2 recovery request sequence=%llu reasons=0x%x accepted_reasons=0x%x stream=%llu codec=%llu consumer=%llu",
+                (unsigned long long)recovery.sequence,recovery.reasons,reasons,
+                (unsigned long long)recovery.stream,(unsigned long long)recovery.codec,
+                (unsigned long long)recovery.consumer);
+    }else if(recovery_rc<0)logf_u2("GEN2 recovery request rejected: invalid bounded record");
     if(access(g2_view_request_path,F_OK)==0){
         char b[16];
         int fd,n,v=-1,rc=ALT111_INVALID;
@@ -3561,15 +3584,24 @@ static void gen2_process_diag_markers(void)
         if(fd>=0){
             n=(int)read(fd,b,sizeof(b)-1u);
             close(fd);
-            if(n>0){b[n]='\0';v=atoi(b);}
+            if(n>0){
+                b[n]='\0';
+                if(n==2 && b[1]=='\n')b[1]=0;
+                if(!alt111_setting_validate(ALTSET_VIEWAREA_SELECTED,b))v=b[0]-'0';
+            }
         }
         unlink(g2_view_request_path);
-        pthread_mutex_lock(&g2_core_lock);
-        if(g2_control_session && (v==0||v==1)){
-            rc=alt111_control_intent(&g2_control,1u,(unsigned)v);
-            pthread_cond_broadcast(&g2_core_cv);
+        if(v==0||v==1){
+            struct alt111_settings *next=malloc(sizeof(*next));
+            const struct alt111_settings_paths paths={MIBR_CFG_TEMP_ROOT,MIBR_CFG_PERSIST_ROOT};
+            unsigned id=ALTSET_VIEWAREA_SELECTED;const char *value=b;char error[256]={0};
+            if(next){
+                pthread_mutex_lock(&g_settings_io_lock);
+                rc=alt111_settings_mutate(&paths,ALT111_TEMP,&id,&value,1u,0u,next,error,sizeof(error));
+                pthread_mutex_unlock(&g_settings_io_lock);free(next);
+                if(!rc)(void)settings_refresh();
+            }
         }
-        pthread_mutex_unlock(&g2_core_lock);
         logf_u2("gen2 VIEWAREA request index=%d rc=%d session=%llu",
                 v,rc,(unsigned long long)g2_control_session);
         gen2_publish_status();
@@ -3595,6 +3627,20 @@ static void gen2_process_diag_markers(void)
     }
 }
 
+static void gen2_apply_selected_view(void)
+{
+    unsigned selected,valid;
+    pthread_mutex_lock(&g_settings_lock);
+    valid=g_settings_valid && g_settings_have_active;
+    selected=alt111_setting_integer(&g_settings_desired,ALTSET_VIEWAREA_SELECTED);
+    pthread_mutex_unlock(&g_settings_lock);
+    if(!valid)return;
+    pthread_mutex_lock(&g2_core_lock);
+    if(g2_control_session && g2_control.desired && selected<g2_control.view_count)
+        (void)alt111_control_intent(&g2_control,1u,selected);
+    pthread_mutex_unlock(&g2_core_lock);
+}
+
 static void *gen2_control_worker(void *arg)
 {
     uint64_t last_settings_poll=0;
@@ -3609,7 +3655,8 @@ static void *gen2_control_worker(void *arg)
         OSStatus e=-1;
         uint64_t settings_now=monotonic_ms();
         if(!last_settings_poll || settings_now-last_settings_poll>=250u){
-            (void)settings_refresh();last_settings_poll=settings_now;
+            (void)settings_refresh();gen2_apply_selected_view();gen2_publish_status();
+            last_settings_poll=settings_now;
         }
 
         pthread_mutex_lock(&g2_core_lock);
@@ -3622,6 +3669,7 @@ static void *gen2_control_worker(void *arg)
 
         gen2_resync_poll();
         gen2_process_diag_markers();
+        gen2_apply_selected_view();
 
         if(access(g2_reacquire_marker,F_OK)==0){
             unlink(g2_reacquire_marker);

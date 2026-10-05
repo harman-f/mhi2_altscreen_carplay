@@ -1,5 +1,7 @@
 /* Exercise the real GEN2 adapter with no target hooks or live sockets. */
 #define ALT111_GEN2_HOST_TEST 1
+static char recovery_path[192];
+#define ALT111_RECOVERY_PATH recovery_path
 #include "../src/native/altscreen111-gen2/libaltscreen111_gen2.c"
 #include <assert.h>
 
@@ -10,10 +12,13 @@ int main(void)
     struct mibr_display_config display;
     struct mibr_viewareas_config views;
     char value[96];
+    struct alt111_recovery_request request={ALT111_KF_SOURCE_GAP,7,8,9,10,1};
+    uint64_t demand;
     AirPlayReceiverSessionRef session=(void *)(uintptr_t)1;
     assert(mkdtemp(root));
     snprintf(status,sizeof(status),"%s/status",root);g2_status_path=status;
     snprintf(log,sizeof(log),"%s/log",root);g_log_path=log;
+    snprintf(recovery_path,sizeof(recovery_path),"%s/recovery",root);
     assert(alt111_control_init(&g2_control,1)==ALT111_OK);
     assert(!alt111_settings_defaults(&g_settings_desired,"omonob790"));
     g_settings_have=g_settings_valid=1;
@@ -47,7 +52,24 @@ int main(void)
     g_settings_advertised_session=NULL;
     assert(gen2_control_projection_on(session));
     assert(g2_control.view_count==2 && !g_settings_active_confirmed);
+    g2_video.stream=7;g2_video.codec=8;g2_video.consumer=9;g2_video.source_ordinal=10;
+    alt111_policy_defaults(&g2_policy.config);g2_policy.config.gap_recovery=0;
+    assert(!alt111_recovery_publish(recovery_path,&request));
+    request.reasons=ALT111_KF_LIFECYCLE_RESET;request.sequence=2;
+    assert(!alt111_recovery_publish(recovery_path,&request)); /* Coalesces both causes. */
+    gen2_process_diag_markers();
+    assert(g2_control.keyframe_reasons==ALT111_KF_LIFECYCLE_RESET);
+    demand=g2_control.keyframe_wanted;
+    assert(!alt111_recovery_publish(recovery_path,&request));
+    gen2_process_diag_markers();assert(g2_control.keyframe_wanted==demand); /* Replay. */
+    request.sequence=3;request.consumer=10;
+    assert(!alt111_recovery_publish(recovery_path,&request));
+    gen2_process_diag_markers();assert(g2_control.keyframe_wanted==demand); /* Old peer. */
+    request.consumer=9;request.ordinal=11;
+    assert(!alt111_recovery_publish(recovery_path,&request));
+    gen2_process_diag_markers();assert(g2_control.keyframe_wanted==demand); /* Future AU. */
     gen2_control_release();
+    strcat(recovery_path,".lock");unlink(recovery_path);
     unlink(status);unlink(log);assert(!rmdir(root));
     puts("ALT111_GEN2_SETTINGS_SESSION_TEST=PASS");
     return 0;

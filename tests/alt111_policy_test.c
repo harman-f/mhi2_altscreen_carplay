@@ -1,5 +1,6 @@
 /* Behavioral tests of the real pure producer policy and serialized controller. */
 #include "alt111.h"
+#include "alt111_recovery.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,6 +13,19 @@ static void timestamp(uint8_t raw[8], uint64_t value)
 
 int main(void)
 {
+    struct alt111_recovery_request request={ALT111_KF_SOURCE_GAP,1,2,3,4,5},parsed;
+    char record[ALT111_RECOVERY_CAP];int length;
+    length=alt111_recovery_render(&request,record,sizeof(record));assert(length>0);
+    assert(!alt111_recovery_parse(record,(size_t)length,&parsed));
+    assert(parsed.consumer==3 && parsed.reasons==ALT111_KF_SOURCE_GAP);
+    assert(alt111_recovery_parse(record,(size_t)length-1u,&parsed)<0);
+    {
+        const char *invalid[]={"M1KF1 16 1 2 3 4 05\n","M1KF1 128 1 2 3 4 5\n",
+            "M1KF1 16 1 2 3 4 5x\n","M1KF1 16 1 2 3 4 18446744073709551616\n"};
+        unsigned j;
+        for(j=0;j<sizeof(invalid)/sizeof(invalid[0]);++j)
+            assert(alt111_recovery_parse(invalid[j],strlen(invalid[j]),&parsed)<0);
+    }
     struct alt111_policy p;
     struct alt111_policy_config cfg;
     struct alt111_control c;
