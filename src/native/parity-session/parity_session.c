@@ -56,7 +56,7 @@ static uint64_t owner_token;
 static uint64_t monotonic_ms(void);
 static int route_restore(void);
 
-static int gate_snapshot(struct alt111_native_gate_status *out)
+static int gate_snapshot_once(struct alt111_native_gate_status *out)
 {
     char data[ALT111_NATIVE_GATE_CAP];struct stat before,after;ssize_t n;int fd;
     uint64_t now=monotonic_ms();
@@ -69,6 +69,16 @@ static int gate_snapshot(struct alt111_native_gate_status *out)
     if(n<=0||alt111_native_gate_parse(data,(size_t)n,out)||
        !out->heartbeat||out->heartbeat>now||now-out->heartbeat>250u)return -1;
     return 0;
+}
+
+static int gate_snapshot(struct alt111_native_gate_status *out)
+{
+    uint64_t until=monotonic_ms()+100u;
+    do {
+        if(!gate_snapshot_once(out))return 0;
+        usleep(1000);
+    } while(monotonic_ms()<until);
+    return -1;
 }
 
 static uint64_t monotonic_ms(void) {
