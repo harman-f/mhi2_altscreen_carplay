@@ -73,7 +73,10 @@ apply_profile(){
   } > "$D2" || exit 11
 
   RC=0
-  write_one "$ROOT" mibr-carplay111-compat-profile omonob790 || RC=1
+  # The parity session owns DMDT directly. Keep the legacy writev-gate
+  # Auto-Direct supervisor disabled through the same layered config contract.
+  write_one "$ROOT" mibr-carplay-autodirect 0 || RC=1
+  [ "$RC" -eq 0 ] && write_one "$ROOT" mibr-carplay111-compat-profile omonob790 || RC=1
   [ "$RC" -eq 0 ] && write_one "$ROOT" mibr-carplay111-fps 40 || RC=1
   [ "$RC" -eq 0 ] && write_one "$ROOT" mibr-carplay111-sourceversion 950.7.1 || RC=1
   [ "$RC" -eq 0 ] && write_one "$ROOT" mibr-carplay111-url maps:/car/instrumentcluster/map || RC=1
@@ -110,6 +113,7 @@ show_file(){
 
 status(){
   echo "=== OMONOB790 FUNCTIONAL-PARITY PROFILE ==="
+  show_file mibr-carplay-autodirect 1
   show_file mibr-carplay111-compat-profile mibr
   show_file mibr-carplay111-fps 30
   show_file mibr-carplay111-sourceversion 1005.8.1
@@ -121,6 +125,7 @@ status(){
   echo "--- legacy D2 ---"
   show_file mibr-carplay111-keyframes.conf "M.I.B. defaults"
   echo "required_parity=1010x376,202x75,maxFPS40,sourceVersion950.7.1,features10,input3,safe606x344@202,16"
+  echo "legacy_autodirect=disabled_in_parity_preset"
   echo "legacy_d2=disabled_in_parity_preset"
 }
 
@@ -132,7 +137,7 @@ clear_layer(){
   else
     ROOT=$ROOT_TEMP
   fi
-  for NAME in     mibr-carplay111-compat-profile     mibr-carplay111-fps     mibr-carplay111-sourceversion     mibr-carplay111-url     mibr-carplay111-display.conf     mibr-carplay111-viewareas.conf     mibr-carplay111-keyframes.conf
+  for NAME in     mibr-carplay-autodirect     mibr-carplay111-compat-profile     mibr-carplay111-fps     mibr-carplay111-sourceversion     mibr-carplay111-url     mibr-carplay111-display.conf     mibr-carplay111-viewareas.conf     mibr-carplay111-keyframes.conf
   do
     rm -f "$ROOT/$NAME" 2>/dev/null || true
   done
