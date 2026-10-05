@@ -57,6 +57,78 @@ grep 'A\|B'
 
 Use separate fixed-string checks where correctness matters.
 
+## `/tmp` / `/dev/shmem` semantics on MU1440
+
+Vehicle-confirmed on the reference `MHI2_ER_SKG13_P4526_MU1440` target on 2026-10-05:
+
+```text
+/tmp -> /dev/shmem
+```
+
+The same test file addressed through `/tmp` and `/dev/shmem` reported the same inode, so
+`/tmp` must be treated as the QNX shared-memory filesystem on this target, not as a normal
+disk-backed Unix `/tmp`.
+
+### What is confirmed to work
+
+Flat regular-file operations in `/tmp` are usable. A direct vehicle probe successfully performed:
+
+```sh
+echo MIBR_RENAME_PROBE > /tmp/mibr-rename-probe.new
+mv /tmp/mibr-rename-probe.new /tmp/mibr-rename-probe.status
+cat /tmp/mibr-rename-probe.status
+```
+
+The `mv` returned `0` and the final file contained the expected data. The native gate status
+publisher also successfully creates, truncates, writes and closes its flat
+`/tmp/mibr-alt111-native-gate.status` file after the target-specific publication fix.
+
+### What must not be assumed
+
+Do **not** use POSIX advisory record locking on a file below `/tmp` as a MU1440 synchronization
+primitive.
+
+The first target implementation of the settings layer created
+`/tmp/mibr-alt111-settings.lock` and then used `fcntl(F_SETLK)`. The lock file itself was created
+successfully, but even a read-only settings query failed reproducibly with:
+
+```text
+result=BUSY settings_lock
+```
+
+No settings journal and no rollback barrier were present. The failure reproduced for both a settings
+read and the `dual-temp` write path. Because the settings implementation mapped any
+`F_SETLK`/related lock setup failure to the same result, this exposed an invalid Linux-style
+assumption in the target settings layer rather than evidence of a real competing writer.
+
+Also do **not** make directory creation below `/tmp` a required synchronization primitive on this
+target. Vehicle testing found that `mkdir` is not a usable replacement there. Keep volatile target
+state flat unless a directory operation has been independently demonstrated on the exact firmware.
+
+### Current synchronization rule
+
+Cross-process settings synchronization must therefore avoid both:
+
+- `fcntl(F_SETLK)` / POSIX record locking on `/tmp`;
+- directory-lock schemes below `/tmp`.
+
+The current replacement candidate uses an atomic flat lock-file create with
+`open(..., O_CREAT|O_EXCL, 0600)` on a new `mibr-alt111-settings.lock-v2` path. This is deliberately
+documented as a **candidate until vehicle-qualified**; successful compilation or host testing is not
+sufficient evidence that the exact MU1440 `/dev/shmem` implementation provides the required
+exclusive-create semantics.
+
+The old `mibr-alt111-settings.lock` file may remain present from the record-lock implementation.
+Its mere existence is not proof that a process owns a lock and it must not be used as a stale-lock
+heuristic.
+
+### Portability implication
+
+Code shared between Linux host tests and QNX target runtime must not infer ordinary filesystem
+locking semantics from the pathname `/tmp`. Target synchronization primitives need an explicit
+MU1440 qualification step, and failure paths should identify the primitive that failed rather than
+collapsing unrelated `fstat`, descriptor-flag and lock failures into a generic `BUSY` result.
+
 ## `awk`: important distinction
 
 `awk` is **not banned**.
