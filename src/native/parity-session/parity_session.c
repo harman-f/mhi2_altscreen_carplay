@@ -314,7 +314,10 @@ done:
         (void)write_text(STATE_PATH, rc == 0 ? "complete_stock\n" : "failed_stock\n");
         if (pipefd[1] >= 0) {
             char token = 'R';
-            (void)write(pipefd[1], &token, 1);
+            if (write(pipefd[1], &token, 1) != 1) {
+                /* Recovery is already complete; the watchdog will time out and
+                 * issue the same stock-route restore again if this signal fails. */
+            }
         }
     } else {
         (void)write_text(STATE_PATH, "restore_retry_by_watchdog\n");
