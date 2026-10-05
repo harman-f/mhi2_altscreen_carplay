@@ -15,6 +15,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -31,6 +32,9 @@
 #define OLD_AUTO_PID "/tmp/mibr-direct-auto-supervisor.pid"
 #define OLD_AUTO_TEMP "/tmp/mibr-carplay-autodirect"
 #define OLD_AUTO_PERSIST "/mnt/app/root/mibr-carplay-autodirect"
+#define DMDT_TIMEOUT_MS 5000u
+#define DMDT_TERM_GRACE_MS 500u
+#define WATCHDOG_MARGIN_SECONDS 20u
 
 static volatile sig_atomic_t g_stop;
 
@@ -92,6 +96,42 @@ static int old_autodirect_enabled(void) {
     return 1;
 }
 
+static int wait_child_bounded(pid_t p, unsigned timeout_ms, int *status) {
+    unsigned elapsed = 0;
+    int st = 0;
+    while (elapsed < timeout_ms) {
+        pid_t w = waitpid(p, &st, WNOHANG);
+        if (w == p) {
+            if (status) *status = st;
+            return 0;
+        }
+        if (w < 0 && errno != EINTR) return -1;
+        usleep(100000);
+        elapsed += 100u;
+    }
+
+    (void)kill(p, SIGTERM);
+    elapsed = 0;
+    while (elapsed < DMDT_TERM_GRACE_MS) {
+        pid_t w = waitpid(p, &st, WNOHANG);
+        if (w == p) {
+            if (status) *status = st;
+            return -1;
+        }
+        if (w < 0 && errno != EINTR) return -1;
+        usleep(100000);
+        elapsed += 100u;
+    }
+
+    (void)kill(p, SIGKILL);
+    while (waitpid(p, &st, 0) < 0) {
+        if (errno == EINTR) continue;
+        break;
+    }
+    if (status) *status = st;
+    return -1;
+}
+
 static int run_argv(char *const argv[]) {
     pid_t p;
     int st = 0;
@@ -102,10 +142,7 @@ static int run_argv(char *const argv[]) {
         execv(DMDT, argv);
         _exit(127);
     }
-    while (waitpid(p, &st, 0) < 0) {
-        if (errno == EINTR) continue;
-        return -1;
-    }
+    if (wait_child_bounded(p, DMDT_TIMEOUT_MS, &st) != 0) return -1;
     return WIFEXITED(st) && WEXITSTATUS(st) == 0 ? 0 : -1;
 }
 
@@ -160,12 +197,39 @@ static void emergency_restore(void) {
     unlink(PID_PATH);
 }
 
-static void watchdog_main(int fd) {
+static void watchdog_main(int fd, unsigned timeout_seconds) {
     char token = 0;
-    ssize_t n;
-    do { n = read(fd, &token, 1); } while (n < 0 && errno == EINTR);
+    ssize_t n = -1;
+    unsigned elapsed_seconds = 0;
+
+    while (elapsed_seconds < timeout_seconds) {
+        fd_set rfds;
+        struct timeval tv;
+        int rc;
+        unsigned slice = timeout_seconds - elapsed_seconds;
+        if (slice > 1u) slice = 1u;
+
+        FD_ZERO(&rfds);
+        FD_SET(fd, &rfds);
+        tv.tv_sec = (long)slice;
+        tv.tv_usec = 0;
+        rc = select(fd + 1, &rfds, NULL, NULL, &tv);
+        if (rc > 0 && FD_ISSET(fd, &rfds)) {
+            do { n = read(fd, &token, 1); } while (n < 0 && errno == EINTR);
+            close(fd);
+            if (n == 1 && token == 'R') _exit(0);
+            emergency_restore();
+            _exit(0);
+        }
+        if (rc < 0 && errno != EINTR) {
+            close(fd);
+            emergency_restore();
+            _exit(0);
+        }
+        if (rc == 0) elapsed_seconds += slice;
+    }
+
     close(fd);
-    if (n == 1 && token == 'R') _exit(0);
     emergency_restore();
     _exit(0);
 }
@@ -212,6 +276,8 @@ static int self_test(void) {
     puts("release=/eso/bin/apps/dmdt dc 72 ; /eso/bin/apps/dmdt sc 4 72");
     puts("release_delay_us=500000");
     puts("restore=/eso/bin/apps/dmdt dc 70 33 ; /eso/bin/apps/dmdt sc 4 70");
+    printf("dmdt_timeout_ms=%u\n", DMDT_TIMEOUT_MS);
+    printf("watchdog_margin_seconds=%u\n", WATCHDOG_MARGIN_SECONDS);
     return 0;
 }
 
@@ -252,7 +318,7 @@ int main(int argc, char **argv) {
     if (watchdog < 0) goto done;
     if (watchdog == 0) {
         close(pipefd[1]);
-        watchdog_main(pipefd[0]);
+        watchdog_main(pipefd[0], (unsigned)max_seconds + WATCHDOG_MARGIN_SECONDS);
     }
     close(pipefd[0]); pipefd[0] = -1;
 
