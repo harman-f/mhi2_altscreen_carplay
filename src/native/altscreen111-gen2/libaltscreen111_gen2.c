@@ -265,7 +265,8 @@ static int g_tee_started;
  *   0x00  char[4]  "M1AU"
  *   0x04  u16      version = 1
  *   0x06  u16      header bytes = 56
- *   0x08  u32      flags: bit0 IDR, bit1 priming(config+IDR)
+ *   0x08  u32      flags: bit0 IDR, bit1 priming(config+IDR),
+ *                 bit2 source-time presence known, bit3 source-time present
  *   0x0c  u32      complete Annex-B AU payload bytes
  *   0x10  u64      stream generation
  *   0x18  u64      codec generation
@@ -276,6 +277,8 @@ static int g_tee_started;
 #define M1AU_HEADER_BYTES 56u
 #define M1AU_FLAG_IDR 0x00000001u
 #define M1AU_FLAG_PRIMING 0x00000002u
+#define M1AU_FLAG_TIME_KNOWN 0x00000004u
+#define M1AU_FLAG_TIME_PRESENT 0x00000008u
 static const char *g_au_framing_marker = "/tmp/mibr-alt111-au-framing.enabled";
 static int g_tee_framed;
 static uint8_t g_tee_frame_header[M1AU_HEADER_BYTES];
@@ -1712,13 +1715,14 @@ static void m1au_put_be64(uint8_t *p, uint64_t v)
 static void m1au_prepare_header_locked(const struct alt111_output_ticket *ticket,
                                        size_t payload_bytes)
 {
-    uint32_t flags=0;
+    uint32_t flags=M1AU_FLAG_TIME_KNOWN;
     memset(g_tee_frame_header,0,sizeof(g_tee_frame_header));
     memcpy(g_tee_frame_header,"M1AU",4u);
     m1au_put_be16(g_tee_frame_header+4u,1u);
     m1au_put_be16(g_tee_frame_header+6u,(uint16_t)M1AU_HEADER_BYTES);
     if(ticket->idr)flags|=M1AU_FLAG_IDR;
     if(ticket->priming)flags|=M1AU_FLAG_PRIMING;
+    if(ticket->source_time_present)flags|=M1AU_FLAG_TIME_PRESENT;
     m1au_put_be32(g_tee_frame_header+8u,flags);
     m1au_put_be32(g_tee_frame_header+12u,(uint32_t)payload_bytes);
     m1au_put_be64(g_tee_frame_header+16u,ticket->stream);

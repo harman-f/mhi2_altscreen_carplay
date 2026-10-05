@@ -65,6 +65,8 @@
 #define M1AU_HEADER_BYTES 56u
 #define M1AU_MAX_PAYLOAD (3u * 1024u * 1024u)
 #define M1AU_FLAG_IDR 0x00000001u
+#define M1AU_FLAG_TIME_KNOWN 0x00000004u
+#define M1AU_FLAG_TIME_PRESENT 0x00000008u
 #define AU_QUEUE_CAP 64u
 #define AU_QUEUE_PACKET_CAP 65536u
 #define STATUS_PATH "/tmp/mibr-parity-ts.status"
@@ -308,8 +310,8 @@ static uint64_t monotonic_us(void) {
     return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull;
 }
 
-static uint64_t assign_pts(struct clock_state *c, uint32_t frac, uint32_t sec,
-                           int *rebased) {
+static uint64_t assign_pts_presence(struct clock_state *c, uint32_t frac, uint32_t sec,
+                                    int presence, int *rebased) {
     uint64_t pcr, pts, floor, target, shift, now_us;
     uint64_t raw = ((uint64_t)sec << 32) | frac;
     int discontinuous = 0;
@@ -317,8 +319,9 @@ static uint64_t assign_pts(struct clock_state *c, uint32_t frac, uint32_t sec,
     *rebased = 0;
     now_us = monotonic_us();
     pthread_mutex_lock(&c->lock);
-    /* Exact zero at a 32.32 rollover is still a valid source timestamp. */
-    source_valid = frac != 0u || sec != 0u || c->have_previous_source;
+    /* New GEN2 records explicitly distinguish a present exact zero from NULL.
+     * presence=-1 retains compatibility with historical M1AU-v1 producers. */
+    source_valid = presence < 0 ? frac != 0u || sec != 0u || c->have_previous_source : presence != 0;
     pcr = c->transport_pcr90k;
     if (source_valid && c->have_previous_source) {
         /* Unsigned 64-bit subtraction followed by signed interpretation also
@@ -367,6 +370,11 @@ static uint64_t assign_pts(struct clock_state *c, uint32_t frac, uint32_t sec,
     c->last_pts90k = pts;
     pthread_mutex_unlock(&c->lock);
     return pts;
+}
+
+static uint64_t assign_pts(struct clock_state *c, uint32_t frac, uint32_t sec,
+                           int *rebased) {
+    return assign_pts_presence(c,frac,sec,-1,rebased);
 }
 
 static int annexb_nal_type(const uint8_t *p, size_t n, size_t *sc, size_t *nal) {
@@ -1012,7 +1020,8 @@ int main(int argc,char **argv) {
         if(waiting_idr&&!idr){pthread_mutex_lock(&stats.lock);++stats.dropped_wait_idr;pthread_mutex_unlock(&stats.lock);free(payload);publish_status(&stats,&clock,&queue,"waiting_idr");continue;}
         if(idr&&waiting_idr){waiting_idr=0;pthread_mutex_lock(&stats.lock);stats.waiting_idr=0;pthread_mutex_unlock(&stats.lock);}
         if(normalize_au(payload,payload_n,idr,&param_cache,&param_cache_n,&norm,&norm_n)!=0){free(payload);break;}free(payload);
-        pts=assign_pts(&clock,frac,sec,&rebased);
+        pts=assign_pts_presence(&clock,frac,sec,
+            flags&M1AU_FLAG_TIME_KNOWN ? !!(flags&M1AU_FLAG_TIME_PRESENT) : -1,&rebased);
         if(packetize_pes(norm,norm_n,pts,idr,discontinuity,&cc_video,&packets,&packet_count)!=0){free(norm);break;}free(norm);discontinuity=0;
         memset(&au,0,sizeof(au));au.packets=packets;au.packet_count=packet_count;au.sequence=seq;au.pts90k=pts;au.idr=idr;
         if(queue_push(&queue,&au)!=0){free(au.packets);break;}

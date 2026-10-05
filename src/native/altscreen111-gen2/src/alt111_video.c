@@ -236,6 +236,7 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
     chunk->sequence = ++v->sequence;
     chunk->source_ordinal = source_ordinal;
     chunk->priming = prefix != 0; chunk->idr = idr;
+    chunk->source_time_present = source_ts_raw != NULL;
     if (source_ts_raw) memcpy(chunk->source_ts_raw, source_ts_raw, 8u);
     else memset(chunk->source_ts_raw, 0, sizeof(chunk->source_ts_raw));
     if (chunk->priming) v->priming_queued = 1;
@@ -264,6 +265,7 @@ int alt111_video_peek(const struct alt111_video *v, const uint8_t **bytes,
     ticket->offset = chunk->offset;
     ticket->priming = chunk->priming;
     ticket->idr = chunk->idr;
+    ticket->source_time_present = chunk->source_time_present;
     memcpy(ticket->source_ts_raw, chunk->source_ts_raw, sizeof(ticket->source_ts_raw));
     return ALT111_OK;
 }

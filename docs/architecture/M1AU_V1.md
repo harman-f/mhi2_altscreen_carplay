@@ -1,5 +1,24 @@
 # M1AU v1 local AU metadata framing
 
+## 2026-10-05 parity source-time extension
+
+The current parity producer/consumer additionally use flag bit 2
+(`source_time_presence_known`) and bit 3 (`source_time_present`).
+The 56-byte layout and header version remain v1. GEN2 always sets bit 2 and
+sets bit 3 only when its timed-AU API received the timestamp bytes. Eight
+zero bytes with both bits set are a valid initial 32.32 timestamp. With bit
+2 set and bit 3 clear, parity uses its explicitly missing-time fallback.
+Historical v1 producers without bit 2 retain the historical nonzero/previous
+timestamp heuristic; their first exact zero remains ambiguous.
+
+This is an explicit compatible flags extension, implemented at both endpoints
+and tested through the real video queue, header writer and parity clock.
+Historical remux readers mask the flags they recognize and still strip the
+same header; this extension does not change their CFR timing.
+The older diagnostic-remux description below remains historical context.
+Parity uses little-endian fractional/seconds words for source-derived PTS;
+its transport PCR remains driven independently by paced TS packet output.
+
 Status: experimental, disabled by default.
 
 M1AU is a **local loopback transport** between the GEN2 Stream-111 receiver and

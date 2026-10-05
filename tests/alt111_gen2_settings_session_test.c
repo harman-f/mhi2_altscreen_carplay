@@ -7,6 +7,29 @@ static char recovery_path[192];
 static CFTypeRef test_retain(CFTypeRef object){return object;}
 static void test_release(CFTypeRef object){(void)object;}
 
+static void test_m1au_time_presence(void)
+{
+    static const uint8_t config[]={1,0x42,0,31,0xff,0xe1,0,4,0x67,0x42,0,31,1,0,2,0x68,0xce};
+    static const uint8_t idr[]={0,0,0,2,0x65,0x88},zero[8]={0};
+    struct alt111_video video;struct alt111_output_ticket ticket;
+    const uint8_t *bytes;size_t size;uint64_t stream;
+    alt111_video_init(&video);stream=alt111_video_begin(&video,1);
+    assert(alt111_video_config(&video,stream,config,sizeof(config))==ALT111_OK);
+    assert(alt111_video_attach(&video)==ALT111_OK);
+    assert(alt111_video_submit_timed(&video,stream,idr,sizeof(idr),1,zero)==ALT111_OK);
+    assert(alt111_video_peek(&video,&bytes,&size,&ticket)==ALT111_OK);
+    assert(ticket.source_time_present && !memcmp(ticket.source_ts_raw,zero,8));
+    m1au_prepare_header_locked(&ticket,size);
+    assert((g_tee_frame_header[11]&12u)==12u);
+    assert(alt111_video_advance(&video,&ticket,size)==ALT111_OK);
+    assert(alt111_video_submit(&video,stream,idr,sizeof(idr),1)==ALT111_OK);
+    assert(alt111_video_peek(&video,&bytes,&size,&ticket)==ALT111_OK);
+    assert(!ticket.source_time_present && !memcmp(ticket.source_ts_raw,zero,8));
+    m1au_prepare_header_locked(&ticket,size);
+    assert((g_tee_frame_header[11]&12u)==4u);
+    alt111_video_destroy(&video);
+}
+
 int main(void)
 {
     char root[]="/tmp/alt111-gen2-session-XXXXXX",status[192],log[192];
@@ -18,6 +41,7 @@ int main(void)
     uint64_t demand;
     AirPlayReceiverSessionRef session=(void *)(uintptr_t)1;
     assert(mkdtemp(root));
+    test_m1au_time_presence();
     p_CFRetain=test_retain;p_CFRelease=test_release;
     snprintf(status,sizeof(status),"%s/status",root);g2_status_path=status;
     snprintf(log,sizeof(log),"%s/log",root);g_log_path=log;

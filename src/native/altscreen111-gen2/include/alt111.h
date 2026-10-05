@@ -139,7 +139,7 @@ struct alt111_output_ticket {
      * chain gaps to downstream parity transport. */
     uint64_t source_ordinal;
     size_t offset;
-    unsigned priming, idr;
+    unsigned priming, idr, source_time_present;
     /* Exact eight bytes from the Stream-111 header timestamp area. */
     uint8_t source_ts_raw[8];
 };
@@ -148,7 +148,7 @@ struct alt111_chunk {
     size_t length, offset;
     uint64_t sequence;
     uint64_t source_ordinal;
-    unsigned priming, idr;
+    unsigned priming, idr, source_time_present;
     uint8_t source_ts_raw[8];
 };
 struct alt111_video {
