@@ -108,12 +108,26 @@ with tempfile.TemporaryDirectory() as td:
         assert not (temp / 'mibr-alt111-settings.journal-armed').exists()
         run('status')
 
-    # Journal without armed means the process died before active mutation was
-    # permitted. Reconcile may discard it without touching settings.
+    # schema=2 journal without armed means the process died before active
+    # mutation was permitted. Reconcile may discard it without touching settings.
     before = snapshot()
-    (temp / 'mibr-alt111-settings.journal').write_text('partial\n')
+    (temp / 'mibr-alt111-settings.journal').write_text(
+        'schema=2\nmask=1\nabsent=1\n')
     run('reconcile')
     assert snapshot() == before
+    assert not (temp / 'mibr-alt111-settings.journal').exists()
+
+    # Legacy schema=1 had no armed barrier and may already have mutated active
+    # files. Preserve upgrade safety by forcing the old rollback semantics.
+    legacy_active = temp / 'mibr-carplay111-compat-profile'
+    legacy_original = legacy_active.read_bytes()
+    legacy_hash = hashlib.sha256(legacy_original).hexdigest()
+    (temp / 'mibr-alt111-settings.backup-0').write_bytes(legacy_original)
+    legacy_active.write_bytes(b'corrupt\n')
+    (temp / 'mibr-alt111-settings.journal').write_text(
+        'schema=1\nmask=1\nabsent=0\n0:' + legacy_hash + '\n')
+    run('reconcile')
+    assert legacy_active.read_bytes() == legacy_original
     assert not (temp / 'mibr-alt111-settings.journal').exists()
 
     # Armed without journal means journal removal already committed the batch;
