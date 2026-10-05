@@ -88,19 +88,61 @@ static int replace_file(const char *path, const char *data, size_t size)
 static int lock_settings(const struct alt111_settings_paths *paths, int write_lock,
                           char *error, size_t cap)
 {
-    char path[512];
-    struct flock lk;
+    char path[512], record[64];
     struct stat st;
-    int fd;
-    if (!paths || path_for(path, sizeof(path), paths->temp, "mibr-alt111-settings.lock"))
+    unsigned attempt;
+    int fd, n;
+    (void)write_lock;
+
+    /*
+     * QNX 6.5 /tmp is /dev/shmem on MU1440 and does not support POSIX
+     * record locks.  Use atomic O_CREAT|O_EXCL instead.  The lock remains
+     * exclusive for both readers and writers; settings operations are tiny
+     * and all callers use the same primitive.
+     *
+     * Do not auto-remove an existing lock based on PID heuristics.  A crash
+     * leaves a fail-closed volatile lock that is cleared by canonical reboot.
+     */
+    if (!paths || path_for(path, sizeof(path), paths->temp,
+                           "mibr-alt111-settings.lock-v2"))
         return fail(error, cap, "INVALID_VALUE settings_root");
-    if (!lstat(path, &st) && !S_ISREG(st.st_mode)) return fail(error, cap, "INVALID_VALUE lock_file_type");
-    fd = open(path, O_RDWR | O_CREAT, 0600);
-    if (fd < 0) return fail(error, cap, "APPLY_FAILED lock_open");
-    memset(&lk, 0, sizeof(lk)); lk.l_type = write_lock ? F_WRLCK : F_RDLCK; lk.l_whence = SEEK_SET;
-    if (fstat(fd, &st) || !S_ISREG(st.st_mode) || fcntl(fd, F_SETFD, FD_CLOEXEC) ||
-        fcntl(fd, F_SETLK, &lk)) { close(fd); return fail(error, cap, "BUSY settings_lock"); }
-    return fd;
+
+    for (attempt = 0; attempt < 100u; ++attempt) {
+        fd = open(path, O_RDWR | O_CREAT | O_EXCL, 0600);
+        if (fd >= 0) {
+            n = snprintf(record, sizeof(record), "%ld\n", (long)getpid());
+            if (n <= 0 || (size_t)n >= sizeof(record) ||
+                write(fd, record, (size_t)n) != n) {
+                (void)close(fd);
+                (void)unlink(path);
+                return fail(error, cap, "APPLY_FAILED lock_owner_write");
+            }
+            return fd;
+        }
+
+        if (errno != EEXIST)
+            return fail(error, cap, "APPLY_FAILED lock_open");
+
+        if (lstat(path, &st)) {
+            if (errno == ENOENT) continue;
+            return fail(error, cap, "APPLY_FAILED lock_stat");
+        }
+        if (!S_ISREG(st.st_mode))
+            return fail(error, cap, "INVALID_VALUE lock_file_type");
+
+        if (attempt + 1u < 100u) (void)usleep(1000);
+    }
+    return fail(error, cap, "BUSY settings_lock");
+}
+
+static void unlock_settings(const struct alt111_settings_paths *paths, int fd)
+{
+    char path[512];
+    if (fd < 0) return;
+    (void)close(fd);
+    if (paths && !path_for(path, sizeof(path), paths->temp,
+                           "mibr-alt111-settings.lock-v2"))
+        (void)unlink(path);
 }
 
 static int journal_path(const struct alt111_settings_paths *p, char out[512])
@@ -198,7 +240,7 @@ int alt111_settings_load(const struct alt111_settings_paths *p,
 {
     int fd = lock_settings(p, 0, error, cap), rc;
     if (fd < 0) return -1;
-    rc = load_locked(p, out, error, cap); close(fd); return rc;
+    rc = load_locked(p, out, error, cap); unlock_settings(p, fd); return rc;
 }
 
 static int backup_path(const struct alt111_settings_paths *p, unsigned group,
@@ -311,7 +353,7 @@ int alt111_settings_mutate(const struct alt111_settings_paths *p,
         return fail(error, cap, "INVALID_VALUE batch");
     fd = lock_settings(p, 1, error, cap); if (fd < 0) return -1;
     desired = malloc(sizeof(*desired));
-    if (!desired) { close(fd); return fail(error, cap, "APPLY_FAILED allocation"); }
+    if (!desired) { unlock_settings(p, fd); return fail(error, cap, "APPLY_FAILED allocation"); }
     if (load_locked(p, desired, error, cap)) goto done;
     if (expected && desired->revision != expected) { fail(error, cap, "STALE_REVISION"); goto done; }
     for (i = 0; i < count; ++i) {
@@ -326,7 +368,7 @@ int alt111_settings_mutate(const struct alt111_settings_paths *p,
     if (alt111_settings_validate(desired, error, cap)) goto done;
     rc = transaction_locked(p, desired, mask, 0, out, error, cap);
 done:
-    free(desired); close(fd); return rc;
+    free(desired); unlock_settings(p, fd); return rc;
 }
 
 int alt111_settings_clear(const struct alt111_settings_paths *p,
@@ -342,7 +384,7 @@ int alt111_settings_clear(const struct alt111_settings_paths *p,
     if (id >= ALTSET_COUNT) return fail(error, cap, "INVALID_VALUE key");
     fd = lock_settings(p, 1, error, cap); if (fd < 0) return -1;
     desired = malloc(sizeof(*desired));
-    if (!desired) { close(fd); return fail(error, cap, "APPLY_FAILED allocation"); }
+    if (!desired) { unlock_settings(p, fd); return fail(error, cap, "APPLY_FAILED allocation"); }
     if (load_locked(p, desired, error, cap)) goto done;
     if (expected && desired->revision != expected) { fail(error, cap, "STALE_REVISION"); goto done; }
     group = alt111_setting(id)->group;
@@ -366,7 +408,7 @@ int alt111_settings_clear(const struct alt111_settings_paths *p,
     if (alt111_settings_validate(desired, error, cap)) { rc = -1; goto done; }
     rc = transaction_locked(p, desired, 1u << group, 1u << group, out, error, cap);
 done:
-    free(desired); close(fd); return rc;
+    free(desired); unlock_settings(p, fd); return rc;
 }
 
 int alt111_settings_reconcile(const struct alt111_settings_paths *p,
@@ -379,14 +421,14 @@ int alt111_settings_reconcile(const struct alt111_settings_paths *p,
     char hashes[ALTSET_GROUP_COUNT][65];
     int fd = lock_settings(p, 1, error, cap), rc, consumed = 0;
     if (fd < 0) return -1;
-    if (rollback_barrier(p, error, cap)) { close(fd); return -1; }
-    if (journal_path(p, path)) { close(fd); return fail(error, cap, "INVALID_VALUE journal_path"); }
+    if (rollback_barrier(p, error, cap)) { unlock_settings(p, fd); return -1; }
+    if (journal_path(p, path)) { unlock_settings(p, fd); return fail(error, cap, "INVALID_VALUE journal_path"); }
     rc = read_file(path, blob, sizeof(blob), &size);
-    if (rc == 1) { close(fd); if (error && cap) error[0] = 0; return 0; }
+    if (rc == 1) { unlock_settings(p, fd); if (error && cap) error[0] = 0; return 0; }
     memset(hashes, 0, sizeof(hashes));
     if (rc || sscanf(blob, "schema=1\nmask=%u\nabsent=%u\n%n", &mask, &absent, &consumed) != 2 ||
         !mask || mask >= (1u << ALTSET_GROUP_COUNT) || (absent & ~mask)) {
-        close(fd); return fail(error, cap, "ROLLBACK_FAILED malformed_journal");
+        unlock_settings(p, fd); return fail(error, cap, "ROLLBACK_FAILED malformed_journal");
     }
     while (consumed < (int)size) {
         int n = 0;
@@ -394,12 +436,12 @@ int alt111_settings_reconcile(const struct alt111_settings_paths *p,
         if (sscanf(blob + consumed, "%u:%64[0123456789abcdef]\n%n", &group, hash, &n) != 2 ||
             !n || strlen(hash) != 64 || group >= ALTSET_GROUP_COUNT ||
             (hash_mask & (1u << group)) || !(mask & (1u << group)) || (absent & (1u << group))) {
-            close(fd); return fail(error, cap, "ROLLBACK_FAILED malformed_journal_hash");
+            unlock_settings(p, fd); return fail(error, cap, "ROLLBACK_FAILED malformed_journal_hash");
         }
         strcpy(hashes[group], hash); hash_mask |= 1u << group; consumed += n;
     }
-    if (hash_mask != (mask & ~absent)) { close(fd); return fail(error, cap, "ROLLBACK_FAILED incomplete_journal_hashes"); }
-    rc = restore_locked(p, mask, absent, hashes, error, cap); close(fd); return rc;
+    if (hash_mask != (mask & ~absent)) { unlock_settings(p, fd); return fail(error, cap, "ROLLBACK_FAILED incomplete_journal_hashes"); }
+    rc = restore_locked(p, mask, absent, hashes, error, cap); unlock_settings(p, fd); return rc;
 }
 
 int alt111_settings_clear_temp(const struct alt111_settings_paths *p,
@@ -411,7 +453,7 @@ int alt111_settings_clear_temp(const struct alt111_settings_paths *p,
     unsigned all=(1u<<ALTSET_GROUP_COUNT)-1u;
     fd=lock_settings(p,1,error,cap);if(fd<0)return -1;
     lower=malloc(sizeof(*lower));
-    if(!lower){close(fd);return fail(error,cap,"APPLY_FAILED allocation");}
+    if(!lower){unlock_settings(p, fd);return fail(error,cap,"APPLY_FAILED allocation");}
     if(expected && (load_locked(p,lower,error,cap)||lower->revision!=expected)){
         fail(error,cap,"STALE_REVISION");goto done;
     }
@@ -419,7 +461,7 @@ int alt111_settings_clear_temp(const struct alt111_settings_paths *p,
     if(load_selected_locked(p,lower,error,cap,1u))goto done;
     rc=transaction_locked(p,lower,all,all,out,error,cap);
 done:
-    free(lower);close(fd);return rc;
+    free(lower);unlock_settings(p, fd);return rc;
 }
 
 int alt111_settings_preset(const struct alt111_settings_paths *p,
@@ -432,7 +474,7 @@ int alt111_settings_preset(const struct alt111_settings_paths *p,
     unsigned i;
     fd = lock_settings(p, 1, error, cap); if (fd < 0) return -1;
     desired = malloc(sizeof(*desired));
-    if (!desired) { close(fd); return fail(error, cap, "APPLY_FAILED allocation"); }
+    if (!desired) { unlock_settings(p, fd); return fail(error, cap, "APPLY_FAILED allocation"); }
     if (rollback_barrier(p, error, cap)) goto done;
     if (journal_path(p, journal) || access(journal, F_OK) == 0) {
         fail(error, cap, "BUSY interrupted_transaction_reconcile_required"); goto done;
@@ -448,5 +490,5 @@ int alt111_settings_preset(const struct alt111_settings_paths *p,
      * pre-existing bytes/ABSENT are journaled, never silently reinterpreted. */
     rc = transaction_locked(p, desired, (1u << ALTSET_GROUP_COUNT) - 1u, 0, out, error, cap);
 done:
-    free(desired); close(fd); return rc;
+    free(desired); unlock_settings(p, fd); return rc;
 }
