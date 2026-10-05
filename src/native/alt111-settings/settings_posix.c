@@ -143,6 +143,10 @@ static int load_selected_locked(const struct alt111_settings_paths *p,
     size_t size = 0;
     unsigned group, layer = 0;
     int rc;
+    if(path_for(journal,sizeof(journal),p->temp,"mibr-parity-rollback.pending"))
+        return fail(error,cap,"INVALID_VALUE rollback_barrier_path");
+    if(access(journal,F_OK)==0)
+        return fail(error,cap,"BUSY overlay_rollback_requires_canonical_reboot");
     if (journal_path(p, journal)) return fail(error, cap, "INVALID_VALUE journal_path");
     if (access(journal, F_OK) == 0) return fail(error, cap, "BUSY interrupted_transaction_reconcile_required");
     if (!alt111_settings_defaults(out, "mibr_legacy")) {

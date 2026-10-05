@@ -9,11 +9,17 @@ PAYLOAD=$ROOT/payload
 RUNTIME=$ROOT/runtime
 SHA=$PAYLOAD/sha256sum
 MANIFEST=$ROOT/PAYLOAD.sha256
+. "$ROOT/runtime/settings-basenames.sh" || exit 20
 
 DST=/mnt/app/root/altscreen-u2
 HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
 AIRPLAY=/mnt/app/eso/lib/libairplay.so
 TARGET=/mnt/system/etc/eso/production/smartphone_integrator.json
+STARTUP=/mnt/system/etc/boot/startup.sh
+GUARD=/mnt/app/eso/lib/libmibr_isotx2_guard.so
+OLD_GATE_LINE='        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
+NEW_GATE_LINE='        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_guard.so:/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
+PATCHED_STARTUP=/tmp/mibr-parity-startup.$$
 
 EXPECTED_AIRPLAY=193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5
 EXPECTED_BASE_GEN2=8cccf1cb1764952acd973cbb4f881cfd70f3312e7f6a29cdef7fec930c83d25c
@@ -25,6 +31,7 @@ BACK=/mnt/app/root/mibr-omonob790-parity-v1-backup
 ACTIVE=/mnt/app/root/mibr-omonob790-parity-v1-active
 STATE_AUTODIRECT=/mnt/app/root/mibr-carplay-autodirect
 APP_RW=0
+SYSTEM_RW=0
 MUTATING=0
 
 hashf(){
@@ -35,11 +42,8 @@ hashf(){
 
 fail(){
   echo "MIBR_OMONOB790_PARITY=FAIL $*"
-  if [ "$APP_RW" -eq 1 ]; then
-    sync 2>/dev/null || true
-    mount -ur /mnt/app 2>/dev/null || true
-    APP_RW=0
-  fi
+  system_ro || echo "SYSTEM_MOUNT_STATE=UNCONFIRMED"
+  app_ro || echo "APP_MOUNT_STATE=UNCONFIRMED"
   if [ "$MUTATING" -eq 1 ]; then
     echo "MIBR_OMONOB790_PARITY=ROLLBACK_AFTER_FAILED_APPLY"
     ksh "$ROOT/uninstall.sh" || echo "MIBR_OMONOB790_PARITY=ROLLBACK_FAILED backups_retained=$BACK"
@@ -56,11 +60,33 @@ app_rw(){
 app_ro(){
   if [ "$APP_RW" -eq 1 ]; then
     sync 2>/dev/null || true
-    mount -ur /mnt/app 2>/dev/null || true
+    mount -ur /mnt/app 2>/dev/null || return 1
     APP_RW=0
   fi
 }
-trap app_ro 0 1 2 15
+system_ro(){
+  if [ "$SYSTEM_RW" -eq 1 ]; then
+    sync 2>/dev/null || true
+    mount -ur /mnt/system 2>/dev/null || return 1
+    SYSTEM_RW=0
+  fi
+}
+cleanup(){ system_ro; app_ro; rm -f "$PATCHED_STARTUP" 2>/dev/null || true; }
+trap cleanup 0
+trap 'cleanup; exit 129' 1
+trap 'cleanup; exit 130' 2
+trap 'cleanup; exit 143' 15
+
+prepare_startup(){
+  [ -r "$STARTUP" ] || fail "startup_missing"
+  [ ! -e /mnt/app/root/mibr-isotx2-gate-disable ] || fail "native_gate_disabled"
+  awk -v old="$OLD_GATE_LINE" -v replacement="$NEW_GATE_LINE" '
+    $0==old {print replacement; hits++; next}
+    {print}
+    END {if(hits!=1)exit 42}
+  ' "$STARTUP" > "$PATCHED_STARTUP" || fail "startup_not_exact_single_known_gate_command"
+  ksh -n "$PATCHED_STARTUP" || fail "startup_generated_syntax"
+}
 
 verify_manifest(){
   [ -x "$SHA" ] || fail "missing_sha256_helper=$SHA"
@@ -124,7 +150,7 @@ show_plan(){
   echo "candidate_bridge_sha256=$(candidate_hash bridge)"
   echo "candidate_session_sha256=$(candidate_hash session)"
   echo "transport=complete_m1au_to_source_clocked_mpegts"
-  echo "ownership=dmdt_72_to_70_33"
+  echo "ownership=writev_gate_initial_dmdt_reference_probe_only"
   echo "legacy_autodirect=persistently_disabled_during_candidate"
   echo "profile_apply=temporary_after_reboot_before_carplay_connect"
   echo "backup=$BACK"
@@ -191,10 +217,13 @@ if [ -e "$ACTIVE" ]; then
      same_as_package "$HOOK" "$PAYLOAD/libaltscreen111.so" &&
      same_as_package "$DST/bin/direct-ts-parity" "$PAYLOAD/direct-ts-parity" &&
      same_as_package "$DST/bin/parity-session" "$PAYLOAD/parity-session" &&
+     same_as_package "$DST/bin/alt111-settings" "$PAYLOAD/alt111-settings" &&
+     same_as_package "$GUARD" "$PAYLOAD/libmibr_isotx2_guard.so" &&
      same_as_package "$DST/scripts/omonob790_profile.sh" "$RUNTIME/omonob790_profile.sh" &&
      same_as_package "$DST/scripts/omonob790_session.sh" "$RUNTIME/omonob790_session.sh" &&
      same_as_package "$DST/scripts/omonob790_status.sh" "$RUNTIME/omonob790_status.sh" &&
      same_as_package "$DST/scripts/gen2_compat_profile.sh" "$RUNTIME/gen2_compat_profile.sh"; then
+    [ "$(awk -v line="$NEW_GATE_LINE" '$0==line {n++} END {print n+0}' "$STARTUP")" = 1 ] || fail "active_startup_guard_missing"
     echo "MIBR_OMONOB790_PARITY=ALREADY_INSTALLED"
     exit 0
   fi
@@ -202,6 +231,10 @@ if [ -e "$ACTIVE" ]; then
 fi
 
 check_base
+prepare_startup
+[ ! -e /tmp/mibr-alt111-settings.journal ] || fail "settings_transaction_reconcile_required"
+[ ! -e /tmp/mibr-parity-rollback.pending ] || fail "rollback_requires_canonical_reboot"
+[ ! -e /tmp/mibr-parity-session.lock ] || fail "parity_owner_requires_confirmed_stop"
 
 if [ -d "$BACK" ] && [ ! -e "$ACTIVE" ]; then
   fail "orphan_backup_exists=$BACK run_uninstall_for_recovery_or_review_backup"
@@ -221,11 +254,14 @@ ksh "$ROOT/collect-logs.sh" || fail "sd_log_preflight"
 app_rw || fail "mount_app_rw"
 mkdir -p "$BACK" || fail "backup_dir"
 
-for SPEC in   "$DST/bin/libaltscreen111.so:bin/libaltscreen111.so"   "$HOOK:hook/libmibr_carplay111.so"   "$DST/bin/direct-ts-parity:bin/direct-ts-parity"   "$DST/bin/parity-session:bin/parity-session"   "$DST/scripts/omonob790_profile.sh:scripts/omonob790_profile.sh"   "$DST/scripts/omonob790_session.sh:scripts/omonob790_session.sh"   "$DST/scripts/omonob790_status.sh:scripts/omonob790_status.sh"   "$DST/scripts/gen2_compat_profile.sh:scripts/gen2_compat_profile.sh"   "$STATE_AUTODIRECT:state/mibr-carplay-autodirect"
+for SPEC in   "$DST/bin/libaltscreen111.so:bin/libaltscreen111.so"   "$HOOK:hook/libmibr_carplay111.so"   "$DST/bin/direct-ts-parity:bin/direct-ts-parity"   "$DST/bin/parity-session:bin/parity-session"   "$DST/bin/alt111-settings:bin/alt111-settings"   "$GUARD:guard/libmibr_isotx2_guard.so"   "$STARTUP:boot/startup.sh"   "$DST/scripts/omonob790_profile.sh:scripts/omonob790_profile.sh"   "$DST/scripts/omonob790_session.sh:scripts/omonob790_session.sh"   "$DST/scripts/omonob790_status.sh:scripts/omonob790_status.sh"   "$DST/scripts/gen2_compat_profile.sh:scripts/gen2_compat_profile.sh"   "$STATE_AUTODIRECT:state/mibr-carplay-autodirect"
 do
   SRC=${SPEC%%:*}
   REL=${SPEC#*:}
   backup_one "$SRC" "$REL"
+done
+for NAME in $ALT111_CONFIG_BASENAMES; do
+  backup_one "/tmp/$NAME" "temp/$NAME"
 done
 : > "$BACK/BACKUP_COMPLETE" || fail "backup_complete_marker"
 MUTATING=1
@@ -234,16 +270,21 @@ install_one "$PAYLOAD/libaltscreen111.so" "$DST/bin/libaltscreen111.so"
 install_one "$PAYLOAD/libaltscreen111.so" "$HOOK"
 install_one "$PAYLOAD/direct-ts-parity" "$DST/bin/direct-ts-parity"
 install_one "$PAYLOAD/parity-session" "$DST/bin/parity-session"
+install_one "$PAYLOAD/alt111-settings" "$DST/bin/alt111-settings"
+install_one "$PAYLOAD/libmibr_isotx2_guard.so" "$GUARD"
 install_one "$RUNTIME/omonob790_profile.sh" "$DST/scripts/omonob790_profile.sh"
 install_one "$RUNTIME/omonob790_session.sh" "$DST/scripts/omonob790_session.sh"
 install_one "$RUNTIME/omonob790_status.sh" "$DST/scripts/omonob790_status.sh"
 install_one "$RUNTIME/gen2_compat_profile.sh" "$DST/scripts/gen2_compat_profile.sh"
 
-# This is the only persistent configuration mutation made by the overlay.
-# It is backed up above and restored byte-for-byte by uninstall.sh.
+# Configuration and the exact DisplayManager boot command are both backed up.
 echo 0 > "$STATE_AUTODIRECT.new.$$" || fail "autodirect_disable_write"
 mv "$STATE_AUTODIRECT.new.$$" "$STATE_AUTODIRECT" || fail "autodirect_disable_replace"
 chmod 644 "$STATE_AUTODIRECT" 2>/dev/null || true
+mount -uw /mnt/system 2>/dev/null || fail "mount_system_rw"
+SYSTEM_RW=1
+install_one "$PATCHED_STARTUP" "$STARTUP" 755
+system_ro || fail "mount_system_ro"
 
 {
   echo "candidate=omonob790-functional-parity-v1"
@@ -255,7 +296,7 @@ chmod 644 "$STATE_AUTODIRECT" 2>/dev/null || true
   echo "installed_from=$ROOT"
 } > "$ACTIVE" || fail "active_marker_write"
 
-app_ro
+app_ro || fail "mount_app_ro"
 
 GH=$(hashf "$DST/bin/libaltscreen111.so") || fail "post_gen2_hash_failed"
 HH=$(hashf "$HOOK") || fail "post_hook_hash_failed"
@@ -267,6 +308,8 @@ RH=$(hashf "$DST/bin/direct-ts-remux") || fail "post_base_remux_hash_failed"
 [ "$HH" = "$(candidate_hash gen2)" ] || fail "post_hook_hash=$HH"
 [ "$BH" = "$(candidate_hash bridge)" ] || fail "post_bridge_hash=$BH"
 [ "$SH" = "$(candidate_hash session)" ] || fail "post_session_hash=$SH"
+same_as_package "$DST/bin/alt111-settings" "$PAYLOAD/alt111-settings" || fail "post_settings_hash"
+same_as_package "$GUARD" "$PAYLOAD/libmibr_isotx2_guard.so" || fail "post_guard_hash"
 [ "$RH" = "$EXPECTED_BASE_REMUX" ] || fail "base_remux_changed=$RH"
 [ -r "$STATE_AUTODIRECT" ] && [ "$(cat "$STATE_AUTODIRECT" 2>/dev/null)" = 0 ] || fail "autodirect_not_disabled"
 

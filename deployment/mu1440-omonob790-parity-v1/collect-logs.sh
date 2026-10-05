@@ -43,6 +43,9 @@ OUT=$LOGROOT/$STAMP
 mkdir -p "$OUT" || fail "mkdir=$OUT"
 
 ksh "$PKG/status.sh" > "$OUT/status.txt" 2>&1 || true
+for F in /tmp/mibr-parity-session.backend /tmp/mibr-parity-session.ticket /tmp/mibr-alt111-native-gate.status /tmp/mibr-alt111-gen2.status /tmp/mibr-parity-rollback.pending; do
+  [ ! -r "$F" ] || cp "$F" "$OUT/" || fail "copy_runtime_status=$F"
+done
 
 for SPEC in   "/tmp/mibr-parity-ts.status:parity-ts.status"   "/tmp/mibr-parity-session.state:parity-session.state"   "/tmp/mibr-parity-session.pid:parity-session.pid"   "/tmp/mibr-parity-session-bridge.pid:parity-session-bridge.pid"   "/tmp/mibr-alt111-gen2.status:gen2.status"   "/tmp/mibr-alt111-source-timing.status:source-timing.status"   "/tmp/mibr-carplay111.state:stream111.state"   "/tmp/mibr-carplay111.heartbeat:stream111.heartbeat"   "/tmp/altscreen111.log:altscreen111.log"
 do

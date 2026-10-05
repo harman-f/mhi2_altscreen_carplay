@@ -44,7 +44,10 @@ def outputs():
     return {
         ROOT / 'src/native/alt111-settings/include/registry_generated.h': header,
         ROOT / 'src/native/alt111-settings/include/registry_table_generated.h': table,
-        ROOT / 'settings/hmi-bindings.generated.json': json.dumps(hmi, indent=2) + '\n'
+        ROOT / 'settings/hmi-bindings.generated.json': json.dumps(hmi, indent=2) + '\n',
+        ROOT / 'settings/runtime-basenames.generated.sh':
+            "# Generated from settings/registry.json. Do not edit.\n" +
+            "ALT111_CONFIG_BASENAMES='" + ' '.join(groups) + "'\n"
     }
 
 def main():

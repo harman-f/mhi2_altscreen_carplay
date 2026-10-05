@@ -1,0 +1,2 @@
+# Generated from settings/registry.json. Do not edit.
+ALT111_CONFIG_BASENAMES='mibr-carplay111-compat-profile mibr-carplay111-enabled mibr-carplay111-fps mibr-carplay111-sourceversion mibr-carplay111-keyframes.conf mibr-carplay111-ownership.conf mibr-carplay111-viewarea-selected mibr-carplay111-viewareas.conf mibr-carplay111-display.conf mibr-carplay111-url mibr-carplay111-nav.conf mibr-carplay111-ui-urls.conf mibr-carplay-autodirect'

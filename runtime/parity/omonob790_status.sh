@@ -3,6 +3,9 @@
 set -u
 
 echo "=== OMONOB790 PARITY SESSION ==="
+for F in /tmp/mibr-parity-session.backend /tmp/mibr-parity-session.ticket /tmp/mibr-alt111-native-gate.status /tmp/mibr-alt111-gen2.status; do
+  [ ! -r "$F" ] || { echo "$F"; cat "$F"; }
+done
 for F in   /tmp/mibr-parity-session.state   /tmp/mibr-parity-session.pid   /tmp/mibr-parity-session-bridge.pid /tmp/mibr-parity-session-watchdog.pid /tmp/mibr-parity-session.lock
 do
   if [ -r "$F" ]; then

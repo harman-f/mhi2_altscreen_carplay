@@ -43,6 +43,12 @@ with tempfile.TemporaryDirectory() as td:
         return {name: (temp/name).read_bytes() if (temp/name).exists() else None for name in basenames}
 
     assert 'preset.id.value=mibr_legacy' in run('status').stdout
+    barrier=temp/'mibr-parity-rollback.pending'
+    barrier.write_text('canonical_reboot_required\n')
+    assert 'rollback_requires_canonical_reboot' in run('status',success=False).stdout
+    assert 'rollback_requires_canonical_reboot' in run('preset','--preset','omonob790',success=False).stdout
+    barrier.unlink()
+    run('status')
     (persistent / 'mibr-carplay111-fps').write_text('25\n')
     assert 'maxFPS.value=25' in run('get', '--key', 'maxFPS').stdout
     assert 'RECONNECT_REQUIRED' in run('preset', '--preset', 'mibr_dual_view').stdout

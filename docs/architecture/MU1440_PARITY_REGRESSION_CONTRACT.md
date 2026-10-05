@@ -1,6 +1,9 @@
 # MU1440 parity regression contract
 
-Target: MHI2_ER_SKG13_P4526_MU1440 / AID10. Review baseline:
+Target: MHI2_ER_SKG13_P4526_MU1440 / AID10. Current implementation:
+[harman-f/mhi2_altscreen_carplay#15](https://github.com/harman-f/mhi2_altscreen_carplay/pull/15),
+Draft / DO NOT MERGE. Source identity comes from the exact candidate manifest.
+Historical review baseline:
 `ee82305beae00612755113c387e09270a8905836`,
 [harman-f/mhi2_altscreen_carplay#14](https://github.com/harman-f/mhi2_altscreen_carplay/issues/14).
 Correction branch: `codex/omonob790-regression-hardening-v1`.
@@ -8,7 +11,8 @@ The earlier vehicle-tested artifacts and reviewed source are preserved.
 
 ## Candidate identity
 
-Build GEN2, direct-ts-parity and parity-session from one exact source commit.
+Build GEN2, direct-ts-parity, parity-session, alt111-settings and the independent
+DisplayManager guard from one exact source commit.
 Materialize their complete overlay together with source commit and SHA-256 of
 the payload and every generated script. Never update binaries inside an existing
 candidate directory. Persist the actual package bytes before handoff; an expiring
@@ -17,9 +21,30 @@ Actions artifact is transport, not the durable research copy.
 Install requires the recorded ENVFIX2 GEN2/hook and remux hashes, target
 libairplay hash, and the frozen vehicle-tested gate hash
 `05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957`.
-The gate remains in STOCK; the parity session uses DMDT. Its hash closes the
-previously unidentified inherited downstream component without attributing the
-old standbild failure to a particular gate revision.
+The historical gate bytes remain unchanged. writev_gate is the initial backend;
+the new independent guard is preloaded first into DisplayManager. GEN2 remains
+in smartphone_integrator and cannot certify another process's writes.
+Native exclusion requires a fresh request-token acknowledgement, registered
+target descriptors, zero in-flight writes and a new positive suppression count.
+The owner monitors heartbeat/process/token throughout the run, freezes its
+backend, and binds its bridge to the exact SHA built into the owner.
+
+dmdt_reference is selectable as a routing-only probe. It executes dc72/sc4-72,
+waits 500 ms and restores dc70-33/sc4-70, with no custom writer. Its result is
+OWNERSHIP_UNPROVEN until independent target evidence qualifies a future payload
+adapter. There is no automatic fallback or mixed backend.
+
+The guard tracks open/open64, close, dup/dup2, write/writev and QNX devctl.
+Inherited handles, fcntl aliases and direct resource-manager calls remain a
+target ABI qualification gate. In-process drain is distinct from MOST driver
+queue drain and visible cluster recovery.
+
+Stop uses an owner-generation request, never a PID-file signal. Parent and
+watchdog retain bound bridge identities and require confirmed writer death
+before disabling exclusion or restoring routing. Unknown stop/restore leaves
+the session quarantined. The package restores all hashes/ABSENT states,
+including original boot script, helper, guard and temporary settings. Its
+rollback reader barrier stays until the canonical normal reboot.
 
 ## Media invariants
 

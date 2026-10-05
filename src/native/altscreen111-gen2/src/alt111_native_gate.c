@@ -156,12 +156,13 @@ static void *gate_worker(void *unused)
 }
 static int open_target(const char *path,int flags,mode_t mode,unsigned large)
 {
-    int fd;resolve_real();
+    int fd;unsigned value=path && !strcmp(path,target_path());resolve_real();
     if(!next_open||!next_open64){errno=ENOSYS;return -1;}
     pthread_mutex_lock(&fd_lifecycle_lock);
     fd=large ? next_open64(path,flags,mode) : next_open(path,flags,mode);
     if(fd>=0){
-        pthread_mutex_lock(&gate_lock);track_fd_locked(fd,path && !strcmp(path,target_path()));pthread_mutex_unlock(&gate_lock);
+        pthread_mutex_lock(&gate_lock);track_fd_locked(fd,value);pthread_mutex_unlock(&gate_lock);
+        if(value && (unsigned)fd>=GATE_FD_CAP){next_close(fd);errno=EMFILE;fd=-1;}
     }
     pthread_mutex_unlock(&fd_lifecycle_lock);
     return fd;
@@ -193,6 +194,7 @@ int dup(int fd)
     pthread_mutex_lock(&gate_lock);value=target_fd_locked(fd);pthread_mutex_unlock(&gate_lock);
     out=next_dup(fd);
     if(out>=0){pthread_mutex_lock(&gate_lock);track_fd_locked(out,value);pthread_mutex_unlock(&gate_lock);}
+    if(value && out>=0 && (unsigned)out>=GATE_FD_CAP){next_close(out);errno=EMFILE;out=-1;}
     pthread_mutex_unlock(&fd_lifecycle_lock);return out;
 }
 int dup2(int fd,int destination)
@@ -200,6 +202,10 @@ int dup2(int fd,int destination)
     int out;unsigned value;resolve_real();if(!next_dup2){errno=ENOSYS;return -1;}
     pthread_mutex_lock(&fd_lifecycle_lock);
     pthread_mutex_lock(&gate_lock);value=target_fd_locked(fd);pthread_mutex_unlock(&gate_lock);
+    if(value && destination>=0 && (unsigned)destination>=GATE_FD_CAP) {
+        pthread_mutex_lock(&gate_lock);unsupported=1u;pthread_mutex_unlock(&gate_lock);
+        pthread_mutex_unlock(&fd_lifecycle_lock);errno=EMFILE;return -1;
+    }
     out=next_dup2(fd,destination);
     if(out>=0){pthread_mutex_lock(&gate_lock);track_fd_locked(out,value);pthread_mutex_unlock(&gate_lock);}
     pthread_mutex_unlock(&fd_lifecycle_lock);return out;
@@ -224,7 +230,7 @@ ssize_t write(int fd,const void *data,size_t size)
     ssize_t rc;unsigned mode;int saved=errno;
     resolve_real();if(!next_write){errno=ENOSYS;return -1;}
     mode=enter_io(fd);
-    if(mode==2u){errno=saved;return (ssize_t)size;}
+    if(mode==2u){if(size>SIZE_MAX/2u){errno=EINVAL;return -1;}errno=saved;return (ssize_t)size;}
     rc=next_write(fd,data,size);saved=errno;leave_io(mode);errno=saved;return rc;
 }
 ssize_t writev(int fd,const struct iovec *iov,int count)
@@ -233,8 +239,9 @@ ssize_t writev(int fd,const struct iovec *iov,int count)
     resolve_real();if(!next_writev){errno=ENOSYS;return -1;}
     mode=enter_io(fd);
     if(mode==2u){
-        if(count<0){errno=EINVAL;return -1;}
+        if(count<0 || (count>0&&!iov)){errno=EINVAL;return -1;}
         for(i=0;i<count;++i){if(iov[i].iov_len>SIZE_MAX-size){errno=EINVAL;return -1;}size+=iov[i].iov_len;}
+        if(size>SIZE_MAX/2u){errno=EINVAL;return -1;}
         errno=saved;return (ssize_t)size;
     }
     rc=next_writev(fd,iov,count);saved=errno;leave_io(mode);errno=saved;return rc;

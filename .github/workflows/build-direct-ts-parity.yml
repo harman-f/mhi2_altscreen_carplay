@@ -113,6 +113,8 @@ jobs:
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror tests/direct_ts_parity_regressions.c -pthread -o /tmp/parity-regressions
           /tmp/parity-regressions
           python3 tests/direct_ts_parity_eof_integration.py /tmp/direct-ts-parity-host
+          if ! command -v ffmpeg >/dev/null; then sudo apt-get update; sudo apt-get install -y ffmpeg; fi
+          python3 tests/direct_ts_parity_decode_integration.py /tmp/direct-ts-parity-host "$OUTDIR/decode-evidence"
           python3 tests/parity_session_lifecycle.py
           python3 tests/parity_overlay_rollback.py
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
@@ -133,7 +135,7 @@ jobs:
           bash -n runtime/parity/omonob790_session.sh
           bash -n runtime/parity/omonob790_status.sh
           bash -n runtime/diagnostics/gen2_compat_profile.sh
-          grep -Fq 'mibr-carplay-autodirect 0' runtime/parity/omonob790_profile.sh
+          grep -Fq '"$HELPER" preset --preset omonob790' runtime/parity/omonob790_profile.sh
           grep -Fq 'alt111_policy_au(&g2_policy,g2_video.stream' src/native/altscreen111-gen2/libaltscreen111_gen2.c
           grep -Fq 'O_WRONLY|O_NONBLOCK' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'DRIVER_DCMD_GET_INTERFACE 0x4004050c' src/native/direct-ts-parity/direct_ts_parity.c
@@ -218,6 +220,11 @@ jobs:
           docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
             arm-unknown-nto-qnx6.5.0eabi-readelf -h "$OUTDIR/alt111-settings" > "$OUTDIR/SETTINGS_ELF_HEADER.txt"
           grep -q 'Machine:.*ARM' "$OUTDIR/SETTINGS_ELF_HEADER.txt"
+          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h "$OUTDIR/libmibr_isotx2_guard.so" > "$OUTDIR/GUARD_ELF_HEADER.txt"
+          grep -q 'Machine:.*ARM' "$OUTDIR/GUARD_ELF_HEADER.txt"
+          EXPECTED_BRIDGE=$(sha256sum "$BIN" | awk '{print $1}')
+          grep -Fq "$EXPECTED_BRIDGE" "$OUTDIR/SESSION_STRINGS.txt"
           grep -Fq 'architecture=omonob790-functional-parity-cleanroom' "$OUTDIR/STRINGS.txt"
           grep -Fq 'source_clock=stream111-32.32' "$OUTDIR/STRINGS.txt"
           grep -Fq 'pts_clock=source-derived-90khz' "$OUTDIR/STRINGS.txt"
@@ -289,4 +296,7 @@ jobs:
             ${{ env.OUTDIR }}/libaltscreen111.so
             ${{ env.OUTDIR }}/alt111-settings
             ${{ env.OUTDIR }}/SETTINGS_ELF_HEADER.txt
+            ${{ env.OUTDIR }}/libmibr_isotx2_guard.so
+            ${{ env.OUTDIR }}/GUARD_ELF_HEADER.txt
+            ${{ env.OUTDIR }}/decode-evidence/
             ${{ env.OUTDIR }}/omonob790-hardened-candidate.tar.gz

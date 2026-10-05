@@ -14,12 +14,16 @@ def sha(data):return hashlib.sha256(data).hexdigest()
 for scenario in ("normal","interrupted"):
     with tempfile.TemporaryDirectory() as td:
         root=Path(td);pkg=root/"package";app=root/"app";system=root/"system";state=root/"state";binpath=root/"host-bin"
-        for p in (pkg,pkg/"payload",pkg/"runtime",app/"root/altscreen-u2/bin",app/"root/altscreen-u2/scripts",app/"eso/lib",system/"etc/eso/production",state,binpath):p.mkdir(parents=True,exist_ok=True)
+        for p in (pkg,pkg/"payload",pkg/"runtime",app/"root/altscreen-u2/bin",app/"root/altscreen-u2/scripts",app/"eso/lib",system/"etc/eso/production",system/"etc/boot",state,binpath):p.mkdir(parents=True,exist_ok=True)
         dst=app/"root/altscreen-u2";backup=app/"root/mibr-omonob790-parity-v1-backup"
         old_gen=b"exact old GEN2";old_remux=b"exact old remux";airplay=b"exact target airplay";gate=b"exact stable gate"
         fixtures={dst/"bin/libaltscreen111.so":old_gen,app/"eso/lib/libmibr_carplay111.so":old_gen,
                   dst/"bin/direct-ts-remux":old_remux,app/"eso/lib/libairplay.so":airplay,
                   app/"eso/lib/libmibr_isotx2_gate.so":gate,app/"root/mibr-carplay-autodirect":b"1\n"}
+        startup=b'#!/bin/sh\n        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &\n'
+        fixtures[system/"etc/boot/startup.sh"]=startup.replace(b"/mnt/app",str(app).encode())
+        fixtures[state/"mibr-carplay111-fps"]=b"old valid legacy fps\n"
+        fixtures[state/"mibr-carplay111-nav.conf"]=b"exact pre-install legacy nav\n"
         for path,data in fixtures.items():path.write_bytes(data)
         (app/"root/mibr-framing-v1-active").touch()
         (system/"etc/eso/production/smartphone_integrator.json").write_text(f"LD_PRELOAD={app}/eso/lib/libmibr_carplay111.so\n")
@@ -27,10 +31,13 @@ for scenario in ("normal","interrupted"):
         (pkg/"payload/libaltscreen111.so").write_bytes(b"new GEN2")
         (pkg/"payload/direct-ts-parity").write_bytes(b"new bridge")
         (pkg/"payload/parity-session").write_text("#!/bin/sh\nexit 0\n")
+        (pkg/"payload/alt111-settings").write_text("#!/bin/sh\nexit 0\n")
+        (pkg/"payload/libmibr_isotx2_guard.so").write_bytes(b"new standalone guard")
         (pkg/"payload/sha256sum").write_text("#!/bin/sh\nexec /usr/bin/sha256sum \"$@\"\n")
         for path in (pkg/"payload").iterdir():path.chmod(0o755)
         for name in ("omonob790_profile.sh","omonob790_session.sh","omonob790_status.sh","gen2_compat_profile.sh"):
             (pkg/"runtime"/name).write_text("#!/bin/sh\nexit 0\n")
+        (pkg/"runtime/settings-basenames.sh").write_text(Path("settings/runtime-basenames.generated.sh").read_text())
         for name in ("install.sh","uninstall.sh"):
             text=Path("deployment/mu1440-omonob790-parity-v1",name).read_text()
             for old,new in (("/tmp/",str(state)+"/"),("/mnt/app",str(app)),("/mnt/system",str(system))):text=text.replace(old,new)
@@ -69,6 +76,10 @@ exec /bin/cp "$@"
         cp=run("install.sh","--apply")
         if scenario=="normal":
             assert cp.returncode==0,cp.stdout+cp.stderr
+            assert b"libmibr_isotx2_guard.so:" in (system/"etc/boot/startup.sh").read_bytes()
+            assert (backup/"temp/mibr-carplay111-fps").read_bytes()==fixtures[state/"mibr-carplay111-fps"]
+            (state/"mibr-carplay111-fps").write_text("40\n")
+            (state/"mibr-carplay111-ownership.conf").write_text("backend=writev_gate\n")
             cp=run("install.sh","--apply");assert cp.returncode==0 and "ALREADY_INSTALLED" in cp.stdout,cp.stdout+cp.stderr
             saved=(backup/"bin/libaltscreen111.so").read_bytes()
             (backup/"bin/libaltscreen111.so").write_bytes(b"corrupt backup")
@@ -81,6 +92,10 @@ exec /bin/cp "$@"
         for path,data in fixtures.items():assert path.read_bytes()==data,(scenario,path)
         assert not (dst/"bin/direct-ts-parity").exists()
         assert not (dst/"bin/parity-session").exists()
+        assert not (dst/"bin/alt111-settings").exists()
+        assert not (app/"eso/lib/libmibr_isotx2_guard.so").exists()
+        assert not (state/"mibr-carplay111-ownership.conf").exists()
+        assert (state/"mibr-parity-rollback.pending").exists()
         assert (backup/"RESTORE_VERIFIED").exists()
         assert (backup/"bin/libaltscreen111.so").read_bytes()==old_gen
-print("PARITY_OVERLAY_ROLLBACK=PASS base_gate idempotency corrupt_backup interrupted_apply exact_restore retained_evidence")
+print("PARITY_OVERLAY_ROLLBACK=PASS base_gate standalone_guard boot_preload shared_helper idempotency corrupt_backup interrupted_apply exact_restore temp_ABSENT reader_barrier retained_evidence")
