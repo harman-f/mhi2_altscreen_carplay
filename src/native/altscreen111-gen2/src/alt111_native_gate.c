@@ -118,21 +118,29 @@ static uint64_t read_request(unsigned *exists)
 }
 static void publish_status(const struct alt111_native_gate_status *snapshot)
 {
-    char data[ALT111_NATIVE_GATE_CAP],temp[192];size_t used=0;int fd,n;
+    char data[ALT111_NATIVE_GATE_CAP];size_t used=0;int fd,n,close_rc;
     n=snprintf(data,sizeof(data),"M1GATE1 %" PRIu64 " %ld %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %u\n",
         snapshot->token,(long)getpid(),snapshot->tracked,snapshot->inflight,snapshot->dropped,
         snapshot->heartbeat,(unsigned)snapshot->state);
-    if(n<=0||(size_t)n>=sizeof(data)||
-       snprintf(temp,sizeof(temp),"%s.new.%ld",status_path(),(long)getpid())>=(int)sizeof(temp))return;
-    fd=next_open(temp,O_WRONLY|O_CREAT|O_TRUNC,0600);if(fd<0)return;
+    if(n<=0||(size_t)n>=sizeof(data))return;
+
+    /*
+     * MU1440 target qualification showed that the composed
+     * guard -> frozen writev gate -> libc preload chain can open/write/close
+     * the temporary status file while the final rename never becomes visible.
+     * Publish directly to the fixed /tmp status path instead. O_TRUNC plus one
+     * complete parser-checked line remains fail-closed: a reader racing the
+     * short truncate/write window sees empty/partial data and rejects it.
+     */
+    fd=next_open(status_path(),O_WRONLY|O_CREAT|O_TRUNC,0600);if(fd<0)return;
     while(used<(size_t)n){
         ssize_t w=next_write(fd,data+used,(size_t)n-used);
         if(w<0&&errno==EINTR)continue;
         if(w<=0)break;
         used+=(size_t)w;
     }
-    if(!next_close(fd)&&used==(size_t)n)(void)rename(temp,status_path());
-    (void)unlink(temp);
+    close_rc=next_close(fd);
+    if(close_rc||used!=(size_t)n)return;
 }
 static void *gate_worker(void *unused)
 {
