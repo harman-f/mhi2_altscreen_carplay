@@ -118,6 +118,7 @@ jobs:
           python3 tests/direct_ts_parity_decode_integration.py /tmp/direct-ts-parity-host "$OUTDIR/decode-evidence"
           python3 tests/parity_session_lifecycle.py
           python3 tests/parity_overlay_rollback.py
+          python3 tests/parity_session_logging.py
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
             -DMIBR_SHA256_LIBRARY_ONLY \
             -Isrc/native/altscreen111-gen2/include -Isrc/native/alt111-settings/include \

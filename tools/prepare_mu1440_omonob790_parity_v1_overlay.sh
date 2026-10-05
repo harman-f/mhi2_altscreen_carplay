@@ -33,6 +33,8 @@ cp "$SETTINGS" "$DEST/payload/alt111-settings"
 cp "$GUARD" "$DEST/payload/libmibr_isotx2_guard.so"
 cp "$SHAHELP" "$DEST/payload/sha256sum"
 
+cp "$ROOT/deployment/mu1440-omonob790-parity-v1/session-logging.sh" "$DEST/runtime/session-logging.sh"
+cp "$ROOT/deployment/mu1440-omonob790-parity-v1/package-logging.sh" "$DEST/runtime/package-logging.sh"
 cp "$ROOT/runtime/parity/omonob790_profile.sh" "$DEST/runtime/omonob790_profile.sh"
 cp "$ROOT/runtime/parity/omonob790_session.sh" "$DEST/runtime/omonob790_session.sh"
 cp "$ROOT/runtime/parity/omonob790_status.sh" "$DEST/runtime/omonob790_status.sh"
@@ -56,7 +58,7 @@ chmod +x "$DEST/"*.sh "$DEST/payload/"* "$DEST/runtime/"*.sh
 
 (
   cd "$DEST"
-  sha256sum     payload/libaltscreen111.so     payload/direct-ts-parity     payload/parity-session     payload/alt111-settings     payload/libmibr_isotx2_guard.so     payload/sha256sum     install.sh     uninstall.sh     status.sh     collect-logs.sh     vehicle-install.sh     vehicle-rollback.sh     runtime/omonob790_profile.sh     runtime/omonob790_session.sh     runtime/omonob790_status.sh     runtime/gen2_compat_profile.sh     runtime/settings-basenames.sh     runtime/master-script-basenames.sh     runtime/master_settings.sh runtime/direct_fps.sh runtime/gen2_sourceversion.sh runtime/gen2_enabled.sh runtime/gen2_display.sh runtime/gen2_keyframes.sh runtime/gen2_viewareas.sh runtime/gen2_safearea.sh runtime/gen2_nav_config.sh runtime/gen2_url.sh runtime/gen2_ui_urls.sh     HMI-BINDINGS.json     > PAYLOAD.sha256
+  sha256sum     payload/libaltscreen111.so     payload/direct-ts-parity     payload/parity-session     payload/alt111-settings     payload/libmibr_isotx2_guard.so     payload/sha256sum     install.sh     uninstall.sh     status.sh     collect-logs.sh     vehicle-install.sh     vehicle-rollback.sh     runtime/omonob790_profile.sh     runtime/omonob790_session.sh     runtime/omonob790_status.sh     runtime/gen2_compat_profile.sh     runtime/settings-basenames.sh     runtime/session-logging.sh     runtime/package-logging.sh     runtime/master-script-basenames.sh     runtime/master_settings.sh runtime/direct_fps.sh runtime/gen2_sourceversion.sh runtime/gen2_enabled.sh runtime/gen2_display.sh runtime/gen2_keyframes.sh runtime/gen2_viewareas.sh runtime/gen2_safearea.sh runtime/gen2_nav_config.sh runtime/gen2_url.sh runtime/gen2_ui_urls.sh     HMI-BINDINGS.json     > PAYLOAD.sha256
 )
 
 GEN2_SHA=$(sha256sum "$GEN2" | awk '{print $1}')
@@ -150,6 +152,10 @@ A normal IOC reboot loads the guard into DisplayManager, before the frozen gate,
 and loads GEN2 into smartphone_integrator. The guard is a separate library;
 GEN2 cannot observe DisplayManager's native writes from another process.
 No live process restart is performed.
+
+Use vehicle-install.sh / vehicle-rollback.sh for console + SD logs.
+Each wrapper prepares SD write access and uses the bundled M.I.B. tee path;
+logging bootstrap or logger failure prevents a successful result.
 
 After reboot, before connecting CarPlay:
   ksh ./status.sh

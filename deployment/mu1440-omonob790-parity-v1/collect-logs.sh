@@ -13,9 +13,9 @@ MOUNTER=$CARD/apps/mounts
 CARD_RW=0
 
 card_ro(){
-  if [ "$CARD_RW" -eq 1 ]; then
+  if [ "$CARD_RW" -eq 1 ] && [ "${MIBR_LOG_ACTIVE:-0}" != 1 ]; then
     sync 2>/dev/null || true
-    mount -ur "$CARD" 2>/dev/null || true
+    mount -ur "$CARD" 2>/dev/null || return 1
     CARD_RW=0
   fi
 }
@@ -24,7 +24,10 @@ fail(){
   card_ro
   exit 20
 }
-trap card_ro 0 1 2 15
+trap card_ro 0
+trap 'card_ro; exit 129' 1
+trap 'card_ro; exit 130' 2
+trap 'card_ro; exit 143' 15
 
 [ -x "$MOUNTER" ] || fail "missing_mount_helper=$MOUNTER"
 [ -r "$PKG/status.sh" ] || fail "missing_status_script=$PKG/status.sh"
@@ -35,7 +38,7 @@ CARD_RW=1
 TEST=$CARD/.mibr-omonob790-parity-write-test-$$
 touch "$TEST" 2>/dev/null || fail "sd_write_test_create"
 [ -f "$TEST" ] || fail "sd_write_test_verify"
-rm -f "$TEST" 2>/dev/null || true
+rm -f "$TEST" 2>/dev/null || fail "sd_write_test_remove"
 
 STAMP=$(/net/rcc/usr/bin/date +%Y%m%d-%H%M%S 2>/dev/null)
 [ -n "$STAMP" ] || STAMP=run-$$
@@ -54,7 +57,7 @@ do
   [ -r "$SRC" ] && cp "$SRC" "$OUT/$NAME" 2>/dev/null || true
 done
 
-card_ro
+card_ro || fail "sd_mount_ro"
 trap - 0 1 2 15
 
 echo "OMONOB790_PARITY_LOG_EXPORT=PASS"
