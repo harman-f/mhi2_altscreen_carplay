@@ -290,6 +290,15 @@ int main(int argc, char **argv) {
     uint64_t elapsed_ms = 0;
 
     if (argc == 2 && !strcmp(argv[1], "--self-test")) return self_test();
+    if (argc == 2 && !strcmp(argv[1], "--restore-stock")) {
+        int rr;
+        (void)write_text(STATE_PATH, "manual_restoring_dmdt\n");
+        rr=route_restore();
+        unlink(AU_MARKER);
+        unlink(OLD_DIRECT_MARKER);
+        (void)write_text(STATE_PATH, rr==0 ? "manual_stock\n" : "manual_restore_failed\n");
+        return rr==0 ? 0 : 20;
+    }
     if (argc != 5) {
         fprintf(stderr, "usage: %s BRIDGE INPUT OUTPUT MAX_SECONDS\n", argv[0]);
         return 64;
