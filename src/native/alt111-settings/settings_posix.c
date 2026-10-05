@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -85,6 +86,34 @@ static int replace_file(const char *path, const char *data, size_t size)
     return 0;
 }
 
+static int stale_lock_owner_gone(const char *path)
+{
+    char owner[64], *end;
+    size_t size = 0;
+    long pid;
+    int rc;
+
+    /*
+     * A creator may be between O_EXCL and writing its PID.  Empty, malformed
+     * or unreadable owner state is therefore BUSY, never stale.
+     */
+    rc = read_file(path, owner, sizeof(owner), &size);
+    if (rc != 0 || !size) return 0;
+    errno = 0;
+    pid = strtol(owner, &end, 10);
+    if (errno || pid <= 1 || end == owner || (*end != '\n' && *end != 0))
+        return 0;
+    if (*end == '\n' && end[1] != 0) return 0;
+
+    /*
+     * Only ESRCH is proof that the recorded owner no longer exists.
+     * Success, EPERM and every other error stay fail-closed.
+     */
+    errno = 0;
+    if (kill((pid_t)pid, 0) == -1 && errno == ESRCH) return 1;
+    return 0;
+}
+
 static int lock_settings(const struct alt111_settings_paths *paths, int write_lock,
                           char *error, size_t cap)
 {
@@ -99,9 +128,6 @@ static int lock_settings(const struct alt111_settings_paths *paths, int write_lo
      * record locks.  Use atomic O_CREAT|O_EXCL instead.  The lock remains
      * exclusive for both readers and writers; settings operations are tiny
      * and all callers use the same primitive.
-     *
-     * Do not auto-remove an existing lock based on PID heuristics.  A crash
-     * leaves a fail-closed volatile lock that is cleared by canonical reboot.
      */
     if (!paths || path_for(path, sizeof(path), paths->temp,
                            "mibr-alt111-settings.lock-v2"))
@@ -130,6 +156,15 @@ static int lock_settings(const struct alt111_settings_paths *paths, int write_lo
         if (!S_ISREG(st.st_mode))
             return fail(error, cap, "INVALID_VALUE lock_file_type");
 
+        if (stale_lock_owner_gone(path)) {
+            /*
+             * The path is still exclusively owned by the dead creator.
+             * Unlink and compete normally for a fresh O_EXCL create.
+             */
+            if (!unlink(path) || errno == ENOENT) continue;
+            return fail(error, cap, "APPLY_FAILED stale_lock_unlink");
+        }
+
         if (attempt + 1u < 100u) (void)usleep(1000);
     }
     return fail(error, cap, "BUSY settings_lock");
@@ -138,10 +173,25 @@ static int lock_settings(const struct alt111_settings_paths *paths, int write_lo
 static void unlock_settings(const struct alt111_settings_paths *paths, int fd)
 {
     char path[512];
+    struct stat held, current;
+
     if (fd < 0) return;
+    if (fstat(fd, &held)) {
+        (void)close(fd);
+        return;
+    }
     (void)close(fd);
-    if (paths && !path_for(path, sizeof(path), paths->temp,
+
+    if (!paths || path_for(path, sizeof(path), paths->temp,
                            "mibr-alt111-settings.lock-v2"))
+        return;
+
+    /*
+     * Do not unlink a replacement path if external interference occurred.
+     * Normal operation sees the same inode that this process acquired.
+     */
+    if (!lstat(path, &current) &&
+        held.st_dev == current.st_dev && held.st_ino == current.st_ino)
         (void)unlink(path);
 }
 
