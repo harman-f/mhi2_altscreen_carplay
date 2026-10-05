@@ -52,6 +52,7 @@ with tempfile.TemporaryDirectory() as td:
         assert 'rollback_requires_canonical_reboot' in run(*args,success=False).stdout
         assert snapshot() == before
         assert not (temp/'mibr-alt111-settings.journal').exists()
+        assert not (temp/'mibr-alt111-settings.journal-armed').exists()
     barrier.unlink()
     barrier.symlink_to(temp/'absent-rollback-target')
     assert 'rollback_requires_canonical_reboot' in run('preset','--preset','omonob790',success=False).stdout
@@ -88,46 +89,44 @@ with tempfile.TemporaryDirectory() as td:
     run('batch', '--input', str(batch), success=False)
     assert snapshot() == before
 
-    # Inject a real SIGKILL after each active settings-file rename. The CLI
-    # control flow, lock, backups, journal and reconciliation are unchanged.
-    preload_source = root / 'inject.c'
-    preload_source.write_text(r'''
-#define _GNU_SOURCE
-#include <dlfcn.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-int rename(const char *a, const char *b) {
-    static int count;
-    int (*real_rename)(const char *, const char *) = dlsym(RTLD_NEXT, "rename");
-    int rc = real_rename(a, b);
-    const char *setting = getenv("INJECT_AFTER");
-    if (!rc && setting && strstr(b, "/mibr-carplay") && ++count == atoi(setting))
-        kill(getpid(), SIGKILL);
-    return rc;
-}
-''')
-    preload = root / 'inject.so'
-    subprocess.run(['cc', '-shared', '-fPIC', '-std=gnu99', '-Wall', '-Wextra', '-Werror',
-                    str(preload_source), '-ldl', '-o', str(preload)], check=True)
-    # Start with both existing and absent files so ABSENT restore is exercised.
+    # The target cannot rename() inside /tmp -> /dev/shmem. Transactions use
+    # direct rewrites only after journal+armed have established rollback state.
+    # Inject a real SIGKILL after each active direct rewrite.
     run('clear', '--key', 'maxFPS')
     run('clear', '--key', 'ownership.backend')
     for after in range(1, len(basenames) + 1):
         before = snapshot()
         rc = run('preset', '--preset', 'omonob790', success=False,
-                 extra={'LD_PRELOAD': str(preload), 'INJECT_AFTER': str(after)})
+                 extra={'ALT111_SETTINGS_TEST_CRASH_AFTER_ACTIVE_WRITE': str(after)})
         assert rc.returncode == -signal.SIGKILL
+        assert (temp / 'mibr-alt111-settings.journal').exists()
+        assert (temp / 'mibr-alt111-settings.journal-armed').exists()
         assert 'reconcile_required' in run('status', success=False).stdout
         run('reconcile')
         assert snapshot() == before, after
+        assert not (temp / 'mibr-alt111-settings.journal').exists()
+        assert not (temp / 'mibr-alt111-settings.journal-armed').exists()
         run('status')
 
+    # Journal without armed means the process died before active mutation was
+    # permitted. Reconcile may discard it without touching settings.
+    before = snapshot()
+    (temp / 'mibr-alt111-settings.journal').write_text('partial\n')
+    run('reconcile')
+    assert snapshot() == before
+    assert not (temp / 'mibr-alt111-settings.journal').exists()
+
+    # Armed without journal means journal removal already committed the batch;
+    # only marker cleanup was interrupted.
+    (temp / 'mibr-alt111-settings.journal-armed').write_text('armed\n')
+    run('reconcile')
+    assert snapshot() == before
+    assert not (temp / 'mibr-alt111-settings.journal-armed').exists()
+
     # An altered backup must stop BEFORE any restore mutation, retaining the
-    # journal and remaining secured originals for inspection/retry.
+    # armed journal and remaining secured originals for inspection/retry.
     rc = run('preset', '--preset', 'omonob790', success=False,
-             extra={'LD_PRELOAD': str(preload), 'INJECT_AFTER': '1'})
+             extra={'ALT111_SETTINGS_TEST_CRASH_AFTER_ACTIVE_WRITE': '1'})
     journal = temp / 'mibr-alt111-settings.journal'
     hash_line = next(line for line in journal.read_text().splitlines() if ':' in line)
     group, original_hash = hash_line.split(':')
@@ -138,6 +137,7 @@ int rename(const char *a, const char *b) {
     before = snapshot()
     assert 'backup_hash' in run('reconcile', success=False).stdout
     assert snapshot() == before and journal.exists()
+    assert (temp / 'mibr-alt111-settings.journal-armed').exists()
     backup.write_bytes(original)
     run('reconcile')
     # Clearing the full temporary layer validates every lower value first.
