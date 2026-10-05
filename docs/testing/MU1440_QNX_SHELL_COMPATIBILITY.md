@@ -71,39 +71,84 @@ disk-backed Unix `/tmp`.
 
 ### What is confirmed to work
 
-Flat regular-file operations in `/tmp` are usable. A direct vehicle probe successfully performed:
+A native QNX ARMv7 vehicle probe on 2026-10-05 measured the actual syscall behavior below
+`/tmp -> /dev/shmem`:
 
-```sh
-echo MIBR_RENAME_PROBE > /tmp/mibr-rename-probe.new
-mv /tmp/mibr-rename-probe.new /tmp/mibr-rename-probe.status
-cat /tmp/mibr-rename-probe.status
+```text
+open_excl_create rc=3 errno=0 strerror=OK
+open_excl_collision rc=-1 errno=17 strerror=File exists
+write rc=17 errno=0 strerror=OK
+fcntl_F_SETLK rc=-1 errno=89 strerror=Function not implemented
+fsync rc=-1 errno=89 strerror=Function not implemented
+close_write_fd rc=0 errno=0 strerror=OK
+rename rc=-1 errno=18 strerror=Improper link
+open_readback rc=-1 errno=2 strerror=No such file or directory
+unlink_final rc=-1 errno=2 strerror=No such file or directory
 ```
 
-The `mv` returned `0` and the final file contained the expected data. The native gate status
-publisher also successfully creates, truncates, writes and closes its flat
-`/tmp/mibr-alt111-native-gate.status` file after the target-specific publication fix.
+This directly qualifies atomic flat lock creation with `O_CREAT|O_EXCL`, ordinary writes and
+close. A separate direct-write vehicle check also confirmed that shell redirection truncates an
+existing flat `/tmp` file correctly: after writing a longer value, `echo X > file` left a
+2-byte file containing only `X\n`.
 
-### `fsync()` on volatile shared-memory files
+The native gate status publisher independently confirms flat create/truncate/write/close behavior
+for `/tmp/mibr-alt111-native-gate.status`.
 
-The settings transaction layer also cannot assume that `fsync()` succeeds on files below
-`/tmp -> /dev/shmem`.
+### Native `rename()` is not available inside `/tmp -> /dev/shmem`
 
-QNX documents both `ENOSYS` and `EINVAL` as possible results when synchronized I/O is not
-implemented/supported for the underlying object. The MU1440 settings transaction initially accepted
-only `ENOSYS`; the first live `dual-temp` mutation then reached journal creation and failed with:
+The same native probe proved that `rename(old, new)` fails reproducibly with:
+
+```text
+errno=18 strerror=Improper link
+```
+
+This is the concrete cause of the first live `dual-temp` failure:
 
 ```text
 result=APPLY_FAILED journal
 ```
 
-At that point the settings lock-v2 acquire/release path had already been vehicle-qualified and no
-journal or rollback barrier pre-existed. The transaction writes its journal through a flat
-create/write/fsync/close/rename helper, while flat create/write/rename behavior had already been
-confirmed separately on the same target. The target fix therefore treats `EINVAL` and `ENOSYS`
-as "synchronized I/O unsupported" for this volatile settings helper only; all other `fsync`
-errors remain fatal.
+The earlier shell test using `mv old new` returned success, but that must not be interpreted as
+native-`rename()` support. The shell utility can fall back to copy+unlink when `rename()` fails.
+For native settings transactions on this target, temp-file-plus-rename is therefore invalid.
 
-This exception must not be generalized to persistent filesystems.
+### `fsync()` on volatile shared-memory files
+
+The target-native probe also measured:
+
+```text
+fsync rc=-1 errno=89 strerror=Function not implemented
+```
+
+The settings layer already tolerated `ENOSYS` for volatile `/dev/shmem` files, so `fsync()`
+was **not** the journal failure. A short-lived hypothesis that `EINVAL` might be the vehicle
+failure was disproved by the native probe and must not be used as target evidence.
+
+The current target contract is therefore narrow: tolerate the vehicle-proven `ENOSYS` result for
+volatile settings files, keep every other `fsync()` error fail-closed, and do not generalize this
+exception to persistent filesystems.
+
+### Transaction design without `rename()`
+
+The replacement transaction design uses only target-proven flat-file primitives:
+
+- `O_CREAT|O_EXCL` for the settings lock and one-shot transaction markers;
+- direct truncate/write for backups and active temporary settings files;
+- `unlink()` for marker cleanup;
+- no native `rename()` below `/tmp`.
+
+Crash recovery uses two flat markers. The journal is written completely first. Then
+`mibr-alt111-settings.journal-armed` is created exclusively. Active settings may only be rewritten
+after the armed marker exists.
+
+This yields three recoverable states:
+
+- journal without armed: transaction died before active mutation; discard the unarmed journal;
+- journal plus armed: active mutation may have started; restore every affected group from validated backups;
+- armed without journal: journal removal already crossed the commit point; only remove the stale armed marker.
+
+This preserves explicit crash recovery without relying on filesystem semantics the MU1440 target
+does not provide.
 
 ### What must not be assumed
 
@@ -134,16 +179,13 @@ Cross-process settings synchronization must therefore avoid both:
 - `fcntl(F_SETLK)` / POSIX record locking on `/tmp`;
 - directory-lock schemes below `/tmp`.
 
-The current replacement candidate uses an atomic flat lock-file create with
-`open(..., O_CREAT|O_EXCL, 0600)` on a new `mibr-alt111-settings.lock-v2` path. The file records the
+The current replacement uses an atomic flat lock-file create with
+`open(..., O_CREAT|O_EXCL, 0600)` on a new `mibr-alt111-settings.lock-v2` path. This
+exclusive-create behavior is now vehicle-qualified on the reference MU1440. The file records the
 owner PID. A pre-existing V2 lock is reclaimed only when `kill(pid, 0)` proves the recorded owner is
 gone with `ESRCH`; success, `EPERM`, malformed/empty owner data and all other errors remain
 fail-closed. This is required so a process killed in the middle of a settings transaction does not
 permanently block the explicit journal-reconciliation path.
-
-The exclusive-create behavior is deliberately documented as a **candidate until vehicle-qualified**;
-successful compilation or host testing is not sufficient evidence that the exact MU1440
-`/dev/shmem` implementation provides the required semantics.
 
 The old `mibr-alt111-settings.lock` file may remain present from the record-lock implementation.
 Its mere existence is not proof that a process owns a lock and it must not be used as a stale-lock
