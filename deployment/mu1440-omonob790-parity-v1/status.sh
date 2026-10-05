@@ -1,0 +1,68 @@
+#!/bin/ksh
+set -u
+
+SELF=$0
+case "$SELF" in */*) ROOT=${SELF%/*} ;; *) ROOT=. ;; esac
+ROOT=$(cd "$ROOT" 2>/dev/null && pwd) || exit 2
+
+SHA=$ROOT/payload/sha256sum
+DST=/mnt/app/root/altscreen-u2
+HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
+ACTIVE=/mnt/app/root/mibr-omonob790-parity-v1-active
+BASE_REMUX_EXPECTED=3f0e730523bd290608dc13e186baa962eeb9c46f117d4d4976be523c0cd94c09
+
+hashf(){
+  [ -x "$SHA" ] || return 1
+  set -- $("$SHA" "$1" 2>/dev/null)
+  [ -n "${1:-}" ] || return 1
+  echo "$1"
+}
+
+compare(){
+  LABEL=$1
+  LIVE=$2
+  PKG=$3
+  if [ ! -r "$LIVE" ]; then
+    echo "$LABEL=FAIL_MISSING"
+    return
+  fi
+  LH=$(hashf "$LIVE" 2>/dev/null)
+  PH=$(hashf "$PKG" 2>/dev/null)
+  echo "${LABEL}_live_sha256=${LH:-HASH_FAILED}"
+  echo "${LABEL}_candidate_sha256=${PH:-HASH_FAILED}"
+  [ -n "${LH:-}" ] && [ "$LH" = "$PH" ] && echo "$LABEL=PASS_CANDIDATE" || echo "$LABEL=FAIL_HASH"
+}
+
+echo "=== MU1440 OMONOB790 PARITY OVERLAY ==="
+[ -e "$ACTIVE" ] && { echo "candidate_active=1"; cat "$ACTIVE" 2>/dev/null || true; } || echo "candidate_active=0"
+
+compare gen2 "$DST/bin/libaltscreen111.so" "$ROOT/payload/libaltscreen111.so"
+compare hook "$HOOK" "$ROOT/payload/libaltscreen111.so"
+compare parity_bridge "$DST/bin/direct-ts-parity" "$ROOT/payload/direct-ts-parity"
+compare parity_session "$DST/bin/parity-session" "$ROOT/payload/parity-session"
+
+if [ -r "$DST/bin/direct-ts-remux" ]; then
+  RH=$(hashf "$DST/bin/direct-ts-remux" 2>/dev/null)
+  echo "base_remux_live_sha256=${RH:-HASH_FAILED}"
+  [ "$RH" = "$BASE_REMUX_EXPECTED" ] && echo "base_remux_state=PASS_UNCHANGED" || echo "base_remux_state=FAIL_CHANGED"
+else
+  echo "base_remux_state=FAIL_MISSING"
+fi
+
+echo
+echo "=== LEGACY AUTO DIRECT ==="
+if [ -r /tmp/mibr-carplay-autodirect ]; then
+  echo "autodirect_source=temp"
+  echo "autodirect=$(cat /tmp/mibr-carplay-autodirect 2>/dev/null)"
+elif [ -r /mnt/app/root/mibr-carplay-autodirect ]; then
+  echo "autodirect_source=persistent"
+  echo "autodirect=$(cat /mnt/app/root/mibr-carplay-autodirect 2>/dev/null)"
+else
+  echo "autodirect_source=default"
+  echo "autodirect=1"
+fi
+
+if [ -x "$DST/scripts/omonob790_status.sh" ]; then
+  echo
+  ksh "$DST/scripts/omonob790_status.sh"
+fi
