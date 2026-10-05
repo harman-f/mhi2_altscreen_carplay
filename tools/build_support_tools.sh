@@ -19,3 +19,9 @@ mkdir -p "$OUTDIR"
 
 
 "$QCC"   -mfloat-abi=softfp   -O2 -g -std=gnu99 -Wall -Wextra   src/native/tee-compat/tee_compat.c   -o "$OUTDIR/tee"
+
+"$QCC" \
+  -mfloat-abi=softfp \
+  -O2 -g -std=gnu99 -Wall -Wextra \
+  src/native/qnx-shmem-probe/shmem_fs_probe.c \
+  -o "$OUTDIR/shmem-fs-probe"
