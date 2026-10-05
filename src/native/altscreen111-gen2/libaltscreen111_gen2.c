@@ -17,6 +17,7 @@
 #include <time.h>
 #include <unistd.h>
 #include "alt111.h"
+#include "alt111_settings.h"
 
 #ifndef MAP_ANON
 #define MAP_ANON MAP_ANONYMOUS
@@ -311,6 +312,19 @@ static const char *g_nav_config_name = "mibr-carplay111-nav.conf";
 static const char *g_display_config_name = "mibr-carplay111-display.conf";
 static const char *g_viewareas_config_name = "mibr-carplay111-viewareas.conf";
 static const char *g_compat_profile_config_name = "mibr-carplay111-compat-profile";
+static pthread_mutex_t g_settings_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t g_settings_io_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_once_t g_settings_scope_once = PTHREAD_ONCE_INIT;
+static pthread_key_t g_settings_scope_key;
+static unsigned g_settings_scope_ready;
+static struct alt111_settings g_settings_desired, g_settings_advertised, g_settings_active;
+static unsigned g_settings_have, g_settings_valid, g_settings_have_advertised, g_settings_have_active;
+static unsigned g_settings_active_confirmed;
+static uint64_t g_settings_active_control_generation;
+static AirPlayReceiverSessionRef g_settings_advertised_session;
+static AirPlayReceiverSessionRef g_settings_active_session;
+static char g_settings_error[256];
+static char g_settings_advertised_version[192], g_settings_active_version[192];
 static char g_alt_uuid[96] = ALT_UUID_DEFAULT;
 static char g_alt_url[160] = ALT_URL_DEFAULT;
 static const char *g_log_path = "/tmp/altscreen111.log";
@@ -334,6 +348,7 @@ static struct alt111_profile g2_profile;
 static struct alt111_control g2_control;
 static struct alt111_video g2_video;
 static struct alt111_resync g2_resync;
+static struct alt111_policy g2_policy;
 static mibr_mode_state_t g2_last_mode_state;
 static unsigned g2_last_mode_valid;
 static uint64_t g2_mode_sequence;
@@ -387,7 +402,7 @@ static uint64_t g2_d2_coalesced;
 
 static void gen2_publish_status(void);
 static int current_advertised_fps(void);
-static void gen2_control_projection_on(void);
+static int gen2_control_projection_on(AirPlayReceiverSessionRef session);
 static void gen2_control_release(void);
 static void gen2_set_command_ready(unsigned ready);
 static void gen2_video_begin_current(void);
@@ -772,24 +787,6 @@ static CFStringRef s_cf(const char *s);
  * Persistent A/B controls are intentionally file-based so the vehicle can
  * switch protocol variants without replacing/recompiling the injected binary.
  */
-static int read_trimmed_value(const char *path, char *out, size_t cap)
-{
-    int fd;
-    ssize_t n;
-    if (!path || !out || cap < 2u) return -1;
-    out[0] = '\0';
-    fd = open(path, O_RDONLY);
-    if (fd < 0) return -1;
-    n = read(fd, out, cap - 1u);
-    close(fd);
-    if (n <= 0) return -1;
-    out[n] = '\0';
-    while (n > 0 && (out[n-1] == '\n' || out[n-1] == '\r' ||
-                     out[n-1] == ' ' || out[n-1] == '\t'))
-        out[--n] = '\0';
-    return n > 0 ? 0 : -1;
-}
-
 static const char *config_layer_name(unsigned layer)
 {
     if(layer==2u)return "temp";
@@ -797,23 +794,79 @@ static const char *config_layer_name(unsigned layer)
     return "default";
 }
 
+struct gen2_settings_scope {
+    struct alt111_settings settings;
+    char actual_source_version[192];
+    unsigned descriptor_complete;
+    unsigned valid;
+};
+
+static void settings_scope_init(void)
+{
+    g_settings_scope_ready=pthread_key_create(&g_settings_scope_key,NULL)==0;
+}
+
+static struct gen2_settings_scope *settings_scope(void)
+{
+    pthread_once(&g_settings_scope_once,settings_scope_init);
+    return g_settings_scope_ready ? pthread_getspecific(g_settings_scope_key) : NULL;
+}
+
+static int settings_refresh(void)
+{
+    static const struct alt111_settings_paths paths={MIBR_CFG_TEMP_ROOT,MIBR_CFG_PERSIST_ROOT};
+    struct alt111_settings *next=malloc(sizeof(*next));
+    struct alt111_policy_config policy;
+    char error[256]={0};
+    int rc;
+    if(!next)return -1;
+    pthread_mutex_lock(&g_settings_io_lock);
+    rc=alt111_settings_load(&paths,next,error,sizeof(error));
+    pthread_mutex_unlock(&g_settings_io_lock);
+    pthread_mutex_lock(&g_settings_lock);
+    g_settings_valid=rc==0;
+    if(rc==0){
+        g_settings_desired=*next;g_settings_have=1;g_settings_error[0]=0;
+        if(g_settings_have_active)alt111_settings_runtime_overlay(&g_settings_active,next,ALT111_OVERLAY_LIVE);
+    }
+    else snprintf(g_settings_error,sizeof(g_settings_error),"%s",error);
+    pthread_mutex_unlock(&g_settings_lock);
+    if(rc==0){
+        alt111_settings_policy(next,&policy);
+        pthread_mutex_lock(&g2_core_lock);
+        (void)alt111_policy_configure(&g2_policy,&policy);
+        g2_control.showui_keyframe=policy.showui;
+        pthread_mutex_unlock(&g2_core_lock);
+    }
+    free(next);
+    return rc;
+}
+
 static int read_layered_value(const char *name, char *out, size_t cap,
                               unsigned *source_layer)
 {
-    char path[192];
+    struct gen2_settings_scope *scope=settings_scope();
+    const struct alt111_settings *snapshot;
+    unsigned i;
+    int n=-1;
     if(source_layer)*source_layer=0u;
     if(!name||!out||cap<2u)return -1;
-    snprintf(path,sizeof(path),"%s/%s",MIBR_CFG_TEMP_ROOT,name);
-    if(read_trimmed_value(path,out,cap)==0){
-        if(source_layer)*source_layer=2u;
-        return 0;
+    pthread_mutex_lock(&g_settings_lock);
+    snapshot=scope ? &scope->settings : g_settings_have ? &g_settings_desired : NULL;
+    if(snapshot){
+        for(i=0;i<ALTSET_COUNT;++i){
+            const struct alt111_setting_descriptor *d=alt111_setting(i);
+            if(strcmp(d->basename,name))continue;
+            if(source_layer)*source_layer=snapshot->layer[i];
+            if(!d->field[0]){
+                n=snprintf(out,cap,"%s",snapshot->value[i]);
+                if(n<0||(size_t)n>=cap)n=-1;
+            }else n=alt111_settings_render_group(snapshot,d->group,out,cap);
+            break;
+        }
     }
-    snprintf(path,sizeof(path),"%s/%s",MIBR_CFG_PERSIST_ROOT,name);
-    if(read_trimmed_value(path,out,cap)==0){
-        if(source_layer)*source_layer=1u;
-        return 0;
-    }
-    return -1;
+    pthread_mutex_unlock(&g_settings_lock);
+    return n>=0 ? 0 : -1;
 }
 
 static unsigned read_layered_bool(const char *name, unsigned defv,
@@ -839,11 +892,21 @@ static unsigned read_layered_bool(const char *name, unsigned defv,
 
 static unsigned master_enabled(void)
 {
-    return read_layered_bool(g_enabled_config_name,1u,NULL);
+    struct gen2_settings_scope *scope=settings_scope();
+    unsigned valid;
+    pthread_mutex_lock(&g_settings_lock);valid=scope ? scope->valid : g_settings_valid;pthread_mutex_unlock(&g_settings_lock);
+    return valid && read_layered_bool(g_enabled_config_name,0u,NULL);
 }
 
 
 static int compat_profile_omonob790(void)
+{
+    char b[48];
+    return read_layered_value(g_compat_profile_config_name,b,sizeof(b),NULL)==0 &&
+           (strcmp(b,"omonob790")==0 || strcmp(b,"mibr_dual_view")==0);
+}
+
+static int compat_profile_exact_reference(void)
 {
     char b[48];
     return read_layered_value(g_compat_profile_config_name,b,sizeof(b),NULL)==0 &&
@@ -925,26 +988,13 @@ struct mibr_viewareas_config {
     unsigned source_layer;
 };
 
+static void load_viewareas_config(struct mibr_viewareas_config *cfg);
+
 static void gen2_d2_timing_load(struct gen2_d2_timing *cfg)
 {
-    char b[224];
-    unsigned enabled,event_delay,min_gap,watchdog,layer=0u;
     if(!cfg)return;
-    cfg->enabled=1u;
-    cfg->event_delay_ms=G2_D2_EVENT_DELAY_DEFAULT_MS;
-    cfg->min_gap_ms=G2_D2_MIN_GAP_DEFAULT_MS;
-    cfg->watchdog_ms=G2_D2_WATCHDOG_DEFAULT_MS;
-    cfg->source_layer=0u;
-    if(read_layered_value(g2_d2_config_name,b,sizeof(b),&layer)!=0)return;
-    if(sscanf(b,"enabled=%u\nevent_delay_ms=%u\nmin_gap_ms=%u\nwatchdog_ms=%u",
-              &enabled,&event_delay,&min_gap,&watchdog)!=4)return;
-    if(enabled>1u||event_delay>G2_D2_EVENT_DELAY_MAX_MS||
-       min_gap>G2_D2_MIN_GAP_MAX_MS||watchdog>G2_D2_WATCHDOG_MAX_MS)return;
-    cfg->enabled=enabled;
-    cfg->event_delay_ms=event_delay;
-    cfg->min_gap_ms=min_gap;
-    cfg->watchdog_ms=watchdog;
-    cfg->source_layer=layer;
+    /* The producer policy replaces the legacy D2 Wallclock timer. */
+    memset(cfg,0,sizeof(*cfg));
 }
 
 static int current_advertised_fps(void)
@@ -962,7 +1012,9 @@ static void set_reference_enabled_features(CFMutableDictionaryRef response)
     CFStringRef k=NULL,alt=NULL,va=NULL,iap=NULL;
     CFMutableArrayRef a=NULL;
     int omonob790=compat_profile_omonob790();
+    struct mibr_viewareas_config cfg;
     if(!response)return;
+    load_viewareas_config(&cfg);
 
     k=s_cf("enabledFeatures");
     alt=s_cf("altScreen");
@@ -970,7 +1022,7 @@ static void set_reference_enabled_features(CFMutableDictionaryRef response)
     if(omonob790)iap=s_cf("iAPChannel");
     a=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
     if(a&&iap)p_CFArrayAppendValue(a,iap);
-    if(a&&va&&g_viewareas)p_CFArrayAppendValue(a,va);
+    if(a&&va&&cfg.enabled)p_CFArrayAppendValue(a,va);
     if(a&&alt)p_CFArrayAppendValue(a,alt);
     if(a&&k)p_CFDictionarySetValue(response,k,a);
 
@@ -983,23 +1035,7 @@ static void set_reference_enabled_features(CFMutableDictionaryRef response)
 
 static int source_version_is_valid(const char *s)
 {
-    const char *p;
-    unsigned dots=0, digits=0;
-    if(!s || !*s) return 0;
-    for(p=s; *p; ++p){
-        if(*p>='0' && *p<='9'){
-            digits=1u;
-            continue;
-        }
-        if(*p=='.' && digits && p[1]){
-            ++dots;
-            digits=0u;
-            if(dots>3u) return 0;
-            continue;
-        }
-        return 0;
-    }
-    return digits && dots>=1u;
+    return s && strcmp(s,"stock") && alt111_setting_validate(ALTSET_SOURCEVERSION,s)==0;
 }
 
 static void source_version_value(char *out, size_t cap,
@@ -1091,6 +1127,8 @@ static void load_display_config(struct mibr_display_config *cfg)
 
 static void viewareas_defaults(struct mibr_viewareas_config *cfg)
 {
+    struct mibr_display_config display;
+    load_display_config(&display);
     memset(cfg,0,sizeof(*cfg));
     cfg->enabled=1u;
     cfg->count=2u;
@@ -1098,16 +1136,16 @@ static void viewareas_defaults(struct mibr_viewareas_config *cfg)
     cfg->transition_ms=0u;
 
     cfg->view[0].x=0; cfg->view[0].y=0;
-    cfg->view[0].w=g_width; cfg->view[0].h=g_height;
+    cfg->view[0].w=display.width; cfg->view[0].h=display.height;
     cfg->view[0].safe_x=0; cfg->view[0].safe_y=0;
-    cfg->view[0].safe_w=g_width; cfg->view[0].safe_h=g_height;
+    cfg->view[0].safe_w=display.width; cfg->view[0].safe_h=display.height;
     cfg->view[0].adjacent=1;
 
     cfg->view[1].x=0; cfg->view[1].y=0;
-    cfg->view[1].w=g_width; cfg->view[1].h=g_height;
+    cfg->view[1].w=display.width; cfg->view[1].h=display.height;
     cfg->view[1].safe_x=0; cfg->view[1].safe_y=0;
-    cfg->view[1].safe_w=g_width; cfg->view[1].safe_h=g_height;
-    if(g_width==1010 && g_height==376){
+    cfg->view[1].safe_w=display.width; cfg->view[1].safe_h=display.height;
+    if(display.width==1010 && display.height==376){
         cfg->view[1].safe_y=58;
         cfg->view[1].safe_w=1010;
         cfg->view[1].safe_h=248;
@@ -1117,10 +1155,12 @@ static void viewareas_defaults(struct mibr_viewareas_config *cfg)
 
 static void load_viewareas_config(struct mibr_viewareas_config *cfg)
 {
+    struct mibr_display_config display;
     char blob[2048],key[64];
     unsigned layer=0u;
     int n,i;
     if(!cfg)return;
+    load_display_config(&display);
     viewareas_defaults(cfg);
     if(read_layered_value(g_viewareas_config_name,blob,sizeof(blob),&layer)!=0)return;
     cfg->source_layer=layer;
@@ -1151,7 +1191,7 @@ static void load_viewareas_config(struct mibr_viewareas_config *cfg)
     if(cfg->initial>=cfg->count)cfg->initial=0u;
     for(i=0;i<(int)cfg->count;++i){
         if(!mibr_rect_valid(cfg->view[i].x,cfg->view[i].y,
-                            cfg->view[i].w,cfg->view[i].h,g_width,g_height)){
+                            cfg->view[i].w,cfg->view[i].h,display.width,display.height)){
             logf_u2("GEN2 ViewArea config invalid area=%d; falling back to defaults",i);
             viewareas_defaults(cfg);
             cfg->source_layer=0u;
@@ -1607,11 +1647,13 @@ static int gen2_video_submit_au(const uint8_t *p, size_t n,
     after_count = g2_video.source_aus;
     /* Reference cadence belongs to the source producer, even when there is
      * no consumer or an AU is dropped before the bridge can observe it. */
-    if (after_count > before && g2_video.source_ordinal &&
-        (g2_video.source_ordinal % 20u) == 0u &&
-        compat_profile_omonob790() && access("/tmp/mibr-alt111-au-framing.enabled",F_OK)==0 &&
-        g2_control_session)
-        (void)alt111_control_keyframe(&g2_control,g2_control_session);
+    if (after_count > before) {
+        unsigned reason=alt111_policy_au(&g2_policy,g2_video.stream,
+            g2_video.source_ordinal,source_ts_raw,source_ts_raw!=NULL,
+            (uint64_t)monotonic_us());
+        if(reason && g2_control_session)
+            (void)alt111_control_keyframe_reason(&g2_control,g2_control_session,reason);
+    }
     if (accepted && after_count > before) *accepted = 1;
     if (consumer_attached) *consumer_attached = g2_video.attached ? 1 : 0;
     pthread_cond_broadcast(&g2_core_cv);
@@ -1623,12 +1665,12 @@ static int gen2_video_submit_au(const uint8_t *p, size_t n,
     return rc;
 }
 
-static void gen2_keyframe_intent(void)
+static void gen2_keyframe_intent(unsigned reason)
 {
     int rc = ALT111_WAIT;
     pthread_mutex_lock(&g2_core_lock);
     if (g2_control_session)
-        rc = alt111_control_keyframe(&g2_control, g2_control_session);
+        rc = alt111_control_keyframe_reason(&g2_control, g2_control_session,reason);
     pthread_cond_broadcast(&g2_core_cv);
     pthread_mutex_unlock(&g2_core_lock);
     logf_u2("gen2 consumer keyframe intent rc=%d", rc);
@@ -1652,7 +1694,7 @@ static void gen2_consumer_attach(void)
     }
     logf_u2("gen2 renderer consumer attach rc=%d generation=%llu",
             rc,(unsigned long long)generation);
-    if (rc == ALT111_OK) gen2_keyframe_intent();
+    if (rc == ALT111_OK) gen2_keyframe_intent(ALT111_KF_BRIDGE_READY);
     gen2_publish_status();
 }
 
@@ -2026,7 +2068,7 @@ static void *capture_accept_thread(void *arg)
         capture_publish_status("waiting_idr");
         logf_u2("GEN2 capture mirror connected on 127.0.0.1:%d seed=%zu; requesting fresh IDR",
                 g_capture_port, cfg_n);
-        gen2_keyframe_intent();
+        gen2_keyframe_intent(ALT111_KF_LIFECYCLE_RESET);
     }
     return NULL;
 }
@@ -2287,12 +2329,23 @@ static void apply_source_version_persona(CFMutableDictionaryRef info)
     unsigned preserve_stock=0u,source_layer=0u;
     if(!info)return;
     source_version_value(version,sizeof(version),&preserve_stock,&source_layer);
+    struct gen2_settings_scope *scope=settings_scope();
     if(preserve_stock){
         logf_u2("GEN2 sourceVersion persona=stock source=%s",config_layer_name(source_layer));
-        return;
+    }else{
+        set_str(info,"sourceVersion",version);
+        logf_u2("GEN2 sourceVersion persona=%s source=%s",version,config_layer_name(source_layer));
     }
-    set_str(info,"sourceVersion",version);
-    logf_u2("GEN2 sourceVersion persona=%s source=%s",version,config_layer_name(source_layer));
+    if(scope){
+        CFStringRef key=s_cf("sourceVersion");
+        CFTypeRef value=key ? p_CFDictionaryGetValue(info,key) : NULL;
+        snprintf(scope->actual_source_version,sizeof(scope->actual_source_version),"%s","unknown");
+        if(value && p_CFGetTypeID(value)==p_CFStringGetTypeID() &&
+           !p_CFStringGetCString((CFStringRef)value,scope->actual_source_version,
+                                 sizeof(scope->actual_source_version),CF_UTF8))
+            snprintf(scope->actual_source_version,sizeof(scope->actual_source_version),"%s","unknown");
+        if(key)p_CFRelease(key);
+    }
 }
 
 static void set_i64(CFMutableDictionaryRef d, const char *key, int64_t val)
@@ -2348,7 +2401,7 @@ static void add_alt_suggest_ui_urls(CFMutableDictionaryRef alt)
 {
     CFMutableArrayRef urls=NULL;
     CFStringRef key=NULL,item=NULL;
-    char blob[2048],url[384],name[32];
+    char blob[2048],url[192];
     unsigned layer=0u;
     int i,count=0;
     if(!alt)return;
@@ -2357,15 +2410,14 @@ static void add_alt_suggest_ui_urls(CFMutableDictionaryRef alt)
     if(!urls)return;
 
     if(read_layered_value(g_ui_urls_config_name,blob,sizeof(blob),&layer)==0){
-        for(i=0;i<8;++i){
-            snprintf(name,sizeof(name),"url%d",i);
-            if(config_line_value(blob,name,url,sizeof(url))!=0)continue;
-            if(!strchr(url,':'))continue;
-            item=s_cf(url);
-            if(!item)continue;
-            p_CFArrayAppendValue(urls,item);
-            p_CFRelease(item); item=NULL;
-            ++count;
+        if(config_line_value(blob,"urls",url,sizeof(url))==0){
+            char *p=url;
+            for(i=0;i<8 && p && *p;++i){
+                char *end=strchr(p,'|');if(end)*end=0;
+                item=s_cf(p);
+                if(item){p_CFArrayAppendValue(urls,item);p_CFRelease(item);item=NULL;++count;}
+                p=end ? end+1 : NULL;
+            }
         }
     }
 
@@ -2400,19 +2452,20 @@ done:
  * fresh /info negotiation; switching between already advertised indices stays
  * in-session via updateViewArea.
  */
-static void add_reference_viewarea(CFMutableDictionaryRef alt)
+static int add_reference_viewarea(CFMutableDictionaryRef alt)
 {
     struct mibr_viewareas_config cfg;
     CFMutableArrayRef areas=NULL;
     CFStringRef k=NULL;
     unsigned i;
+    int complete=0;
 
-    if(!alt||g_width<=0||g_height<=0)return;
+    if(!alt)return 0;
     load_viewareas_config(&cfg);
-    if(!cfg.enabled)return;
+    if(!cfg.enabled)return 1;
 
     areas=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
-    if(!areas)return;
+    if(!areas)return 0;
 
     for(i=0;i<cfg.count;++i){
         CFMutableDictionaryRef view=dict_new(),safe=dict_new();
@@ -2455,12 +2508,14 @@ static void add_reference_viewarea(CFMutableDictionaryRef alt)
     p_CFDictionarySetValue(alt,k,areas);
     p_CFRelease(k);k=NULL;
     set_i64(alt,"initialViewArea",(int64_t)cfg.initial);
+    complete=1;
     logf_u2("GEN2 ViewAreas advertised count=%u initial=%u transitionMs=%u source=%s",
             cfg.count,cfg.initial,cfg.transition_ms,config_layer_name(cfg.source_layer));
 
 done:
     if(k)p_CFRelease(k);
     if(areas)p_CFRelease(areas);
+    return complete;
 }
 
 static void log_stream_types(const char *tag, CFDictionaryRef request)
@@ -2790,28 +2845,7 @@ static void log_stock_url_capability(CFDictionaryRef stock_display, const char *
     }
 }
 
-static void refresh_negotiation_config(void)
-{
-    struct mibr_display_config dcfg;
-    struct mibr_viewareas_config vcfg;
-
-    load_display_config(&dcfg);
-    g_width=dcfg.width;
-    g_height=dcfg.height;
-    g_width_mm=dcfg.width_mm;
-    g_height_mm=dcfg.height_mm;
-    snprintf(g_alt_uuid,sizeof(g_alt_uuid),"%s",dcfg.uuid);
-
-    load_viewareas_config(&vcfg);
-    g_viewareas=vcfg.enabled ? 1 : 0;
-
-    logf_u2("GEN2 negotiation config display=%dx%d physical=%dx%d uuid=%s displaySource=%s viewAreas=%u count=%u viewSource=%s",
-            g_width,g_height,g_width_mm,g_height_mm,g_alt_uuid,
-            config_layer_name(dcfg.source_layer),vcfg.enabled,vcfg.count,
-            config_layer_name(vcfg.source_layer));
-}
-
-CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArrayRef properties, uint8_t *mac, OSStatus *outErr)
+static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session, CFArrayRef properties, uint8_t *mac, OSStatus *outErr)
 {
     CFDictionaryRef base,stock_display;
     CFMutableDictionaryRef info=NULL,alt=NULL;
@@ -2819,8 +2853,11 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
     CFArrayRef old=NULL;
     CFMutableArrayRef displays=NULL;
     int advertised_fps;
+    struct mibr_display_config display;
+    struct mibr_viewareas_config views;
 
-    refresh_negotiation_config();
+    load_display_config(&display);
+    load_viewareas_config(&views);
     advertised_fps=current_advertised_fps();
 
     if(!g_real_serverinfo)g_real_serverinfo=(fn_serverinfo_t)sym_next("AirPlayCopyServerInfo");
@@ -2894,29 +2931,38 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
         set_i64(alt,"type",(int64_t)g2_profile.type);
         set_i64(alt,"maxFPS",(int64_t)advertised_fps);
         set_i64(alt,"features",(int64_t)(compat_profile_omonob790()?10u:g2_profile.features));
-        set_i64(alt,"widthPixels",(int64_t)g_width);
-        set_i64(alt,"heightPixels",(int64_t)g_height);
-        set_i64(alt,"widthPhysical",(int64_t)g_width_mm);
-        set_i64(alt,"heightPhysical",(int64_t)g_height_mm);
-        set_str(alt,"uuid",g_alt_uuid);
+        set_i64(alt,"widthPixels",(int64_t)display.width);
+        set_i64(alt,"heightPixels",(int64_t)display.height);
+        set_i64(alt,"widthPhysical",(int64_t)display.width_mm);
+        set_i64(alt,"heightPhysical",(int64_t)display.height_mm);
+        set_str(alt,"uuid",display.uuid);
         set_str(alt,"initialURL",active_url);
         /* Free790 does not advertise altScreenSuggestUIURLs. Keep the M.I.B.
          * extension available outside the strict parity profile. */
-        if(!compat_profile_omonob790())add_alt_suggest_ui_urls(alt);
-        if(g_viewareas)add_reference_viewarea(alt);
+        if(!compat_profile_exact_reference())add_alt_suggest_ui_urls(alt);
+        if(views.enabled && !add_reference_viewarea(alt)){
+            logf_u2("GEN2 /info incomplete ViewArea descriptor; returning stock info");
+            p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+            return base;
+        }
 
         p_CFArrayAppendValue(displays,alt);
         p_CFDictionarySetValue(info,kdisplays,displays);
+        if(settings_scope())settings_scope()->descriptor_complete=1u;
         logf_u2("GEN2 /info ready: profile=%s root=altScreen%s type=%u maxFPS=%u features=%u primaryInput=%s geometry=%ux%u physical=%ux%u uuid=%s url=%s",
                 compat_profile_omonob790()?"omonob790":"mibr",
-                g_viewareas?"+viewAreas":"",
+                views.enabled?"+viewAreas":"",
                 g2_profile.type,(unsigned)advertised_fps,
                 compat_profile_omonob790()?10u:g2_profile.features,
                 compat_profile_omonob790()?"3":"none",
-                g_width,g_height,g_width_mm,g_height_mm,
-                g_alt_uuid,active_url);
+                display.width,display.height,display.width_mm,display.height_mm,
+                display.uuid,active_url);
     }else{
         logf_u2("IRC-parity /info: display clone failed");
+        if(alt)p_CFRelease(alt);
+        if(displays)p_CFRelease(displays);
+        p_CFRelease(kdisplays);p_CFRelease(info);
+        return base;
     }
 
     if(alt)p_CFRelease(alt);
@@ -2926,13 +2972,49 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
     return info;
 }
 
+CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArrayRef properties, uint8_t *mac, OSStatus *outErr)
+{
+    struct gen2_settings_scope *scope,*previous;
+    CFDictionaryRef result;
+    (void)settings_refresh();
+    previous=settings_scope();
+    scope=calloc(1,sizeof(*scope));
+    if(!g_settings_scope_ready || !scope){
+        free(scope);
+        if(!g_real_serverinfo)g_real_serverinfo=(fn_serverinfo_t)sym_next("AirPlayCopyServerInfo");
+        return g_real_serverinfo ? g_real_serverinfo(session,properties,mac,outErr) : NULL;
+    }
+    pthread_mutex_lock(&g_settings_lock);
+    scope->settings=g_settings_desired;
+    scope->valid=g_settings_valid;
+    pthread_mutex_unlock(&g_settings_lock);
+    if(pthread_setspecific(g_settings_scope_key,scope)!=0){free(scope);return NULL;}
+    result=gen2_serverinfo_scoped(session,properties,mac,outErr);
+    if(scope->descriptor_complete){
+        pthread_mutex_lock(&g_settings_lock);
+        g_settings_advertised=scope->settings;
+        g_settings_have_advertised=1u;g_settings_advertised_session=session;
+        snprintf(g_settings_advertised_version,sizeof(g_settings_advertised_version),"%s",scope->actual_source_version);
+        pthread_mutex_unlock(&g_settings_lock);
+    }
+    (void)pthread_setspecific(g_settings_scope_key,previous);
+    free(scope);
+    return result;
+}
+
+static const char *command_uuid(void)
+{
+    struct gen2_settings_scope *scope=settings_scope();
+    return scope ? scope->settings.value[ALTSET_DISPLAY_UUID] : NULL;
+}
+
 static CFMutableDictionaryRef command_showui(void)
 {
     char active_url[384];
     CFMutableDictionaryRef req=dict_new(), params=dict_new();
     if(!req||!params){if(req)p_CFRelease(req);if(params)p_CFRelease(params);return NULL;}
     active_alt_url_copy(active_url,sizeof(active_url));
-    set_str(req,"type","showUI"); set_str(params,"uuid",g_alt_uuid); set_str(params,"url",active_url);
+    set_str(req,"type","showUI"); set_str(params,"uuid",command_uuid()); set_str(params,"url",active_url);
     { CFStringRef k=s_cf("params"); p_CFDictionarySetValue(req,k,params); p_CFRelease(k); }
     p_CFRelease(params); return req;
 }
@@ -2941,7 +3023,7 @@ static CFMutableDictionaryRef command_force_keyframe(void)
 {
     CFMutableDictionaryRef req=dict_new(), params=dict_new();
     if(!req||!params){if(req)p_CFRelease(req);if(params)p_CFRelease(params);return NULL;}
-    set_str(req,"type","forceKeyFrame"); set_str(params,"uuid",g_alt_uuid);
+    set_str(req,"type","forceKeyFrame"); set_str(params,"uuid",command_uuid());
     { CFStringRef k=s_cf("params"); p_CFDictionarySetValue(req,k,params); p_CFRelease(k); }
     p_CFRelease(params); return req;
 }
@@ -2950,7 +3032,7 @@ static CFMutableDictionaryRef command_stopui(void)
 {
     CFMutableDictionaryRef req=dict_new(), params=dict_new();
     if(!req||!params){if(req)p_CFRelease(req);if(params)p_CFRelease(params);return NULL;}
-    set_str(req,"type","stopUI"); set_str(params,"uuid",g_alt_uuid);
+    set_str(req,"type","stopUI"); set_str(params,"uuid",command_uuid());
     { CFStringRef k=s_cf("params"); p_CFDictionarySetValue(req,k,params); p_CFRelease(k); }
     p_CFRelease(params); return req;
 }
@@ -2969,7 +3051,7 @@ static CFMutableDictionaryRef command_update_view(unsigned view)
         return NULL;
     }
     set_str(req,"type","updateViewArea");
-    set_str(params,"uuid",g_alt_uuid);
+    set_str(params,"uuid",command_uuid());
     set_i64(params,"viewAreaIndex",(int64_t)view);
     set_i64(params,"animationDurationMillis",(int64_t)cfg.transition_ms);
     if(cfg.count>1u)set_adjacent_view(params,cfg.view[view].adjacent);
@@ -2979,7 +3061,7 @@ static CFMutableDictionaryRef command_update_view(unsigned view)
 
 static CFMutableDictionaryRef gen2_command_dictionary(const struct alt111_command *cmd)
 {
-    if (!cmd) return NULL;
+    if (!cmd || !command_uuid()) return NULL;
     switch (cmd->type) {
     case ALT111_CMD_SHOW: return command_showui();
     case ALT111_CMD_STOP: return command_stopui();
@@ -2991,7 +3073,7 @@ static CFMutableDictionaryRef gen2_command_dictionary(const struct alt111_comman
 
 static void gen2_publish_status(void)
 {
-    char b[3072];
+    char b[8192],tmp[192];
     int fd, n;
     struct alt111_control cs;
     struct alt111_video vs;
@@ -3010,6 +3092,8 @@ static void gen2_publish_status(void)
     unsigned source_version_stock=0u, source_version_layer=0u;
     uint64_t d2_pending_due_ms, d2_last_request_ms, d2_last_idr_ms;
     uint64_t d2_event_triggers, d2_watchdog_triggers, d2_coalesced;
+    char settings_status[3072];
+    unsigned i,reconnect_pending=0u,presentation_pending=0u,session_pending=0u;
     pthread_mutex_lock(&g2_core_lock);
     cs = g2_control;
     vs = g2_video;
@@ -3030,6 +3114,37 @@ static void gen2_publish_status(void)
     d2_watchdog_triggers = g2_d2_watchdog_triggers;
     d2_coalesced = g2_d2_coalesced;
     pthread_mutex_unlock(&g2_core_lock);
+    pthread_mutex_lock(&g_settings_lock);
+    for(i=0;i<ALTSET_COUNT && g_settings_have_active;++i){
+        const char *apply=alt111_setting(i)->apply;
+        if(!strcmp(g_settings_active.value[i],g_settings_desired.value[i]))continue;
+        reconnect_pending|=!strcmp(apply,"reconnect");
+        presentation_pending|=!strcmp(apply,"presentation");
+        session_pending|=!strcmp(apply,"session");
+    }
+    snprintf(settings_status,sizeof(settings_status),
+        "settings_valid=%u\nsettings_error=%s\nsettings_desired_revision=%llu\n"
+        "settings_advertised_revision=%llu\nsettings_active_revision=%llu\n"
+        "settings_active_present=%u\nsettings_active_confirmed=%u\n"
+        "settings_reconnect_pending=%u\nsettings_session_pending=%u\nsettings_presentation_pending=%u\n"
+        "source_version_desired=%s\nsource_version_advertised=%s\nsource_version_active=%s\n"
+        "display_uuid_active=%s\nviewarea_selected_desired=%s\n"
+        "keyframe_mode_active=%s\nkeyframe_interval_frames_active=%s\nkeyframe_interval_ms_active=%s\n"
+        "ownership_backend_desired=%s\nownership_backend_runtime=see_parity_session_state\n",
+        g_settings_valid,g_settings_error,(unsigned long long)g_settings_desired.revision,
+        (unsigned long long)(g_settings_have_advertised ? g_settings_advertised.revision : 0u),
+        (unsigned long long)(g_settings_have_active ? g_settings_active.revision : 0u),
+        g_settings_have_active,g_settings_active_confirmed,reconnect_pending,session_pending,presentation_pending,
+        g_settings_desired.value[ALTSET_SOURCEVERSION],
+        g_settings_have_advertised ? g_settings_advertised_version : "unknown",
+        g_settings_have_active ? g_settings_active_version : "unknown",
+        g_settings_have_active ? g_settings_active.value[ALTSET_DISPLAY_UUID] : "unknown",
+        g_settings_desired.value[ALTSET_VIEWAREA_SELECTED],
+        g_settings_have_active ? g_settings_active.value[ALTSET_KEYFRAME_MODE] : "inactive",
+        g_settings_have_active ? g_settings_active.value[ALTSET_KEYFRAME_INTERVAL_FRAMES] : "inactive",
+        g_settings_have_active ? g_settings_active.value[ALTSET_KEYFRAME_INTERVAL_MS] : "inactive",
+        g_settings_desired.value[ALTSET_OWNERSHIP_BACKEND]);
+    pthread_mutex_unlock(&g_settings_lock);
     nav_query_enabled = nav_query_is_enabled();
     gen2_d2_timing_load(&d2_timing);
     source_version_value(source_version,sizeof(source_version),
@@ -3056,7 +3171,7 @@ static void gen2_publish_status(void)
         "d2_last_request_ms=%llu\nd2_last_idr_ms=%llu\n"
         "d2_event_triggers=%llu\nd2_watchdog_triggers=%llu\nd2_coalesced=%llu\n"
         "mode_valid=%u\nmode_sequence=%llu\nmode_screen=%d\nmode_main_audio=%d\n"
-        "mode_speech=%d\nmode_speech_detail=%d\nmode_phone=%d\nmode_turns=%d\n",
+        "mode_speech=%d\nmode_speech_detail=%d\nmode_phone=%d\nmode_turns=%d\n%s",
         (unsigned long long)cs.session,command_ready,cs.desired,cs.shown_ack,cs.reacquiring,
         cs.view_count,cs.desired_view,cs.acknowledged_view,
         (unsigned long long)last_dispatched,(unsigned long long)last_completed,last_completion_status,
@@ -3082,12 +3197,23 @@ static void gen2_publish_status(void)
         (unsigned long long)d2_event_triggers,(unsigned long long)d2_watchdog_triggers,
         (unsigned long long)d2_coalesced,
         mode_valid,(unsigned long long)mode_sequence,
-        ms.screen,ms.main_audio,ms.speech,ms.speech_detail,ms.phone,ms.turns);
+        ms.screen,ms.main_audio,ms.speech,ms.speech_detail,ms.phone,ms.turns,settings_status);
     if(n<=0)return;
-    if((size_t)n>=sizeof(b))n=(int)sizeof(b)-1;
+    if((size_t)n>=sizeof(b))return;
     pthread_mutex_lock(&g2_status_lock);
-    fd=open(g2_status_path,O_WRONLY|O_CREAT|O_TRUNC,0644);
-    if(fd>=0){(void)write(fd,b,(size_t)n);close(fd);}
+    snprintf(tmp,sizeof(tmp),"%s.new.%ld",g2_status_path,(long)getpid());
+    fd=open(tmp,O_WRONLY|O_CREAT|O_TRUNC,0644);
+    if(fd>=0){
+        size_t used=0;
+        while(used<(size_t)n){
+            ssize_t written=write(fd,b+used,(size_t)n-used);
+            if(written<0 && errno==EINTR)continue;
+            if(written<=0)break;
+            used+=(size_t)written;
+        }
+        if(close(fd)==0 && used==(size_t)n)(void)rename(tmp,g2_status_path);
+        (void)unlink(tmp);
+    }
     pthread_mutex_unlock(&g2_status_lock);
 }
 
@@ -3100,13 +3226,36 @@ static void gen2_set_command_ready(unsigned ready)
     gen2_publish_status();
 }
 
-static void gen2_control_projection_on(void)
+static int gen2_control_projection_on(AirPlayReceiverSessionRef session)
 {
     struct mibr_viewareas_config vcfg;
     unsigned initial_view=0u, view_count=1u;
     int repeated = 0, rrc = ALT111_OK;
 
+    struct gen2_settings_scope *scope=calloc(1,sizeof(*scope)),*previous=settings_scope();
+    if(!scope || !g_settings_scope_ready){free(scope);return 0;}
+    pthread_mutex_lock(&g_settings_lock);
+    if(g_settings_have_active && session==g_settings_active_session){
+        scope->settings=g_settings_active;
+    }else if(!g_settings_have_advertised ||
+             (g_settings_advertised_session && session!=g_settings_advertised_session)){
+        pthread_mutex_unlock(&g_settings_lock);free(scope);
+        logf_u2("GEN2 SETUP rejected: no matching advertised settings snapshot");
+        return 0;
+    }else scope->settings=g_settings_advertised;
+    scope->valid=1u;
+    pthread_mutex_unlock(&g_settings_lock);
+    if(pthread_setspecific(g_settings_scope_key,scope)!=0){free(scope);return 0;}
     load_viewareas_config(&vcfg);
+    pthread_mutex_lock(&g_settings_lock);
+    if(!g_settings_have_active || session!=g_settings_active_session){
+        g_settings_active=scope->settings;g_settings_have_active=1u;
+        g_settings_active_session=session;
+        g_settings_active_confirmed=session && session==g_settings_advertised_session;
+        snprintf(g_settings_active_version,sizeof(g_settings_active_version),"%s",g_settings_advertised_version);
+    }
+    pthread_mutex_unlock(&g_settings_lock);
+    (void)pthread_setspecific(g_settings_scope_key,previous);free(scope);
     if(vcfg.enabled){
         view_count=vcfg.count;
         initial_view=vcfg.initial<vcfg.count?vcfg.initial:0u;
@@ -3120,6 +3269,9 @@ static void gen2_control_projection_on(void)
         repeated = 1;
     }
     (void)alt111_control_intent(&g2_control,1,initial_view);
+    pthread_mutex_lock(&g_settings_lock);
+    g_settings_active_control_generation=g2_control_session;
+    pthread_mutex_unlock(&g_settings_lock);
     if (repeated)
         rrc = alt111_control_reacquire(&g2_control,g2_control_session);
     pthread_cond_broadcast(&g2_core_cv);
@@ -3130,6 +3282,7 @@ static void gen2_control_projection_on(void)
     if (repeated)
         logf_u2("gen2 repeated stream111 SETUP -> ownership reacquire rc=%d",rrc);
     gen2_publish_status();
+    return 1;
 }
 
 static void gen2_control_release(void)
@@ -3175,6 +3328,9 @@ static void gen2_control_release(void)
     if(s)(void)alt111_control_end(&g2_control,s);
     g2_control_session=0;
     pthread_mutex_unlock(&g2_core_lock);
+    pthread_mutex_lock(&g_settings_lock);
+    g_settings_have_active=0u;g_settings_active_confirmed=0u;g_settings_active_session=NULL;
+    pthread_mutex_unlock(&g_settings_lock);
     gen2_publish_status();
 }
 
@@ -3182,20 +3338,39 @@ struct gen2_command_context {
     uint64_t session;
     uint64_t request;
     unsigned type;
+    unsigned view;
+    struct alt111_settings settings;
 };
 
 static void gen2_command_completion(OSStatus status, CFDictionaryRef response, void *opaque)
 {
     struct gen2_command_context *ctx = (struct gen2_command_context *)opaque;
     int crc = ALT111_STALE;
+    int accepted=0;
+    uint64_t now=monotonic_ms();
     (void)response;
     if(!ctx)return;
 
     pthread_mutex_lock(&g2_core_lock);
+    accepted=g2_control.active && ctx->session==g2_control.session &&
+        ctx->request==g2_control.pending.request &&
+        status==K_NO_ERR && now<g2_control.deadline_ms;
     g2_last_completed_request = ctx->request;
     g2_last_completion_status = (int)status;
     crc = alt111_control_complete(&g2_control,ctx->session,ctx->request,
-                                  status==K_NO_ERR,monotonic_ms());
+                                  status==K_NO_ERR,now);
+    if(accepted && crc==ALT111_OK){
+        pthread_mutex_lock(&g_settings_lock);
+        if(g_settings_have_active && g_settings_active_control_generation==ctx->session){
+            if(ctx->type==ALT111_CMD_SHOW)
+                alt111_settings_runtime_overlay(&g_settings_active,&ctx->settings,ALT111_OVERLAY_PRESENTATION);
+            if(ctx->type==ALT111_CMD_VIEW ||
+               (ctx->type==ALT111_CMD_SHOW && g2_control.view_count==1u))
+                snprintf(g_settings_active.value[ALTSET_VIEWAREA_SELECTED],
+                         ALT111_SETTING_VALUE_CAP,"%u",ctx->view);
+        }
+        pthread_mutex_unlock(&g_settings_lock);
+    }
     pthread_cond_broadcast(&g2_core_cv);
     pthread_mutex_unlock(&g2_core_lock);
 
@@ -3203,52 +3378,6 @@ static void gen2_command_completion(OSStatus status, CFDictionaryRef response, v
             ctx->type,(unsigned long long)ctx->request,(int)status,crc);
     free(ctx);
     gen2_publish_status();
-}
-
-struct gen2_diag_context {
-    const char *label;
-};
-
-static void gen2_diag_completion(OSStatus status, CFDictionaryRef response, void *opaque)
-{
-    struct gen2_diag_context *ctx=(struct gen2_diag_context *)opaque;
-    (void)response;
-    logf_u2("gen2 DIAG completion command=%s status=%d",
-            (ctx&&ctx->label)?ctx->label:"<unknown>",(int)status);
-    if(ctx)free(ctx);
-}
-
-static void gen2_dispatch_diag_command(const char *label, CFMutableDictionaryRef req)
-{
-    AirPlayReceiverSessionRef s=NULL;
-    struct gen2_diag_context *ctx=NULL;
-    OSStatus e=-1;
-
-    if(!req||!label){
-        if(req)p_CFRelease(req);
-        return;
-    }
-
-    s=retain_active_session();
-    ctx=(struct gen2_diag_context *)calloc(1,sizeof(*ctx));
-    if(ctx)ctx->label=label;
-
-    if(s&&ctx){
-        e=g_sendcmd(s,req,gen2_diag_completion,ctx);
-        if(e==K_NO_ERR){
-            logf_u2("gen2 DIAG dispatched command=%s",label);
-            ctx=NULL;
-        }else{
-            logf_u2("gen2 DIAG dispatch failed command=%s os=%d",label,(int)e);
-        }
-    }else{
-        logf_u2("gen2 DIAG dispatch unavailable command=%s session=%s ctx=%s",
-                label,s?"yes":"no",ctx?"yes":"no");
-    }
-
-    if(ctx)free(ctx);
-    if(s)p_CFRelease(s);
-    p_CFRelease(req);
 }
 
 static void gen2_resync_snapshot_locked(struct alt111_resync_snapshot *snap)
@@ -3447,33 +3576,41 @@ static void gen2_process_diag_markers(void)
     }
     if(access(g2_diag_keyframe_marker,F_OK)==0){
         unlink(g2_diag_keyframe_marker);
-        logf_u2("gen2 DIAG marker keyframe-only");
-        gen2_dispatch_diag_command("forceKeyFrame",command_force_keyframe());
+        gen2_keyframe_intent(ALT111_KF_MANUAL);
     }
     if(access(g2_diag_show_marker,F_OK)==0){
-        char active_url[384];
         unlink(g2_diag_show_marker);
-        active_alt_url_copy(active_url,sizeof(active_url));
-        logf_u2("gen2 DIAG marker show-only url=%s",active_url);
-        gen2_dispatch_diag_command("showUI",command_showui());
+        pthread_mutex_lock(&g2_core_lock);
+        if(g2_control_session){
+            (void)alt111_control_intent(&g2_control,1u,g2_control.desired_view);
+            (void)alt111_control_reacquire(&g2_control,g2_control_session);
+        }
+        pthread_mutex_unlock(&g2_core_lock);
     }
     if(access(g2_diag_stop_marker,F_OK)==0){
         unlink(g2_diag_stop_marker);
-        logf_u2("gen2 DIAG marker stop-only");
-        gen2_dispatch_diag_command("stopUI",command_stopui());
+        pthread_mutex_lock(&g2_core_lock);
+        if(g2_control_session)(void)alt111_control_intent(&g2_control,0u,g2_control.desired_view);
+        pthread_mutex_unlock(&g2_core_lock);
     }
 }
 
 static void *gen2_control_worker(void *arg)
 {
+    uint64_t last_settings_poll=0;
     (void)arg;
     for (;;) {
         struct alt111_command cmd;
         struct gen2_command_context *ctx=NULL;
         int nrc, queued=0;
         CFMutableDictionaryRef req=NULL;
+        struct gen2_settings_scope *scope=NULL,*previous=NULL;
         AirPlayReceiverSessionRef s=NULL;
         OSStatus e=-1;
+        uint64_t settings_now=monotonic_ms();
+        if(!last_settings_poll || settings_now-last_settings_poll>=250u){
+            (void)settings_refresh();last_settings_poll=settings_now;
+        }
 
         pthread_mutex_lock(&g2_core_lock);
         if(!g2_command_ready){
@@ -3501,13 +3638,28 @@ static void *gen2_control_worker(void *arg)
         pthread_mutex_unlock(&g2_core_lock);
         if(nrc!=ALT111_OK){usleep(10000);continue;}
 
-        req=gen2_command_dictionary(&cmd);
-        s=retain_active_session();
         ctx=(struct gen2_command_context *)calloc(1,sizeof(*ctx));
+        scope=calloc(1,sizeof(*scope));previous=settings_scope();
+        pthread_mutex_lock(&g_settings_lock);
+        if(scope && g_settings_have_active && g_settings_active_control_generation==cmd.session){
+            scope->settings=g_settings_active;scope->valid=1u;
+            alt111_settings_runtime_overlay(&scope->settings,&g_settings_desired,
+                 ALT111_OVERLAY_LIVE | (cmd.type==ALT111_CMD_SHOW ? ALT111_OVERLAY_PRESENTATION : 0u));
+        }
+        pthread_mutex_unlock(&g_settings_lock);
+        if(scope && scope->valid && g_settings_scope_ready &&
+           pthread_setspecific(g_settings_scope_key,scope)==0){
+            req=gen2_command_dictionary(&cmd);
+            (void)pthread_setspecific(g_settings_scope_key,previous);
+            if(ctx)ctx->settings=scope->settings;
+        }
+        free(scope);
+        s=retain_active_session();
         if(ctx){
             ctx->session=cmd.session;
             ctx->request=cmd.request;
             ctx->type=(unsigned)cmd.type;
+            ctx->view=cmd.view;
         }
 
         if(req&&s&&ctx){
@@ -3535,6 +3687,14 @@ static void *gen2_control_worker(void *arg)
         }else{
             logf_u2("gen2 UI command dispatched type=%u request=%llu awaiting completion",
                     (unsigned)cmd.type,(unsigned long long)cmd.request);
+            if(cmd.type==ALT111_CMD_KEYFRAME){
+                unsigned bit;
+                for(bit=1u;bit<=ALT111_KF_MANUAL;bit<<=1u)
+                    if(cmd.keyframe_reasons&bit)
+                        logf_u2("GEN2 KEYFRAME request=%llu reason=%s session=%llu",
+                            (unsigned long long)cmd.request,alt111_keyframe_reason_name(bit),
+                            (unsigned long long)cmd.session);
+            }
         }
         gen2_publish_status();
     }
@@ -3932,10 +4092,13 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
     }else{
         port=start_alt_receiver(cid);
         if(port>0 && stockResp){
-            append_alt_setup_response((CFMutableDictionaryRef)stockResp,altDesc,port);
-            gen2_control_projection_on();
-            logf_u2("GEN2 stream111 SETUP accepted cid=%llu dataPort=%d response=cloned-request+streamID111; UI acquisition armed",
-                    (unsigned long long)cid,port);
+            if(gen2_control_projection_on(s)){
+                append_alt_setup_response((CFMutableDictionaryRef)stockResp,altDesc,port);
+                logf_u2("GEN2 stream111 SETUP accepted cid=%llu dataPort=%d response=cloned-request+streamID111; UI acquisition armed",
+                        (unsigned long long)cid,port);
+            }else{
+                stop_alt_receiver();clear_video_observer();publish_state("setup_settings_unbound");
+            }
         }else{
             if(port>0) stop_alt_receiver();
             clear_video_observer();
@@ -4070,12 +4233,15 @@ OSStatus AES_CBCFrame_Init(void *ctx, const uint8_t key[16], const uint8_t iv[16
     return e;
 }
 
+#ifndef ALT111_GEN2_HOST_TEST
 __attribute__((constructor))
+#endif
 static void altscreen111_init(void)
 {
     char active_url[384];
     void *setup,*start,*td,*platform,*control;
     signal(SIGPIPE,SIG_IGN);
+    (void)settings_refresh();
     {
         struct mibr_display_config dcfg;
         struct mibr_viewareas_config vcfg;

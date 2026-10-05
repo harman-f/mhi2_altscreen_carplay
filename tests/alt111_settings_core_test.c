@@ -57,6 +57,22 @@ int main(void)
     s = before;
     alt111_settings_policy(&s, &policy);
     assert(policy.mode == ALT111_SOURCE_FRAMES && policy.interval_frames == 20);
+    assert(!alt111_settings_defaults(&before, "omonob790"));
+    assert(!alt111_settings_defaults(&s, "mibr_dual_view"));
+    assert(!alt111_settings_set(&s, ALTSET_SOURCEVERSION, "1.2.3", ALT111_TEMP));
+    assert(!alt111_settings_set(&s, ALTSET_KEYFRAME_INTERVAL_FRAMES, "37", ALT111_TEMP));
+    assert(!alt111_settings_set(&s, ALTSET_VIEWAREA_SELECTED, "1", ALT111_TEMP));
+    assert(!alt111_settings_set(&s, ALTSET_NAVIGATION_QUERY, "1", ALT111_TEMP));
+    alt111_settings_runtime_overlay(&before, &s, ALT111_OVERLAY_LIVE);
+    assert(!strcmp(before.value[ALTSET_SOURCEVERSION], "950.7.1"));
+    assert(!strcmp(before.value[ALTSET_VIEWAREAS_COUNT], "1"));
+    assert(!strcmp(before.value[ALTSET_VIEWAREA_0_SAFE_X], "202"));
+    assert(!strcmp(before.value[ALTSET_VIEWAREA_SELECTED], "0"));
+    assert(!strcmp(before.value[ALTSET_KEYFRAME_INTERVAL_FRAMES], "37"));
+    assert(!strcmp(before.value[ALTSET_NAVIGATION_QUERY], "0"));
+    alt111_settings_runtime_overlay(&before, &s, ALT111_OVERLAY_PRESENTATION);
+    assert(!strcmp(before.value[ALTSET_NAVIGATION_QUERY], "1"));
+    assert(!strcmp(before.value[ALTSET_VIEWAREAS_COUNT], "1"));
     puts("ALT111_SETTINGS_CORE_TEST=PASS");
     return 0;
 }

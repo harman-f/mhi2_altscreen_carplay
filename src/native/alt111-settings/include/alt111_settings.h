@@ -39,6 +39,12 @@ int alt111_settings_render_group(const struct alt111_settings *s, unsigned group
 unsigned alt111_setting_integer(const struct alt111_settings *s, unsigned id);
 void alt111_settings_policy(const struct alt111_settings *s,
                             struct alt111_policy_config *config);
+/* Keep negotiated/session fields frozen. selected is committed only by a
+ * successful generation-bound VIEW/SHOW acknowledgement, never by polling. */
+enum alt111_runtime_overlay { ALT111_OVERLAY_LIVE=1u, ALT111_OVERLAY_PRESENTATION=2u };
+void alt111_settings_runtime_overlay(struct alt111_settings *active,
+                                    const struct alt111_settings *desired,
+                                    unsigned classes);
 /* POSIX implementation; these operations hold the same advisory lock.
  * A process must additionally serialize its threads around these calls. */
 int alt111_settings_load(const struct alt111_settings_paths *paths,

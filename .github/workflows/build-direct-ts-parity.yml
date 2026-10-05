@@ -87,6 +87,15 @@ jobs:
             src/native/altscreen111-gen2/src/alt111_policy.c -o /tmp/alt111-settings-core-test
           /tmp/alt111-settings-core-test
           python3 tests/alt111_settings_integration.py
+          cc -O2 -g -std=gnu99 -Wall -Wextra -Wno-unused-function \
+            -DMIBR_SHA256_LIBRARY_ONLY \
+            -Isrc/native/altscreen111-gen2/include -Isrc/native/alt111-settings/include \
+            tests/alt111_gen2_settings_session_test.c \
+            src/native/altscreen111-gen2/src/alt111_{profile,control,policy,video,resync}.c \
+            src/native/alt111-settings/settings_{core,posix}.c \
+            src/native/sha256sum-compat/sha256sum_compat.c -ldl -pthread \
+            -o /tmp/alt111-gen2-settings-session-test
+          /tmp/alt111-gen2-settings-session-test
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
             src/native/direct-ts-parity/direct_ts_parity.c -pthread \
             -o /tmp/direct-ts-parity-host
@@ -117,7 +126,7 @@ jobs:
           bash -n runtime/parity/omonob790_status.sh
           bash -n runtime/diagnostics/gen2_compat_profile.sh
           grep -Fq 'mibr-carplay-autodirect 0' runtime/parity/omonob790_profile.sh
-          grep -Fq 'g2_video.source_ordinal % 20u' src/native/altscreen111-gen2/libaltscreen111_gen2.c
+          grep -Fq 'alt111_policy_au(&g2_policy,g2_video.stream' src/native/altscreen111-gen2/libaltscreen111_gen2.c
           grep -Fq 'O_WRONLY|O_NONBLOCK' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'DRIVER_DCMD_GET_INTERFACE 0x4004050c' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'DRIVER_DCMD_GET_PACKET_SIZE 0x4004050d' src/native/direct-ts-parity/direct_ts_parity.c

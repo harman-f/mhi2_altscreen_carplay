@@ -310,3 +310,19 @@ void alt111_settings_policy(const struct alt111_settings *s, struct alt111_polic
     c->gap_recovery = alt111_setting_integer(s, ALTSET_KEYFRAME_GAP_RECOVERY);
     c->latency_recovery = alt111_setting_integer(s, ALTSET_KEYFRAME_LATENCY_RECOVERY);
 }
+
+void alt111_settings_runtime_overlay(struct alt111_settings *active,
+                                    const struct alt111_settings *desired,
+                                    unsigned classes)
+{
+    unsigned i;
+    if (!active || !desired) return;
+    for (i = 0; i < ALTSET_COUNT; ++i) {
+        if (i == ALTSET_VIEWAREA_SELECTED) continue;
+        if (!((classes & ALT111_OVERLAY_LIVE) && !strcmp(registry[i].apply, "live")) &&
+            !((classes & ALT111_OVERLAY_PRESENTATION) && !strcmp(registry[i].apply, "presentation"))) continue;
+        memcpy(active->value[i], desired->value[i], ALT111_SETTING_VALUE_CAP);
+        active->layer[i] = desired->layer[i];
+    }
+    /* A mixed runtime snapshot is not the desired storage revision. */
+}
