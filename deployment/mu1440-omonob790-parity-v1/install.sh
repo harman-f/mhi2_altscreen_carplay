@@ -131,7 +131,9 @@ check_base(){
   [ "$HH" = "$EXPECTED_BASE_GEN2" ] || fail "wrong_base_hook=$HH"
   [ "$RH" = "$EXPECTED_BASE_REMUX" ] || fail "wrong_base_remux=$RH"
 
-  [ -x "$DST/scripts/direct_ts_auto_stop.sh" ] || fail "base_autodirect_stop_missing"
+  for LEGACY_STATE in /tmp/mibr-direct-auto-supervisor.pid /tmp/mibr-direct-auto-watchdog.pid /tmp/mibr-direct-auto-bridge.pid; do
+    [ ! -e "$LEGACY_STATE" ] || fail "legacy_owner_hint_requires_review=$LEGACY_STATE"
+  done
 }
 
 check_tmp_root(){
@@ -252,8 +254,8 @@ fi
 
 ksh "$ROOT/collect-logs.sh" || fail "sd_log_preflight"
 
-# Never let the legacy writev-gate Auto-Direct path race the DMDT parity path.
-"$DST/scripts/direct_ts_auto_stop.sh" >/dev/null 2>&1 || true
+# Preflight rejects legacy ownership hints. The installer never signals a
+# numeric PID or releases a gate through the old unbound stop script.
 
 app_rw || fail "mount_app_rw"
 mkdir -p "$BACK" || fail "backup_dir"

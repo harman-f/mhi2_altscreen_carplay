@@ -1,29 +1,63 @@
 #!/bin/ksh
 # SPDX-License-Identifier: GPL-3.0-or-later
+# Compatibility wrapper for the former single SafeArea helper.
+# It modifies ViewArea 0 only; use gen2_viewareas.sh for both areas.
 set -u
-. "${0%/*}/master_settings.sh" || exit 10
-C=${1:-status}
-case "$C" in
+HELPER=/mnt/app/root/altscreen-u2/scripts/gen2_viewareas.sh
+[ -x "$HELPER" ] || { echo "GEN2_SAFEAREA=FAIL_HELPER"; exit 3; }
+FULL_W=1010
+FULL_H=376
+
+usage(){
+  echo "usage: $0 status|full|set X Y W H|bottom PIXELS|inset L T R B"
+  echo "       $0 temp {full|set X Y W H|bottom PIXELS|inset L T R B}"
+  echo "       $0 persist {full|set X Y W H|bottom PIXELS|inset L T R B}"
+  echo "       $0 clear-temp|clear-persist"
+  echo "compatibility_scope=view0.safe; canonical_helper=gen2_viewareas.sh"
+  exit 2
+}
+is_uint(){ case "$1" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+
+set_rect(){
+  L=$1; X=$2; Y=$3; W=$4; HH=$5
+  for V in "$X" "$Y" "$W" "$HH"; do is_uint "$V" || usage; done
+  [ "$W" -gt 0 ] && [ "$HH" -gt 0 ] || usage
+  [ $((X+W)) -le "$FULL_W" ] && [ $((Y+HH)) -le "$FULL_H" ] || usage
+  [ "$L" = temp ] && C=temp-set || C=persist-set
+  "$HELPER" "$C" view0.safe.x "$X" >/dev/null || exit $?
+  "$HELPER" "$C" view0.safe.y "$Y" >/dev/null || exit $?
+  "$HELPER" "$C" view0.safe.w "$W" >/dev/null || exit $?
+  "$HELPER" "$C" view0.safe.h "$HH" >/dev/null || exit $?
+  "$HELPER" status
+}
+
+run(){
+  L=$1; shift
+  C=$1; shift
+  case "$C" in
+    full) [ "$#" -eq 0 ] || usage; set_rect "$L" 0 0 "$FULL_W" "$FULL_H" ;;
+    set) [ "$#" -eq 4 ] || usage; set_rect "$L" "$1" "$2" "$3" "$4" ;;
+    bottom)
+      [ "$#" -eq 1 ] || usage; is_uint "$1" || usage
+      [ "$1" -lt "$FULL_H" ] || usage
+      set_rect "$L" 0 0 "$FULL_W" $((FULL_H-$1))
+      ;;
+    inset)
+      [ "$#" -eq 4 ] || usage
+      for V in "$1" "$2" "$3" "$4"; do is_uint "$V" || usage; done
+      set_rect "$L" "$1" "$2" $((FULL_W-$1-$3)) $((FULL_H-$2-$4))
+      ;;
+    *) usage ;;
+  esac
+}
+
+case "${1:-status}" in
   status) exec "$HELPER" status ;;
-  persist|clear-persist) blocked ;;
-  clear-temp) clear_key viewareas.enabled; exit $? ;;
-  temp) shift; C=${1:-};;
-esac
-uint(){ case "$1" in ''|*[!0-9]*) usage ;; esac; [ "${#1}" -le 4 ] || usage; }
-case "$C" in
-  full) [ "$#" -eq 1 ] || usage; X=0; Y=0; W=1010; H=376 ;;
-  set) [ "$#" -eq 5 ] || usage; X=$2; Y=$3; W=$4; H=$5 ;;
-  bottom) [ "$#" -eq 2 ] || usage; uint "$2"; X=0; Y=0; W=1010; H=$((376-$2)) ;;
-  inset)
-    [ "$#" -eq 5 ] || usage
-    for V in "$2" "$3" "$4" "$5"; do uint "$V"; done
-    X=$2; Y=$3; W=$((1010-$2-$4)); H=$((376-$3-$5)) ;;
+  temp|persist)
+    L=$1; shift; [ "$#" -ge 1 ] || usage; run "$L" "$@" ;;
+  full|set|bottom|inset)
+    run temp "$@" ;;
+  clear-temp) exec "$HELPER" clear-temp ;;
+  clear-persist) exec "$HELPER" clear-persist ;;
   *) usage ;;
 esac
-for V in "$X" "$Y" "$W" "$H"; do uint "$V"; done
-batch <<EOF
-viewarea.0.safe.x=$X
-viewarea.0.safe.y=$Y
-viewarea.0.safe.w=$W
-viewarea.0.safe.h=$H
-EOF

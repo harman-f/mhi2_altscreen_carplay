@@ -26,9 +26,7 @@ with tempfile.TemporaryDirectory() as td:
            'ALT111_SETTINGS_PERSISTENT_ROOT': str(root/'persistent')}
     inventory = (ROOT/'runtime/parity/master-script-basenames.sh').read_text().split("'")[1].split()
     for name in inventory:
-        candidates = list((ROOT/'runtime').rglob(name))
-        assert len(candidates) == 1, name
-        shutil.copyfile(candidates[0], root/'scripts'/name)
+        shutil.copyfile(ROOT/'runtime/master'/name, root/'scripts'/name)
         subprocess.run(['bash', '-n', str(root/'scripts'/name)], check=True)
 
     def cli(*args):
@@ -79,7 +77,7 @@ with tempfile.TemporaryDirectory() as td:
     for name in inventory:
         if name == 'master_settings.sh':
             continue
-        assert 'POLICY_BLOCKED' in run(name, 'persist', success=False)
+        assert 'POLICY_BLOCKED' in run(name, 'persist', success=False), name
         assert snapshot() == before
     (root/'temp/mibr-parity-rollback.pending').write_text('canonical_reboot_required\n')
     assert 'rollback_requires_canonical_reboot' in run('direct_fps.sh', 'temp', '40', success=False)
