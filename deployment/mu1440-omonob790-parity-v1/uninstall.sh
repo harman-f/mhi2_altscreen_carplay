@@ -7,6 +7,11 @@ BACK=/mnt/app/root/mibr-omonob790-parity-v1-backup
 ACTIVE=/mnt/app/root/mibr-omonob790-parity-v1-active
 STATE_AUTODIRECT=/mnt/app/root/mibr-carplay-autodirect
 APP_RW=0
+SELF=$0
+case "$SELF" in */*) ROOT=${SELF%/*} ;; *) ROOT=. ;; esac
+ROOT=$(cd "$ROOT" 2>/dev/null && pwd) || exit 2
+SHA=$ROOT/payload/sha256sum
+hashf(){ set -- $("$SHA" "$1" 2>/dev/null); [ -n "${1:-}" ] || return 1; echo "$1"; }
 
 fail(){
   echo "MIBR_OMONOB790_PARITY_UNINSTALL=FAIL $*"
@@ -43,6 +48,11 @@ fi
 [ -d "$BACK" ] || fail "backup_dir_missing"
 [ -e "$BACK/BACKUP_COMPLETE" ] || fail "backup_incomplete_refusing_automatic_restore"
 [ -e "$ACTIVE" ] || echo "MIBR_OMONOB790_PARITY_UNINSTALL=RECOVERY_FROM_INTERRUPTED_INSTALL"
+[ -x "$SHA" ] && [ -r "$BACK/BACKUP.sha256" ] || fail "backup_verification_missing"
+while read EXPECT REL; do
+  GOT=$(hashf "$BACK/$REL") || fail "backup_hash_failed=$REL"
+  [ "$GOT" = "$EXPECT" ] || fail "backup_corrupt=$REL"
+done < "$BACK/BACKUP.sha256"
 
 # Stop only parity-owned processes. The session parent owns graceful bridge
 # termination and DMDT restore. Never hot-restart the CarPlay process stack.
@@ -68,6 +78,7 @@ if [ -x "$DST/bin/parity-session" ]; then
   "$DST/bin/parity-session" --restore-stock || fail "dmdt_stock_restore"
 fi
 
+ksh "$ROOT/collect-logs.sh" || fail "sd_log_pre_restore"
 app_rw || fail "mount_app_rw"
 
 for SPEC in   "bin/libaltscreen111.so:$DST/bin/libaltscreen111.so:755"   "hook/libmibr_carplay111.so:$HOOK:755"   "bin/direct-ts-parity:$DST/bin/direct-ts-parity:755"   "bin/parity-session:$DST/bin/parity-session:755"   "scripts/omonob790_profile.sh:$DST/scripts/omonob790_profile.sh:755"   "scripts/omonob790_session.sh:$DST/scripts/omonob790_session.sh:755"   "scripts/omonob790_status.sh:$DST/scripts/omonob790_status.sh:755"   "scripts/gen2_compat_profile.sh:$DST/scripts/gen2_compat_profile.sh:755"   "state/mibr-carplay-autodirect:$STATE_AUTODIRECT:644"
@@ -79,8 +90,19 @@ do
   restore_one "$REL" "$DSTF" "$MODE"
 done
 
-rm -f "$ACTIVE" 2>/dev/null || true
-rm -rf "$BACK" 2>/dev/null || true
+while read EXPECT REL; do
+  case "$REL" in
+    hook/*) LIVE=$HOOK ;;
+    state/*) LIVE=$STATE_AUTODIRECT ;;
+    *) LIVE=$DST/$REL ;;
+  esac
+  GOT=$(hashf "$LIVE") || fail "restored_hash_failed=$REL"
+  [ "$GOT" = "$EXPECT" ] || fail "restored_hash_mismatch=$REL"
+done < "$BACK/BACKUP.sha256"
+rm -f "$ACTIVE" 2>/dev/null || fail "active_marker_remove"
+# Retain verified backups and restoration evidence. A later install refuses
+# this directory until a separately reviewed retirement/archival action.
+echo "RESTORE_VERIFIED=YES" > "$BACK/RESTORE_VERIFIED" || fail "restore_verification_marker"
 app_ro
 
 # Keep the legacy Auto-Direct path suppressed only until the required reboot.

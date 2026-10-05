@@ -24,6 +24,7 @@ BACK=/mnt/app/root/mibr-omonob790-parity-v1-backup
 ACTIVE=/mnt/app/root/mibr-omonob790-parity-v1-active
 STATE_AUTODIRECT=/mnt/app/root/mibr-carplay-autodirect
 APP_RW=0
+MUTATING=0
 
 hashf(){
   set -- $("$SHA" "$1" 2>/dev/null)
@@ -37,6 +38,10 @@ fail(){
     sync 2>/dev/null || true
     mount -ur /mnt/app 2>/dev/null || true
     APP_RW=0
+  fi
+  if [ "$MUTATING" -eq 1 ]; then
+    echo "MIBR_OMONOB790_PARITY=ROLLBACK_AFTER_FAILED_APPLY"
+    ksh "$ROOT/uninstall.sh" || echo "MIBR_OMONOB790_PARITY=ROLLBACK_FAILED backups_retained=$BACK"
   fi
   exit 20
 }
@@ -133,6 +138,10 @@ backup_one(){
   mkdir -p "$DIR" || fail "backup_mkdir=$DIR"
   if [ -e "$SRC" ]; then
     cp "$SRC" "$DSTB" || fail "backup_copy=$SRC"
+    EXPECT=$(hashf "$SRC") || fail "backup_source_hash=$SRC"
+    GOT=$(hashf "$DSTB") || fail "backup_target_hash=$DSTB"
+    [ "$EXPECT" = "$GOT" ] || fail "backup_hash_mismatch=$SRC"
+    echo "$EXPECT $REL" >> "$BACK/BACKUP.sha256" || fail "backup_manifest=$REL"
   else
     : > "$DSTB.ABSENT" || fail "backup_absent_marker=$REL"
   fi
@@ -157,17 +166,11 @@ same_as_package(){
 }
 
 verify_manifest
-check_base
 check_tmp_root
 show_plan
 
 case "${1:---check}" in
-  --check)
-    echo "MIBR_OMONOB790_PARITY_CHECK=PASS"
-    echo "next=./install.sh --apply"
-    exit 0
-    ;;
-  --apply) ;;
+  --check|--apply) ;;
   *) echo "usage: $0 --check|--apply"; exit 64 ;;
 esac
 
@@ -175,16 +178,30 @@ if [ -e "$ACTIVE" ]; then
   if same_as_package "$DST/bin/libaltscreen111.so" "$PAYLOAD/libaltscreen111.so" &&
      same_as_package "$HOOK" "$PAYLOAD/libaltscreen111.so" &&
      same_as_package "$DST/bin/direct-ts-parity" "$PAYLOAD/direct-ts-parity" &&
-     same_as_package "$DST/bin/parity-session" "$PAYLOAD/parity-session"; then
+     same_as_package "$DST/bin/parity-session" "$PAYLOAD/parity-session" &&
+     same_as_package "$DST/scripts/omonob790_profile.sh" "$RUNTIME/omonob790_profile.sh" &&
+     same_as_package "$DST/scripts/omonob790_session.sh" "$RUNTIME/omonob790_session.sh" &&
+     same_as_package "$DST/scripts/omonob790_status.sh" "$RUNTIME/omonob790_status.sh" &&
+     same_as_package "$DST/scripts/gen2_compat_profile.sh" "$RUNTIME/gen2_compat_profile.sh"; then
     echo "MIBR_OMONOB790_PARITY=ALREADY_INSTALLED"
     exit 0
   fi
   fail "active_marker_with_different_runtime"
 fi
 
+check_base
+
 if [ -d "$BACK" ] && [ ! -e "$ACTIVE" ]; then
   fail "orphan_backup_exists=$BACK run_uninstall_for_recovery_or_review_backup"
 fi
+
+if [ "${1:---check}" = --check ]; then
+  echo "MIBR_OMONOB790_PARITY_CHECK=PASS"
+  echo "next=./install.sh --apply"
+  exit 0
+fi
+
+ksh "$ROOT/collect-logs.sh" || fail "sd_log_preflight"
 
 # Never let the legacy writev-gate Auto-Direct path race the DMDT parity path.
 "$DST/scripts/direct_ts_auto_stop.sh" >/dev/null 2>&1 || true
@@ -199,6 +216,7 @@ do
   backup_one "$SRC" "$REL"
 done
 : > "$BACK/BACKUP_COMPLETE" || fail "backup_complete_marker"
+MUTATING=1
 
 install_one "$PAYLOAD/libaltscreen111.so" "$DST/bin/libaltscreen111.so"
 install_one "$PAYLOAD/libaltscreen111.so" "$HOOK"
@@ -240,6 +258,7 @@ RH=$(hashf "$DST/bin/direct-ts-remux") || fail "post_base_remux_hash_failed"
 [ -r "$STATE_AUTODIRECT" ] && [ "$(cat "$STATE_AUTODIRECT" 2>/dev/null)" = 0 ] || fail "autodirect_not_disabled"
 
 echo "MIBR_OMONOB790_PARITY=PASS"
+ksh "$ROOT/collect-logs.sh" || fail "sd_log_post_install"
 echo "legacy_autodirect=0"
 echo "base_direct_ts_remux=UNCHANGED"
 echo "REBOOT_REQUIRED=YES"

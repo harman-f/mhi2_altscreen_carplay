@@ -17,7 +17,7 @@ for f in "$GEN2" "$BRIDGE" "$SESSION" "$SHAHELP"; do
   [[ -f "$f" ]] || { echo "missing required file: $f"; exit 10; }
 done
 
-rm -rf "$DEST"
+[[ ! -e "$DEST" ]] || { echo "refusing to overwrite an existing candidate: $DEST"; exit 11; }
 mkdir -p "$DEST/payload" "$DEST/runtime"
 
 for f in install.sh uninstall.sh status.sh collect-logs.sh vehicle-install.sh vehicle-rollback.sh; do
@@ -77,6 +77,12 @@ input=m1au_complete_au
 source_clock=stream111_32.32
 pts_clock=source_derived_90khz
 frame_pacer=none
+transport_pacer=absolute_monotonic_all_outputs
+transport_late_limit_us=40000
+write_timeout_us=500000
+pts_emission_guard=complete_pes_budget_plus_margin
+profile_persistence=disabled
+rollback_backups=retained_hash_verified
 transport_bps=12288000
 pat_pid=0x0000
 pmt_pid=0x0010
@@ -168,9 +174,13 @@ The reference packet-level low-latency flush can truncate an already-started
 PES. This candidate never does that. Recovery discards only complete not-yet-
 started AUs and preserves the tail of an in-flight PES.
 
-The reference producer's 262144-byte payload ceiling is recorded for audit but
-is not deliberately reintroduced as a failure mode; the bridge keeps its larger
-bounded safety envelope.
+Records larger than the reference 262144-byte transport budget are read within
+the bounded safety envelope, dropped as whole AUs and followed by IDR recovery.
+Every output is paced on absolute monotonic deadlines. A driver delay greater
+than 40 ms or incomplete physical-block acceptance fails the session explicitly.
+PTS is checked again at PES emission against the complete transfer budget.
+These guards bound software timing; hardware drain and decoder behavior still
+require target validation.
 
 Control-plane note
 ------------------

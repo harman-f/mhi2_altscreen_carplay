@@ -6,6 +6,16 @@ NAME=mibr-carplay111-compat-profile
 TEMP=/tmp/$NAME
 PERSIST=/mnt/app/root/$NAME
 
+# The reversible parity overlay backs up no persistent profile settings.
+case "${1:-status}" in
+  persist|clear-persist)
+    [ ! -e /mnt/app/root/mibr-omonob790-parity-v1-active ] && [ ! -d /mnt/app/root/mibr-omonob790-parity-v1-backup ] || {
+      echo "GEN2_COMPAT_PROFILE=FAIL parity_overlay_is_volatile_only"
+      exit 24
+    }
+    ;;
+esac
+
 usage(){
   echo "usage: $0 status|mibr|omonob790|temp {mibr|omonob790}|persist {mibr|omonob790}|clear-temp|clear-persist|default"
   echo "changes require a fresh CarPlay negotiation"

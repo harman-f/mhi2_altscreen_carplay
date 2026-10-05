@@ -25,6 +25,8 @@
 #define STATE_PATH "/tmp/mibr-parity-session.state"
 #define PID_PATH "/tmp/mibr-parity-session.pid"
 #define BRIDGE_PID_PATH "/tmp/mibr-parity-session-bridge.pid"
+#define LOCK_PATH "/tmp/mibr-parity-session.lock"
+#define WATCHDOG_PID_PATH "/tmp/mibr-parity-session-watchdog.pid"
 #define AU_MARKER "/tmp/mibr-alt111-au-framing.enabled"
 #define OLD_DIRECT_MARKER "/tmp/mibr-isotx2-gate.direct"
 #define SOURCE_STATE "/tmp/mibr-carplay111.state"
@@ -37,6 +39,25 @@
 #define WATCHDOG_MARGIN_SECONDS 20u
 
 static volatile sig_atomic_t g_stop;
+static int session_lock_fd=-1;
+
+static uint64_t monotonic_ms(void) {
+    struct timespec ts;
+    if(clock_gettime(CLOCK_MONOTONIC,&ts)!=0)return 0;
+    return (uint64_t)ts.tv_sec*1000u+(uint64_t)ts.tv_nsec/1000000u;
+}
+
+static int acquire_lock(void) {
+    struct flock lk;
+    int fd=open(LOCK_PATH,O_WRONLY|O_CREAT|O_EXCL,0600);
+    if(fd<0)return -1;
+    close(fd);
+    fd=open(LOCK_PATH,O_RDWR);
+    memset(&lk,0,sizeof(lk));lk.l_type=F_RDLCK;lk.l_whence=SEEK_SET;
+    if(fd<0 || fcntl(fd,F_SETLK,&lk)!=0) {if(fd>=0)close(fd);return -1;}
+    if(fcntl(fd,F_SETFD,FD_CLOEXEC)!=0) {close(fd);return -1;}
+    session_lock_fd=fd;return 0;
+}
 
 static void on_signal(int sig) { (void)sig; g_stop = 1; }
 
@@ -124,9 +145,11 @@ static int wait_child_bounded(pid_t p, unsigned timeout_ms, int *status) {
     }
 
     (void)kill(p, SIGKILL);
-    while (waitpid(p, &st, 0) < 0) {
-        if (errno == EINTR) continue;
-        break;
+    elapsed=0;
+    while(elapsed<DMDT_TERM_GRACE_MS) {
+        pid_t w=waitpid(p,&st,WNOHANG);
+        if(w==p || (w<0 && errno==ECHILD))break;
+        usleep(100000); elapsed+=100u;
     }
     if (status) *status = st;
     return -1;
@@ -187,20 +210,31 @@ static void kill_pid_from_file(const char *path) {
     if (kill((pid_t)v, 0) == 0 || errno == EPERM) kill((pid_t)v, SIGKILL);
 }
 
-static void emergency_restore(void) {
+static int emergency_restore(void) {
+    int restored;
     kill_pid_from_file(BRIDGE_PID_PATH);
     unlink(AU_MARKER);
     unlink(OLD_DIRECT_MARKER);
-    (void)route_restore();
-    (void)write_text(STATE_PATH, "emergency_restored\n");
+    restored=route_restore()==0;
+    (void)write_text(STATE_PATH,restored ? "emergency_restored\n" : "emergency_restore_failed\n");
     unlink(BRIDGE_PID_PATH);
-    unlink(PID_PATH);
+    if(!pid_alive_from_file(PID_PATH))unlink(PID_PATH);
+    /* Keep the lock after an emergency. A stale session must be explicitly
+     * restored/reconciled before another owner may acquire the route. */
+    return restored ? 0 : -1;
 }
 
 static void watchdog_main(int fd, unsigned timeout_seconds) {
     char token = 0;
     ssize_t n = -1;
     unsigned elapsed_seconds = 0;
+    struct flock lk;
+    char b[48];
+    memset(&lk,0,sizeof(lk));lk.l_type=F_RDLCK;lk.l_whence=SEEK_SET;
+    if(fcntl(session_lock_fd,F_SETLK,&lk)!=0)_exit(18);
+    snprintf(b,sizeof(b),"%ld\n",(long)getpid());
+    if(write_text(WATCHDOG_PID_PATH,b)!=0)_exit(18);
+    signal(SIGINT,SIG_IGN); signal(SIGTERM,SIG_IGN); signal(SIGHUP,SIG_IGN);
 
     while (elapsed_seconds < timeout_seconds) {
         fd_set rfds;
@@ -217,21 +251,18 @@ static void watchdog_main(int fd, unsigned timeout_seconds) {
         if (rc > 0 && FD_ISSET(fd, &rfds)) {
             do { n = read(fd, &token, 1); } while (n < 0 && errno == EINTR);
             close(fd);
-            if (n == 1 && token == 'R') _exit(0);
-            emergency_restore();
-            _exit(0);
+            if (n == 1 && token == 'R') { unlink(WATCHDOG_PID_PATH); _exit(0); }
+            rc=emergency_restore(); unlink(WATCHDOG_PID_PATH); _exit(rc ? 20 : 0);
         }
         if (rc < 0 && errno != EINTR) {
             close(fd);
-            emergency_restore();
-            _exit(0);
+            rc=emergency_restore(); unlink(WATCHDOG_PID_PATH); _exit(rc ? 20 : 0);
         }
         if (rc == 0) elapsed_seconds += slice;
     }
 
     close(fd);
-    emergency_restore();
-    _exit(0);
+    { int rc=emergency_restore(); unlink(WATCHDOG_PID_PATH); _exit(rc ? 20 : 0); }
 }
 
 static int source_ready(void) {
@@ -243,13 +274,27 @@ static int source_ready(void) {
 
 static int bridge_spawn(const char *bridge, const char *input, const char *output,
                         pid_t *out_pid) {
+    int gate[2];
+    char token='G', b[48];
+    if(pipe(gate)!=0)return -1;
     pid_t p = fork();
-    if (p < 0) return -1;
+    if (p < 0) {close(gate[0]);close(gate[1]);return -1;}
     if (p == 0) {
+        ssize_t n;
+        close(gate[1]);
+        do { n=read(gate[0],&token,1); } while(n<0&&errno==EINTR);
+        close(gate[0]);
+        if(n!=1||token!='G')_exit(126);
         execl(bridge, bridge, input, output, (char *)NULL);
         _exit(127);
     }
     *out_pid = p;
+    close(gate[0]);
+    snprintf(b,sizeof(b),"%ld\n",(long)p);
+    if(write_text(BRIDGE_PID_PATH,b)!=0 || write(gate[1],&token,1)!=1) {
+        close(gate[1]); return -1;
+    }
+    close(gate[1]);
     return 0;
 }
 
@@ -265,7 +310,11 @@ static void stop_bridge(pid_t p) {
         usleep(100000);
     }
     kill(p, SIGKILL);
-    while (waitpid(p, &st, 0) < 0 && errno == EINTR) {}
+    for(i=0;i<5;++i) {
+        pid_t w=waitpid(p,&st,WNOHANG);
+        if(w==p || (w<0&&errno==ECHILD))return;
+        usleep(100000);
+    }
 }
 
 static int self_test(void) {
@@ -287,16 +336,28 @@ int main(int argc, char **argv) {
     char *end = NULL, b[64];
     int pipefd[2] = {-1,-1}, st = 0, rc = 1, route_owned = 0, restore_ok = 0;
     pid_t watchdog = -1, bridge_pid = -1;
-    uint64_t elapsed_ms = 0;
+    uint64_t deadline = 0;
+    int watchdog_reaped=0, lock_owned=0;
 
     if (argc == 2 && !strcmp(argv[1], "--self-test")) return self_test();
     if (argc == 2 && !strcmp(argv[1], "--restore-stock")) {
         int rr;
+        struct flock lk;
+        if(pid_alive_from_file(PID_PATH) || pid_alive_from_file(WATCHDOG_PID_PATH)) {
+            fprintf(stderr,"ERROR active parity owner; stop it before restoring\n"); return 18;
+        }
+        if(access(LOCK_PATH,F_OK)!=0 && acquire_lock()!=0)return 18;
+        if(session_lock_fd<0)session_lock_fd=open(LOCK_PATH,O_RDWR);
+        memset(&lk,0,sizeof(lk));lk.l_type=F_WRLCK;lk.l_whence=SEEK_SET;
+        if(session_lock_fd<0 || fcntl(session_lock_fd,F_SETLK,&lk)!=0)return 18;
+        kill_pid_from_file(BRIDGE_PID_PATH);
         (void)write_text(STATE_PATH, "manual_restoring_dmdt\n");
         rr=route_restore();
         unlink(AU_MARKER);
         unlink(OLD_DIRECT_MARKER);
         (void)write_text(STATE_PATH, rr==0 ? "manual_stock\n" : "manual_restore_failed\n");
+        if(rr==0) { unlink(LOCK_PATH); unlink(BRIDGE_PID_PATH); unlink(PID_PATH); }
+        close(session_lock_fd);
         return rr==0 ? 0 : 20;
     }
     if (argc != 5) {
@@ -311,18 +372,24 @@ int main(int argc, char **argv) {
     if (access(DMDT, X_OK) != 0) { fprintf(stderr, "ERROR missing dmdt\n"); return 10; }
     if (access(bridge, X_OK) != 0) { fprintf(stderr, "ERROR missing bridge\n"); return 11; }
     if (!source_ready()) { fprintf(stderr, "ERROR stream111 not ready\n"); return 12; }
-    if (old_autodirect_enabled() || pid_alive_from_file(OLD_AUTO_PID)) {
+    if (old_autodirect_enabled() || pid_alive_from_file(OLD_AUTO_PID) ||
+        pid_alive_from_file("/tmp/mibr-direct-auto-watchdog.pid") ||
+        pid_alive_from_file("/tmp/mibr-direct-auto-bridge.pid")) {
         fprintf(stderr, "ERROR legacy Auto-Direct must be disabled/stopped\n");
         return 13;
     }
 
-    signal(SIGINT, on_signal); signal(SIGTERM, on_signal); signal(SIGHUP, on_signal);
+    if(acquire_lock()!=0) { fprintf(stderr,"ERROR parity owner lock exists; reconcile stock first\n"); return 18; }
+    lock_owned=1;
+
+    signal(SIGINT, on_signal); signal(SIGTERM, on_signal); signal(SIGHUP, on_signal); signal(SIGPIPE,SIG_IGN);
     snprintf(b, sizeof(b), "%ld\n", (long)getpid());
-    if (write_text(PID_PATH, b) != 0) return 14;
+    if (write_text(PID_PATH, b) != 0) {unlink(LOCK_PATH);return 14;}
     (void)write_text(STATE_PATH, "preflight\n");
     unlink(OLD_DIRECT_MARKER);
 
     if (pipe(pipefd) != 0) goto done;
+    if(fcntl(pipefd[0],F_SETFD,FD_CLOEXEC)!=0 || fcntl(pipefd[1],F_SETFD,FD_CLOEXEC)!=0)goto done;
     watchdog = fork();
     if (watchdog < 0) goto done;
     if (watchdog == 0) {
@@ -330,6 +397,16 @@ int main(int argc, char **argv) {
         watchdog_main(pipefd[0], (unsigned)max_seconds + WATCHDOG_MARGIN_SECONDS);
     }
     close(pipefd[0]); pipefd[0] = -1;
+    {
+        char expected[48], actual[48];
+        uint64_t until=monotonic_ms()+2000u;
+        snprintf(expected,sizeof(expected),"%ld",(long)watchdog);
+        do {
+            if(read_trimmed(WATCHDOG_PID_PATH,actual,sizeof(actual))==0 && !strcmp(actual,expected))break;
+            usleep(10000);
+        } while(monotonic_ms()<until);
+        if(read_trimmed(WATCHDOG_PID_PATH,actual,sizeof(actual))!=0 || strcmp(actual,expected))goto done;
+    }
 
     if (touch_file(AU_MARKER) != 0) {
         fprintf(stderr, "ERROR cannot arm M1AU marker\n");
@@ -337,6 +414,7 @@ int main(int argc, char **argv) {
     }
 
     (void)write_text(STATE_PATH, "releasing_dmdt\n");
+    if(g_stop)goto done;
     if (route_release() != 0) {
         fprintf(stderr, "ERROR DMDT release failed\n");
         goto done;
@@ -344,18 +422,20 @@ int main(int argc, char **argv) {
     route_owned = 1;
 
     usleep(500000);
+    if(g_stop)goto done;
 
     (void)write_text(STATE_PATH, "starting_bridge\n");
     if (bridge_spawn(bridge, input, output, &bridge_pid) != 0) {
         fprintf(stderr, "ERROR bridge spawn failed\n");
         goto done;
     }
-    snprintf(b, sizeof(b), "%ld\n", (long)bridge_pid);
-    if (write_text(BRIDGE_PID_PATH, b) != 0) goto done;
     (void)write_text(STATE_PATH, "direct\n");
 
     rc = 0;
-    while (!g_stop && elapsed_ms < (uint64_t)max_seconds * 1000ull) {
+    deadline=monotonic_ms()+(uint64_t)max_seconds*1000u;
+    while (!g_stop && monotonic_ms() < deadline) {
+        pid_t ww=waitpid(watchdog,&st,WNOHANG);
+        if(ww==watchdog || (ww<0&&errno!=EINTR)) {watchdog_reaped=1;rc=17;break;}
         pid_t w = waitpid(bridge_pid, &st, WNOHANG);
         if (w == bridge_pid) {
             bridge_pid = -1;
@@ -368,7 +448,6 @@ int main(int argc, char **argv) {
             break;
         }
         usleep(100000);
-        elapsed_ms += 100u;
     }
     if (g_stop && rc == 0) rc = 130;
 
@@ -399,10 +478,23 @@ done:
         rc = 20;
     }
     if (pipefd[1] >= 0) close(pipefd[1]);
-    if (watchdog > 1) {
-        while (waitpid(watchdog, &st, 0) < 0 && errno == EINTR) {}
+    if (watchdog > 1 && !watchdog_reaped) {
+        uint64_t until=monotonic_ms()+15000u;
+        while(monotonic_ms()<until) {
+            pid_t w=waitpid(watchdog,&st,WNOHANG);
+            if(w==watchdog || (w<0&&errno==ECHILD)) {
+                watchdog_reaped=1;
+                if(w==watchdog && WIFEXITED(st) && WEXITSTATUS(st)!=0) { rc=20;restore_ok=0; }
+                break;
+            }
+            usleep(100000);
+        }
+        if(!watchdog_reaped)rc=20;
     }
     unlink(PID_PATH);
     unlink(BRIDGE_PID_PATH);
+    if(watchdog_reaped)unlink(WATCHDOG_PID_PATH);
+    if(restore_ok && (watchdog<=1 || watchdog_reaped) && lock_owned)unlink(LOCK_PATH);
+    if(session_lock_fd>=0)close(session_lock_fd);
     return rc;
 }

@@ -6,7 +6,7 @@ ROOT_TEMP=/tmp
 ROOT_PERSIST=/mnt/app/root
 
 usage(){
-  echo "usage: $0 status|temp|persist|clear-temp|clear-persist"
+  echo "usage: $0 status|temp|clear-temp"
   echo "preset changes require a fresh CarPlay negotiation"
   exit 2
 }
@@ -150,8 +150,8 @@ clear_layer(){
 
 case "${1:-status}" in
   status) status ;;
-  temp|persist) apply_profile "$1" ;;
+  temp) apply_profile temp ;;
   clear-temp) clear_layer temp ;;
-  clear-persist) clear_layer persistent ;;
+  persist|clear-persist) echo "OMONOB790_PROFILE=FAIL volatile_only_candidate"; exit 24 ;;
   *) usage ;;
 esac

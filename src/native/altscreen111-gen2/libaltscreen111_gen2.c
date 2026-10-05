@@ -1605,6 +1605,13 @@ static int gen2_video_submit_au(const uint8_t *p, size_t n,
                                                      p, n, 1, source_ts_raw)
                          : ALT111_STALE;
     after_count = g2_video.source_aus;
+    /* Reference cadence belongs to the source producer, even when there is
+     * no consumer or an AU is dropped before the bridge can observe it. */
+    if (after_count > before && g2_video.source_ordinal &&
+        (g2_video.source_ordinal % 20u) == 0u &&
+        compat_profile_omonob790() && access("/tmp/mibr-alt111-au-framing.enabled",F_OK)==0 &&
+        g2_control_session)
+        (void)alt111_control_keyframe(&g2_control,g2_control_session);
     if (accepted && after_count > before) *accepted = 1;
     if (consumer_attached) *consumer_attached = g2_video.attached ? 1 : 0;
     pthread_cond_broadcast(&g2_core_cv);

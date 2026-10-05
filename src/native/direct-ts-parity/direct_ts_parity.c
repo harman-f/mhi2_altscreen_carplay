@@ -35,6 +35,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
@@ -74,6 +75,8 @@
 #define PARITY_IDR_INTERVAL 20u
 #define REFERENCE_PRODUCER_PAYLOAD_LIMIT 0x40000u
 #define LOW_LATENCY_PACKET_LIMIT 1024u
+#define WRITE_TIMEOUT_US 500000u
+#define TRANSPORT_LATE_LIMIT_US 40000u
 
 struct ts_au {
     uint8_t *packets;
@@ -93,6 +96,7 @@ struct au_queue {
     unsigned count;
     size_t packets_queued;
     int stop;
+    int input_done;
 };
 
 struct clock_state {
@@ -108,6 +112,11 @@ struct clock_state {
     int origin_is_source;
     uint64_t pts_rebases;
     uint64_t source_rebases;
+    uint64_t previous_source;
+    uint64_t previous_arrival_us;
+    int have_previous_source;
+    uint64_t emitted_pts90k;
+    uint64_t emission_shift90k;
 };
 
 struct bridge_stats {
@@ -151,6 +160,7 @@ struct bridge_stats {
 struct writer_ctx {
     int fd;
     int regular_file;
+    int input_fd;
     struct au_queue *queue;
     struct clock_state *clock;
     struct bridge_stats *stats;
@@ -299,14 +309,24 @@ static uint64_t monotonic_us(void) {
 static uint64_t assign_pts(struct clock_state *c, uint32_t frac, uint32_t sec,
                            int *rebased) {
     uint64_t pcr, pts, floor, target, shift, now_us;
+    uint64_t raw = ((uint64_t)sec << 32) | frac;
+    int discontinuous = 0;
     int source_valid = (frac != 0u || sec != 0u);
     *rebased = 0;
     now_us = monotonic_us();
     pthread_mutex_lock(&c->lock);
     pcr = c->transport_pcr90k;
+    if (source_valid && c->have_previous_source) {
+        /* Unsigned 64-bit subtraction followed by signed interpretation also
+         * handles the seconds-word rollover. Compare successive source times,
+         * not the original session epoch. Idle time is allowed. */
+        int64_t delta = (int64_t)(raw - c->previous_source);
+        uint64_t wall_us = now_us - c->previous_arrival_us;
+        uint64_t allowed = ((wall_us / 1000u + 500u) << 32) / 1000u;
+        discontinuous = delta < 0 || (uint64_t)delta > allowed;
+    }
     if (!c->have_origin || c->origin_is_source != source_valid ||
-        (source_valid && (sec < c->origin_sec ||
-         (sec == c->origin_sec && frac < c->origin_frac)))) {
+        discontinuous) {
         c->origin_frac = frac;
         c->origin_sec = sec;
         c->local_origin_us = now_us;
@@ -316,9 +336,18 @@ static uint64_t assign_pts(struct clock_state *c, uint32_t frac, uint32_t sec,
         c->have_origin = 1;
         c->origin_is_source = source_valid;
     }
-    if (source_valid)
+    c->previous_source = raw;
+    c->previous_arrival_us = now_us;
+    c->have_previous_source = source_valid;
+    if (source_valid) {
         pts = c->pts_origin90k + source_delta_90k(c->origin_frac, c->origin_sec, frac, sec);
-    else
+        if (source_delta_90k(c->origin_frac, c->origin_sec, frac, sec) >
+                ((now_us - c->local_origin_us) * 90u) / 1000u + 45000u) {
+            c->origin_frac = frac; c->origin_sec = sec; c->local_origin_us = now_us;
+            c->pts_origin90k = pcr + PTS_LEAD_90K;
+            pts = c->pts_origin90k; ++c->source_rebases; *rebased = 1;
+        }
+    } else
         pts = c->pts_origin90k + ((now_us - c->local_origin_us) * 90ull) / 1000ull;
     floor = pcr + PTS_MIN_LEAD_90K;
     if (pts < floor) {
@@ -372,6 +401,21 @@ static int extract_param_sets(const uint8_t *p, size_t n, uint8_t **out, size_t 
     size_t sc = 0, nal = 0;
     uint8_t *buf = NULL; size_t used = 0;
     int type;
+    int incoming_sps = au_has_type(p, n, 7);
+    int incoming_pps = au_has_type(p, n, 8);
+    /* A partial config update must retain the other parameter-set type. */
+    while ((type = annexb_nal_type(*out, *out_n, &sc, &nal)) >= 0) {
+        size_t next_sc = annexb_find_next_start(*out, *out_n, nal + 1u);
+        if ((type == 7 && !incoming_sps) || (type == 8 && !incoming_pps)) {
+            size_t len = next_sc - sc;
+            uint8_t *nb = (uint8_t *)realloc(buf, used + len);
+            if (!nb) { free(buf); return -1; }
+            buf = nb; memcpy(buf + used, *out + sc, len); used += len;
+        }
+        if (next_sc == *out_n) break;
+        sc = next_sc;
+    }
+    sc = 0; nal = 0;
     while ((type = annexb_nal_type(p, n, &sc, &nal)) >= 0) {
         size_t next_sc = annexb_find_next_start(p, n, nal + 1u);
         if (type == 7 || type == 8) {
@@ -392,21 +436,40 @@ static int normalize_au(const uint8_t *in, size_t in_n, int idr,
                         uint8_t **cache, size_t *cache_n,
                         uint8_t **out, size_t *out_n) {
     static const uint8_t aud[] = {0,0,0,1,0x09,0xf0};
-    int has_aud = au_has_type(in, in_n, 9);
     int has_sps = au_has_type(in, in_n, 7);
     int has_pps = au_has_type(in, in_n, 8);
-    size_t extra = (has_aud ? 0u : sizeof(aud));
-    uint8_t *buf; size_t off = 0;
-    if (has_sps || has_pps) (void)extract_param_sets(in, in_n, cache, cache_n);
-    if (idr && !(has_sps && has_pps) && *cache && *cache_n) extra += *cache_n;
+    size_t extra = sizeof(aud), sc = 0, nal = 0;
+    uint8_t *buf; size_t off = 0; int type;
+    if (!in_n || (in[0] != 0) || !au_has_type(in, in_n, idr ? 5 : 1)) return -1;
+    if ((has_sps || has_pps) && extract_param_sets(in, in_n, cache, cache_n) != 0) return -1;
+    if (idr && (!au_has_type(*cache, *cache_n, 7) || !au_has_type(*cache, *cache_n, 8))) return -1;
+    if (idr) extra += *cache_n;
     if (in_n > SIZE_MAX - extra) return -1;
     buf = (uint8_t *)malloc(in_n + extra);
     if (!buf) return -1;
-    if (!has_aud) { memcpy(buf + off, aud, sizeof(aud)); off += sizeof(aud); }
-    if (idr && !(has_sps && has_pps) && *cache && *cache_n) {
-        memcpy(buf + off, *cache, *cache_n); off += *cache_n;
+    memcpy(buf, aud, sizeof(aud)); off += sizeof(aud);
+    if (idr) {
+        /* Canonical ordering: AUD, all SPS, all PPS, then SEI/VCL. */
+        int wanted;
+        for (wanted = 7; wanted <= 8; ++wanted) {
+            sc = 0; nal = 0;
+            while ((type = annexb_nal_type(*cache, *cache_n, &sc, &nal)) >= 0) {
+                size_t next = annexb_find_next_start(*cache, *cache_n, nal + 1u);
+                if (type == wanted) { memcpy(buf + off, *cache + sc, next - sc); off += next - sc; }
+                if (next == *cache_n) break;
+                sc = next;
+            }
+        }
     }
-    memcpy(buf + off, in, in_n); off += in_n;
+    sc = 0; nal = 0;
+    while ((type = annexb_nal_type(in, in_n, &sc, &nal)) >= 0) {
+        size_t next = annexb_find_next_start(in, in_n, nal + 1u);
+        if (type != 9 && (!idr || (type != 7 && type != 8))) {
+            memcpy(buf + off, in + sc, next - sc); off += next - sc;
+        }
+        if (next == in_n) break;
+        sc = next;
+    }
     *out = buf; *out_n = off;
     return 0;
 }
@@ -547,10 +610,10 @@ static void record_safe_recovery(struct bridge_stats *s, const char *reason,
 static int queue_push(struct au_queue *q, struct ts_au *au) {
     unsigned idx;
     pthread_mutex_lock(&q->lock);
-    while (!q->stop && (q->count == AU_QUEUE_CAP ||
+    while (!q->stop && !g_stop && (q->count == AU_QUEUE_CAP ||
            q->packets_queued + au->packet_count > AU_QUEUE_PACKET_CAP))
         pthread_cond_wait(&q->cv_space, &q->lock);
-    if (q->stop) { pthread_mutex_unlock(&q->lock); return -1; }
+    if (q->stop || g_stop) { pthread_mutex_unlock(&q->lock); return -1; }
     idx = (q->head + q->count) % AU_QUEUE_CAP;
     q->q[idx] = *au; ++q->count; q->packets_queued += au->packet_count;
     memset(au, 0, sizeof(*au));
@@ -558,11 +621,27 @@ static int queue_push(struct au_queue *q, struct ts_au *au) {
     return 0;
 }
 
-static int queue_take_packet(struct au_queue *q, uint8_t p[TS_SIZE]) {
+static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
+                                struct clock_state *clock, uint64_t pcr) {
     struct ts_au *a;
     pthread_mutex_lock(&q->lock);
     if (!q->count) { pthread_mutex_unlock(&q->lock); return 0; }
     a = &q->q[q->head];
+    if (clock && a->packet_pos == 0) {
+        /* Guard the complete PES deadline at emission, including PSI/PCR
+         * slots and two physical blocks of scheduling/driver margin. */
+        uint64_t budget = a->packet_count + (a->packet_count / 300u + 1u) * 3u + 128u;
+        uint64_t floor = pcr + (budget * TRANSPORT_TICKS_NUM + 63u) / 64u + PTS_MIN_LEAD_90K;
+        uint64_t pts;
+        size_t offset = 5u + a->packets[4];
+        pthread_mutex_lock(&clock->lock);
+        pts = a->pts90k + clock->emission_shift90k;
+        if (pts < floor) { clock->emission_shift90k += floor - pts; pts = floor; ++clock->pts_rebases; }
+        if (pts <= clock->emitted_pts90k) pts = clock->emitted_pts90k + 1u;
+        clock->emitted_pts90k = pts;
+        pthread_mutex_unlock(&clock->lock);
+        encode_pts(a->packets + offset + 9u, pts);
+    }
     memcpy(p, a->packets + a->packet_pos * TS_SIZE, TS_SIZE);
     ++a->packet_pos; --q->packets_queued;
     if (a->packet_pos == a->packet_count) {
@@ -571,6 +650,10 @@ static int queue_take_packet(struct au_queue *q, uint8_t p[TS_SIZE]) {
     }
     pthread_cond_signal(&q->cv_space); pthread_mutex_unlock(&q->lock);
     return 1;
+}
+
+static int queue_take_packet(struct au_queue *q, uint8_t p[TS_SIZE]) {
+    return queue_take_packet_at(q, p, NULL, 0);
 }
 
 static int queue_wait_empty(struct au_queue *q, unsigned max_ms) {
@@ -587,6 +670,12 @@ static int queue_wait_empty(struct au_queue *q, unsigned max_ms) {
         usleep(1000);
         ++waited;
     }
+}
+
+static int queue_finished(struct au_queue *q) {
+    int done;
+    pthread_mutex_lock(&q->lock); done = q->input_done && !q->count; pthread_mutex_unlock(&q->lock);
+    return done;
 }
 
 static void stats_add_u64(uint64_t *v, pthread_mutex_t *m, uint64_t add) {
@@ -608,6 +697,13 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"source_clock=stream111-32.32\n");
     fprintf(f,"pts_clock=source-derived-90khz\n");
     fprintf(f,"frame_pacer=none\n");
+    fprintf(f,"transport_pacer=absolute_monotonic_all_outputs\n");
+    fprintf(f,"transport_clock_model=scheduled_cbr_accepted_blocks\n");
+    fprintf(f,"hardware_drain_validation=required\n");
+    pthread_mutex_lock(&c->lock);
+    fprintf(f,"last_emitted_pts90k=%llu\nemission_shift90k=%llu\n",
+        (unsigned long long)c->emitted_pts90k,(unsigned long long)c->emission_shift90k);
+    pthread_mutex_unlock(&c->lock);
     fprintf(f,"transport_bps=%u\n",TRANSPORT_BPS);
     fprintf(f,"pat_pid=0x%04x\npmt_pid=0x%04x\npcr_pid=0x%04x\nvideo_pid=0x%04x\n",PID_PAT,PID_PMT,PID_PCR,PID_VIDEO);
     fprintf(f,"most_block_bytes=%u\n",MOST_BLOCK_BYTES);
@@ -650,11 +746,18 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
 
 static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s) {
     size_t off=0;
-    while(off<n && !g_stop) {
+    uint64_t deadline = monotonic_us() + WRITE_TIMEOUT_US;
+    while(off<n) {
         ssize_t w=write(fd,p+off,n-off);
-        if(w>0){off+=(size_t)w;continue;}
+        if(w>0) {
+            /* An isoTX2 short acceptance breaks the 64-packet syscall
+             * contract. Fail rather than silently submit a partial block. */
+            if ((size_t)w != n) { stats_add_u64(&s->write_errors,&s->lock,1); return -1; }
+            off+=(size_t)w; continue;
+        }
         if(w<0 && errno==EINTR)continue;
         if(w<0 && (errno==EAGAIN||errno==EWOULDBLOCK)){
+            if (monotonic_us() >= deadline) { stats_add_u64(&s->write_errors,&s->lock,1); return -1; }
             stats_add_u64(&s->write_eagain,&s->lock,1); usleep(1000); continue;
         }
         stats_add_u64(&s->write_errors,&s->lock,1); return -1;
@@ -672,23 +775,39 @@ static void update_transport_clock(struct clock_state *c, uint64_t packets) {
 static void *writer_main(void *arg) {
     struct writer_ctx *w=(struct writer_ctx*)arg;
     uint8_t block[MOST_BLOCK_BYTES]; uint64_t packet_index=0;
+    uint64_t epoch = monotonic_us();
     w->next_pat_packet=0; w->next_pmt_packet=1; w->next_pcr_packet=2;
-    while(!g_stop) {
+    for (;;) {
         unsigned i;
+        uint64_t due = epoch + (packet_index * TS_SIZE * 8ull * 1000000ull) / TRANSPORT_BPS;
+        uint64_t now = monotonic_us();
+        while (now < due) { usleep((unsigned)((due - now) > 1000u ? 1000u : due - now)); now = monotonic_us(); }
+        if (now > due + TRANSPORT_LATE_LIMIT_US) {
+            fprintf(stderr,"ERROR transport deadline exceeded late_us=%llu\n",(unsigned long long)(now-due));
+            stats_add_u64(&w->stats->write_errors,&w->stats->lock,1); goto failed;
+        }
         for(i=0;i<MOST_BLOCK_PACKETS;++i) {
             uint8_t *p=block+i*TS_SIZE;
             uint64_t pcr=TRANSPORT_PCR_BASE + (packet_index * TRANSPORT_TICKS_NUM) / TRANSPORT_TICKS_DEN;
             if(packet_index>=w->next_pat_packet){make_pat(p,&w->cc_pat);w->next_pat_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pat_packets,&w->stats->lock,1);}
             else if(packet_index>=w->next_pmt_packet){make_pmt(p,&w->cc_pmt);w->next_pmt_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pmt_packets,&w->stats->lock,1);}
             else if(packet_index>=w->next_pcr_packet){make_pcr_packet(p,pcr);w->next_pcr_packet+=PCR_INTERVAL_PACKETS;stats_add_u64(&w->stats->pcr_packets,&w->stats->lock,1);}
-            else if(!queue_take_packet(w->queue,p)){make_null_packet(p,&w->cc_null);stats_add_u64(&w->stats->null_packets,&w->stats->lock,1);}
+            else if(!queue_take_packet_at(w->queue,p,w->clock,pcr)){make_null_packet(p,&w->cc_null);stats_add_u64(&w->stats->null_packets,&w->stats->lock,1);}
             ++packet_index;
         }
-        if(write_full(w->fd,block,sizeof(block),w->stats)!=0){g_stop=1;break;}
+        if(write_full(w->fd,block,sizeof(block),w->stats)!=0) goto failed;
+        if (monotonic_us() > due + 7834u + TRANSPORT_LATE_LIMIT_US) {
+            fprintf(stderr,"ERROR driver acceptance exceeded transport deadline\n");
+            stats_add_u64(&w->stats->write_errors,&w->stats->lock,1); goto failed;
+        }
         update_transport_clock(w->clock,packet_index);
         pthread_mutex_lock(&w->stats->lock); ++w->stats->blocks_written; w->stats->bytes_written+=MOST_BLOCK_BYTES; pthread_mutex_unlock(&w->stats->lock);
-        if (w->regular_file) usleep(7833);
+        /* EOF is acknowledged only after the writer-local block is committed. */
+        if (queue_finished(w->queue)) break;
     }
+    return NULL;
+failed:
+    g_stop=1; queue_stop(w->queue); shutdown(w->input_fd,SHUT_RDWR);
     return NULL;
 }
 
@@ -713,7 +832,7 @@ static int connect_input(const char *url) {
 
 static int recv_exact(int fd, void *buf, size_t n) {
     uint8_t *p=(uint8_t*)buf; size_t off=0;
-    while(off<n&&!g_stop){ssize_t r=recv(fd,p+off,n-off,0);if(r>0){off+=(size_t)r;continue;}if(r==0)return 0;if(errno==EINTR)continue;if(errno==EAGAIN||errno==EWOULDBLOCK){usleep(5000);continue;}return -1;}
+    while(off<n&&!g_stop){ssize_t r=recv(fd,p+off,n-off,0);if(r>0){off+=(size_t)r;continue;}if(r==0)return off ? -1 : 0;if(errno==EINTR)continue;if(errno==EAGAIN||errno==EWOULDBLOCK){usleep(5000);continue;}return -1;}
     return off==n?1:-1;
 }
 
@@ -749,7 +868,7 @@ static int driver_init(int fd, int regular_file, struct bridge_stats *s) {
     src=devctl(fd,DRIVER_DCMD_START,&packets,sizeof(packets),NULL);
     pthread_mutex_lock(&s->lock); s->driver_start_rc=src; pthread_mutex_unlock(&s->lock);
     fprintf(stderr,"PARITY_DRIVER start status=%d packets=%u\n",src,packets);
-    if(src!=0)return -1;
+    if(irc!=0 || prc!=0 || brc!=0 || frc!=0 || src!=0)return -1;
 #else
     (void)fd; (void)regular_file; (void)s;
 #endif
@@ -816,7 +935,11 @@ int main(int argc,char **argv) {
     if(fstat(out_fd,&st)==0 && S_ISREG(st.st_mode))regular_file=1;
     if(driver_init(out_fd,regular_file,&stats)!=0){fprintf(stderr,"ERROR driver start failed errno=%d\n",errno);goto done;}
     in_fd=connect_input(input);if(in_fd<0){fprintf(stderr,"ERROR cannot connect input %s\n",input);goto done;}
-    memset(&wctx,0,sizeof(wctx));wctx.fd=out_fd;wctx.regular_file=regular_file;wctx.queue=&queue;wctx.clock=&clock;wctx.stats=&stats;
+    {
+        struct timeval tv; tv.tv_sec=0; tv.tv_usec=100000;
+        if(setsockopt(in_fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv))!=0){perror("input timeout");goto done;}
+    }
+    memset(&wctx,0,sizeof(wctx));wctx.fd=out_fd;wctx.input_fd=in_fd;wctx.regular_file=regular_file;wctx.queue=&queue;wctx.clock=&clock;wctx.stats=&stats;
     if(pthread_create(&writer,NULL,writer_main,&wctx)!=0){fprintf(stderr,"ERROR writer thread\n");goto done;}writer_started=1;
     request_keyframe();
     publish_status(&stats,&clock,&queue,"running");
@@ -824,19 +947,25 @@ int main(int argc,char **argv) {
 
     while(!g_stop){
         uint8_t h[M1AU_HEADER_BYTES];uint32_t flags,payload_n,frac,sec;uint64_t stream,codec,consumer,seq,pts;uint8_t *payload=NULL,*norm=NULL,*packets=NULL;size_t norm_n=0,packet_count=0;int rr,idr,rebased=0;struct ts_au au;
-        rr=recv_exact(in_fd,h,sizeof(h));if(rr<=0)break;
+        rr=recv_exact(in_fd,h,sizeof(h));if(rr<=0){if(rr==0&&!g_stop)rc=0;break;}
         if(memcmp(h,"M1AU",4)||be16(h+4)!=1u||be16(h+6)!=M1AU_HEADER_BYTES){fprintf(stderr,"ERROR invalid M1AU header\n");break;}
         flags=be32(h+8);payload_n=be32(h+12);stream=be64(h+16);codec=be64(h+24);consumer=be64(h+32);seq=be64(h+40);frac=le32(h+48);sec=le32(h+52);idr=(flags&M1AU_FLAG_IDR)?1:0;
         if(!payload_n||payload_n>M1AU_MAX_PAYLOAD){fprintf(stderr,"ERROR invalid M1AU payload=%u\n",payload_n);break;}
         payload=(uint8_t*)malloc(payload_n);if(!payload)break;
         rr=recv_exact(in_fd,payload,payload_n);if(rr<=0){free(payload);break;}
+        if(payload_n>REFERENCE_PRODUCER_PAYLOAD_LIMIT) {
+            free(payload); waiting_idr=1; discontinuity=1; request_keyframe();
+            fprintf(stderr,"PARITY_DROP oversized AU bytes=%u\n",payload_n);
+            continue;
+        }
         pthread_mutex_lock(&stats.lock);++stats.input_records;stats.input_bytes+=payload_n;stats.input_idrs+=idr;stats.last_sequence=seq;stats.last_frac=frac;stats.last_sec=sec;pthread_mutex_unlock(&stats.lock);
         if ((prev_stream && stream != prev_stream) || (prev_codec && codec != prev_codec) ||
             (prev_consumer && consumer != prev_consumer)) {
             uint64_t da=0,dp=0,pp=0;
             queue_recover_au_boundary(&queue,&da,&dp,&pp);
             record_safe_recovery(&stats,"generation",da,dp,pp);
-            pthread_mutex_lock(&clock.lock); clock.have_origin=0; ++clock.source_rebases; pthread_mutex_unlock(&clock.lock);
+            pthread_mutex_lock(&clock.lock); clock.have_origin=0; clock.have_previous_source=0; ++clock.source_rebases; pthread_mutex_unlock(&clock.lock);
+            free(param_cache); param_cache=NULL; param_cache_n=0;
             prev_seq=0;
             waiting_idr=1; discontinuity=1; request_keyframe();
             pthread_mutex_lock(&stats.lock); stats.waiting_idr=1; pthread_mutex_unlock(&stats.lock);
@@ -857,9 +986,8 @@ int main(int argc,char **argv) {
             waiting_idr=1;discontinuity=1;request_keyframe();
             pthread_mutex_lock(&stats.lock);stats.waiting_idr=1;pthread_mutex_unlock(&stats.lock);
         }
-        /* Omonob's producer cadence is keyed to the source frame ordinal,
-         * not to how many records this bridge happened to receive. */
-        if (seq && (seq % PARITY_IDR_INTERVAL) == 0u) request_keyframe();
+        /* Periodic reference requests are made in GEN2 before consumer/drop
+         * decisions. This bridge requests only startup/gap/latency recovery. */
         if(waiting_idr&&!idr){pthread_mutex_lock(&stats.lock);++stats.dropped_wait_idr;pthread_mutex_unlock(&stats.lock);free(payload);publish_status(&stats,&clock,&queue,"waiting_idr");continue;}
         if(idr&&waiting_idr){waiting_idr=0;pthread_mutex_lock(&stats.lock);stats.waiting_idr=0;pthread_mutex_unlock(&stats.lock);}
         if(normalize_au(payload,payload_n,idr,&param_cache,&param_cache_n,&norm,&norm_n)!=0){free(payload);break;}free(payload);
@@ -871,7 +999,6 @@ int main(int argc,char **argv) {
         if(rebased)fprintf(stderr,"PARITY_PTS_REBASE seq=%llu pcr=%llu pts=%llu\n",(unsigned long long)seq,(unsigned long long)clock_pcr_now(&clock),(unsigned long long)pts);
         publish_status(&stats,&clock,&queue,"running");
     }
-    rc=0;
     /* A clean input EOF must not discard complete AUs that are already queued.
      * Drain the AU/PES queue before stopping the continuous writer. */
     if (!g_stop && queue_wait_empty(&queue, 10000u) != 0) {
@@ -880,9 +1007,13 @@ int main(int argc,char **argv) {
     }
 
 done:
+    if (g_stop && rc==0) rc=130;
+    if (rc!=0) queue_recover_au_boundary(&queue,NULL,NULL,NULL);
+    pthread_mutex_lock(&queue.lock); queue.input_done=1; pthread_mutex_unlock(&queue.lock);
     g_stop=1;
     queue_stop(&queue);
     if(writer_started)pthread_join(writer,NULL);
+    if(stats.write_errors)rc=1;
     publish_status(&stats,&clock,&queue,rc==0?"done":"error");
     if(in_fd>=0)close(in_fd);
     if(out_fd>=0)close(out_fd);

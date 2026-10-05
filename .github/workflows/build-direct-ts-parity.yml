@@ -11,8 +11,13 @@ on:
       - 'runtime/diagnostics/gen2_compat_profile.sh'
       - 'tools/build_direct_ts_parity.sh'
       - 'tools/build_parity_session.sh'
+      - 'tests/direct_ts_parity*'
+      - 'tests/parity_session_lifecycle.py'
+      - 'src/native/altscreen111-gen2/**'
+      - 'deployment/mu1440-omonob790-parity-v1/**'
+      - 'tools/prepare_mu1440_omonob790_parity_v1_overlay.sh'
   push:
-    branches: [ main ]
+    branches: [ main, codex/omonob790-regression-hardening-v1 ]
     paths:
       - '.github/workflows/build-direct-ts-parity.yml'
       - 'src/native/direct-ts-parity/**'
@@ -21,12 +26,17 @@ on:
       - 'runtime/diagnostics/gen2_compat_profile.sh'
       - 'tools/build_direct_ts_parity.sh'
       - 'tools/build_parity_session.sh'
+      - 'tests/direct_ts_parity*'
+      - 'tests/parity_session_lifecycle.py'
+      - 'src/native/altscreen111-gen2/**'
+      - 'deployment/mu1440-omonob790-parity-v1/**'
+      - 'tools/prepare_mu1440_omonob790_parity_v1_overlay.sh'
 
 permissions:
   contents: read
 
 concurrency:
-  group: mu1440-omonob790-parity
+  group: mu1440-omonob790-parity-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -64,6 +74,10 @@ jobs:
           python3 tests/direct_ts_parity_recovery_integration.py /tmp/direct-ts-parity-host \
             | tee /tmp/parity-recovery.txt
           grep -Fq 'PARITY_RECOVERY_INTEGRATION=PASS' /tmp/parity-recovery.txt
+          cc -O2 -g -std=gnu99 -Wall -Wextra -Werror tests/direct_ts_parity_regressions.c -pthread -o /tmp/parity-regressions
+          /tmp/parity-regressions
+          python3 tests/direct_ts_parity_eof_integration.py /tmp/direct-ts-parity-host
+          python3 tests/parity_session_lifecycle.py
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
             src/native/parity-session/parity_session.c \
             -o /tmp/parity-session-host
@@ -78,7 +92,7 @@ jobs:
           bash -n runtime/parity/omonob790_status.sh
           bash -n runtime/diagnostics/gen2_compat_profile.sh
           grep -Fq 'mibr-carplay-autodirect 0' runtime/parity/omonob790_profile.sh
-          grep -Fq 'seq % PARITY_IDR_INTERVAL' src/native/direct-ts-parity/direct_ts_parity.c
+          grep -Fq 'g2_video.source_ordinal % 20u' src/native/altscreen111-gen2/libaltscreen111_gen2.c
           grep -Fq 'O_WRONLY|O_NONBLOCK' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'DRIVER_DCMD_GET_INTERFACE 0x4004050c' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'DRIVER_DCMD_GET_PACKET_SIZE 0x4004050d' src/native/direct-ts-parity/direct_ts_parity.c
@@ -128,6 +142,9 @@ jobs:
           docker run --rm --platform=linux/amd64 \
             -v "$PWD:/src" -w /src "$IMAGE" \
             bash -c 'bash ./tools/build_parity_session.sh src/native/parity-session/parity_session.c build/ci-direct-ts-parity/parity-session'
+          docker run --rm --platform=linux/amd64 \
+            -v "$PWD:/src" -w /src "$IMAGE" \
+            bash -c 'bash ./tools/build_altscreen111_gen2.sh build/ci-direct-ts-parity/libaltscreen111.so'
           sudo chown -R "$(id -u):$(id -g)" "$OUTDIR"
 
       - name: Binary and contract audit
@@ -135,7 +152,9 @@ jobs:
         run: |
           set -euxo pipefail
           BIN="$OUTDIR/direct-ts-parity"
+          strings "$BIN" > "$OUTDIR/STRINGS.txt"
           SESSION="$OUTDIR/parity-session"
+          strings "$SESSION" > "$OUTDIR/SESSION_STRINGS.txt"
           docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
             arm-unknown-nto-qnx6.5.0eabi-readelf -h "$BIN" > "$OUTDIR/ELF_HEADER.txt"
           docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" \
@@ -148,23 +167,23 @@ jobs:
           file "$SESSION" | tee "$OUTDIR/SESSION_FILE.txt"
           grep -q 'Machine:.*ARM' "$OUTDIR/ELF_HEADER.txt"
           grep -q 'Machine:.*ARM' "$OUTDIR/SESSION_ELF_HEADER.txt"
-          strings "$BIN" | grep -Fq 'architecture=omonob790-functional-parity-cleanroom'
-          strings "$BIN" | grep -Fq 'source_clock=stream111-32.32'
-          strings "$BIN" | grep -Fq 'pts_clock=source-derived-90khz'
-          strings "$BIN" | grep -Fq 'frame_pacer=none'
-          strings "$BIN" | grep -Fq 'PARITY_START'
-          strings "$BIN" | grep -Fq 'PARITY_PTS_REBASE'
-          strings "$BIN" | grep -Fq '/tmp/mibr-alt111-keyframe-only'
-          strings "$BIN" | grep -Fq 'PARITY_DRIVER interface'
-          strings "$BIN" | grep -Fq 'device_open_mode=write_only_nonblock'
-          strings "$BIN" | grep -Fq 'reference_producer_payload_limit=262144'
-          strings "$BIN" | grep -Fq 'PARITY_SAFE_RECOVERY'
-          strings "$BIN" | grep -Fq 'latency_packet_limit=1024'
-          ! strings "$BIN" | grep -Fq 'avformat_'
-          ! strings "$BIN" | grep -Fq 'libavformat'
-          strings "$SESSION" | grep -Fq '/eso/bin/apps/dmdt'
-          strings "$SESSION" | grep -Fq '/tmp/mibr-alt111-au-framing.enabled'
-          strings "$SESSION" | grep -Fq 'PARITY_SESSION_SELFTEST=PASS'
+          grep -Fq 'architecture=omonob790-functional-parity-cleanroom' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'source_clock=stream111-32.32' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'pts_clock=source-derived-90khz' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'frame_pacer=none' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'PARITY_START' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'PARITY_PTS_REBASE' "$OUTDIR/STRINGS.txt"
+          grep -Fq '/tmp/mibr-alt111-keyframe-only' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'PARITY_DRIVER interface' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'device_open_mode=write_only_nonblock' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'reference_producer_payload_limit=%u' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'PARITY_SAFE_RECOVERY' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'latency_packet_limit=%u' "$OUTDIR/STRINGS.txt"
+          ! grep -Fq 'avformat_' "$OUTDIR/STRINGS.txt"
+          ! grep -Fq 'libavformat' "$OUTDIR/STRINGS.txt"
+          grep -Fq '/eso/bin/apps/dmdt' "$OUTDIR/SESSION_STRINGS.txt"
+          grep -Fq '/tmp/mibr-alt111-au-framing.enabled' "$OUTDIR/SESSION_STRINGS.txt"
+          grep -Fq 'PARITY_SESSION_SELFTEST=PASS' "$OUTDIR/SESSION_STRINGS.txt"
           sha256sum "$BIN" | tee "$OUTDIR/direct-ts-parity.sha256"
           sha256sum "$SESSION" | tee "$OUTDIR/parity-session.sha256"
           cat > "$OUTDIR/BUILDINFO.txt" <<INFO
@@ -188,6 +207,18 @@ jobs:
           INFO
           sed -i 's/^          //' "$OUTDIR/BUILDINFO.txt"
 
+      - name: Materialize and verify immutable complete candidate
+        shell: bash
+        env:
+          SOURCE_HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          tools/prepare_mu1440_omonob790_parity_v1_overlay.sh "$OUTDIR/package" "$OUTDIR/libaltscreen111.so" "$OUTDIR/direct-ts-parity" "$OUTDIR/parity-session"
+          (cd "$OUTDIR/package"; sha256sum -c PACKAGE-SHA256SUMS.txt)
+          while IFS= read -r script; do bash -n "$script"; done < <(find "$OUTDIR/package" -name '*.sh' -type f)
+          grep -Fxq "source_head_commit=$SOURCE_HEAD_COMMIT" "$OUTDIR/package/CANDIDATE-MANIFEST.txt"
+          tar -czf "$OUTDIR/omonob790-hardened-candidate.tar.gz" -C "$OUTDIR" package
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: direct-ts-parity-MU1440-unstripped
@@ -203,3 +234,5 @@ jobs:
             ${{ env.OUTDIR }}/ELF_HEADER.txt
             ${{ env.OUTDIR }}/DYNAMIC.txt
             ${{ env.OUTDIR }}/SYMBOLS.txt
+            ${{ env.OUTDIR }}/libaltscreen111.so
+            ${{ env.OUTDIR }}/omonob790-hardened-candidate.tar.gz
