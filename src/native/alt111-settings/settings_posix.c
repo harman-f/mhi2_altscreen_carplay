@@ -62,31 +62,73 @@ static int read_file(const char *path, char *out, size_t cap, size_t *size)
     return 0;
 }
 
-static int replace_file(const char *path, const char *data, size_t size)
+static int sync_volatile_fd(int fd)
 {
-    char temp[640];
-    int fd, n;
+    if (!fsync(fd)) return 0;
+    /* Vehicle probe on MU1440 /tmp -> /dev/shmem: fsync() returns ENOSYS. */
+    return errno == ENOSYS ? 0 : -1;
+}
+
+static int write_full_fd(int fd, const char *data, size_t size)
+{
     size_t used = 0;
-    n = snprintf(temp, sizeof(temp), "%s.new.%ld", path, (long)getpid());
-    if (n < 0 || (size_t)n >= sizeof(temp)) return -1;
-    /* No truncation of a pre-existing unowned temporary file. */
-    fd = open(temp, O_WRONLY | O_CREAT | O_EXCL, 0600);
-    if (fd < 0) return -1;
     while (used < size) {
         ssize_t wrote = write(fd, data + used, size - used);
         if (wrote < 0 && errno == EINTR) continue;
-        if (wrote <= 0) { close(fd); unlink(temp); return -1; }
+        if (wrote <= 0) return -1;
         used += (size_t)wrote;
     }
-    /* MU1440 /tmp is /dev/shmem. QNX may report either ENOSYS or EINVAL
-     * when synchronized I/O is unsupported for this volatile object. This
-     * helper is used only for the volatile temp/settings transaction layer;
-     * all other fsync failures remain fatal. */
-    if (fsync(fd) && errno != ENOSYS && errno != EINVAL) {
-        close(fd); unlink(temp); return -1;
+    return 0;
+}
+
+/*
+ * MU1440 vehicle probe: native rename() inside /tmp -> /dev/shmem fails with
+ * errno=EXDEV ("Improper link"), while flat O_TRUNC rewrites are supported.
+ * All callers hold the settings lock. Active settings are rewritten only
+ * after the transaction journal has been armed, so an interrupted write is
+ * recoverable from the pre-mutation backup.
+ */
+static int write_file_direct(const char *path, const char *data, size_t size)
+{
+    struct stat before, opened;
+    int existed = 0, fd;
+
+    if (!lstat(path, &before)) {
+        if (!S_ISREG(before.st_mode)) return -1;
+        existed = 1;
+    } else if (errno != ENOENT) return -1;
+
+    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0) return -1;
+    if (fstat(fd, &opened) || !S_ISREG(opened.st_mode) ||
+        (existed && (opened.st_dev != before.st_dev || opened.st_ino != before.st_ino))) {
+        (void)close(fd);
+        return -1;
     }
-    if (close(fd)) { unlink(temp); return -1; }
-    if (rename(temp, path)) { unlink(temp); return -1; }
+    if (write_full_fd(fd, data, size) || sync_volatile_fd(fd) || close(fd))
+        return -1;
+
+#ifdef ALT111_SETTINGS_TEST
+    {
+        static unsigned active_writes;
+        const char *after = getenv("ALT111_SETTINGS_TEST_CRASH_AFTER_ACTIVE_WRITE");
+        if (after && strstr(path, "/mibr-carplay") &&
+            ++active_writes == (unsigned)strtoul(after, NULL, 10))
+            kill(getpid(), SIGKILL);
+    }
+#endif
+    return 0;
+}
+
+/* Create a transaction marker exactly once; never truncate an existing one. */
+static int create_file_exclusive(const char *path, const char *data, size_t size)
+{
+    int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (fd < 0) return -1;
+    if (write_full_fd(fd, data, size) || sync_volatile_fd(fd) || close(fd)) {
+        (void)unlink(path);
+        return -1;
+    }
     return 0;
 }
 
@@ -204,6 +246,11 @@ static int journal_path(const struct alt111_settings_paths *p, char out[512])
     return path_for(out, 512, p->temp, "mibr-alt111-settings.journal");
 }
 
+static int journal_armed_path(const struct alt111_settings_paths *p, char out[512])
+{
+    return path_for(out, 512, p->temp, "mibr-alt111-settings.journal-armed");
+}
+
 static int rollback_barrier(const struct alt111_settings_paths *p, char *error, size_t cap)
 {
     char path[512];
@@ -248,13 +295,15 @@ static uint64_t revision_of(const struct alt111_settings *s)
 static int load_selected_locked(const struct alt111_settings_paths *p,
                         struct alt111_settings *out, char *error, size_t cap,unsigned skip_temp)
 {
-    char blob[2049], journal[512], preset[192];
+    char blob[2049], journal[512], armed[512], preset[192];
     size_t size = 0;
     unsigned group, layer = 0;
     int rc;
     if (rollback_barrier(p, error, cap)) return -1;
-    if (journal_path(p, journal)) return fail(error, cap, "INVALID_VALUE journal_path");
-    if (access(journal, F_OK) == 0) return fail(error, cap, "BUSY interrupted_transaction_reconcile_required");
+    if (journal_path(p, journal) || journal_armed_path(p, armed))
+        return fail(error, cap, "INVALID_VALUE journal_path");
+    if (access(journal, F_OK) == 0 || access(armed, F_OK) == 0)
+        return fail(error, cap, "BUSY interrupted_transaction_reconcile_required");
     if (!alt111_settings_defaults(out, "mibr_legacy")) {
         group = alt111_setting(ALTSET_PRESET_ID)->group;
         rc = read_layer(p, group, blob, &size, &layer,skip_temp);
@@ -310,7 +359,7 @@ static int restore_locked(const struct alt111_settings_paths *p,
                            char *error, size_t cap)
 {
     unsigned group;
-    char path[512], backup[512], blob[2049], journal[512];
+    char path[512], backup[512], blob[2049], journal[512], armed[512];
     size_t size;
     char hash[65];
     /* Validate every backup before performing any restore mutation. */
@@ -328,14 +377,19 @@ static int restore_locked(const struct alt111_settings_paths *p,
         if (absent & (1u << group)) {
             if (unlink(path) && errno != ENOENT) return fail(error, cap, "ROLLBACK_FAILED absent group=%u", group);
         } else {
-            if (read_file(backup, blob, sizeof(blob), &size) || replace_file(path, blob, size) ||
+            if (read_file(backup, blob, sizeof(blob), &size) || write_file_direct(path, blob, size) ||
                 read_file(path, blob, sizeof(blob), &size))
                 return fail(error, cap, "ROLLBACK_FAILED group=%u", group);
             mibr_sha256_bytes(blob, size, hash);
             if (strcmp(hash, hashes[group])) return fail(error, cap, "ROLLBACK_FAILED restored_hash group=%u", group);
         }
     }
-    if (journal_path(p, journal) || unlink(journal)) return fail(error, cap, "ROLLBACK_FAILED journal");
+    if (journal_path(p, journal) || journal_armed_path(p, armed))
+        return fail(error, cap, "ROLLBACK_FAILED journal_path");
+    if (unlink(journal) && errno != ENOENT)
+        return fail(error, cap, "ROLLBACK_FAILED journal");
+    if (unlink(armed) && errno != ENOENT)
+        return fail(error, cap, "ROLLBACK_FAILED journal_armed");
     return 0;
 }
 
@@ -344,7 +398,7 @@ static int transaction_locked(const struct alt111_settings_paths *p,
                                unsigned clear_mask, struct alt111_settings *out,
                                char *error, size_t cap)
 {
-    char path[512], backup[512], journal[512], blob[2049], record[2049];
+    char path[512], backup[512], journal[512], armed[512], blob[2049], record[2049];
     char hashes[ALTSET_GROUP_COUNT][65];
     unsigned group, absent = 0;
     size_t size;
@@ -360,7 +414,7 @@ static int transaction_locked(const struct alt111_settings_paths *p,
         if (rc == 1) absent |= 1u << group;
         else {
             mibr_sha256_bytes(blob, size, hashes[group]);
-            if (replace_file(backup, blob, size)) return fail(error, cap, "APPLY_FAILED backup group=%u", group);
+            if (write_file_direct(backup, blob, size)) return fail(error, cap, "APPLY_FAILED backup group=%u", group);
         }
     }
     if (journal_path(p, journal)) return fail(error, cap, "APPLY_FAILED journal_path");
@@ -371,7 +425,14 @@ static int transaction_locked(const struct alt111_settings_paths *p,
         if (length < 0 || (size_t)length >= sizeof(record) - (size_t)used) return fail(error, cap, "APPLY_FAILED journal_capacity");
         used += length;
     }
-    if (replace_file(journal, record, (size_t)used)) return fail(error, cap, "APPLY_FAILED journal");
+    if (journal_armed_path(p, armed))
+        return fail(error, cap, "APPLY_FAILED journal_armed_path");
+    if (create_file_exclusive(journal, record, (size_t)used))
+        return fail(error, cap, "APPLY_FAILED journal");
+    if (create_file_exclusive(armed, "armed\n", 6u)) {
+        (void)unlink(journal);
+        return fail(error, cap, "APPLY_FAILED journal_arm");
+    }
     for (group = 0; group < ALTSET_GROUP_COUNT; ++group) {
         if (!(mask & (1u << group))) continue;
         if (path_for(path, sizeof(path), p->temp, group_name(group))) goto rollback;
@@ -379,13 +440,19 @@ static int transaction_locked(const struct alt111_settings_paths *p,
             if (unlink(path) && errno != ENOENT) goto rollback;
         } else {
             length = alt111_settings_render_group(desired, group, blob, sizeof(blob));
-            if (length < 0 || replace_file(path, blob, (size_t)length)) goto rollback;
+            if (length < 0 || write_file_direct(path, blob, (size_t)length)) goto rollback;
         }
     }
-    /* The lock is the reader barrier. Removing the journal commits the batch;
-     * a crash before removal means rollback at next explicit reconciliation. */
+    /*
+     * The lock is the reader barrier. Journal removal is the commit point.
+     * If the process dies after journal removal but before armed cleanup,
+     * reconcile sees armed-without-journal and only removes the stale marker.
+     */
     if (unlink(journal)) goto rollback;
-    if (load_locked(p, out, error, cap)) return fail(error, cap, "APPLY_FAILED committed_snapshot_read");
+    if (unlink(armed) && errno != ENOENT)
+        return fail(error, cap, "APPLY_FAILED committed_marker_cleanup_reconcile_required");
+    if (load_locked(p, out, error, cap))
+        return fail(error, cap, "APPLY_FAILED committed_snapshot_read");
     return 0;
 rollback:
     rc = restore_locked(p, mask, absent, hashes, error, cap);
@@ -468,34 +535,80 @@ done:
 int alt111_settings_reconcile(const struct alt111_settings_paths *p,
                               char *error, size_t cap)
 {
-    char path[512], blob[2049];
+    char journal[512], armed[512], blob[2049];
     size_t size;
     unsigned mask = 0, absent = 0;
     unsigned group, hash_mask = 0;
     char hashes[ALTSET_GROUP_COUNT][65];
     int fd = lock_settings(p, 1, error, cap), rc, consumed = 0;
+    int have_journal, have_armed;
+
     if (fd < 0) return -1;
     if (rollback_barrier(p, error, cap)) { unlock_settings(p, fd); return -1; }
-    if (journal_path(p, path)) { unlock_settings(p, fd); return fail(error, cap, "INVALID_VALUE journal_path"); }
-    rc = read_file(path, blob, sizeof(blob), &size);
-    if (rc == 1) { unlock_settings(p, fd); if (error && cap) error[0] = 0; return 0; }
+    if (journal_path(p, journal) || journal_armed_path(p, armed)) {
+        unlock_settings(p, fd);
+        return fail(error, cap, "INVALID_VALUE journal_path");
+    }
+
+    have_journal = access(journal, F_OK) == 0;
+    have_armed = access(armed, F_OK) == 0;
+
+    if (!have_journal && !have_armed) {
+        unlock_settings(p, fd);
+        if (error && cap) error[0] = 0;
+        return 0;
+    }
+
+    /*
+     * Journal exists but is not armed: the process died while preparing the
+     * journal. Active settings were not yet eligible for mutation.
+     */
+    if (have_journal && !have_armed) {
+        rc = unlink(journal);
+        unlock_settings(p, fd);
+        return rc ? fail(error, cap, "ROLLBACK_FAILED unarmed_journal_cleanup") : 0;
+    }
+
+    /*
+     * Armed exists but journal is gone: journal removal was the commit point;
+     * only marker cleanup was interrupted.
+     */
+    if (!have_journal && have_armed) {
+        rc = unlink(armed);
+        unlock_settings(p, fd);
+        return rc ? fail(error, cap, "ROLLBACK_FAILED committed_marker_cleanup") : 0;
+    }
+
+    rc = read_file(journal, blob, sizeof(blob), &size);
     memset(hashes, 0, sizeof(hashes));
-    if (rc || sscanf(blob, "schema=1\nmask=%u\nabsent=%u\n%n", &mask, &absent, &consumed) != 2 ||
+    if (rc || sscanf(blob, "schema=1\nmask=%u\nabsent=%u\n%n",
+                     &mask, &absent, &consumed) != 2 ||
         !mask || mask >= (1u << ALTSET_GROUP_COUNT) || (absent & ~mask)) {
-        unlock_settings(p, fd); return fail(error, cap, "ROLLBACK_FAILED malformed_journal");
+        unlock_settings(p, fd);
+        return fail(error, cap, "ROLLBACK_FAILED malformed_journal");
     }
     while (consumed < (int)size) {
         int n = 0;
         char hash[65];
-        if (sscanf(blob + consumed, "%u:%64[0123456789abcdef]\n%n", &group, hash, &n) != 2 ||
+        if (sscanf(blob + consumed, "%u:%64[0123456789abcdef]\n%n",
+                   &group, hash, &n) != 2 ||
             !n || strlen(hash) != 64 || group >= ALTSET_GROUP_COUNT ||
-            (hash_mask & (1u << group)) || !(mask & (1u << group)) || (absent & (1u << group))) {
-            unlock_settings(p, fd); return fail(error, cap, "ROLLBACK_FAILED malformed_journal_hash");
+            (hash_mask & (1u << group)) || !(mask & (1u << group)) ||
+            (absent & (1u << group))) {
+            unlock_settings(p, fd);
+            return fail(error, cap, "ROLLBACK_FAILED malformed_journal_hash");
         }
-        strcpy(hashes[group], hash); hash_mask |= 1u << group; consumed += n;
+        strcpy(hashes[group], hash);
+        hash_mask |= 1u << group;
+        consumed += n;
     }
-    if (hash_mask != (mask & ~absent)) { unlock_settings(p, fd); return fail(error, cap, "ROLLBACK_FAILED incomplete_journal_hashes"); }
-    rc = restore_locked(p, mask, absent, hashes, error, cap); unlock_settings(p, fd); return rc;
+    if (hash_mask != (mask & ~absent)) {
+        unlock_settings(p, fd);
+        return fail(error, cap, "ROLLBACK_FAILED incomplete_journal_hashes");
+    }
+    rc = restore_locked(p, mask, absent, hashes, error, cap);
+    unlock_settings(p, fd);
+    return rc;
 }
 
 int alt111_settings_clear_temp(const struct alt111_settings_paths *p,
@@ -523,14 +636,15 @@ int alt111_settings_preset(const struct alt111_settings_paths *p,
                            struct alt111_settings *out, char *error, size_t cap)
 {
     struct alt111_settings *desired;
-    char journal[512];
+    char journal[512], armed[512];
     int fd, rc = -1;
     unsigned i;
     fd = lock_settings(p, 1, error, cap); if (fd < 0) return -1;
     desired = malloc(sizeof(*desired));
     if (!desired) { unlock_settings(p, fd); return fail(error, cap, "APPLY_FAILED allocation"); }
     if (rollback_barrier(p, error, cap)) goto done;
-    if (journal_path(p, journal) || access(journal, F_OK) == 0) {
+    if (journal_path(p, journal) || journal_armed_path(p, armed) ||
+        access(journal, F_OK) == 0 || access(armed, F_OK) == 0) {
         fail(error, cap, "BUSY interrupted_transaction_reconcile_required"); goto done;
     }
     if (expected && (load_locked(p, desired, error, cap) || desired->revision != expected)) {
