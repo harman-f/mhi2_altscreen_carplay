@@ -78,9 +78,13 @@ static int replace_file(const char *path, const char *data, size_t size)
         if (wrote <= 0) { close(fd); unlink(temp); return -1; }
         used += (size_t)wrote;
     }
-    /* /dev/shmem may not implement fsync. It is volatile by contract; other
-     * failures and all future persistent failures must still be surfaced. */
-    if (fsync(fd) && errno != ENOSYS) { close(fd); unlink(temp); return -1; }
+    /* MU1440 /tmp is /dev/shmem. QNX may report either ENOSYS or EINVAL
+     * when synchronized I/O is unsupported for this volatile object. This
+     * helper is used only for the volatile temp/settings transaction layer;
+     * all other fsync failures remain fatal. */
+    if (fsync(fd) && errno != ENOSYS && errno != EINVAL) {
+        close(fd); unlink(temp); return -1;
+    }
     if (close(fd)) { unlink(temp); return -1; }
     if (rename(temp, path)) { unlink(temp); return -1; }
     return 0;
