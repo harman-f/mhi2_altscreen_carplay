@@ -1,5 +1,6 @@
 """Immediate EOF, transfer deadlines and malformed-input regression tests."""
 import socket
+import signal
 import subprocess
 import sys
 import tempfile
@@ -47,7 +48,38 @@ for i in range(12):
     duration=len(data)*8/12288000
     assert elapsed>=duration-0.04,(elapsed,duration,"transport clock runs ahead")
 valid=m1au(1,SPS+PPS+sc(b"\x65\x88"),idr=True)
+with tempfile.TemporaryDirectory() as td:
+    listener=socket.socket();listener.bind(("127.0.0.1",0));listener.listen(1)
+    port=listener.getsockname()[1];halt=threading.Event()
+    def serve_stop():
+        conn,_=listener.accept()
+        with conn:
+            conn.sendall(m1au(1,large,idr=True))
+            halt.wait(4)
+        listener.close()
+    thread=threading.Thread(target=serve_stop,daemon=True);thread.start()
+    output=Path(td)/"stop.ts"
+    proc=subprocess.Popen([binary,f"tcp://127.0.0.1:{port}",str(output)],stderr=subprocess.PIPE)
+    try:
+        until=time.monotonic()+3
+        while time.monotonic()<until:
+            data=output.read_bytes() if output.exists() else b""
+            if any(pid(data[i:i+188])==0x11 for i in range(0,len(data)-187,188)):break
+            time.sleep(.001)
+        else:raise AssertionError("large PES did not begin")
+        assert len(data)<len(large),"stop test missed in-flight PES"
+        proc.send_signal(signal.SIGTERM)
+        _,errors=proc.communicate(timeout=3)
+        assert proc.returncode in (1,130),errors  # Interrupted input is not clean EOF.
+        data=output.read_bytes()
+        video=[data[i:i+188] for i in range(0,len(data),188) if pid(data[i:i+188])==0x11]
+        raw=b"".join(p[payload_offset(p):] for p in video)
+        assert raw[14:]==sc(b"\x09\xf0")+large,"SIGTERM truncated an already-started PES"
+        assert len(data)%12032==0
+    finally:
+        halt.set();thread.join(1)
+        if proc.poll() is None:proc.kill();proc.wait(timeout=2)
 for invalid in (valid[:20],valid[:-2],b"BAD!"+valid[4:]):
     cp,_,_=run(binary,invalid)
     assert cp.returncode!=0,"malformed/partial input was reported successful"
-print("PARITY_EOF_INTEGRATION=PASS immediate_eof=12 large_idr_then_predictive large_pes_deadline malformed_input=3 paced_output")
+print("PARITY_EOF_INTEGRATION=PASS immediate_eof=12 large_idr_then_predictive large_pes_deadline sigterm_PES_tail malformed_input=3 paced_output")
