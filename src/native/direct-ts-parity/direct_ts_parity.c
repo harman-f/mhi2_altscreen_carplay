@@ -73,6 +73,7 @@
 #define DRIVER_DCMD_GET_BLOCK_COUNT 0x40040510
 #define PARITY_IDR_INTERVAL 20u
 #define REFERENCE_PRODUCER_PAYLOAD_LIMIT 0x40000u
+#define LOW_LATENCY_PACKET_LIMIT 1024u
 
 struct ts_au {
     uint8_t *packets;
@@ -116,6 +117,12 @@ struct bridge_stats {
     uint64_t input_idrs;
     uint64_t sequence_gaps;
     uint64_t dropped_wait_idr;
+    uint64_t safe_recoveries;
+    uint64_t generation_recoveries;
+    uint64_t latency_recoveries;
+    uint64_t safe_recovery_discarded_aus;
+    uint64_t safe_recovery_discarded_packets;
+    uint64_t safe_recovery_preserved_packets;
     uint64_t aus_queued;
     uint64_t pes_packets;
     uint64_t blocks_written;
@@ -474,6 +481,69 @@ static void queue_destroy(struct au_queue *q) {
     pthread_mutex_destroy(&q->lock);
 }
 
+static size_t queue_packet_depth(struct au_queue *q) {
+    size_t packets;
+    pthread_mutex_lock(&q->lock);
+    packets=q->packets_queued;
+    pthread_mutex_unlock(&q->lock);
+    return packets;
+}
+
+/*
+ * Unlike the reference packet-level queue flush, discard only whole AUs that
+ * have not started physical presentation. If the writer has consumed any
+ * packet from the head AU, preserve its remaining tail to avoid truncating an
+ * in-flight PES.
+ */
+static void queue_recover_au_boundary(struct au_queue *q,
+                                      uint64_t *discarded_aus,
+                                      uint64_t *discarded_packets,
+                                      uint64_t *preserved_packets) {
+    unsigned i, keep_head=0, old_count;
+    uint64_t da=0, dp=0, pp=0;
+    pthread_mutex_lock(&q->lock);
+    old_count=q->count;
+    if(old_count && q->q[q->head].packet_pos>0u) {
+        keep_head=1u;
+        pp=(uint64_t)(q->q[q->head].packet_count-q->q[q->head].packet_pos);
+    }
+    for(i=keep_head;i<old_count;++i) {
+        unsigned idx=(q->head+i)%AU_QUEUE_CAP;
+        struct ts_au *a=&q->q[idx];
+        dp+=(uint64_t)(a->packet_count-a->packet_pos);
+        ++da;
+        free(a->packets);
+        memset(a,0,sizeof(*a));
+    }
+    q->count=keep_head;
+    q->packets_queued=(size_t)pp;
+    pthread_cond_broadcast(&q->cv_space);
+    pthread_mutex_unlock(&q->lock);
+    if(discarded_aus)*discarded_aus=da;
+    if(discarded_packets)*discarded_packets=dp;
+    if(preserved_packets)*preserved_packets=pp;
+}
+
+static void record_safe_recovery(struct bridge_stats *s, const char *reason,
+                                 uint64_t discarded_aus,
+                                 uint64_t discarded_packets,
+                                 uint64_t preserved_packets) {
+    pthread_mutex_lock(&s->lock);
+    ++s->safe_recoveries;
+    if(reason && strcmp(reason,"generation")==0) ++s->generation_recoveries;
+    if(reason && strcmp(reason,"latency")==0) ++s->latency_recoveries;
+    s->safe_recovery_discarded_aus+=discarded_aus;
+    s->safe_recovery_discarded_packets+=discarded_packets;
+    s->safe_recovery_preserved_packets+=preserved_packets;
+    pthread_mutex_unlock(&s->lock);
+    fprintf(stderr,
+            "PARITY_SAFE_RECOVERY reason=%s discarded_aus=%llu discarded_packets=%llu preserved_head_packets=%llu\n",
+            reason?reason:"unknown",
+            (unsigned long long)discarded_aus,
+            (unsigned long long)discarded_packets,
+            (unsigned long long)preserved_packets);
+}
+
 static int queue_push(struct au_queue *q, struct ts_au *au) {
     unsigned idx;
     pthread_mutex_lock(&q->lock);
@@ -553,8 +623,18 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"input_records=%llu\ninput_bytes=%llu\ninput_idrs=%llu\nsequence_gaps=%llu\n",
         (unsigned long long)snap.input_records,(unsigned long long)snap.input_bytes,
         (unsigned long long)snap.input_idrs,(unsigned long long)snap.sequence_gaps);
-    fprintf(f,"dropped_wait_idr=%llu\naus_queued=%llu\npes_packets=%llu\n",
-        (unsigned long long)snap.dropped_wait_idr,(unsigned long long)snap.aus_queued,(unsigned long long)snap.pes_packets);
+    fprintf(f,"dropped_wait_idr=%llu\n",(unsigned long long)snap.dropped_wait_idr);
+    fprintf(f,"safe_recoveries=%llu\ngeneration_recoveries=%llu\nlatency_recoveries=%llu\n",
+        (unsigned long long)snap.safe_recoveries,
+        (unsigned long long)snap.generation_recoveries,
+        (unsigned long long)snap.latency_recoveries);
+    fprintf(f,"safe_recovery_discarded_aus=%llu\nsafe_recovery_discarded_packets=%llu\nsafe_recovery_preserved_packets=%llu\n",
+        (unsigned long long)snap.safe_recovery_discarded_aus,
+        (unsigned long long)snap.safe_recovery_discarded_packets,
+        (unsigned long long)snap.safe_recovery_preserved_packets);
+    fprintf(f,"latency_packet_limit=%u\n",LOW_LATENCY_PACKET_LIMIT);
+    fprintf(f,"aus_queued=%llu\npes_packets=%llu\n",
+        (unsigned long long)snap.aus_queued,(unsigned long long)snap.pes_packets);
     fprintf(f,"blocks_written=%llu\nbytes_written=%llu\nwrite_eagain=%llu\nwrite_errors=%llu\n",
         (unsigned long long)snap.blocks_written,(unsigned long long)snap.bytes_written,
         (unsigned long long)snap.write_eagain,(unsigned long long)snap.write_errors);
