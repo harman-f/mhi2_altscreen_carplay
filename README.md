@@ -28,6 +28,8 @@
 >
 > SafeArea/ViewArea tuning, reduced-view layout handling, lifecycle hardening and cadence/jitter analysis are still active work.
 
+Current master development is draft [harman-f/mhi2_altscreen_carplay#15](https://github.com/harman-f/mhi2_altscreen_carplay/pull/15). Its new ownership, settings and transport combination still requires target qualification. [Current implementation status](docs/status/CURRENT_DEVELOPMENT_STATUS.md) separates the new candidate from the historical vehicle PoC.
+
 [**Roadmap**](ROADMAP.md) · [Cluster / display KB](docs/research/MIB2_CLUSTER_DISPLAY_TRANSPORT_KNOWLEDGE_BASE.md) · [FPK firmware/control](docs/research/FPK_FIRMWARE_AND_CONTROL_ACCESS.md) · [Installation](docs/INSTALLATION.md) · [Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) · [Security & privacy](SECURITY.md)
 
 > [!CAUTION]

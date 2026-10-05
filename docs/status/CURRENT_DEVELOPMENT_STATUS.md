@@ -1,12 +1,24 @@
 # Current development status
 
-Last updated: **2026-09-29**
+Last updated: **2026-10-05**
 
 > The downloadable experimental GEN2 binary is intentionally **not the newest development build**.
 >
 > The public binary is a known, understandable vehicle-tested snapshot. Development has already moved
 > several steps beyond it, but those newer changes are still being used to isolate lifecycle edge
 > cases and are not published as the recommended binary yet.
+
+## MU1440 master candidate — 2026-10-05
+
+The current development line is draft [harman-f/mhi2_altscreen_carplay#15](https://github.com/harman-f/mhi2_altscreen_carplay/pull/15), branch `codex/omonob790-regression-hardening-v1`. Keep it unmerged. Its exact source identity is recorded in each generated candidate manifest; the historical vehicle PoC below does not qualify this new combination.
+
+The code now includes a shared 48-key settings registry, atomic temporary-file transactions and crash reconciliation, source-frame/source-time keyframe policy, generation-bound recovery, frozen negotiated geometry/UUID/source version, and a native owner with bound process handles and an independent watchdog. The separate native guard runs in DisplayManager; GEN2 runs in smartphone_integrator. Initial ownership is `writev_gate`. The DMDT backend is a routing probe that starts no custom payload until independently qualified on the target.
+
+Master-specific shell adapters use the same native settings helper. SafeArea, display and navigation batches commit together; stored values are not reported as runtime completion. The master installer backs up the exact boot command, all affected native components and scripts, and all 13 temporary configuration files, including absence. A rollback barrier prevents GEN2 from consuming a partially restored set until normal reboot. SD vehicle wrappers use the existing M.I.B. media bootstrap and MU1440 `tee` logger; every entry point establishes the proven target environment itself.
+
+Host regressions now include real moving H.264 with predictive pictures, comparing all 40 decoded frame hashes before and after TS transport. This establishes codec continuity on the host. Physical MOST ownership/drain, loaded ABI coverage, QNX process identity self-test and visible predictive frames remain hardware acceptance gates. See [the exact runtime and regression contract](../architecture/MU1440_PARITY_REGRESSION_CONTRACT.md).
+
+The earlier ENVFIX2 keyframe/standstill observation remains a separate, unmeasured hardware failure. The candidate does not retrospectively establish its cause. Java FPS-policy work remains deferred for the first media/ownership proof.
 
 ## Where the project is now
 

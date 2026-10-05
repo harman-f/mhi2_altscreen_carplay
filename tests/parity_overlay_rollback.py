@@ -46,6 +46,7 @@ for scenario in ("normal","interrupted"):
         (pkg/"runtime/settings-basenames.sh").write_text(Path("settings/runtime-basenames.generated.sh").read_text())
         for name in ("install.sh","uninstall.sh"):
             text=Path("deployment/mu1440-omonob790-parity-v1",name).read_text()
+            text=re.sub(r"# BEGIN_TARGET_ENV.*?# END_TARGET_ENV\n", "", text, flags=re.S)
             for old,new in (("/tmp/",str(state)+"/"),("/mnt/app",str(app)),("/mnt/system",str(system))):text=text.replace(old,new)
             assert f"DST={dst}" in text,(name,"DST rewrite",dst)
             if name=="install.sh":

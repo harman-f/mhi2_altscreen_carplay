@@ -1,8 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # M.I.B. SD bootstrap precedent, plus existing MU1440 session logger.
-PATH=/sbin:/bin:/usr/sbin:/usr/bin:/net/rcc/bin:/net/rcc/usr/bin
-export PATH
+# BEGIN_TARGET_ENV -- proven installed MU1440 runtime paths
+export PATH=/proc/boot:/bin:/usr/bin:/usr/sbin:/sbin:/mnt/app/media/gracenote/bin:/mnt/app/armle/bin:/mnt/app/armle/sbin:/mnt/app/armle/usr/bin:/mnt/app/armle/usr/sbin
+export LD_LIBRARY_PATH=/lib:/mnt/app/root/lib-target:/eso/lib:/mnt/app/usr/lib:/mnt/app/armle/lib:/mnt/app/armle/lib/dll:/mnt/app/armle/usr/lib
 unset LD_PRELOAD
+export GEM=1
+# END_TARGET_ENV
 CARD=/net/mmx/fs/sda0
 PACKAGE_CARD_RW=0
 package_card_ro(){
