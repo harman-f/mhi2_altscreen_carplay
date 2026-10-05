@@ -83,6 +83,28 @@ The `mv` returned `0` and the final file contained the expected data. The native
 publisher also successfully creates, truncates, writes and closes its flat
 `/tmp/mibr-alt111-native-gate.status` file after the target-specific publication fix.
 
+### `fsync()` on volatile shared-memory files
+
+The settings transaction layer also cannot assume that `fsync()` succeeds on files below
+`/tmp -> /dev/shmem`.
+
+QNX documents both `ENOSYS` and `EINVAL` as possible results when synchronized I/O is not
+implemented/supported for the underlying object. The MU1440 settings transaction initially accepted
+only `ENOSYS`; the first live `dual-temp` mutation then reached journal creation and failed with:
+
+```text
+result=APPLY_FAILED journal
+```
+
+At that point the settings lock-v2 acquire/release path had already been vehicle-qualified and no
+journal or rollback barrier pre-existed. The transaction writes its journal through a flat
+create/write/fsync/close/rename helper, while flat create/write/rename behavior had already been
+confirmed separately on the same target. The target fix therefore treats `EINVAL` and `ENOSYS`
+as "synchronized I/O unsupported" for this volatile settings helper only; all other `fsync`
+errors remain fatal.
+
+This exception must not be generalized to persistent filesystems.
+
 ### What must not be assumed
 
 Do **not** use POSIX advisory record locking on a file below `/tmp` as a MU1440 synchronization
