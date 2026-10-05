@@ -108,6 +108,19 @@ static int journal_path(const struct alt111_settings_paths *p, char out[512])
     return path_for(out, 512, p->temp, "mibr-alt111-settings.journal");
 }
 
+static int rollback_barrier(const struct alt111_settings_paths *p, char *error, size_t cap)
+{
+    char path[512];
+    struct stat st;
+    if (path_for(path, sizeof(path), p->temp, "mibr-parity-rollback.pending"))
+        return fail(error, cap, "INVALID_VALUE rollback_barrier_path");
+    /* Any entry, including a dangling symlink, quarantines the settings.
+     * Errors cannot be mistaken for an absent barrier. */
+    if (!lstat(path, &st))
+        return fail(error, cap, "BUSY overlay_rollback_requires_canonical_reboot");
+    return errno == ENOENT ? 0 : fail(error, cap, "BUSY rollback_barrier_unreadable");
+}
+
 static int read_layer(const struct alt111_settings_paths *p, unsigned group,
                        char blob[2049], size_t *size, unsigned *layer,unsigned skip_temp)
 {
@@ -143,10 +156,7 @@ static int load_selected_locked(const struct alt111_settings_paths *p,
     size_t size = 0;
     unsigned group, layer = 0;
     int rc;
-    if(path_for(journal,sizeof(journal),p->temp,"mibr-parity-rollback.pending"))
-        return fail(error,cap,"INVALID_VALUE rollback_barrier_path");
-    if(access(journal,F_OK)==0)
-        return fail(error,cap,"BUSY overlay_rollback_requires_canonical_reboot");
+    if (rollback_barrier(p, error, cap)) return -1;
     if (journal_path(p, journal)) return fail(error, cap, "INVALID_VALUE journal_path");
     if (access(journal, F_OK) == 0) return fail(error, cap, "BUSY interrupted_transaction_reconcile_required");
     if (!alt111_settings_defaults(out, "mibr_legacy")) {
@@ -243,6 +253,7 @@ static int transaction_locked(const struct alt111_settings_paths *p,
     unsigned group, absent = 0;
     size_t size;
     int rc, length, used;
+    if (rollback_barrier(p, error, cap)) return -1;
     memset(hashes, 0, sizeof(hashes));
     for (group = 0; group < ALTSET_GROUP_COUNT; ++group) {
         if (!(mask & (1u << group))) continue;
@@ -368,6 +379,7 @@ int alt111_settings_reconcile(const struct alt111_settings_paths *p,
     char hashes[ALTSET_GROUP_COUNT][65];
     int fd = lock_settings(p, 1, error, cap), rc, consumed = 0;
     if (fd < 0) return -1;
+    if (rollback_barrier(p, error, cap)) { close(fd); return -1; }
     if (journal_path(p, path)) { close(fd); return fail(error, cap, "INVALID_VALUE journal_path"); }
     rc = read_file(path, blob, sizeof(blob), &size);
     if (rc == 1) { close(fd); if (error && cap) error[0] = 0; return 0; }
@@ -421,6 +433,7 @@ int alt111_settings_preset(const struct alt111_settings_paths *p,
     fd = lock_settings(p, 1, error, cap); if (fd < 0) return -1;
     desired = malloc(sizeof(*desired));
     if (!desired) { close(fd); return fail(error, cap, "APPLY_FAILED allocation"); }
+    if (rollback_barrier(p, error, cap)) goto done;
     if (journal_path(p, journal) || access(journal, F_OK) == 0) {
         fail(error, cap, "BUSY interrupted_transaction_reconcile_required"); goto done;
     }

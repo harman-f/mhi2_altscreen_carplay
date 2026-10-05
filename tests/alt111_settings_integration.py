@@ -45,8 +45,17 @@ with tempfile.TemporaryDirectory() as td:
     assert 'preset.id.value=mibr_legacy' in run('status').stdout
     barrier=temp/'mibr-parity-rollback.pending'
     barrier.write_text('canonical_reboot_required\n')
-    assert 'rollback_requires_canonical_reboot' in run('status',success=False).stdout
+    before = snapshot()
+    for args in [('status',), ('preset','--preset','omonob790'),
+                 ('set','--key','maxFPS','--value','40'),
+                 ('clear','--key','maxFPS'), ('clear-temp',), ('reconcile',)]:
+        assert 'rollback_requires_canonical_reboot' in run(*args,success=False).stdout
+        assert snapshot() == before
+        assert not (temp/'mibr-alt111-settings.journal').exists()
+    barrier.unlink()
+    barrier.symlink_to(temp/'absent-rollback-target')
     assert 'rollback_requires_canonical_reboot' in run('preset','--preset','omonob790',success=False).stdout
+    assert snapshot() == before
     barrier.unlink()
     run('status')
     (persistent / 'mibr-carplay111-fps').write_text('25\n')
