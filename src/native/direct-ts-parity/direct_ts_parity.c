@@ -1024,6 +1024,7 @@ static void *writer_main(void *arg) {
         {
             uint64_t block_starts=0u,block_completes=0u,block_idr_starts=0u,block_non_idr_starts=0u;
             uint64_t block_idr_completes=0u,block_non_idr_completes=0u;
+            uint64_t slice_start[6]={0,0,0,0,0,0},slice_complete[6]={0,0,0,0,0,0};
             uint64_t write_start,write_us,blocks_now;
             for(i=0;i<MOST_BLOCK_PACKETS;++i) {
                 uint8_t *p=block+i*TS_SIZE;
@@ -1033,8 +1034,20 @@ static void *writer_main(void *arg) {
                 else if(packet_index>=w->next_pmt_packet){make_pmt(p,&w->cc_pmt);w->next_pmt_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pmt_packets,&w->stats->lock,1);}
                 else if(packet_index>=w->next_pcr_packet){make_pcr_packet(p,pcr);w->next_pcr_packet+=PCR_INTERVAL_PACKETS;stats_add_u64(&w->stats->pcr_packets,&w->stats->lock,1);}
                 else if(queue_take_packet_at(w->queue,p,w->clock,pcr,&ev)){
-                    if(ev&AU_EVENT_STARTED){++block_starts;if(ev&AU_EVENT_IDR)++block_idr_starts;else ++block_non_idr_starts;}
-                    if(ev&AU_EVENT_COMPLETED){++block_completes;if(ev&AU_EVENT_IDR)++block_idr_completes;else ++block_non_idr_completes;}
+                    {
+                        unsigned cls=(ev&AU_EVENT_SLICE_MASK)>>AU_EVENT_SLICE_SHIFT;
+                        if(cls>AU_SLICE_SI)cls=AU_SLICE_UNKNOWN;
+                        if(ev&AU_EVENT_STARTED){
+                            ++block_starts;
+                            if(ev&AU_EVENT_IDR)++block_idr_starts;else ++block_non_idr_starts;
+                            ++slice_start[cls];
+                        }
+                        if(ev&AU_EVENT_COMPLETED){
+                            ++block_completes;
+                            if(ev&AU_EVENT_IDR)++block_idr_completes;else ++block_non_idr_completes;
+                            ++slice_complete[cls];
+                        }
+                    }
                 }else{
                     make_null_packet(p,&w->cc_null);stats_add_u64(&w->stats->null_packets,&w->stats->lock,1);
                 }
