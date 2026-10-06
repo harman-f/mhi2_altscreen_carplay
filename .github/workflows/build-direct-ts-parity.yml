@@ -172,7 +172,12 @@ jobs:
           )
           if needle not in s:
               raise SystemExit("qnx-sdp apt bootstrap anchor not found")
-          p.write_text(s.replace(needle,replacement,1))
+          s=s.replace(needle,replacement,1)
+          gcc_url="https://ftp.gnu.org/gnu/gcc/gcc-${GCC49_VER}/gcc-${GCC49_VER}.tar.bz2"
+          gcc_mirror="https://mirrors.kernel.org/gnu/gcc/gcc-${GCC49_VER}/gcc-${GCC49_VER}.tar.bz2"
+          if gcc_url not in s:
+              raise SystemExit("gcc-4.9 download anchor not found")
+          p.write_text(s.replace(gcc_url,gcc_mirror,1))
           PY
           docker buildx build --platform=linux/amd64 \
             --target base-env --build-arg BASE=base-4.9 \
