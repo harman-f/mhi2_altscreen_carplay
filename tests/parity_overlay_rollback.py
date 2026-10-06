@@ -35,7 +35,10 @@ for scenario in ("normal","interrupted"):
         (pkg/"payload/libmibr_isotx2_guard.so").write_bytes(b"new standalone guard")
         (pkg/"payload/sha256sum").write_text("#!/bin/sh\nexec /usr/bin/sha256sum \"$@\"\n")
         for path in (pkg/"payload").iterdir():path.chmod(0o755)
-        for name in ("omonob790_profile.sh","omonob790_session.sh","omonob790_status.sh","gen2_compat_profile.sh"):
+        for name in ("omonob790_profile.sh","omonob790_session.sh","omonob790_status.sh",
+                     "omonob790_drive_supervisor.sh","omonob790_drive_enable.sh",
+                     "omonob790_drive_disable.sh","omonob790_drive_status.sh",
+                     "gen2_compat_profile.sh"):
             (pkg/"runtime"/name).write_text("#!/bin/sh\nexit 0\n")
         script_inventory=Path("runtime/parity/master-script-basenames.sh").read_text()
         (pkg/"runtime/master-script-basenames.sh").write_text(script_inventory)
