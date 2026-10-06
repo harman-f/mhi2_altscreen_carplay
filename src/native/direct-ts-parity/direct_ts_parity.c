@@ -497,7 +497,7 @@ static int h264_read_bit(struct h264_bit_reader *b, unsigned *out) {
 }
 
 static int h264_read_ue(struct h264_bit_reader *b, unsigned *out) {
-    unsigned bit=zeros=0u, value=0u, i;
+    unsigned bit=0u, zeros=0u, value=0u, i;
     while(1) {
         if(h264_read_bit(b,&bit))return -1;
         if(bit)break;
@@ -866,7 +866,9 @@ static void stats_add_u64(uint64_t *v, pthread_mutex_t *m, uint64_t add) {
 static void publish_status(struct bridge_stats *s, struct clock_state *c,
                            struct au_queue *q, const char *state) {
     FILE *f;
-    if(!g_status_enabled)return; unsigned qcount; size_t qpkts;
+    unsigned qcount;
+    size_t qpkts;
+    if(!g_status_enabled)return;
     struct bridge_stats snap; uint64_t pcr, rebase, source_rebase;
     pthread_mutex_lock(&g_status_publish_lock);
     pthread_mutex_lock(&s->lock); snap = *s; pthread_mutex_unlock(&s->lock);
