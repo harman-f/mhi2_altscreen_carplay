@@ -38,6 +38,10 @@ cp "$ROOT/deployment/mu1440-omonob790-parity-v1/package-logging.sh" "$DEST/runti
 cp "$ROOT/runtime/parity/omonob790_profile.sh" "$DEST/runtime/omonob790_profile.sh"
 cp "$ROOT/runtime/parity/omonob790_session.sh" "$DEST/runtime/omonob790_session.sh"
 cp "$ROOT/runtime/parity/omonob790_status.sh" "$DEST/runtime/omonob790_status.sh"
+cp "$ROOT/runtime/parity/omonob790_drive_supervisor.sh" "$DEST/runtime/omonob790_drive_supervisor.sh"
+cp "$ROOT/runtime/parity/omonob790_drive_enable.sh" "$DEST/runtime/omonob790_drive_enable.sh"
+cp "$ROOT/runtime/parity/omonob790_drive_disable.sh" "$DEST/runtime/omonob790_drive_disable.sh"
+cp "$ROOT/runtime/parity/omonob790_drive_status.sh" "$DEST/runtime/omonob790_drive_status.sh"
 cp "$ROOT/runtime/diagnostics/gen2_compat_profile.sh" "$DEST/runtime/gen2_compat_profile.sh"
 cp "$ROOT/runtime/master/master_settings.sh" "$DEST/runtime/master_settings.sh"
 cp "$ROOT/runtime/master/direct_fps.sh" "$DEST/runtime/direct_fps.sh"
@@ -58,7 +62,7 @@ chmod +x "$DEST/"*.sh "$DEST/payload/"* "$DEST/runtime/"*.sh
 
 (
   cd "$DEST"
-  sha256sum     payload/libaltscreen111.so     payload/direct-ts-parity     payload/parity-session     payload/alt111-settings     payload/libmibr_isotx2_guard.so     payload/sha256sum     install.sh     uninstall.sh     status.sh     collect-logs.sh     vehicle-install.sh     vehicle-rollback.sh     runtime/omonob790_profile.sh     runtime/omonob790_session.sh     runtime/omonob790_status.sh     runtime/gen2_compat_profile.sh     runtime/settings-basenames.sh     runtime/session-logging.sh     runtime/package-logging.sh     runtime/master-script-basenames.sh     runtime/master_settings.sh runtime/direct_fps.sh runtime/gen2_sourceversion.sh runtime/gen2_enabled.sh runtime/gen2_display.sh runtime/gen2_keyframes.sh runtime/gen2_viewareas.sh runtime/gen2_safearea.sh runtime/gen2_nav_config.sh runtime/gen2_url.sh runtime/gen2_ui_urls.sh     HMI-BINDINGS.json     > PAYLOAD.sha256
+  sha256sum     payload/libaltscreen111.so     payload/direct-ts-parity     payload/parity-session     payload/alt111-settings     payload/libmibr_isotx2_guard.so     payload/sha256sum     install.sh     uninstall.sh     status.sh     collect-logs.sh     vehicle-install.sh     vehicle-rollback.sh     runtime/omonob790_profile.sh     runtime/omonob790_session.sh     runtime/omonob790_status.sh     runtime/omonob790_drive_supervisor.sh     runtime/omonob790_drive_enable.sh     runtime/omonob790_drive_disable.sh     runtime/omonob790_drive_status.sh     runtime/gen2_compat_profile.sh     runtime/settings-basenames.sh     runtime/session-logging.sh     runtime/package-logging.sh     runtime/master-script-basenames.sh     runtime/master_settings.sh runtime/direct_fps.sh runtime/gen2_sourceversion.sh runtime/gen2_enabled.sh runtime/gen2_display.sh runtime/gen2_keyframes.sh runtime/gen2_viewareas.sh runtime/gen2_safearea.sh runtime/gen2_nav_config.sh runtime/gen2_url.sh runtime/gen2_ui_urls.sh     HMI-BINDINGS.json     > PAYLOAD.sha256
 )
 
 GEN2_SHA=$(sha256sum "$GEN2" | awk '{print $1}')
@@ -103,8 +107,9 @@ input=m1au_complete_au
 source_clock=stream111_32.32
 pts_clock=source_derived_90khz
 frame_pacer=none
-transport_pacer=absolute_monotonic_all_outputs
-transport_late_limit_us=40000
+transport_pacer=qnx_device_backpressure_regular_file_absolute
+device_transport_late_fatal=disabled_vehicle_qualified
+regular_file_transport_late_limit_us=40000
 write_timeout_us=500000
 pts_emission_guard=complete_pes_budget_plus_margin
 profile_persistence=disabled
@@ -184,6 +189,17 @@ Stop and explicit reconciliation:
   ksh /mnt/app/root/altscreen-u2/scripts/omonob790_session.sh stop
   ksh /mnt/app/root/altscreen-u2/scripts/omonob790_session.sh restore-stock
 
+Guarded long-run/drive mode (optional, disabled until explicitly enabled):
+  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_enable.sh
+  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh
+  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_disable.sh
+
+Drive mode launches no stock-process restart. It waits for Stream-111, then
+runs the same token-bound parity owner for bounded two-hour sessions and
+re-enters only after a confirmed stock handback. One-second telemetry is
+persisted to SD when writable and records source FPS/IDRs plus parity
+IDR/non-IDR emission, queue, MOST block and driver-backpressure counters.
+
 Stop uses the current owner ticket; PID hints never authorize signals.
 Parent and independent watchdog retain the exact bridge process identity.
 Unconfirmed writer death or handback leaves a quarantined lock.
@@ -201,8 +217,10 @@ remain frozen until renegotiation. Persistent setting writes are POLICY_BLOCKED.
 HMI-BINDINGS.json uses the same generated registry; no new HMI menu is claimed.
 
 Media: complete AU -> canonical AUD/SPS/PPS -> one PES; source 32.32 -> PTS;
-continuous independently paced 12.288-Mbit/s TS, 12032-byte physical blocks,
-PAT/PMT/PCR/video PIDs 0/0x10/0x1000/0x11. No CFR frame pacer.
+continuous 12.288-Mbit/s TS, 12032-byte physical blocks,
+PAT/PMT/PCR/video PIDs 0/0x10/0x1000/0x11. The real QNX device path is paced
+by bounded driver backpressure; regular-file tests retain absolute pacing.
+No CFR frame pacer.
 Recovery preserves any PES already started and waits for IDR after chain loss.
 M1AU presence flags distinguish a real initial timestamp zero from missing time.
 
