@@ -1065,6 +1065,18 @@ static void *writer_main(void *arg) {
             w->stats->output_non_idr_aus_started+=block_non_idr_starts;
             w->stats->output_idr_aus_completed+=block_idr_completes;
             w->stats->output_non_idr_aus_completed+=block_non_idr_completes;
+            w->stats->output_slice_unknown_started+=slice_start[AU_SLICE_UNKNOWN];
+            w->stats->output_slice_p_started+=slice_start[AU_SLICE_P];
+            w->stats->output_slice_b_started+=slice_start[AU_SLICE_B];
+            w->stats->output_slice_i_started+=slice_start[AU_SLICE_I];
+            w->stats->output_slice_sp_started+=slice_start[AU_SLICE_SP];
+            w->stats->output_slice_si_started+=slice_start[AU_SLICE_SI];
+            w->stats->output_slice_unknown_completed+=slice_complete[AU_SLICE_UNKNOWN];
+            w->stats->output_slice_p_completed+=slice_complete[AU_SLICE_P];
+            w->stats->output_slice_b_completed+=slice_complete[AU_SLICE_B];
+            w->stats->output_slice_i_completed+=slice_complete[AU_SLICE_I];
+            w->stats->output_slice_sp_completed+=slice_complete[AU_SLICE_SP];
+            w->stats->output_slice_si_completed+=slice_complete[AU_SLICE_SI];
             ++w->stats->blocks_written;
             w->stats->bytes_written+=MOST_BLOCK_BYTES;
             blocks_now=w->stats->blocks_written;
