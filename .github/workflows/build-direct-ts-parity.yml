@@ -138,6 +138,15 @@ jobs:
           bash -n runtime/parity/omonob790_profile.sh
           bash -n runtime/parity/omonob790_session.sh
           bash -n runtime/parity/omonob790_status.sh
+          bash -n runtime/parity/omonob790_drive_supervisor.sh
+          bash -n runtime/parity/omonob790_drive_enable.sh
+          bash -n runtime/parity/omonob790_drive_disable.sh
+          bash -n runtime/parity/omonob790_drive_status.sh
+          ! grep -Eq '(^|[;&|[:space:]])kill([[:space:]]|$)' runtime/parity/omonob790_drive_*.sh
+          grep -Fq 'mount -uw /net/mmx/fs/sda0' runtime/parity/omonob790_drive_supervisor.sh
+          grep -Fq '/net/mmx/fs/sda0/esd/mibr-parity-drive-logs' runtime/parity/omonob790_drive_supervisor.sh
+          grep -Fq 'DEFAULT_SECONDS=0' runtime/parity/omonob790_drive_supervisor.sh
+          grep -Fq 'output_non_idr_aus_completed' src/native/direct-ts-parity/direct_ts_parity.c
           bash -n runtime/diagnostics/gen2_compat_profile.sh
           grep -Fq '"$HELPER" preset --preset omonob790' runtime/parity/omonob790_profile.sh
           grep -Fq 'alt111_policy_au(&g2_policy,g2_video.stream' src/native/altscreen111-gen2/libaltscreen111_gen2.c
