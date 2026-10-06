@@ -334,10 +334,15 @@ SELF_PID=$(pidin ar 2>/dev/null | awk '/[o]monob790_drive_supervisor.sh/ {p=$1} 
 [ -n "$SELF_PID" ] || exit 4
 echo "$SELF_PID" > "$PIDFILE" 2>/dev/null || exit 4
 
-if ! sd_make_rw; then
+while enabled; do
+  if sd_make_rw; then
+    break
+  fi
   publish waiting_log_media
-  exit 5
-fi
+  heartbeat
+  sleep 2
+done
+enabled || { publish disabled; exit 0; }
 
 MASTER_LOG="$LOGROOT/drive-supervisor.log"
 LATEST_STATUS="$LOGROOT/current.status"
