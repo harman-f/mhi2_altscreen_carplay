@@ -72,6 +72,9 @@
 #define STATUS_PATH "/tmp/mibr-parity-ts.status"
 #define STATUS_ENABLE_TEMP "/tmp/mibr-parity-status-enabled"
 #define STATUS_ENABLE_PERSIST "/mnt/app/root/mibr-parity-status-enabled"
+#define AU_EVENT_STARTED 0x01u
+#define AU_EVENT_COMPLETED 0x02u
+#define AU_EVENT_IDR 0x04u
 #define KEYFRAME_MARKER "/tmp/mibr-alt111-keyframe-only"
 #define DRIVER_DCMD_FLUSH 0x40040506
 #define DRIVER_DCMD_START 0x80040509
@@ -144,6 +147,8 @@ struct bridge_stats {
     uint64_t output_aus_completed;
     uint64_t output_idr_aus_started;
     uint64_t output_non_idr_aus_started;
+    uint64_t output_idr_aus_completed;
+    uint64_t output_non_idr_aus_completed;
     uint64_t blocks_written;
     uint64_t bytes_written;
     uint64_t write_eagain;
@@ -187,6 +192,7 @@ struct writer_ctx {
 
 static volatile sig_atomic_t g_stop;
 static int g_status_enabled = 1;
+static pthread_mutex_t g_status_publish_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static uint16_t be16(const uint8_t *p) {
     return (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
@@ -673,17 +679,15 @@ static int queue_push(struct au_queue *q, struct ts_au *au) {
 
 static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
                                 struct clock_state *clock, uint64_t pcr,
-                                struct bridge_stats *stats) {
+                                unsigned *event) {
     struct ts_au *a;
+    unsigned ev=0u;
     pthread_mutex_lock(&q->lock);
-    if (!q->count) { pthread_mutex_unlock(&q->lock); return 0; }
+    if (!q->count) { pthread_mutex_unlock(&q->lock); if(event)*event=0u; return 0; }
     a = &q->q[q->head];
-    if (a->packet_pos == 0 && stats) {
-        pthread_mutex_lock(&stats->lock);
-        ++stats->output_aus_started;
-        if(a->idr) ++stats->output_idr_aus_started;
-        else ++stats->output_non_idr_aus_started;
-        pthread_mutex_unlock(&stats->lock);
+    if (a->packet_pos == 0) {
+        ev|=AU_EVENT_STARTED;
+        if(a->idr)ev|=AU_EVENT_IDR;
     }
     if (clock && a->packet_pos == 0) {
         /* Guard the complete PES deadline at emission, including PSI/PCR
@@ -703,15 +707,13 @@ static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
     memcpy(p, a->packets + a->packet_pos * TS_SIZE, TS_SIZE);
     ++a->packet_pos; --q->packets_queued;
     if (a->packet_pos == a->packet_count) {
-        if(stats) {
-            pthread_mutex_lock(&stats->lock);
-            ++stats->output_aus_completed;
-            pthread_mutex_unlock(&stats->lock);
-        }
+        ev|=AU_EVENT_COMPLETED;
+        if(a->idr)ev|=AU_EVENT_IDR;
         free(a->packets); memset(a, 0, sizeof(*a));
         q->head = (q->head + 1u) % AU_QUEUE_CAP; --q->count;
     }
     pthread_cond_signal(&q->cv_space); pthread_mutex_unlock(&q->lock);
+    if(event)*event=ev;
     return 1;
 }
 
@@ -750,6 +752,7 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     FILE *f;
     if(!g_status_enabled)return; unsigned qcount; size_t qpkts;
     struct bridge_stats snap; uint64_t pcr, rebase, source_rebase;
+    pthread_mutex_lock(&g_status_publish_lock);
     pthread_mutex_lock(&s->lock); snap = *s; pthread_mutex_unlock(&s->lock);
     pthread_mutex_lock(&c->lock); pcr=c->transport_pcr90k; rebase=c->pts_rebases; source_rebase=c->source_rebases; pthread_mutex_unlock(&c->lock);
     pthread_mutex_lock(&q->lock); qcount=q->count; qpkts=q->packets_queued; pthread_mutex_unlock(&q->lock);
@@ -758,7 +761,7 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
      * can fail with EXDEV.  This is advisory telemetry; publish by direct
      * truncate/write, matching the qualified session-state primitive.
      */
-    f=fopen(STATUS_PATH,"w"); if(!f)return;
+    f=fopen(STATUS_PATH,"w"); if(!f){pthread_mutex_unlock(&g_status_publish_lock);return;}
     fprintf(f,"state=%s\n",state);
     fprintf(f,"architecture=omonob790-functional-parity-cleanroom\n");
     fprintf(f,"input_mode=m1au-complete-au\n");
@@ -801,11 +804,13 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"latency_packet_limit=%u\n",LOW_LATENCY_PACKET_LIMIT);
     fprintf(f,"aus_queued=%llu\npes_packets=%llu\n",
         (unsigned long long)snap.aus_queued,(unsigned long long)snap.pes_packets);
-    fprintf(f,"output_aus_started=%llu\noutput_aus_completed=%llu\noutput_idr_aus_started=%llu\noutput_non_idr_aus_started=%llu\n",
+    fprintf(f,"output_aus_started=%llu\noutput_aus_completed=%llu\noutput_idr_aus_started=%llu\noutput_non_idr_aus_started=%llu\noutput_idr_aus_completed=%llu\noutput_non_idr_aus_completed=%llu\n",
         (unsigned long long)snap.output_aus_started,
         (unsigned long long)snap.output_aus_completed,
         (unsigned long long)snap.output_idr_aus_started,
-        (unsigned long long)snap.output_non_idr_aus_started);
+        (unsigned long long)snap.output_non_idr_aus_started,
+        (unsigned long long)snap.output_idr_aus_completed,
+        (unsigned long long)snap.output_non_idr_aus_completed);
     fprintf(f,"blocks_written=%llu\nbytes_written=%llu\nwrite_eagain=%llu\nwrite_errors=%llu\nlast_write_us=%llu\nmax_write_us=%llu\n",
         (unsigned long long)snap.blocks_written,(unsigned long long)snap.bytes_written,
         (unsigned long long)snap.write_eagain,(unsigned long long)snap.write_errors,
@@ -818,6 +823,7 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
         (unsigned long long)snap.last_sequence,snap.last_frac,snap.last_sec,
         (unsigned long long)snap.last_pts,snap.waiting_idr);
     fclose(f);
+    pthread_mutex_unlock(&g_status_publish_lock);
 }
 
 static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s) {
@@ -878,22 +884,40 @@ static void *writer_main(void *arg) {
                 stats_add_u64(&w->stats->write_errors,&w->stats->lock,1); goto failed;
             }
         }
-        for(i=0;i<MOST_BLOCK_PACKETS;++i) {
-            uint8_t *p=block+i*TS_SIZE;
-            uint64_t pcr=TRANSPORT_PCR_BASE + (packet_index * TRANSPORT_TICKS_NUM) / TRANSPORT_TICKS_DEN;
-            if(packet_index>=w->next_pat_packet){make_pat(p,&w->cc_pat);w->next_pat_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pat_packets,&w->stats->lock,1);}
-            else if(packet_index>=w->next_pmt_packet){make_pmt(p,&w->cc_pmt);w->next_pmt_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pmt_packets,&w->stats->lock,1);}
-            else if(packet_index>=w->next_pcr_packet){make_pcr_packet(p,pcr);w->next_pcr_packet+=PCR_INTERVAL_PACKETS;stats_add_u64(&w->stats->pcr_packets,&w->stats->lock,1);}
-            else if(!queue_take_packet_at(w->queue,p,w->clock,pcr,w->stats)){make_null_packet(p,&w->cc_null);stats_add_u64(&w->stats->null_packets,&w->stats->lock,1);}
-            ++packet_index;
-        }
         {
-            uint64_t write_start = monotonic_us(), write_us;
+            uint64_t block_starts=0u,block_completes=0u,block_idr_starts=0u,block_non_idr_starts=0u;
+            uint64_t block_idr_completes=0u,block_non_idr_completes=0u;
+            uint64_t write_start,write_us,blocks_now;
+            for(i=0;i<MOST_BLOCK_PACKETS;++i) {
+                uint8_t *p=block+i*TS_SIZE;
+                uint64_t pcr=TRANSPORT_PCR_BASE + (packet_index * TRANSPORT_TICKS_NUM) / TRANSPORT_TICKS_DEN;
+                unsigned ev=0u;
+                if(packet_index>=w->next_pat_packet){make_pat(p,&w->cc_pat);w->next_pat_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pat_packets,&w->stats->lock,1);}
+                else if(packet_index>=w->next_pmt_packet){make_pmt(p,&w->cc_pmt);w->next_pmt_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pmt_packets,&w->stats->lock,1);}
+                else if(packet_index>=w->next_pcr_packet){make_pcr_packet(p,pcr);w->next_pcr_packet+=PCR_INTERVAL_PACKETS;stats_add_u64(&w->stats->pcr_packets,&w->stats->lock,1);}
+                else if(queue_take_packet_at(w->queue,p,w->clock,pcr,&ev)){
+                    if(ev&AU_EVENT_STARTED){++block_starts;if(ev&AU_EVENT_IDR)++block_idr_starts;else ++block_non_idr_starts;}
+                    if(ev&AU_EVENT_COMPLETED){++block_completes;if(ev&AU_EVENT_IDR)++block_idr_completes;else ++block_non_idr_completes;}
+                }else{
+                    make_null_packet(p,&w->cc_null);stats_add_u64(&w->stats->null_packets,&w->stats->lock,1);
+                }
+                ++packet_index;
+            }
+            write_start = monotonic_us();
             if(write_full(w->fd,block,sizeof(block),w->stats)!=0) goto failed;
             write_us = monotonic_us() - write_start;
             pthread_mutex_lock(&w->stats->lock);
             w->stats->last_write_us=write_us;
             if(write_us>w->stats->max_write_us)w->stats->max_write_us=write_us;
+            w->stats->output_aus_started+=block_starts;
+            w->stats->output_aus_completed+=block_completes;
+            w->stats->output_idr_aus_started+=block_idr_starts;
+            w->stats->output_non_idr_aus_started+=block_non_idr_starts;
+            w->stats->output_idr_aus_completed+=block_idr_completes;
+            w->stats->output_non_idr_aus_completed+=block_non_idr_completes;
+            ++w->stats->blocks_written;
+            w->stats->bytes_written+=MOST_BLOCK_BYTES;
+            blocks_now=w->stats->blocks_written;
             pthread_mutex_unlock(&w->stats->lock);
             if (!w->regular_file && write_us > max_device_write_us) {
                 max_device_write_us = write_us;
@@ -902,9 +926,9 @@ static void *writer_main(void *arg) {
                             (unsigned long long)write_us,
                             (unsigned long long)(packet_index / MOST_BLOCK_PACKETS));
             }
+            update_transport_clock(w->clock,packet_index);
+            if((blocks_now & 127u)==0u)publish_status(w->stats,w->clock,w->queue,"running");
         }
-        update_transport_clock(w->clock,packet_index);
-        pthread_mutex_lock(&w->stats->lock); ++w->stats->blocks_written; w->stats->bytes_written+=MOST_BLOCK_BYTES; pthread_mutex_unlock(&w->stats->lock);
         /* EOF is acknowledged only after the writer-local block is committed. */
         if (queue_finished(w->queue)) break;
     }
