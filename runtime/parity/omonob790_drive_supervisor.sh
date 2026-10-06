@@ -70,6 +70,7 @@ status_value(){
 }
 
 choose_log_root(){
+  [ -d /net/mmx/fs/sda0 ] && mount -uw /net/mmx/fs/sda0 2>/dev/null || true
   for R in /net/mmx/fs/sda0/esd/mibr-parity-drive-logs /mnt/app/root/mibr-parity-drive-logs /tmp/mibr-parity-drive-logs; do
     mkdir -p "$R" 2>/dev/null || continue
     T="$R/.write-test-$$"
@@ -86,7 +87,7 @@ telemetry_loop(){
   OUT=$1
   SEEN=0
   WAIT=0
-  echo "sample\ttime\tstream_state\tstream_hb\tgen2_source_aus\tgen2_source_idrs\tgen2_delivered_aus\tgen2_dropped_aus\tsource_fps_x100\tsource_input_bps\tsource_last_us\tsource_min_us\tsource_max_us\tparity_input_aus\tparity_input_idrs\tparity_input_non_idr\tparity_output_started\tparity_output_completed\tparity_output_idr_started\tparity_output_non_idr_started\tsequence_gaps\tdropped_wait_idr\tsafe_recoveries\tqueue_aus\tqueue_packets\tblocks_written\tbytes_written\twrite_eagain\twrite_errors\tlast_write_us\tmax_write_us\tgate_raw" > "$OUT" 2>/dev/null || return
+  echo "sample\telapsed_s\tstream_state\tstream_hb\tgen2_source_aus\tgen2_source_idrs\tgen2_delivered_aus\tgen2_dropped_aus\tsource_fps_x100\tsource_input_bps\tsource_last_us\tsource_min_us\tsource_max_us\tparity_input_aus\tparity_input_idrs\tparity_input_non_idr\tparity_output_started\tparity_output_completed\tparity_output_idr_started\tparity_output_non_idr_started\tsequence_gaps\tdropped_wait_idr\tsafe_recoveries\tqueue_aus\tqueue_packets\tblocks_written\tbytes_written\twrite_eagain\twrite_errors\tlast_write_us\tmax_write_us\tgate_raw" > "$OUT" 2>/dev/null || return
   N=0
   while :; do
     if [ -e "$SESSION_LOCK" ]; then
@@ -136,7 +137,7 @@ telemetry_loop(){
     GR=missing
     [ -r "$GATE_STATUS" ] && GR=$(cat "$GATE_STATUS" 2>/dev/null | tr '\t' ' ')
 
-    echo "$N\t$(stamp)\t$SS\t$SH\t$GA\t$GI\t$GD\t$GX\t$SF\t$SB\t$SL\t$SMIN\t$SMAX\t$PI\t$PII\t$PIN\t$POS\t$POC\t$POI\t$PON\t$PG\t$PD\t$PR\t$QA\t$QP\t$BW\t$BY\t$WE\t$WERR\t$LW\t$MW\t$GR" >> "$OUT" 2>/dev/null || true
+    echo "$N\t$N\t$SS\t$SH\t$GA\t$GI\t$GD\t$GX\t$SF\t$SB\t$SL\t$SMIN\t$SMAX\t$PI\t$PII\t$PIN\t$POS\t$POC\t$POI\t$PON\t$PG\t$PD\t$PR\t$QA\t$QP\t$BW\t$BY\t$WE\t$WERR\t$LW\t$MW\t$GR" >> "$OUT" 2>/dev/null || true
     sleep 1
   done
 }
