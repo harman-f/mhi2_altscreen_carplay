@@ -882,9 +882,17 @@ static void request_keyframe(unsigned reasons,uint64_t stream,uint64_t codec,
     if(!stream||!codec||!consumer||!ordinal)return;
     request.reasons=reasons;request.stream=stream;request.codec=codec;
     request.consumer=consumer;request.ordinal=ordinal;request.sequence=++sequence;
-    if(alt111_recovery_publish(ALT111_RECOVERY_PATH,&request))
-        fprintf(stderr,"PARITY_RECOVERY_REQUEST_FAILED sequence=%llu reasons=%u\n",
-                (unsigned long long)sequence,reasons);
+    if(alt111_recovery_publish(ALT111_RECOVERY_PATH,&request)) {
+        int fd=open(KEYFRAME_MARKER,O_WRONLY|O_CREAT|O_TRUNC,0644);
+        if(fd>=0){
+            close(fd);
+            fprintf(stderr,"PARITY_RECOVERY_FALLBACK keyframe_marker=YES sequence=%llu reasons=%u\n",
+                    (unsigned long long)sequence,reasons);
+        }else{
+            fprintf(stderr,"PARITY_RECOVERY_REQUEST_FAILED sequence=%llu reasons=%u errno=%d\n",
+                    (unsigned long long)sequence,reasons,errno);
+        }
+    }
 }
 
 static int driver_init(int fd, int regular_file, struct bridge_stats *s) {
