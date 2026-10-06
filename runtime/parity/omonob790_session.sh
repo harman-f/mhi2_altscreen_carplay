@@ -18,12 +18,15 @@ HELPER=$BASE/bin/alt111-settings
 case "${1:-120}" in
   stop) exec "$RUNNER" --stop ;;
   restore-stock) exec "$RUNNER" --restore-stock ;;
-  ''|*[!0-9]*) echo "usage: $0 [SECONDS 5..7200]|stop|restore-stock"; exit 2 ;;
+  ''|*[!0-9]*) echo "usage: $0 [SECONDS 0|5..7200]|stop|restore-stock"; exit 2 ;;
   *) LIMIT=${1:-120} ;;
 esac
 # No tuning scalar is hard-coded here. The shared validator reads one complete
 # layered snapshot; the native owner independently freezes its backend.
-[ "$LIMIT" -ge 5 ] && [ "$LIMIT" -le 7200 ] || exit 2
+if [ "$LIMIT" -ne 0 ]; then
+  [ "$LIMIT" -ge 5 ] && [ "$LIMIT" -le 7200 ] || exit 2
+fi
 "$HELPER" status || exit 20
-echo "PARITY_SESSION=PREFLIGHT seconds=$LIMIT"
+[ "$LIMIT" -eq 0 ] && MODE=until-stop || MODE=bounded
+echo "PARITY_SESSION=PREFLIGHT mode=$MODE seconds=$LIMIT"
 exec "$RUNNER" "$BRIDGE" tcp://127.0.0.1:19820 /dev/mlb/isoTX2 "$LIMIT"
