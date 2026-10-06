@@ -130,7 +130,7 @@ done
 echo
 echo "=== PARITY TRANSPORT ==="
 if [ -r /tmp/mibr-parity-ts.status ]; then
-  grep -E '^(state|input_records|input_idrs|input_non_idr_aus|output_aus_started|output_aus_completed|output_idr_aus_started|output_non_idr_aus_started|sequence_gaps|dropped_wait_idr|safe_recoveries|blocks_written|bytes_written|write_eagain|write_errors|last_write_us|max_write_us|queue_aus|queue_packets)=' /tmp/mibr-parity-ts.status 2>/dev/null || true
+  grep -E '^(state|input_records|input_idrs|input_non_idr_aus|input_slice_p|input_slice_b|input_slice_i|input_slice_unknown|output_aus_started|output_aus_completed|output_idr_aus_started|output_non_idr_aus_started|output_idr_aus_completed|output_non_idr_aus_completed|output_slice_p_started|output_slice_b_started|output_slice_i_started|output_slice_unknown_started|output_slice_p_completed|output_slice_b_completed|output_slice_i_completed|output_slice_unknown_completed|sequence_gaps|dropped_wait_idr|safe_recoveries|blocks_written|bytes_written|write_eagain|write_errors|last_write_us|max_write_us|queue_aus|queue_packets)=' /tmp/mibr-parity-ts.status 2>/dev/null || true
 else
   echo "parity_transport_status=missing"
 fi
