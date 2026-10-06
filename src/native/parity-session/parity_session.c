@@ -516,18 +516,28 @@ static int identity_self_test(void) {
     observer_rc=wait_child_bounded(observer,4000u,&observer_status);
     /*
      * On QNX an O_RDWR /proc/<pid>/as handle sets Run-on-Last-Close.
-     * A successful DCMD_PROC_SIGNAL may therefore leave the target at the
-     * procfs TERMINATED point until the last inherited handle is closed.
-     * First prove that exact bound object is terminal/quiescent, then release
-     * the final parent handle and only afterwards require waitpid() to reap it.
+     * The stock SignalKill path moves the exact bound child to the procfs
+     * TERMINATED point while the inherited RLC handles keep its process
+     * object present.  First prove that terminal/quiescent state on the bound
+     * object, then release the final parent handle and require a bounded reap.
+     *
+     * Exact MU1440 vehicle evidence shows that last-close reaps this terminal
+     * child as WIFEXITED(status)==1 / WEXITSTATUS(status)==0 rather than
+     * preserving WIFSIGNALED(SIGTERM).  The termination proof therefore comes
+     * from the bound procfs handle before close; the post-close requirement is
+     * successful reap, not a Linux-style signal wait status.
      */
     ok=!observer_rc &&
        WIFEXITED(observer_status) && WEXITSTATUS(observer_status)==0 &&
        bound_process_dead(fd);
     close(fd);fd=-1;
     child_rc=wait_child_bounded(child,3000u,&st);
+#ifdef __QNXNTO__
+    ok=ok && !child_rc;
+#else
     ok=ok && !child_rc &&
        WIFSIGNALED(st) && WTERMSIG(st)==SIGTERM;
+#endif
     if(ok)puts("PARITY_PROCESS_IDENTITY_SELFTEST=PASS inherited_handle_signal_and_exit no_most_io");
     return ok ? 0 : 1;
 }
