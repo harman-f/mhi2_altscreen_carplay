@@ -130,7 +130,7 @@ sd_make_rw(){
   mount -uw "$CARD" 2>/dev/null || return 1
   SD_RW=1
   mkdir -p "$LOGROOT" 2>/dev/null || return 1
-  T="$LOGROOT/.write-test-$"
+  T="$LOGROOT/.write-test-parity-drive"
   : > "$T" 2>/dev/null || return 1
   [ -f "$T" ] || return 1
   rm -f "$T" 2>/dev/null || return 1
@@ -339,7 +339,8 @@ fi
 
 MASTER_LOG="$LOGROOT/drive-supervisor.log"
 LATEST_STATUS="$LOGROOT/current.status"
-echo "SUPERVISOR_START pid=$" >> "$MASTER_LOG" 2>/dev/null || true
+SELF_PID=$(cat "$PIDFILE" 2>/dev/null)
+echo "SUPERVISOR_START pid=$SELF_PID" >> "$MASTER_LOG" 2>/dev/null || true
 sync 2>/dev/null || true
 
 NEED_RECONNECT=0
