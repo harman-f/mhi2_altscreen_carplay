@@ -461,12 +461,15 @@ static int stop_bridge(pid_t p) {
     first=waitpid(p,&st,WNOHANG);
     if(first==p)return 0;
     if(first<0 && errno!=EINTR)return bound_process_dead(bridge_handle) ? 0 : -1;
+    if(bound_process_dead(bridge_handle))return 0;
     if(bridge_handle>=0)(void)bound_process_signal(bridge_handle,SIGTERM);
     else (void)kill(p,SIGTERM); /* Still our unreaped direct child. */
     for (i = 0; i < 20; ++i) {
         pid_t w = waitpid(p, &st, WNOHANG);
         if (w == p) return 0;
-        if (w < 0 && errno == ECHILD) return bound_process_dead(bridge_handle) ? 0 : -1;
+        if(bound_process_dead(bridge_handle))return 0;
+        if (w < 0 && errno == ECHILD) return -1;
+        if (w < 0 && errno != EINTR) return -1;
         usleep(100000);
     }
     if(bridge_handle>=0)(void)bound_process_signal(bridge_handle,SIGKILL);
@@ -474,7 +477,9 @@ static int stop_bridge(pid_t p) {
     for(i=0;i<5;++i) {
         pid_t w=waitpid(p,&st,WNOHANG);
         if(w==p)return 0;
-        if(w<0&&errno==ECHILD)return bound_process_dead(bridge_handle) ? 0 : -1;
+        if(bound_process_dead(bridge_handle))return 0;
+        if(w<0&&errno==ECHILD)return -1;
+        if(w<0&&errno!=EINTR)return -1;
         usleep(100000);
     }
     return -1;
@@ -509,11 +514,20 @@ static int identity_self_test(void) {
     }
     if(observer<0){kill(child,SIGKILL);waitpid(child,&st,0);close(fd);return 1;}
     observer_rc=wait_child_bounded(observer,4000u,&observer_status);
+    /*
+     * On QNX an O_RDWR /proc/<pid>/as handle sets Run-on-Last-Close.
+     * A successful DCMD_PROC_SIGNAL may therefore leave the target at the
+     * procfs TERMINATED point until the last inherited handle is closed.
+     * First prove that exact bound object is terminal/quiescent, then release
+     * the final parent handle and only afterwards require waitpid() to reap it.
+     */
+    ok=!observer_rc &&
+       WIFEXITED(observer_status) && WEXITSTATUS(observer_status)==0 &&
+       bound_process_dead(fd);
+    close(fd);fd=-1;
     child_rc=wait_child_bounded(child,3000u,&st);
-    ok=!child_rc && !observer_rc &&
-       WIFSIGNALED(st) && WTERMSIG(st)==SIGTERM &&
-       WIFEXITED(observer_status) && WEXITSTATUS(observer_status)==0;
-    close(fd);
+    ok=ok && !child_rc &&
+       WIFSIGNALED(st) && WTERMSIG(st)==SIGTERM;
     if(ok)puts("PARITY_PROCESS_IDENTITY_SELFTEST=PASS inherited_handle_signal_and_exit no_most_io");
     return ok ? 0 : 1;
 }
@@ -697,6 +711,16 @@ int main(int argc, char **argv) {
         }
         if (w < 0 && errno != EINTR) {
             rc = 16;
+            break;
+        }
+        /*
+         * QNX O_RDWR procfs handles hold a terminating process at the
+         * debugger termination point until last-close. Treat that state as
+         * an early bridge exit even though waitpid() cannot reap it yet.
+         */
+        if(bridge_handle>=0 && bound_process_dead(bridge_handle)) {
+            bridge_stopped=1;
+            rc=15;
             break;
         }
         usleep(100000);
