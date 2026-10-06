@@ -23,7 +23,7 @@ done
 echo
 echo "=== PARITY TRANSPORT ==="
 if [ -r /tmp/mibr-parity-ts.status ]; then
-  grep -E '^(state|input_records|input_idrs|input_non_idr_aus|output_aus_started|output_aus_completed|output_idr_aus_started|output_non_idr_aus_started|sequence_gaps|dropped_wait_idr|safe_recoveries|blocks_written|bytes_written|write_eagain|write_errors|last_write_us|max_write_us|queue_aus|queue_packets)=' /tmp/mibr-parity-ts.status 2>/dev/null || true
+  grep -E '^(state|input_records|input_idrs|input_non_idr_aus|output_aus_started|output_aus_completed|output_idr_aus_started|output_non_idr_aus_started|output_idr_aus_completed|output_non_idr_aus_completed|sequence_gaps|dropped_wait_idr|safe_recoveries|blocks_written|bytes_written|write_eagain|write_errors|last_write_us|max_write_us|queue_aus|queue_packets)=' /tmp/mibr-parity-ts.status 2>/dev/null || true
 else
   echo "parity_transport_status=missing"
 fi
@@ -46,5 +46,15 @@ echo "=== GATE ==="
 echo
 echo "=== LOG ROOTS ==="
 for R in /net/mmx/fs/sda0/esd/mibr-parity-drive-logs /mnt/app/root/mibr-parity-drive-logs /tmp/mibr-parity-drive-logs; do
-  [ -d "$R" ] && echo "$R"
+  if [ -d "$R" ]; then
+    echo "log_root=$R"
+    if [ -r "$R/current.status" ]; then
+      echo "--- persisted current.status ---"
+      cat "$R/current.status"
+    fi
+    if [ -r "$R/drive-supervisor.log" ]; then
+      echo "--- persisted supervisor tail ---"
+      tail -20 "$R/drive-supervisor.log" 2>/dev/null || true
+    fi
+  fi
 done
