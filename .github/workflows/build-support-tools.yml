@@ -9,6 +9,8 @@ on:
       - 'src/native/most-ts-writer/**'
       - 'src/native/sha256sum-compat/**'
       - 'src/native/tee-compat/**'
+      - 'src/native/qnx-shmem-probe/**'
+      - 'src/native/qnx-bound-process-probe/**'
       - 'tools/build_support_tools.sh'
   push:
     branches: [ main ]
@@ -132,7 +134,12 @@ jobs:
           )
           if needle not in s:
               raise SystemExit("qnx-sdp apt bootstrap anchor not found")
-          p.write_text(s.replace(needle, replacement, 1))
+          s = s.replace(needle, replacement, 1)
+          gcc_url = "https://ftp.gnu.org/gnu/gcc/gcc-${GCC49_VER}/gcc-${GCC49_VER}.tar.bz2"
+          gcc_mirror = "https://ftpmirror.gnu.org/gcc/gcc-${GCC49_VER}/gcc-${GCC49_VER}.tar.bz2"
+          if gcc_url not in s:
+              raise SystemExit("gcc-4.9 download anchor not found")
+          p.write_text(s.replace(gcc_url, gcc_mirror, 1))
           PY
 
           docker buildx build \
@@ -184,7 +191,7 @@ jobs:
         run: |
           set -euxo pipefail
 
-          for f in libmibr_isotx2_gate.so gate_selftest_qnx most-ts-writer sha256sum tee; do
+          for f in libmibr_isotx2_gate.so gate_selftest_qnx most-ts-writer sha256sum tee shmem-fs-probe bound-process-probe; do
             file "build/support-tools/$f"
 
             docker run --rm --platform=linux/amd64 \
