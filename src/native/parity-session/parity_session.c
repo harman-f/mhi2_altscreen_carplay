@@ -113,16 +113,22 @@ static int acquire_lock(void) {
 static void on_signal(int sig) { (void)sig; g_stop = 1; }
 
 static int write_text(const char *path, const char *text) {
-    char tmp[192];
     int fd;
     size_t n = strlen(text);
-    snprintf(tmp, sizeof(tmp), "%s.new.%ld", path, (long)getpid());
-    fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    /*
+     * Exact MU1440 target qualification:
+     *   - flat create/write/read/unlink under /tmp works
+     *   - direct O_TRUNC rewrite works
+     *   - native rename across the /tmp -> /dev/shmem spelling boundary
+     *     returns EXDEV, even though the shell may emulate mv via copy+unlink.
+     *
+     * Session state files are advisory/control records guarded by the O_EXCL
+     * owner lock, so publish them directly instead of relying on rename().
+     */
+    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd < 0) return -1;
-    if (write(fd, text, n) != (ssize_t)n) { close(fd); unlink(tmp); return -1; }
-    if (close(fd) != 0) { unlink(tmp); return -1; }
-    if (rename(tmp, path) != 0) { unlink(tmp); return -1; }
-    return 0;
+    if (write(fd, text, n) != (ssize_t)n) { close(fd); return -1; }
+    return close(fd);
 }
 
 static int touch_file(const char *path) {
