@@ -268,7 +268,7 @@ ksh "$ROOT/collect-logs.sh" || fail "sd_log_preflight"
 app_rw || fail "mount_app_rw"
 mkdir -p "$BACK" || fail "backup_dir"
 
-for SPEC in   "$DST/bin/libaltscreen111.so:bin/libaltscreen111.so"   "$HOOK:hook/libmibr_carplay111.so"   "$DST/bin/direct-ts-parity:bin/direct-ts-parity"   "$DST/bin/parity-session:bin/parity-session"   "$DST/bin/alt111-settings:bin/alt111-settings"   "$GUARD:guard/libmibr_isotx2_guard.so"   "$STARTUP:boot/startup.sh"   "$DST/scripts/omonob790_profile.sh:scripts/omonob790_profile.sh"   "$DST/scripts/omonob790_session.sh:scripts/omonob790_session.sh"   "$DST/scripts/omonob790_status.sh:scripts/omonob790_status.sh"   "$DST/scripts/gen2_compat_profile.sh:scripts/gen2_compat_profile.sh"   "$STATE_AUTODIRECT:state/mibr-carplay-autodirect"
+for SPEC in   "$DST/bin/libaltscreen111.so:bin/libaltscreen111.so"   "$HOOK:hook/libmibr_carplay111.so"   "$DST/bin/direct-ts-parity:bin/direct-ts-parity"   "$DST/bin/parity-session:bin/parity-session"   "$DST/bin/alt111-settings:bin/alt111-settings"   "$GUARD:guard/libmibr_isotx2_guard.so"   "$STARTUP:boot/startup.sh"   "$DST/scripts/omonob790_profile.sh:scripts/omonob790_profile.sh"   "$DST/scripts/omonob790_session.sh:scripts/omonob790_session.sh"   "$DST/scripts/omonob790_status.sh:scripts/omonob790_status.sh"   "$DST/scripts/omonob790_drive_supervisor.sh:scripts/omonob790_drive_supervisor.sh"   "$DST/scripts/omonob790_drive_enable.sh:scripts/omonob790_drive_enable.sh"   "$DST/scripts/omonob790_drive_disable.sh:scripts/omonob790_drive_disable.sh"   "$DST/scripts/omonob790_drive_status.sh:scripts/omonob790_drive_status.sh"   "$DST/scripts/gen2_compat_profile.sh:scripts/gen2_compat_profile.sh"   "$STATE_AUTODIRECT:state/mibr-carplay-autodirect"
 do
   SRC=${SPEC%%:*}
   REL=${SPEC#*:}
@@ -292,6 +292,10 @@ install_one "$PAYLOAD/libmibr_isotx2_guard.so" "$GUARD"
 install_one "$RUNTIME/omonob790_profile.sh" "$DST/scripts/omonob790_profile.sh"
 install_one "$RUNTIME/omonob790_session.sh" "$DST/scripts/omonob790_session.sh"
 install_one "$RUNTIME/omonob790_status.sh" "$DST/scripts/omonob790_status.sh"
+install_one "$RUNTIME/omonob790_drive_supervisor.sh" "$DST/scripts/omonob790_drive_supervisor.sh"
+install_one "$RUNTIME/omonob790_drive_enable.sh" "$DST/scripts/omonob790_drive_enable.sh"
+install_one "$RUNTIME/omonob790_drive_disable.sh" "$DST/scripts/omonob790_drive_disable.sh"
+install_one "$RUNTIME/omonob790_drive_status.sh" "$DST/scripts/omonob790_drive_status.sh"
 install_one "$RUNTIME/gen2_compat_profile.sh" "$DST/scripts/gen2_compat_profile.sh"
 
 for SCRIPT in $ALT111_MASTER_SCRIPTS; do
