@@ -46,6 +46,7 @@
 #define DMDT_TIMEOUT_MS 5000u
 #define DMDT_TERM_GRACE_MS 500u
 #define WATCHDOG_MARGIN_SECONDS 20u
+#define MAX_SESSION_SECONDS 7200L
 
 static volatile sig_atomic_t g_stop;
 static int session_lock_fd=-1;
@@ -656,7 +657,7 @@ int main(int argc, char **argv) {
     }
     bridge = argv[1]; input = argv[2]; output = argv[3];
     errno = 0; max_seconds = strtol(argv[4], &end, 10);
-    if (errno || end == argv[4] || *end || max_seconds < 5 || max_seconds > 600)
+    if (errno || end == argv[4] || *end || max_seconds < 5 || max_seconds > MAX_SESSION_SECONDS)
         return 65;
 
     if(settings_backend())return 13;
