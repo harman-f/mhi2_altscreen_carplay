@@ -49,6 +49,7 @@
 
 static volatile sig_atomic_t g_stop;
 static int session_lock_fd=-1;
+static pid_t owner_process_pid=-1;
 static int bridge_handle=-1;
 static unsigned gate_backend,bridge_created;
 static uint64_t gate_token,native_process,gate_dropped_before,gate_request_ms;
@@ -87,15 +88,25 @@ static uint64_t monotonic_ms(void) {
     return (uint64_t)ts.tv_sec*1000u+(uint64_t)ts.tv_nsec/1000000u;
 }
 
+static int lock_fd_matches_path(int fd) {
+    struct stat held,path;
+    if(fd<0 || fstat(fd,&held)!=0 || lstat(LOCK_PATH,&path)!=0)return 0;
+    return S_ISREG(held.st_mode) && S_ISREG(path.st_mode) &&
+           held.st_dev==path.st_dev && held.st_ino==path.st_ino;
+}
+
 static int acquire_lock(void) {
-    struct flock lk;
-    int fd=open(LOCK_PATH,O_WRONLY|O_CREAT|O_EXCL,0600);
+    char record[80];
+    size_t n;
+    int fd=open(LOCK_PATH,O_RDWR|O_CREAT|O_EXCL,0600);
     if(fd<0)return -1;
-    close(fd);
-    fd=open(LOCK_PATH,O_RDWR);
-    memset(&lk,0,sizeof(lk));lk.l_type=F_RDLCK;lk.l_whence=SEEK_SET;
-    if(fd<0 || fcntl(fd,F_SETLK,&lk)!=0) {if(fd>=0)close(fd);return -1;}
-    if(fcntl(fd,F_SETFD,FD_CLOEXEC)!=0) {close(fd);return -1;}
+    if(fcntl(fd,F_SETFD,FD_CLOEXEC)!=0) {close(fd);unlink(LOCK_PATH);return -1;}
+    n=(size_t)snprintf(record,sizeof(record),"M1PLOCK1 %ld %llu\n",
+                      (long)owner_process_pid,(unsigned long long)owner_token);
+    if(n==0u || n>=sizeof(record) || write(fd,record,n)!=(ssize_t)n) {
+        close(fd);unlink(LOCK_PATH);return -1;
+    }
+    if(!lock_fd_matches_path(fd)) {close(fd);unlink(LOCK_PATH);return -1;}
     session_lock_fd=fd;return 0;
 }
 
@@ -359,10 +370,14 @@ static void watchdog_main(int fd, unsigned timeout_seconds) {
     char token = 0;
     ssize_t n = -1;
     unsigned elapsed_seconds = 0;
-    struct flock lk;
     char b[48];
-    memset(&lk,0,sizeof(lk));lk.l_type=F_RDLCK;lk.l_whence=SEEK_SET;
-    if(fcntl(session_lock_fd,F_SETLK,&lk)!=0)_exit(18);
+    /*
+     * Exact MU1440 /tmp == /dev/shmem does not implement POSIX F_SETLK.
+     * The parent-created O_EXCL lock inode is inherited across fork; require
+     * that the pathname still names that exact inode before the watchdog may
+     * participate in recovery.
+     */
+    if(!lock_fd_matches_path(session_lock_fd))_exit(18);
     snprintf(b,sizeof(b),"%ld\n",(long)getpid());
     if(write_text(WATCHDOG_PID_PATH,b)!=0)_exit(18);
     signal(SIGINT,SIG_IGN); signal(SIGTERM,SIG_IGN); signal(SIGHUP,SIG_IGN);
@@ -570,32 +585,63 @@ int main(int argc, char **argv) {
     if (argc == 2 && !strcmp(argv[1], "--stop")) return request_stop();
     if (argc == 2 && !strcmp(argv[1], "--restore-stock")) {
         int rr;
-        struct flock lk;
+        struct alt111_native_gate_status gs;
         if(access(LOCK_PATH,F_OK)!=0 && access(BRIDGE_PID_PATH,F_OK)!=0 &&
            access(OLD_DIRECT_MARKER,F_OK)!=0) {puts("owner_result=NO_ACTIVE_OWNER");return 0;}
         if(pid_alive_from_file(PID_PATH) || pid_alive_from_file(WATCHDOG_PID_PATH)) {
             fprintf(stderr,"ERROR active parity owner; stop it before restoring\n"); return 18;
         }
-        if(access(LOCK_PATH,F_OK)!=0 && acquire_lock()!=0)return 18;
-        if(session_lock_fd<0)session_lock_fd=open(LOCK_PATH,O_RDWR);
-        memset(&lk,0,sizeof(lk));lk.l_type=F_WRLCK;lk.l_whence=SEEK_SET;
-        if(session_lock_fd<0 || fcntl(session_lock_fd,F_SETLK,&lk)!=0)return 18;
+
+        owner_process_pid=getpid();
+        owner_token=((monotonic_ms()<<20)^((uint64_t)getpid()<<3))|1u;
+        if(access(LOCK_PATH,F_OK)!=0) {
+            if(acquire_lock()!=0)return 18;
+        } else {
+            session_lock_fd=open(LOCK_PATH,O_RDWR);
+            if(session_lock_fd<0 || fcntl(session_lock_fd,F_SETFD,FD_CLOEXEC)!=0 ||
+               !lock_fd_matches_path(session_lock_fd)) {
+                if(session_lock_fd>=0)close(session_lock_fd);
+                session_lock_fd=-1;return 18;
+            }
+        }
+
         if(access(BRIDGE_PID_PATH,F_OK)==0){
             fprintf(stderr,"ERROR unconfirmed writer identity; reboot/reconcile required\n");
-            close(session_lock_fd);return 19;
+            close(session_lock_fd);session_lock_fd=-1;return 19;
         }
+
+        /*
+         * Recover the exact stale-preflight case proven on MU1440: an older
+         * session created LOCK_PATH, then F_SETLK returned ENOSYS before PID,
+         * ticket, backend, AU marker or route ownership existed.  Only clear
+         * it when the live native gate proves stock state and every ownership
+         * artifact is absent.
+         */
+        if(access(PID_PATH,F_OK)!=0 && access(WATCHDOG_PID_PATH,F_OK)!=0 &&
+           access(BACKEND_STATE_PATH,F_OK)!=0 && access(OWNER_TICKET_PATH,F_OK)!=0 &&
+           access(AU_MARKER,F_OK)!=0 && access(OLD_DIRECT_MARKER,F_OK)!=0 &&
+           gate_snapshot(&gs)==0 && gs.state==0u) {
+            if(lock_fd_matches_path(session_lock_fd))unlink(LOCK_PATH);
+            unlink(STOP_REQUEST_PATH);
+            close(session_lock_fd);session_lock_fd=-1;
+            puts("owner_result=STALE_PREFLIGHT_LOCK_CLEARED_STOCK_CONFIRMED");
+            return 0;
+        }
+
         if(read_trimmed(BACKEND_STATE_PATH,b,sizeof(b)) ||
            (strcmp(b,"writev_gate") && strcmp(b,"dmdt_reference"))) {
             fprintf(stderr,"ERROR missing/invalid original ownership backend; reconcile required\n");
-            close(session_lock_fd);return 21;
+            close(session_lock_fd);session_lock_fd=-1;return 21;
         }
         gate_backend=!strcmp(b,"writev_gate");
         (void)write_text(STATE_PATH, "manual_restoring_backend\n");
         rr=backend_restore();
         unlink(AU_MARKER);
         (void)write_text(STATE_PATH, rr==0 ? "manual_stock\n" : "manual_restore_failed\n");
-        if(rr==0) { unlink(LOCK_PATH); unlink(BRIDGE_PID_PATH); unlink(PID_PATH); }
-        close(session_lock_fd);
+        if(rr==0 && lock_fd_matches_path(session_lock_fd)) {
+            unlink(LOCK_PATH); unlink(BRIDGE_PID_PATH); unlink(PID_PATH);
+        }
+        close(session_lock_fd);session_lock_fd=-1;
         return rr==0 ? 0 : 20;
     }
     if (argc != 5) {
@@ -627,13 +673,17 @@ int main(int argc, char **argv) {
         fprintf(stderr,"ERROR bound process-handle target qualification failed\n");return 19;
     }
 
+    owner_process_pid=getpid();
+    owner_token=((monotonic_ms()<<20)^((uint64_t)getpid()<<3))|1u;
     if(acquire_lock()!=0) { fprintf(stderr,"ERROR parity owner lock exists; reconcile stock first\n"); return 18; }
     lock_owned=1;
-    owner_token=((monotonic_ms()<<20)^((uint64_t)getpid()<<3))|1u;
 
     signal(SIGINT, on_signal); signal(SIGTERM, on_signal); signal(SIGHUP, on_signal); signal(SIGPIPE,SIG_IGN);
     snprintf(b, sizeof(b), "%ld\n", (long)getpid());
-    if (write_text(PID_PATH, b) != 0) {unlink(LOCK_PATH);return 14;}
+    if (write_text(PID_PATH, b) != 0) {
+        if(lock_fd_matches_path(session_lock_fd))unlink(LOCK_PATH);
+        close(session_lock_fd);session_lock_fd=-1;return 14;
+    }
     snprintf(b,sizeof(b),"%llu\n",(unsigned long long)owner_token);
     if(write_text(OWNER_TICKET_PATH,b))goto done;
     if(write_text(BACKEND_STATE_PATH,gate_backend ? "writev_gate\n" : "dmdt_reference\n"))goto done;
@@ -783,7 +833,8 @@ done:
     unlink(PID_PATH);
     if(bridge_stopped)unlink(BRIDGE_PID_PATH);
     if(watchdog_reaped)unlink(WATCHDOG_PID_PATH);
-    if(restore_ok && (watchdog<=1 || watchdog_reaped) && lock_owned)unlink(LOCK_PATH);
+    if(restore_ok && (watchdog<=1 || watchdog_reaped) && lock_owned &&
+       lock_fd_matches_path(session_lock_fd))unlink(LOCK_PATH);
     if(session_lock_fd>=0)close(session_lock_fd);
     if(bridge_handle>=0)close(bridge_handle);
     return rc;
