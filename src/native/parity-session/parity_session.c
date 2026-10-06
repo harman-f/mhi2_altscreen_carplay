@@ -389,12 +389,16 @@ static void watchdog_main(int fd, unsigned timeout_seconds) {
     if(write_text(WATCHDOG_PID_PATH,b)!=0)_exit(18);
     signal(SIGINT,SIG_IGN); signal(SIGTERM,SIG_IGN); signal(SIGHUP,SIG_IGN);
 
-    while (elapsed_seconds < timeout_seconds) {
+    for (;;) {
         fd_set rfds;
         struct timeval tv;
         int rc;
-        unsigned slice = timeout_seconds - elapsed_seconds;
-        if (slice > 1u) slice = 1u;
+        unsigned slice = 1u;
+        if(timeout_seconds) {
+            if(elapsed_seconds >= timeout_seconds)break;
+            slice = timeout_seconds - elapsed_seconds;
+            if (slice > 1u) slice = 1u;
+        }
 
         FD_ZERO(&rfds);
         FD_SET(fd, &rfds);
@@ -411,7 +415,7 @@ static void watchdog_main(int fd, unsigned timeout_seconds) {
             close(fd);
             rc=emergency_restore(); unlink(WATCHDOG_PID_PATH); _exit(rc ? 20 : 0);
         }
-        if (rc == 0) elapsed_seconds += slice;
+        if (rc == 0 && timeout_seconds) elapsed_seconds += slice;
     }
 
     close(fd);
@@ -652,12 +656,13 @@ int main(int argc, char **argv) {
         return rr==0 ? 0 : 20;
     }
     if (argc != 5) {
-        fprintf(stderr, "usage: %s BRIDGE INPUT OUTPUT MAX_SECONDS\n", argv[0]);
+        fprintf(stderr, "usage: %s BRIDGE INPUT OUTPUT MAX_SECONDS(0=until-stop)\n", argv[0]);
         return 64;
     }
     bridge = argv[1]; input = argv[2]; output = argv[3];
     errno = 0; max_seconds = strtol(argv[4], &end, 10);
-    if (errno || end == argv[4] || *end || max_seconds < 5 || max_seconds > MAX_SESSION_SECONDS)
+    if (errno || end == argv[4] || *end ||
+        (max_seconds != 0 && (max_seconds < 5 || max_seconds > MAX_SESSION_SECONDS)))
         return 65;
 
     if(settings_backend())return 13;
@@ -710,7 +715,7 @@ int main(int argc, char **argv) {
     if (watchdog == 0) {
         close(pipefd[1]);
         if(exec_gate>=0)close(exec_gate);
-        watchdog_main(pipefd[0], (unsigned)max_seconds + WATCHDOG_MARGIN_SECONDS);
+        watchdog_main(pipefd[0], max_seconds ? (unsigned)max_seconds + WATCHDOG_MARGIN_SECONDS : 0u);
     }
     close(pipefd[0]); pipefd[0] = -1;
     {
@@ -763,8 +768,8 @@ int main(int argc, char **argv) {
     (void)write_text(STATE_PATH, "direct\n");
 
     rc = 0;
-    deadline=monotonic_ms()+(uint64_t)max_seconds*1000u;
-    while (!g_stop && monotonic_ms() < deadline) {
+    deadline=max_seconds ? monotonic_ms()+(uint64_t)max_seconds*1000u : 0u;
+    while (!g_stop && (!deadline || monotonic_ms() < deadline)) {
         if(read_ticket(STOP_REQUEST_PATH)==owner_token){g_stop=1;break;}
         if(!gate_owned()) {fprintf(stderr,"ERROR native gate proof lost; stopping custom writer\n");rc=23;break;}
         pid_t ww=waitpid(watchdog,&st,WNOHANG);
