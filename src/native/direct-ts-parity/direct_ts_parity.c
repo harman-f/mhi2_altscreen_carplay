@@ -70,6 +70,8 @@
 #define AU_QUEUE_CAP 64u
 #define AU_QUEUE_PACKET_CAP 65536u
 #define STATUS_PATH "/tmp/mibr-parity-ts.status"
+#define STATUS_ENABLE_TEMP "/tmp/mibr-parity-status-enabled"
+#define STATUS_ENABLE_PERSIST "/mnt/app/root/mibr-parity-status-enabled"
 #define KEYFRAME_MARKER "/tmp/mibr-alt111-keyframe-only"
 #define DRIVER_DCMD_FLUSH 0x40040506
 #define DRIVER_DCMD_START 0x80040509
@@ -184,6 +186,7 @@ struct writer_ctx {
 };
 
 static volatile sig_atomic_t g_stop;
+static int g_status_enabled = 1;
 
 static uint16_t be16(const uint8_t *p) {
     return (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
@@ -308,6 +311,31 @@ static uint64_t clock_pcr_now(struct clock_state *c) {
     uint64_t v;
     pthread_mutex_lock(&c->lock); v = c->transport_pcr90k; pthread_mutex_unlock(&c->lock);
     return v;
+}
+
+static int read_bool_setting_file(const char *path, int *value) {
+    char b[16]; ssize_t n; int fd;
+    fd=open(path,O_RDONLY);
+    if(fd<0)return -1;
+    n=read(fd,b,sizeof(b)-1u); close(fd);
+    if(n<=0)return -1;
+    b[n]=0;
+    while(n>0 && (b[n-1]=='\n'||b[n-1]=='\r'||b[n-1]==' '||b[n-1]=='\t'))b[--n]=0;
+    if(!strcmp(b,"1")||!strcmp(b,"on")||!strcmp(b,"yes")||!strcmp(b,"true")){*value=1;return 0;}
+    if(!strcmp(b,"0")||!strcmp(b,"off")||!strcmp(b,"no")||!strcmp(b,"false")){*value=0;return 0;}
+    return -1;
+}
+
+static int load_status_enabled(void) {
+    const char *env=getenv("MIBR_PARITY_STATUS");
+    int v=1;
+    if(env && *env) {
+        if(!strcmp(env,"0")||!strcmp(env,"off")||!strcmp(env,"no")||!strcmp(env,"false"))return 0;
+        if(!strcmp(env,"1")||!strcmp(env,"on")||!strcmp(env,"yes")||!strcmp(env,"true"))return 1;
+    }
+    if(read_bool_setting_file(STATUS_ENABLE_TEMP,&v)==0)return v;
+    if(read_bool_setting_file(STATUS_ENABLE_PERSIST,&v)==0)return v;
+    return 1;
 }
 
 static uint64_t monotonic_us(void) {
@@ -719,7 +747,8 @@ static void stats_add_u64(uint64_t *v, pthread_mutex_t *m, uint64_t add) {
 
 static void publish_status(struct bridge_stats *s, struct clock_state *c,
                            struct au_queue *q, const char *state) {
-    FILE *f; unsigned qcount; size_t qpkts;
+    FILE *f;
+    if(!g_status_enabled)return; unsigned qcount; size_t qpkts;
     struct bridge_stats snap; uint64_t pcr, rebase, source_rebase;
     pthread_mutex_lock(&s->lock); snap = *s; pthread_mutex_unlock(&s->lock);
     pthread_mutex_lock(&c->lock); pcr=c->transport_pcr90k; rebase=c->pts_rebases; source_rebase=c->source_rebases; pthread_mutex_unlock(&c->lock);
@@ -1026,6 +1055,9 @@ int main(int argc,char **argv) {
     if(argc!=3){fprintf(stderr,"usage: %s tcp://127.0.0.1:PORT OUTPUT\n",argv[0]);return 64;}
     input=argv[1];output=argv[2];
     signal(SIGINT,on_signal);signal(SIGTERM,on_signal);signal(SIGHUP,on_signal);
+    g_status_enabled=load_status_enabled();
+    if(!g_status_enabled)(void)unlink(STATUS_PATH);
+    fprintf(stderr,"PARITY_DIAGNOSTICS status=%s\n",g_status_enabled?"on":"off");
     memset(&clock,0,sizeof(clock));pthread_mutex_init(&clock.lock,NULL);clock.transport_pcr90k=TRANSPORT_PCR_BASE;
     memset(&stats,0,sizeof(stats));pthread_mutex_init(&stats.lock,NULL);stats.waiting_idr=1;
     queue_init(&queue);
