@@ -330,7 +330,9 @@ if [ -r "$PIDFILE" ]; then
     exit 0
   fi
 fi
-echo "$" > "$PIDFILE" 2>/dev/null || exit 4
+SELF_PID=$(pidin ar 2>/dev/null | awk '/[o]monob790_drive_supervisor.sh/ {p=$1} END {print p}')
+[ -n "$SELF_PID" ] || exit 4
+echo "$SELF_PID" > "$PIDFILE" 2>/dev/null || exit 4
 
 if ! sd_make_rw; then
   publish waiting_log_media
@@ -339,7 +341,6 @@ fi
 
 MASTER_LOG="$LOGROOT/drive-supervisor.log"
 LATEST_STATUS="$LOGROOT/current.status"
-SELF_PID=$(cat "$PIDFILE" 2>/dev/null)
 echo "SUPERVISOR_START pid=$SELF_PID" >> "$MASTER_LOG" 2>/dev/null || true
 sync 2>/dev/null || true
 
