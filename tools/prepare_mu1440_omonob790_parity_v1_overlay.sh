@@ -126,6 +126,13 @@ device_open_mode=write_only_nonblock
 ownership=validated_shared_settings_snapshot_writev_gate_initial
 dmdt_timeout_ms=5000
 session_watchdog_margin_seconds=20
+session_until_stop_supported=1
+drive_default_session_seconds=0
+drive_sd_log_root=/net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive
+drive_sd_write_required=1
+diagnostics_status_default=1
+diagnostics_statistics_default=1
+diagnostics_statistics_requires_status=1
 reference_producer_payload_limit=262144
 bridge_safety_payload_limit=3145728
 recovery=au_pes_boundary_safe
@@ -171,6 +178,9 @@ qualification. The reference one-area preset is available through 'temp'.
 Preset application is one shared transaction and requires real CarPlay reconnect.
 Connect CarPlay, open Maps/Waze, confirm Stream-111 streaming, then:
   ksh /mnt/app/root/altscreen-u2/scripts/omonob790_session.sh 60
+
+For a guarded until-stop manual session:
+  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_session.sh 0
 
 The native owner reads one validated backend snapshot. writev_gate is initial:
 it requires current native FD tracking, completed in-flight writes and a new
