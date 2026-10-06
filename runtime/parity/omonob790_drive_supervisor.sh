@@ -4,6 +4,9 @@
 # Guarded MU1440 long-run parity supervisor.
 # It never signals stock processes. Each parity-session owns and, on exit,
 # restores the temporary writev-gate route. The supervisor only waits/retries.
+#
+# Drive evidence is deliberately SD-only. If the deployment SD cannot be made
+# writable and verified, no parity session is started.
 
 set -u
 
@@ -28,21 +31,71 @@ SOURCE_TIMING_ENABLE=/tmp/mibr-alt111-source-timing.enabled
 SOURCE_TIMING_INTERVAL=/tmp/mibr-alt111-source-timing-interval-ms
 PARITY_STATUS=/tmp/mibr-parity-ts.status
 GATE_STATUS=/tmp/mibr-alt111-native-gate.status
+
+STATUS_CFG_TEMP=/tmp/mibr-parity-status-enabled
+STATUS_CFG_PERSIST=/mnt/app/root/mibr-parity-status-enabled
+STATS_CFG_TEMP=/tmp/mibr-parity-statistics-enabled
+STATS_CFG_PERSIST=/mnt/app/root/mibr-parity-statistics-enabled
+
+CARD=/net/mmx/fs/sda0
+MOUNTER=$CARD/apps/mounts
+LOGROOT=$CARD/esd/carplay-test/logs/omonob790-parity-drive
+SD_RW=0
+
+# 0 means true until-stop operation. Finite 60..7200 second sessions remain
+# available as a diagnostic override through MIBR_PARITY_DRIVE_SECONDS.
 DEFAULT_SECONDS=0
 SECONDS_PER_SESSION=${MIBR_PARITY_DRIVE_SECONDS:-$DEFAULT_SECONDS}
 SEQ=0
 SESSION=0
+STATUS_ON=1
+STATS_ON=1
 
 case "$SECONDS_PER_SESSION" in
   *[!0-9]*|'') exit 2 ;;
 esac
-[ "$SECONDS_PER_SESSION" -eq 0 ] || { [ "$SECONDS_PER_SESSION" -ge 60 ] && [ "$SECONDS_PER_SESSION" -le 7200 ]; } || exit 2
+if [ "$SECONDS_PER_SESSION" -ne 0 ]; then
+  [ "$SECONDS_PER_SESSION" -ge 60 ] && [ "$SECONDS_PER_SESSION" -le 7200 ] || exit 2
+fi
 [ -x "$RUNNER" ] && [ -x "$BRIDGE" ] || exit 3
 
 enabled(){
   [ -r "$ENABLE" ] || return 1
   V=$(cat "$ENABLE" 2>/dev/null)
   [ "$V" = "1" ]
+}
+
+cfg_bool(){
+  T=$1
+  P=$2
+  D=$3
+  if [ -r "$T" ]; then V=$(cat "$T" 2>/dev/null)
+  elif [ -r "$P" ]; then V=$(cat "$P" 2>/dev/null)
+  else V=$D
+  fi
+  case "$V" in
+    1|on|yes|true) echo 1 ;;
+    0|off|no|false) echo 0 ;;
+    *) echo "$D" ;;
+  esac
+}
+
+cfg_source(){
+  T=$1
+  P=$2
+  [ -r "$T" ] && { echo temp; return; }
+  [ -r "$P" ] && { echo persistent; return; }
+  echo default
+}
+
+load_diagnostics(){
+  STATUS_ON=$(cfg_bool "$STATUS_CFG_TEMP" "$STATUS_CFG_PERSIST" 1)
+  STATS_ON=$(cfg_bool "$STATS_CFG_TEMP" "$STATS_CFG_PERSIST" 1)
+  # Persistent statistics require the bridge's live status counters. Refuse
+  # the contradictory manual file combination rather than silently fabricate.
+  if [ "$STATS_ON" = "1" ] && [ "$STATUS_ON" != "1" ]; then
+    STATS_ON=0
+  fi
 }
 
 stamp(){
@@ -69,30 +122,72 @@ status_value(){
   [ -n "$V" ] && echo "$V" || echo 0
 }
 
-choose_log_root(){
-  [ -d /net/mmx/fs/sda0 ] && mount -uw /net/mmx/fs/sda0 2>/dev/null || true
-  for R in /net/mmx/fs/sda0/esd/mibr-parity-drive-logs /mnt/app/root/mibr-parity-drive-logs /tmp/mibr-parity-drive-logs; do
-    mkdir -p "$R" 2>/dev/null || continue
-    T="$R/.write-test-$$"
-    if : > "$T" 2>/dev/null; then
-      rm -f "$T" 2>/dev/null || true
-      echo "$R"
-      return 0
-    fi
-  done
-  return 1
+sd_make_rw(){
+  [ -d "$CARD" ] || return 1
+  if [ -x "$MOUNTER" ]; then
+    . "$MOUNTER" -usb >/dev/null 2>&1 || return 1
+  else
+    mount -uw "$CARD" 2>/dev/null || return 1
+  fi
+  SD_RW=1
+  mkdir -p "$LOGROOT" 2>/dev/null || return 1
+  T="$LOGROOT/.write-test-$$"
+  : > "$T" 2>/dev/null || return 1
+  [ -f "$T" ] || return 1
+  rm -f "$T" 2>/dev/null || return 1
+  return 0
 }
 
-telemetry_loop(){
+sd_make_ro(){
+  [ "$SD_RW" -eq 1 ] || return 0
+  sync 2>/dev/null || true
+  mount -ur "$CARD" 2>/dev/null || return 1
+  SD_RW=0
+  return 0
+}
+
+configure_timing(){
+  if [ "$STATUS_ON" = "1" ] || [ "$STATS_ON" = "1" ]; then
+    echo 1000 > "$SOURCE_TIMING_INTERVAL" 2>/dev/null || true
+    : > "$SOURCE_TIMING_ENABLE" 2>/dev/null || true
+  else
+    rm -f "$SOURCE_TIMING_ENABLE" "$SOURCE_TIMING_INTERVAL" 2>/dev/null || true
+  fi
+}
+
+append_raw_status(){
   OUT=$1
+  SAMPLE=$2
+  {
+    echo "===== sample=$SAMPLE ====="
+    [ -r /tmp/mibr-parity-session.state ] && echo "session_state=$(cat /tmp/mibr-parity-session.state 2>/dev/null)"
+    [ -r "$SOURCE_STATE" ] && echo "stream111_state=$(cat "$SOURCE_STATE" 2>/dev/null)"
+    [ -r "$SOURCE_HB" ] && echo "stream111_heartbeat=$(cat "$SOURCE_HB" 2>/dev/null)"
+    echo "--- parity ---"
+    [ -r "$PARITY_STATUS" ] && cat "$PARITY_STATUS" 2>/dev/null || echo "parity_status=missing"
+    echo "--- gen2 ---"
+    [ -r "$GEN2_STATUS" ] && cat "$GEN2_STATUS" 2>/dev/null || echo "gen2_status=missing"
+    echo "--- source timing ---"
+    [ -r "$SOURCE_TIMING" ] && cat "$SOURCE_TIMING" 2>/dev/null || echo "source_timing=missing"
+    echo "--- gate ---"
+    [ -r "$GATE_STATUS" ] && cat "$GATE_STATUS" 2>/dev/null || echo "gate_status=missing"
+    echo
+  } >> "$OUT" 2>/dev/null || true
+}
+
+evidence_loop(){
+  RUN=$1
+  TELEMETRY="$RUN/telemetry.tsv"
+  SNAPSHOTS="$RUN/status-snapshots.log"
   SEEN=0
   WAIT=0
-  echo "sample\telapsed_s\tstream_state\tstream_hb\tgen2_source_aus\tgen2_source_idrs\tgen2_delivered_aus\tgen2_dropped_aus\tgen2_source_fps\tparity_input_fps\tparity_input_idr_fps\tparity_input_non_idr_fps\tsource_fps_x100\tsource_input_bps\tsource_last_us\tsource_min_us\tsource_max_us\tparity_input_aus\tparity_input_idrs\tparity_input_non_idr\tparity_output_started\tparity_output_completed\tparity_output_idr_started\tparity_output_non_idr_started\tsequence_gaps\tdropped_wait_idr\tsafe_recoveries\tqueue_aus\tqueue_packets\tblocks_written\tbytes_written\twrite_eagain\twrite_errors\tlast_write_us\tmax_write_us\tgate_raw" > "$OUT" 2>/dev/null || return
   N=0
-  PREV_GA=
-  PREV_PI=
-  PREV_PII=
-  PREV_PIN=
+
+  if [ "$STATS_ON" = "1" ]; then
+    echo "sample\telapsed_s\tstream_state\tstream_hb\tgen2_source_aus\tgen2_source_idrs\tgen2_delivered_aus\tgen2_dropped_aus\tsource_fps_x100\tsource_input_bps\tsource_last_us\tsource_min_us\tsource_max_us\tparity_input_aus\tparity_input_idrs\tparity_input_non_idr\tparity_output_started\tparity_output_completed\tparity_output_idr_started\tparity_output_non_idr_started\tsequence_gaps\tdropped_wait_idr\tsafe_recoveries\tqueue_aus\tqueue_packets\tblocks_written\tbytes_written\twrite_eagain\twrite_errors\tlast_write_us\tmax_write_us\tgate_raw" > "$TELEMETRY" 2>/dev/null || return
+  fi
+  [ "$STATUS_ON" = "1" ] && : > "$SNAPSHOTS" 2>/dev/null || true
+
   while :; do
     if [ -e "$SESSION_LOCK" ]; then
       SEEN=1
@@ -104,92 +199,51 @@ telemetry_loop(){
     fi
 
     N=$((N+1))
-    SS=missing
-    SH=0
-    [ -r "$SOURCE_STATE" ] && SS=$(cat "$SOURCE_STATE" 2>/dev/null)
-    [ -r "$SOURCE_HB" ] && SH=$(cat "$SOURCE_HB" 2>/dev/null)
 
-    GA=$(status_value "$GEN2_STATUS" source_aus)
-    GI=$(status_value "$GEN2_STATUS" source_idrs)
-    GD=$(status_value "$GEN2_STATUS" delivered_aus)
-    GX=$(status_value "$GEN2_STATUS" dropped_aus)
+    if [ "$STATUS_ON" = "1" ]; then
+      append_raw_status "$SNAPSHOTS" "$N"
+    fi
 
-    SF=$(status_value "$SOURCE_TIMING" source_arrival_fps_x100)
-    SB=$(status_value "$SOURCE_TIMING" source_input_bps)
-    SL=$(status_value "$SOURCE_TIMING" source_arrival_last_us)
-    SMIN=$(status_value "$SOURCE_TIMING" source_arrival_min_us)
-    SMAX=$(status_value "$SOURCE_TIMING" source_arrival_max_us)
+    if [ "$STATS_ON" = "1" ]; then
+      SS=missing
+      SH=0
+      [ -r "$SOURCE_STATE" ] && SS=$(cat "$SOURCE_STATE" 2>/dev/null)
+      [ -r "$SOURCE_HB" ] && SH=$(cat "$SOURCE_HB" 2>/dev/null)
 
-    PI=$(status_value "$PARITY_STATUS" input_records)
-    PII=$(status_value "$PARITY_STATUS" input_idrs)
-    PIN=$(status_value "$PARITY_STATUS" input_non_idr_aus)
-    POS=$(status_value "$PARITY_STATUS" output_aus_started)
-    POC=$(status_value "$PARITY_STATUS" output_aus_completed)
-    POI=$(status_value "$PARITY_STATUS" output_idr_aus_started)
-    PON=$(status_value "$PARITY_STATUS" output_non_idr_aus_started)
-    PG=$(status_value "$PARITY_STATUS" sequence_gaps)
-    PD=$(status_value "$PARITY_STATUS" dropped_wait_idr)
-    PR=$(status_value "$PARITY_STATUS" safe_recoveries)
-    QA=$(status_value "$PARITY_STATUS" queue_aus)
-    QP=$(status_value "$PARITY_STATUS" queue_packets)
-    BW=$(status_value "$PARITY_STATUS" blocks_written)
-    BY=$(status_value "$PARITY_STATUS" bytes_written)
-    WE=$(status_value "$PARITY_STATUS" write_eagain)
-    WERR=$(status_value "$PARITY_STATUS" write_errors)
-    LW=$(status_value "$PARITY_STATUS" last_write_us)
-    MW=$(status_value "$PARITY_STATUS" max_write_us)
-    GAFPS=0
-    PIFPS=0
-    PIIFPS=0
-    PINFPS=0
-    case "$GA:$PREV_GA" in *[!0-9:]*|:*) ;; *) [ -n "$PREV_GA" ] && GAFPS=$((GA-PREV_GA)) ;; esac
-    case "$PI:$PREV_PI" in *[!0-9:]*|:*) ;; *) [ -n "$PREV_PI" ] && PIFPS=$((PI-PREV_PI)) ;; esac
-    case "$PII:$PREV_PII" in *[!0-9:]*|:*) ;; *) [ -n "$PREV_PII" ] && PIIFPS=$((PII-PREV_PII)) ;; esac
-    case "$PIN:$PREV_PIN" in *[!0-9:]*|:*) ;; *) [ -n "$PREV_PIN" ] && PINFPS=$((PIN-PREV_PIN)) ;; esac
-    PREV_GA=$GA
-    PREV_PI=$PI
-    PREV_PII=$PII
-    PREV_PIN=$PIN
+      GA=$(status_value "$GEN2_STATUS" source_aus)
+      GI=$(status_value "$GEN2_STATUS" source_idrs)
+      GD=$(status_value "$GEN2_STATUS" delivered_aus)
+      GX=$(status_value "$GEN2_STATUS" dropped_aus)
 
-    GR=missing
-    [ -r "$GATE_STATUS" ] && GR=$(cat "$GATE_STATUS" 2>/dev/null | tr '\t' ' ')
+      SF=$(status_value "$SOURCE_TIMING" source_arrival_fps_x100)
+      SB=$(status_value "$SOURCE_TIMING" source_input_bps)
+      SL=$(status_value "$SOURCE_TIMING" source_arrival_last_us)
+      SMIN=$(status_value "$SOURCE_TIMING" source_arrival_min_us)
+      SMAX=$(status_value "$SOURCE_TIMING" source_arrival_max_us)
 
-    echo "$N\t$N\t$SS\t$SH\t$GA\t$GI\t$GD\t$GX\t$GAFPS\t$PIFPS\t$PIIFPS\t$PINFPS\t$SF\t$SB\t$SL\t$SMIN\t$SMAX\t$PI\t$PII\t$PIN\t$POS\t$POC\t$POI\t$PON\t$PG\t$PD\t$PR\t$QA\t$QP\t$BW\t$BY\t$WE\t$WERR\t$LW\t$MW\t$GR" >> "$OUT" 2>/dev/null || true
+      PI=$(status_value "$PARITY_STATUS" input_records)
+      PII=$(status_value "$PARITY_STATUS" input_idrs)
+      PIN=$(status_value "$PARITY_STATUS" input_non_idr_aus)
+      POS=$(status_value "$PARITY_STATUS" output_aus_started)
+      POC=$(status_value "$PARITY_STATUS" output_aus_completed)
+      POI=$(status_value "$PARITY_STATUS" output_idr_aus_started)
+      PON=$(status_value "$PARITY_STATUS" output_non_idr_aus_started)
+      PG=$(status_value "$PARITY_STATUS" sequence_gaps)
+      PD=$(status_value "$PARITY_STATUS" dropped_wait_idr)
+      PR=$(status_value "$PARITY_STATUS" safe_recoveries)
+      QA=$(status_value "$PARITY_STATUS" queue_aus)
+      QP=$(status_value "$PARITY_STATUS" queue_packets)
+      BW=$(status_value "$PARITY_STATUS" blocks_written)
+      BY=$(status_value "$PARITY_STATUS" bytes_written)
+      WE=$(status_value "$PARITY_STATUS" write_eagain)
+      WERR=$(status_value "$PARITY_STATUS" write_errors)
+      LW=$(status_value "$PARITY_STATUS" last_write_us)
+      MW=$(status_value "$PARITY_STATUS" max_write_us)
+      GR=missing
+      [ -r "$GATE_STATUS" ] && GR=$(cat "$GATE_STATUS" 2>/dev/null)
 
-    {
-      echo "sample=$N"
-      echo "stream_state=$SS"
-      echo "stream_heartbeat=$SH"
-      echo "gen2_source_aus=$GA"
-      echo "gen2_source_idrs=$GI"
-      echo "gen2_delivered_aus=$GD"
-      echo "gen2_dropped_aus=$GX"
-      echo "gen2_source_fps=$GAFPS"
-      echo "parity_input_fps=$PIFPS"
-      echo "parity_input_idr_fps=$PIIFPS"
-      echo "parity_input_non_idr_fps=$PINFPS"
-      echo "source_fps_x100=$SF"
-      echo "source_input_bps=$SB"
-      echo "parity_input_aus=$PI"
-      echo "parity_input_idrs=$PII"
-      echo "parity_input_non_idr=$PIN"
-      echo "parity_output_started=$POS"
-      echo "parity_output_completed=$POC"
-      echo "parity_output_idr_started=$POI"
-      echo "parity_output_non_idr_started=$PON"
-      echo "sequence_gaps=$PG"
-      echo "dropped_wait_idr=$PD"
-      echo "safe_recoveries=$PR"
-      echo "queue_aus=$QA"
-      echo "queue_packets=$QP"
-      echo "blocks_written=$BW"
-      echo "bytes_written=$BY"
-      echo "write_eagain=$WE"
-      echo "write_errors=$WERR"
-      echo "last_write_us=$LW"
-      echo "max_write_us=$MW"
-      echo "gate=$GR"
-    } > "$LATEST_STATUS" 2>/dev/null || true
+      echo "$N\t$N\t$SS\t$SH\t$GA\t$GI\t$GD\t$GX\t$SF\t$SB\t$SL\t$SMIN\t$SMAX\t$PI\t$PII\t$PIN\t$POS\t$POC\t$POI\t$PON\t$PG\t$PD\t$PR\t$QA\t$QP\t$BW\t$BY\t$WE\t$WERR\t$LW\t$MW\t$GR" >> "$TELEMETRY" 2>/dev/null || true
+    fi
 
     sleep 1
   done
@@ -198,19 +252,18 @@ telemetry_loop(){
 cleanup(){
   rm -f "$SOURCE_TIMING_ENABLE" "$SOURCE_TIMING_INTERVAL" "$HB" "$PIDFILE" 2>/dev/null || true
   publish stopped
+  sd_make_ro >/dev/null 2>&1 || true
 }
 trap cleanup 0 1 2 15
 
 # This PID file is diagnostic only; it is never authority for signalling.
 echo "$$" > "$PIDFILE" 2>/dev/null || exit 4
-echo 1000 > "$SOURCE_TIMING_INTERVAL" 2>/dev/null || true
-: > "$SOURCE_TIMING_ENABLE" 2>/dev/null || true
 
-ROOT=$(choose_log_root) || exit 5
-MASTER_LOG="$ROOT/drive-supervisor.log"
-LATEST_STATUS="$ROOT/current.status"
-echo "PARITY_DRIVE_SUPERVISOR_START pid=$ log_root=$ROOT" >> "$MASTER_LOG" 2>/dev/null || true
-sync 2>/dev/null || true
+if ! sd_make_rw; then
+  publish waiting_log_media
+  exit 5
+fi
+
 publish waiting_stream111
 
 while enabled; do
@@ -231,25 +284,39 @@ while enabled; do
     continue
   fi
 
-  SESSION=$((SESSION+1))
-  RUN="$ROOT/$(stamp)-session-$SESSION"
-  mkdir -p "$RUN" 2>/dev/null || { publish log_error; sleep 2; continue; }
-  SESSION_LOG="$RUN/session.log"
-  TELEMETRY="$RUN/telemetry.tsv"
+  load_diagnostics
+  configure_timing
 
+  SESSION=$((SESSION+1))
+  RUN="$LOGROOT/$(stamp)-session-$SESSION"
+  mkdir -p "$RUN" 2>/dev/null || { publish log_error; sleep 2; continue; }
+  T="$RUN/.write-test"
+  : > "$T" 2>/dev/null || { publish log_error; sleep 2; continue; }
+  rm -f "$T" 2>/dev/null || true
+
+  SESSION_LOG="$RUN/session.log"
   publish starting
-  telemetry_loop "$TELEMETRY" &
-  TPID=$!
+
+  if [ "$STATUS_ON" = "1" ] || [ "$STATS_ON" = "1" ]; then
+    evidence_loop "$RUN" &
+    EPID=$!
+  else
+    EPID=""
+  fi
 
   if [ "$SECONDS_PER_SESSION" -eq 0 ]; then SESSION_MODE=until-stop; else SESSION_MODE=bounded; fi
-  echo "PARITY_DRIVE_SESSION_START mode=$SESSION_MODE seconds=$SECONDS_PER_SESSION" >> "$SESSION_LOG" 2>/dev/null
-  echo "SESSION_START session=$SESSION dir=$RUN mode=$SESSION_MODE seconds=$SECONDS_PER_SESSION" >> "$MASTER_LOG" 2>/dev/null || true
+  {
+    echo "PARITY_DRIVE_SESSION_START mode=$SESSION_MODE seconds=$SECONDS_PER_SESSION"
+    echo "diagnostics_status=$STATUS_ON source=$(cfg_source "$STATUS_CFG_TEMP" "$STATUS_CFG_PERSIST")"
+    echo "diagnostics_statistics=$STATS_ON source=$(cfg_source "$STATS_CFG_TEMP" "$STATS_CFG_PERSIST")"
+    echo "sd_log_root=$LOGROOT"
+  } >> "$SESSION_LOG" 2>/dev/null
+
   "$RUNNER" "$BRIDGE" tcp://127.0.0.1:19820 /dev/mlb/isoTX2 "$SECONDS_PER_SESSION" >> "$SESSION_LOG" 2>&1
   RC=$?
   echo "PARITY_DRIVE_SESSION_DONE rc=$RC" >> "$SESSION_LOG" 2>/dev/null
-  echo "SESSION_DONE session=$SESSION rc=$RC dir=$RUN" >> "$MASTER_LOG" 2>/dev/null || true
 
-  wait "$TPID" 2>/dev/null || true
+  [ -z "$EPID" ] || wait "$EPID" 2>/dev/null || true
   [ -r "$PARITY_STATUS" ] && cp "$PARITY_STATUS" "$RUN/parity-final.status" 2>/dev/null || true
   [ -r "$GEN2_STATUS" ] && cp "$GEN2_STATUS" "$RUN/gen2-final.status" 2>/dev/null || true
   [ -r "$SOURCE_TIMING" ] && cp "$SOURCE_TIMING" "$RUN/source-timing-final.status" 2>/dev/null || true
@@ -261,7 +328,9 @@ while enabled; do
     echo "rc=$RC"
     echo "mode=$SESSION_MODE"
     echo "seconds_limit=$SECONDS_PER_SESSION"
-    echo "log_root=$ROOT"
+    echo "diagnostics_status=$STATUS_ON"
+    echo "diagnostics_statistics=$STATS_ON"
+    echo "log_root=$LOGROOT"
     echo "stream_state=$(cat "$SOURCE_STATE" 2>/dev/null)"
     echo "parity_state=$(cat /tmp/mibr-parity-session.state 2>/dev/null)"
   } > "$RUN/summary.txt" 2>/dev/null || true
@@ -273,7 +342,7 @@ while enabled; do
     while enabled && [ -e "$SESSION_LOCK" ]; do heartbeat; sleep 2; done
   else
     publish stock
-    # If CarPlay remains connected after a bounded session, loop and reacquire.
+    # On disconnect/bridge exit, wait for the next valid Stream-111 session.
     sleep 2
   fi
 done
