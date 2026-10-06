@@ -908,6 +908,13 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
         (unsigned long long)snap.input_idrs,
         (unsigned long long)(snap.input_records-snap.input_idrs),
         (unsigned long long)snap.sequence_gaps);
+    fprintf(f,"input_slice_p=%llu\ninput_slice_b=%llu\ninput_slice_i=%llu\ninput_slice_sp=%llu\ninput_slice_si=%llu\ninput_slice_unknown=%llu\n",
+        (unsigned long long)snap.input_slice_p,
+        (unsigned long long)snap.input_slice_b,
+        (unsigned long long)snap.input_slice_i,
+        (unsigned long long)snap.input_slice_sp,
+        (unsigned long long)snap.input_slice_si,
+        (unsigned long long)snap.input_slice_unknown);
     fprintf(f,"dropped_wait_idr=%llu\n",(unsigned long long)snap.dropped_wait_idr);
     fprintf(f,"safe_recoveries=%llu\ngeneration_recoveries=%llu\nlatency_recoveries=%llu\n",
         (unsigned long long)snap.safe_recoveries,
