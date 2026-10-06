@@ -1194,6 +1194,9 @@ static int host_self_test(void) {
     uint64_t d;
     uint8_t pat[TS_SIZE],pmt[TS_SIZE],pcr[TS_SIZE],cc=0;
     uint8_t au[]={0,0,0,1,0x65,0x88,0x84};
+    uint8_t slice_p[]={0,0,0,1,0x41,0xc0};
+    uint8_t slice_b[]={0,0,0,1,0x41,0xa0};
+    uint8_t slice_i[]={0,0,0,1,0x41,0xb0};
     uint8_t *pkts=NULL;size_t n=0;uint8_t ccv=0;
     struct clock_state c; int rb=0; uint64_t p1,p2;
     struct au_queue tq;
@@ -1206,6 +1209,9 @@ static int host_self_test(void) {
     make_pat(pat,&cc); if(pat[0]!=0x47||(((pat[1]&0x1f)<<8)|pat[2])!=PID_PAT)return 4;
     cc=0;make_pmt(pmt,&cc);if(pmt[0]!=0x47||(((pmt[1]&0x1f)<<8)|pmt[2])!=PID_PMT)return 5;
     make_pcr_packet(pcr,45000);if(pcr[0]!=0x47||(((pcr[1]&0x1f)<<8)|pcr[2])!=PID_PCR||pcr[3]!=0x20)return 6;
+    if(h264_slice_class(slice_p,sizeof(slice_p))!=AU_SLICE_P)return 16;
+    if(h264_slice_class(slice_b,sizeof(slice_b))!=AU_SLICE_B)return 17;
+    if(h264_slice_class(slice_i,sizeof(slice_i))!=AU_SLICE_I)return 18;
     if(packetize_pes(au,sizeof(au),54000,1,1,&ccv,&pkts,&n)!=0||!n)return 7;
     if(pkts[0]!=0x47||!(pkts[1]&0x40)||(((pkts[1]&0x1f)<<8)|pkts[2])!=PID_VIDEO){free(pkts);return 8;}
     free(pkts);
