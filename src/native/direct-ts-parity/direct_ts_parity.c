@@ -792,16 +792,31 @@ static void update_transport_clock(struct clock_state *c, uint64_t packets) {
 static void *writer_main(void *arg) {
     struct writer_ctx *w=(struct writer_ctx*)arg;
     uint8_t block[MOST_BLOCK_BYTES]; uint64_t packet_index=0;
-    uint64_t epoch = monotonic_us();
+    uint64_t epoch = monotonic_us(), max_device_write_us = 0;
     w->next_pat_packet=0; w->next_pmt_packet=1; w->next_pcr_packet=2;
     for (;;) {
         unsigned i;
         uint64_t due = epoch + (packet_index * TS_SIZE * 8ull * 1000000ull) / TRANSPORT_BPS;
-        uint64_t now = monotonic_us();
-        while (now < due) { usleep((unsigned)((due - now) > 1000u ? 1000u : due - now)); now = monotonic_us(); }
-        if (now > due + TRANSPORT_LATE_LIMIT_US) {
-            fprintf(stderr,"ERROR transport deadline exceeded late_us=%llu\n",(unsigned long long)(now-due));
-            stats_add_u64(&w->stats->write_errors,&w->stats->lock,1); goto failed;
+        /*
+         * Regular-file output needs an application pacer.  The real MU1440
+         * isoTX2 path is a nonblocking QNX resource-manager device and is
+         * paced by driver backpressure.  Exact-vehicle qualification showed
+         * that a valid 12032-byte device write can take >47.8 ms; treating
+         * that as a transport failure aborts a path that is visibly reaching
+         * the VC.  Keep the bounded 500-ms write/EAGAIN timeout instead of
+         * inventing a device-drain deadline.
+         */
+        if (w->regular_file) {
+            uint64_t now = monotonic_us();
+            while (now < due) {
+                usleep((unsigned)((due - now) > 1000u ? 1000u : due - now));
+                now = monotonic_us();
+            }
+            if (now > due + TRANSPORT_LATE_LIMIT_US) {
+                fprintf(stderr,"ERROR file transport deadline exceeded late_us=%llu\n",
+                        (unsigned long long)(now-due));
+                stats_add_u64(&w->stats->write_errors,&w->stats->lock,1); goto failed;
+            }
         }
         for(i=0;i<MOST_BLOCK_PACKETS;++i) {
             uint8_t *p=block+i*TS_SIZE;
@@ -812,10 +827,17 @@ static void *writer_main(void *arg) {
             else if(!queue_take_packet_at(w->queue,p,w->clock,pcr)){make_null_packet(p,&w->cc_null);stats_add_u64(&w->stats->null_packets,&w->stats->lock,1);}
             ++packet_index;
         }
-        if(write_full(w->fd,block,sizeof(block),w->stats)!=0) goto failed;
-        if (monotonic_us() > due + 7834u + TRANSPORT_LATE_LIMIT_US) {
-            fprintf(stderr,"ERROR driver acceptance exceeded transport deadline\n");
-            stats_add_u64(&w->stats->write_errors,&w->stats->lock,1); goto failed;
+        {
+            uint64_t write_start = monotonic_us(), write_us;
+            if(write_full(w->fd,block,sizeof(block),w->stats)!=0) goto failed;
+            write_us = monotonic_us() - write_start;
+            if (!w->regular_file && write_us > max_device_write_us) {
+                max_device_write_us = write_us;
+                if (write_us >= 10000u)
+                    fprintf(stderr,"PARITY_DRIVER backpressure_max_us=%llu block=%llu\n",
+                            (unsigned long long)write_us,
+                            (unsigned long long)(packet_index / MOST_BLOCK_PACKETS));
+            }
         }
         update_transport_clock(w->clock,packet_index);
         pthread_mutex_lock(&w->stats->lock); ++w->stats->blocks_written; w->stats->bytes_written+=MOST_BLOCK_BYTES; pthread_mutex_unlock(&w->stats->lock);
