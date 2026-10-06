@@ -195,10 +195,12 @@ Guarded long-run/drive mode (optional, disabled until explicitly enabled):
   ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_disable.sh
 
 Drive mode launches no stock-process restart. It waits for Stream-111, then
-runs the same token-bound parity owner for bounded two-hour sessions and
-re-enters only after a confirmed stock handback. One-second telemetry is
-persisted to SD when writable and records source FPS/IDRs plus parity
-IDR/non-IDR emission, queue, MOST block and driver-backpressure counters.
+runs the same token-bound parity owner in until-stop mode and re-enters only
+after a confirmed stock handback. The owner/watchdog remain fail-safe: bridge
+exit, gate-proof loss, explicit token stop or supervisor failure restores stock. One-second telemetry is persisted to a writable SD first
+(/net/mmx/fs/sda0/esd/mibr-parity-drive-logs), with 30-second syncs and
+internal-storage fallback. It records source FPS/IDRs plus parity IDR/non-IDR
+accepted output, queue, MOST block and driver-backpressure counters.
 
 Stop uses the current owner ticket; PID hints never authorize signals.
 Parent and independent watchdog retain the exact bridge process identity.
