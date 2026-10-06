@@ -136,7 +136,7 @@ jobs:
               raise SystemExit("qnx-sdp apt bootstrap anchor not found")
           s = s.replace(needle, replacement, 1)
           gcc_url = "https://ftp.gnu.org/gnu/gcc/gcc-${GCC49_VER}/gcc-${GCC49_VER}.tar.bz2"
-          gcc_mirror = "https://ftpmirror.gnu.org/gcc/gcc-${GCC49_VER}/gcc-${GCC49_VER}.tar.bz2"
+          gcc_mirror = "https://mirrors.kernel.org/gnu/gcc/gcc-${GCC49_VER}/gcc-${GCC49_VER}.tar.bz2"
           if gcc_url not in s:
               raise SystemExit("gcc-4.9 download anchor not found")
           p.write_text(s.replace(gcc_url, gcc_mirror, 1))
