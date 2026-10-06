@@ -893,7 +893,17 @@ static int driver_init(int fd, int regular_file, struct bridge_stats *s) {
     src=devctl(fd,DRIVER_DCMD_START,&packets,sizeof(packets),NULL);
     pthread_mutex_lock(&s->lock); s->driver_start_rc=src; pthread_mutex_unlock(&s->lock);
     fprintf(stderr,"PARITY_DRIVER start status=%d packets=%u\n",src,packets);
-    if(irc!=0 || prc!=0 || brc!=0 || frc!=0 || src!=0)return -1;
+    /*
+     * Exact MU1440 vehicle qualification: DRIVER_DCMD_FLUSH returns
+     * ENOTTY (25), while the readback commands succeed and START succeeds
+     * with the required 64-packet block size.  Treat only ENOTTY as a
+     * supported "flush command not implemented" capability result; retain
+     * fail-closed behavior for every other FLUSH error and for all required
+     * driver contract/readback/start failures.
+     */
+    if(frc==ENOTTY)
+        fprintf(stderr,"PARITY_DRIVER queue_flush unsupported=ENOTTY continue=YES\n");
+    if(irc!=0 || prc!=0 || brc!=0 || (frc!=0 && frc!=ENOTTY) || src!=0)return -1;
 #else
     (void)fd; (void)regular_file; (void)s;
 #endif
