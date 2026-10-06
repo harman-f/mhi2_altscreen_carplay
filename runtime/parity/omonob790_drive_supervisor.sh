@@ -138,6 +138,38 @@ telemetry_loop(){
     [ -r "$GATE_STATUS" ] && GR=$(cat "$GATE_STATUS" 2>/dev/null | tr '\t' ' ')
 
     echo "$N\t$N\t$SS\t$SH\t$GA\t$GI\t$GD\t$GX\t$SF\t$SB\t$SL\t$SMIN\t$SMAX\t$PI\t$PII\t$PIN\t$POS\t$POC\t$POI\t$PON\t$PG\t$PD\t$PR\t$QA\t$QP\t$BW\t$BY\t$WE\t$WERR\t$LW\t$MW\t$GR" >> "$OUT" 2>/dev/null || true
+
+    {
+      echo "sample=$N"
+      echo "stream_state=$SS"
+      echo "stream_heartbeat=$SH"
+      echo "gen2_source_aus=$GA"
+      echo "gen2_source_idrs=$GI"
+      echo "gen2_delivered_aus=$GD"
+      echo "gen2_dropped_aus=$GX"
+      echo "source_fps_x100=$SF"
+      echo "source_input_bps=$SB"
+      echo "parity_input_aus=$PI"
+      echo "parity_input_idrs=$PII"
+      echo "parity_input_non_idr=$PIN"
+      echo "parity_output_started=$POS"
+      echo "parity_output_completed=$POC"
+      echo "parity_output_idr_started=$POI"
+      echo "parity_output_non_idr_started=$PON"
+      echo "sequence_gaps=$PG"
+      echo "dropped_wait_idr=$PD"
+      echo "safe_recoveries=$PR"
+      echo "queue_aus=$QA"
+      echo "queue_packets=$QP"
+      echo "blocks_written=$BW"
+      echo "bytes_written=$BY"
+      echo "write_eagain=$WE"
+      echo "write_errors=$WERR"
+      echo "last_write_us=$LW"
+      echo "max_write_us=$MW"
+      echo "gate=$GR"
+    } > "$LATEST_STATUS" 2>/dev/null || true
+
     sleep 1
   done
 }
@@ -154,6 +186,10 @@ echo 1000 > "$SOURCE_TIMING_INTERVAL" 2>/dev/null || true
 : > "$SOURCE_TIMING_ENABLE" 2>/dev/null || true
 
 ROOT=$(choose_log_root) || exit 5
+MASTER_LOG="$ROOT/drive-supervisor.log"
+LATEST_STATUS="$ROOT/current.status"
+echo "PARITY_DRIVE_SUPERVISOR_START pid=$ log_root=$ROOT" >> "$MASTER_LOG" 2>/dev/null || true
+sync 2>/dev/null || true
 publish waiting_stream111
 
 while enabled; do
@@ -185,9 +221,11 @@ while enabled; do
   TPID=$!
 
   echo "PARITY_DRIVE_SESSION_START seconds=$SECONDS_PER_SESSION" >> "$SESSION_LOG" 2>/dev/null
+  echo "SESSION_START session=$SESSION dir=$RUN seconds=$SECONDS_PER_SESSION" >> "$MASTER_LOG" 2>/dev/null || true
   "$RUNNER" "$BRIDGE" tcp://127.0.0.1:19820 /dev/mlb/isoTX2 "$SECONDS_PER_SESSION" >> "$SESSION_LOG" 2>&1
   RC=$?
   echo "PARITY_DRIVE_SESSION_DONE rc=$RC" >> "$SESSION_LOG" 2>/dev/null
+  echo "SESSION_DONE session=$SESSION rc=$RC dir=$RUN" >> "$MASTER_LOG" 2>/dev/null || true
 
   wait "$TPID" 2>/dev/null || true
   [ -r "$PARITY_STATUS" ] && cp "$PARITY_STATUS" "$RUN/parity-final.status" 2>/dev/null || true
