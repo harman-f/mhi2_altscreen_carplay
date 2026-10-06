@@ -138,10 +138,16 @@ struct bridge_stats {
     uint64_t safe_recovery_preserved_packets;
     uint64_t aus_queued;
     uint64_t pes_packets;
+    uint64_t output_aus_started;
+    uint64_t output_aus_completed;
+    uint64_t output_idr_aus_started;
+    uint64_t output_non_idr_aus_started;
     uint64_t blocks_written;
     uint64_t bytes_written;
     uint64_t write_eagain;
     uint64_t write_errors;
+    uint64_t last_write_us;
+    uint64_t max_write_us;
     uint64_t null_packets;
     uint64_t pat_packets;
     uint64_t pmt_packets;
@@ -638,11 +644,19 @@ static int queue_push(struct au_queue *q, struct ts_au *au) {
 }
 
 static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
-                                struct clock_state *clock, uint64_t pcr) {
+                                struct clock_state *clock, uint64_t pcr,
+                                struct bridge_stats *stats) {
     struct ts_au *a;
     pthread_mutex_lock(&q->lock);
     if (!q->count) { pthread_mutex_unlock(&q->lock); return 0; }
     a = &q->q[q->head];
+    if (a->packet_pos == 0 && stats) {
+        pthread_mutex_lock(&stats->lock);
+        ++stats->output_aus_started;
+        if(a->idr) ++stats->output_idr_aus_started;
+        else ++stats->output_non_idr_aus_started;
+        pthread_mutex_unlock(&stats->lock);
+    }
     if (clock && a->packet_pos == 0) {
         /* Guard the complete PES deadline at emission, including PSI/PCR
          * slots and two physical blocks of scheduling/driver margin. */
@@ -661,6 +675,11 @@ static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
     memcpy(p, a->packets + a->packet_pos * TS_SIZE, TS_SIZE);
     ++a->packet_pos; --q->packets_queued;
     if (a->packet_pos == a->packet_count) {
+        if(stats) {
+            pthread_mutex_lock(&stats->lock);
+            ++stats->output_aus_completed;
+            pthread_mutex_unlock(&stats->lock);
+        }
         free(a->packets); memset(a, 0, sizeof(*a));
         q->head = (q->head + 1u) % AU_QUEUE_CAP; --q->count;
     }
@@ -669,7 +688,7 @@ static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
 }
 
 static int queue_take_packet(struct au_queue *q, uint8_t p[TS_SIZE]) {
-    return queue_take_packet_at(q, p, NULL, 0);
+    return queue_take_packet_at(q, p, NULL, 0, NULL);
 }
 
 static int queue_wait_empty(struct au_queue *q, unsigned max_ms) {
@@ -700,21 +719,25 @@ static void stats_add_u64(uint64_t *v, pthread_mutex_t *m, uint64_t add) {
 
 static void publish_status(struct bridge_stats *s, struct clock_state *c,
                            struct au_queue *q, const char *state) {
-    char tmp[128]; FILE *f; unsigned qcount; size_t qpkts;
+    FILE *f; unsigned qcount; size_t qpkts;
     struct bridge_stats snap; uint64_t pcr, rebase, source_rebase;
-    snprintf(tmp, sizeof(tmp), "%s.tmp", STATUS_PATH);
     pthread_mutex_lock(&s->lock); snap = *s; pthread_mutex_unlock(&s->lock);
     pthread_mutex_lock(&c->lock); pcr=c->transport_pcr90k; rebase=c->pts_rebases; source_rebase=c->source_rebases; pthread_mutex_unlock(&c->lock);
     pthread_mutex_lock(&q->lock); qcount=q->count; qpkts=q->packets_queued; pthread_mutex_unlock(&q->lock);
-    f=fopen(tmp,"w"); if(!f)return;
+    /*
+     * Exact MU1440: /tmp aliases /dev/shmem and native temp+rename publication
+     * can fail with EXDEV.  This is advisory telemetry; publish by direct
+     * truncate/write, matching the qualified session-state primitive.
+     */
+    f=fopen(STATUS_PATH,"w"); if(!f)return;
     fprintf(f,"state=%s\n",state);
     fprintf(f,"architecture=omonob790-functional-parity-cleanroom\n");
     fprintf(f,"input_mode=m1au-complete-au\n");
     fprintf(f,"source_clock=stream111-32.32\n");
     fprintf(f,"pts_clock=source-derived-90khz\n");
     fprintf(f,"frame_pacer=none\n");
-    fprintf(f,"transport_pacer=absolute_monotonic_all_outputs\n");
-    fprintf(f,"transport_clock_model=scheduled_cbr_accepted_blocks\n");
+    fprintf(f,"transport_pacer=device_driver_backpressure_file_absolute\n");
+    fprintf(f,"transport_clock_model=accepted_12032_byte_blocks\n");
     fprintf(f,"hardware_drain_validation=required\n");
     pthread_mutex_lock(&c->lock);
     fprintf(f,"last_emitted_pts90k=%llu\nemission_shift90k=%llu\n",
@@ -732,9 +755,11 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"driver_flush_rc=%d\ndriver_start_rc=%d\n",snap.driver_flush_rc,snap.driver_start_rc);
     fprintf(f,"transport_pcr90k=%llu\n",(unsigned long long)pcr);
     fprintf(f,"pts_rebases=%llu\nsource_rebases=%llu\n",(unsigned long long)rebase,(unsigned long long)source_rebase);
-    fprintf(f,"input_records=%llu\ninput_bytes=%llu\ninput_idrs=%llu\nsequence_gaps=%llu\n",
+    fprintf(f,"input_records=%llu\ninput_bytes=%llu\ninput_idrs=%llu\ninput_non_idr_aus=%llu\nsequence_gaps=%llu\n",
         (unsigned long long)snap.input_records,(unsigned long long)snap.input_bytes,
-        (unsigned long long)snap.input_idrs,(unsigned long long)snap.sequence_gaps);
+        (unsigned long long)snap.input_idrs,
+        (unsigned long long)(snap.input_records-snap.input_idrs),
+        (unsigned long long)snap.sequence_gaps);
     fprintf(f,"dropped_wait_idr=%llu\n",(unsigned long long)snap.dropped_wait_idr);
     fprintf(f,"safe_recoveries=%llu\ngeneration_recoveries=%llu\nlatency_recoveries=%llu\n",
         (unsigned long long)snap.safe_recoveries,
@@ -747,9 +772,15 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"latency_packet_limit=%u\n",LOW_LATENCY_PACKET_LIMIT);
     fprintf(f,"aus_queued=%llu\npes_packets=%llu\n",
         (unsigned long long)snap.aus_queued,(unsigned long long)snap.pes_packets);
-    fprintf(f,"blocks_written=%llu\nbytes_written=%llu\nwrite_eagain=%llu\nwrite_errors=%llu\n",
+    fprintf(f,"output_aus_started=%llu\noutput_aus_completed=%llu\noutput_idr_aus_started=%llu\noutput_non_idr_aus_started=%llu\n",
+        (unsigned long long)snap.output_aus_started,
+        (unsigned long long)snap.output_aus_completed,
+        (unsigned long long)snap.output_idr_aus_started,
+        (unsigned long long)snap.output_non_idr_aus_started);
+    fprintf(f,"blocks_written=%llu\nbytes_written=%llu\nwrite_eagain=%llu\nwrite_errors=%llu\nlast_write_us=%llu\nmax_write_us=%llu\n",
         (unsigned long long)snap.blocks_written,(unsigned long long)snap.bytes_written,
-        (unsigned long long)snap.write_eagain,(unsigned long long)snap.write_errors);
+        (unsigned long long)snap.write_eagain,(unsigned long long)snap.write_errors,
+        (unsigned long long)snap.last_write_us,(unsigned long long)snap.max_write_us);
     fprintf(f,"null_packets=%llu\npat_packets=%llu\npmt_packets=%llu\npcr_packets=%llu\n",
         (unsigned long long)snap.null_packets,(unsigned long long)snap.pat_packets,
         (unsigned long long)snap.pmt_packets,(unsigned long long)snap.pcr_packets);
@@ -757,7 +788,7 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"last_sequence=%llu\nlast_source_frac=0x%08x\nlast_source_sec=0x%08x\nlast_pts90k=%llu\nwaiting_idr=%d\n",
         (unsigned long long)snap.last_sequence,snap.last_frac,snap.last_sec,
         (unsigned long long)snap.last_pts,snap.waiting_idr);
-    fclose(f); rename(tmp,STATUS_PATH);
+    fclose(f);
 }
 
 static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s) {
@@ -824,13 +855,17 @@ static void *writer_main(void *arg) {
             if(packet_index>=w->next_pat_packet){make_pat(p,&w->cc_pat);w->next_pat_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pat_packets,&w->stats->lock,1);}
             else if(packet_index>=w->next_pmt_packet){make_pmt(p,&w->cc_pmt);w->next_pmt_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pmt_packets,&w->stats->lock,1);}
             else if(packet_index>=w->next_pcr_packet){make_pcr_packet(p,pcr);w->next_pcr_packet+=PCR_INTERVAL_PACKETS;stats_add_u64(&w->stats->pcr_packets,&w->stats->lock,1);}
-            else if(!queue_take_packet_at(w->queue,p,w->clock,pcr)){make_null_packet(p,&w->cc_null);stats_add_u64(&w->stats->null_packets,&w->stats->lock,1);}
+            else if(!queue_take_packet_at(w->queue,p,w->clock,pcr,w->stats)){make_null_packet(p,&w->cc_null);stats_add_u64(&w->stats->null_packets,&w->stats->lock,1);}
             ++packet_index;
         }
         {
             uint64_t write_start = monotonic_us(), write_us;
             if(write_full(w->fd,block,sizeof(block),w->stats)!=0) goto failed;
             write_us = monotonic_us() - write_start;
+            pthread_mutex_lock(&w->stats->lock);
+            w->stats->last_write_us=write_us;
+            if(write_us>w->stats->max_write_us)w->stats->max_write_us=write_us;
+            pthread_mutex_unlock(&w->stats->lock);
             if (!w->regular_file && write_us > max_device_write_us) {
                 max_device_write_us = write_us;
                 if (write_us >= 10000u)
