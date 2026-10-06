@@ -18,6 +18,8 @@ export GEM=1
 BASE=/mnt/app/root/altscreen-u2
 RUNNER=$BASE/bin/parity-session
 BRIDGE=$BASE/bin/direct-ts-parity
+HELPER=$BASE/bin/alt111-settings
+PROFILE_MARKER=/tmp/mibr-parity-drive-profile-applied
 ENABLE=/mnt/app/root/mibr-parity-drive.enabled
 STATE=/tmp/mibr-parity-drive.state
 HB=/tmp/mibr-parity-drive.heartbeat
@@ -38,7 +40,6 @@ STATS_CFG_TEMP=/tmp/mibr-parity-statistics-enabled
 STATS_CFG_PERSIST=/mnt/app/root/mibr-parity-statistics-enabled
 
 CARD=/net/mmx/fs/sda0
-MOUNTER=$CARD/apps/mounts
 LOGROOT=$CARD/esd/carplay-test/logs/omonob790-parity-drive
 SD_RW=0
 
@@ -57,7 +58,7 @@ esac
 if [ "$SECONDS_PER_SESSION" -ne 0 ]; then
   [ "$SECONDS_PER_SESSION" -ge 60 ] && [ "$SECONDS_PER_SESSION" -le 7200 ] || exit 2
 fi
-[ -x "$RUNNER" ] && [ -x "$BRIDGE" ] || exit 3
+[ -x "$RUNNER" ] && [ -x "$BRIDGE" ] && [ -x "$HELPER" ] || exit 3
 
 enabled(){
   [ -r "$ENABLE" ] || return 1
@@ -124,14 +125,12 @@ status_value(){
 
 sd_make_rw(){
   [ -d "$CARD" ] || return 1
-  if [ -x "$MOUNTER" ]; then
-    . "$MOUNTER" -usb >/dev/null 2>&1 || return 1
-  else
-    mount -uw "$CARD" 2>/dev/null || return 1
-  fi
+  # Exact MU1440/M.I.B. contract used in the vehicle: remount this SD volume
+  # writable directly. Do not rely on an optional SD-side helper script.
+  mount -uw "$CARD" 2>/dev/null || return 1
   SD_RW=1
   mkdir -p "$LOGROOT" 2>/dev/null || return 1
-  T="$LOGROOT/.write-test-$$"
+  T="$LOGROOT/.write-test-$"
   : > "$T" 2>/dev/null || return 1
   [ -f "$T" ] || return 1
   rm -f "$T" 2>/dev/null || return 1
@@ -182,9 +181,13 @@ evidence_loop(){
   SEEN=0
   WAIT=0
   N=0
+  PREV_GA=
+  PREV_PI=
+  PREV_PII=
+  PREV_PIN=
 
   if [ "$STATS_ON" = "1" ]; then
-    echo "sample\telapsed_s\tstream_state\tstream_hb\tgen2_source_aus\tgen2_source_idrs\tgen2_delivered_aus\tgen2_dropped_aus\tsource_fps_x100\tsource_input_bps\tsource_last_us\tsource_min_us\tsource_max_us\tparity_input_aus\tparity_input_idrs\tparity_input_non_idr\tparity_output_started\tparity_output_completed\tparity_output_idr_started\tparity_output_non_idr_started\tparity_output_idr_completed\tparity_output_non_idr_completed\tsequence_gaps\tdropped_wait_idr\tsafe_recoveries\tqueue_aus\tqueue_packets\tblocks_written\tbytes_written\twrite_eagain\twrite_errors\tlast_write_us\tmax_write_us\tgate_raw" > "$TELEMETRY" 2>/dev/null || return
+    echo "sample\telapsed_s\tstream_state\tstream_hb\tgen2_source_aus\tgen2_source_idrs\tgen2_delivered_aus\tgen2_dropped_aus\tgen2_source_fps\tparity_input_fps\tparity_input_idr_fps\tparity_input_non_idr_fps\tsource_fps_x100\tsource_input_bps\tsource_last_us\tsource_min_us\tsource_max_us\tparity_input_aus\tparity_input_idrs\tparity_input_non_idr\tinput_slice_p\tinput_slice_b\tinput_slice_i\tinput_slice_unknown\tparity_output_started\tparity_output_completed\tparity_output_idr_started\tparity_output_non_idr_started\tparity_output_idr_completed\tparity_output_non_idr_completed\toutput_slice_p_completed\toutput_slice_b_completed\toutput_slice_i_completed\toutput_slice_unknown_completed\tsequence_gaps\tdropped_wait_idr\tsafe_recoveries\tqueue_aus\tqueue_packets\tblocks_written\tbytes_written\twrite_eagain\twrite_errors\tlast_write_us\tmax_write_us\tgate_raw" > "$TELEMETRY" 2>/dev/null || return
   fi
   [ "$STATUS_ON" = "1" ] && : > "$SNAPSHOTS" 2>/dev/null || true
 
@@ -224,10 +227,20 @@ evidence_loop(){
       PI=$(status_value "$PARITY_STATUS" input_records)
       PII=$(status_value "$PARITY_STATUS" input_idrs)
       PIN=$(status_value "$PARITY_STATUS" input_non_idr_aus)
+      ISP=$(status_value "$PARITY_STATUS" input_slice_p)
+      ISB=$(status_value "$PARITY_STATUS" input_slice_b)
+      ISI=$(status_value "$PARITY_STATUS" input_slice_i)
+      ISU=$(status_value "$PARITY_STATUS" input_slice_unknown)
       POS=$(status_value "$PARITY_STATUS" output_aus_started)
       POC=$(status_value "$PARITY_STATUS" output_aus_completed)
       POI=$(status_value "$PARITY_STATUS" output_idr_aus_started)
       PON=$(status_value "$PARITY_STATUS" output_non_idr_aus_started)
+      POIC=$(status_value "$PARITY_STATUS" output_idr_aus_completed)
+      PONC=$(status_value "$PARITY_STATUS" output_non_idr_aus_completed)
+      OSPC=$(status_value "$PARITY_STATUS" output_slice_p_completed)
+      OSBC=$(status_value "$PARITY_STATUS" output_slice_b_completed)
+      OSIC=$(status_value "$PARITY_STATUS" output_slice_i_completed)
+      OSUC=$(status_value "$PARITY_STATUS" output_slice_unknown_completed)
       PG=$(status_value "$PARITY_STATUS" sequence_gaps)
       PD=$(status_value "$PARITY_STATUS" dropped_wait_idr)
       PR=$(status_value "$PARITY_STATUS" safe_recoveries)
@@ -239,10 +252,48 @@ evidence_loop(){
       WERR=$(status_value "$PARITY_STATUS" write_errors)
       LW=$(status_value "$PARITY_STATUS" last_write_us)
       MW=$(status_value "$PARITY_STATUS" max_write_us)
-      GR=missing
-      [ -r "$GATE_STATUS" ] && GR=$(cat "$GATE_STATUS" 2>/dev/null)
+      GAFPS=0
+      PIFPS=0
+      PIIFPS=0
+      PINFPS=0
+      [ -n "$PREV_GA" ] && GAFPS=$((GA-PREV_GA))
+      [ -n "$PREV_PI" ] && PIFPS=$((PI-PREV_PI))
+      [ -n "$PREV_PII" ] && PIIFPS=$((PII-PREV_PII))
+      [ -n "$PREV_PIN" ] && PINFPS=$((PIN-PREV_PIN))
+      PREV_GA=$GA
+      PREV_PI=$PI
+      PREV_PII=$PII
+      PREV_PIN=$PIN
 
-      echo "$N\t$N\t$SS\t$SH\t$GA\t$GI\t$GD\t$GX\t$SF\t$SB\t$SL\t$SMIN\t$SMAX\t$PI\t$PII\t$PIN\t$POS\t$POC\t$POI\t$PON\t$POIC\t$PONC\t$PG\t$PD\t$PR\t$QA\t$QP\t$BW\t$BY\t$WE\t$WERR\t$LW\t$MW\t$GR" >> "$TELEMETRY" 2>/dev/null || true
+      GR=missing
+      [ -r "$GATE_STATUS" ] && GR=$(cat "$GATE_STATUS" 2>/dev/null | tr '\t' ' ')
+
+      echo "$N\t$N\t$SS\t$SH\t$GA\t$GI\t$GD\t$GX\t$GAFPS\t$PIFPS\t$PIIFPS\t$PINFPS\t$SF\t$SB\t$SL\t$SMIN\t$SMAX\t$PI\t$PII\t$PIN\t$ISP\t$ISB\t$ISI\t$ISU\t$POS\t$POC\t$POI\t$PON\t$POIC\t$PONC\t$OSPC\t$OSBC\t$OSIC\t$OSUC\t$PG\t$PD\t$PR\t$QA\t$QP\t$BW\t$BY\t$WE\t$WERR\t$LW\t$MW\t$GR" >> "$TELEMETRY" 2>/dev/null || true
+
+      {
+        echo "sample=$N"
+        echo "stream_state=$SS"
+        echo "gen2_source_fps=$GAFPS"
+        echo "parity_input_fps=$PIFPS"
+        echo "parity_input_idr_fps=$PIIFPS"
+        echo "parity_input_non_idr_fps=$PINFPS"
+        echo "source_fps_x100=$SF"
+        echo "input_slice_p=$ISP"
+        echo "input_slice_b=$ISB"
+        echo "input_slice_i=$ISI"
+        echo "parity_output_idr_completed=$POIC"
+        echo "parity_output_non_idr_completed=$PONC"
+        echo "output_slice_p_completed=$OSPC"
+        echo "output_slice_b_completed=$OSBC"
+        echo "output_slice_i_completed=$OSIC"
+        echo "output_slice_unknown_completed=$OSUC"
+        echo "blocks_written=$BW"
+        echo "write_eagain=$WE"
+        echo "write_errors=$WERR"
+        echo "last_write_us=$LW"
+        echo "max_write_us=$MW"
+        echo "gate=$GR"
+      } > "$LATEST_STATUS" 2>/dev/null || true
     fi
 
     if [ $((N % 30)) -eq 0 ]; then sync 2>/dev/null || true; fi
@@ -258,11 +309,38 @@ cleanup(){
 trap cleanup 0 1 2 15
 
 # This PID file is diagnostic only; it is never authority for signalling.
-echo "$$" > "$PIDFILE" 2>/dev/null || exit 4
+if [ -r "$PIDFILE" ]; then
+  OLD=$(cat "$PIDFILE" 2>/dev/null)
+  if [ -n "$OLD" ] && pidin ar 2>/dev/null | grep -E "^[[:space:]]*$OLD[[:space:]]" | grep -F 'omonob790_drive_supervisor.sh' >/dev/null 2>&1; then
+    echo "PARITY_DRIVE_SUPERVISOR=ALREADY_RUNNING pid=$OLD"
+    exit 0
+  fi
+fi
+echo "$" > "$PIDFILE" 2>/dev/null || exit 4
 
 if ! sd_make_rw; then
   publish waiting_log_media
   exit 5
+fi
+
+MASTER_LOG="$LOGROOT/drive-supervisor.log"
+LATEST_STATUS="$LOGROOT/current.status"
+echo "SUPERVISOR_START pid=$" >> "$MASTER_LOG" 2>/dev/null || true
+sync 2>/dev/null || true
+
+NEED_RECONNECT=0
+if [ ! -e "$PROFILE_MARKER" ]; then
+  PRE_PROFILE_STATE=missing
+  [ -r "$SOURCE_STATE" ] && PRE_PROFILE_STATE=$(cat "$SOURCE_STATE" 2>/dev/null)
+  if "$HELPER" preset --preset mibr_dual_view --layer temp >> "$MASTER_LOG" 2>&1; then
+    : > "$PROFILE_MARKER" 2>/dev/null || true
+    echo "PROFILE_APPLIED preset=mibr_dual_view layer=temp pre_stream_state=$PRE_PROFILE_STATE" >> "$MASTER_LOG" 2>/dev/null || true
+    [ "$PRE_PROFILE_STATE" = "streaming" ] && NEED_RECONNECT=1
+  else
+    publish profile_error
+    echo "PROFILE_APPLY_FAILED preset=mibr_dual_view" >> "$MASTER_LOG" 2>/dev/null || true
+    exit 6
+  fi
 fi
 
 publish waiting_stream111
@@ -279,6 +357,19 @@ while enabled; do
 
   CUR=missing
   [ -r "$SOURCE_STATE" ] && CUR=$(cat "$SOURCE_STATE" 2>/dev/null)
+
+  if [ "$NEED_RECONNECT" -eq 1 ]; then
+    if [ "$CUR" = "streaming" ]; then
+      publish waiting_reconnect_after_profile
+      sleep 1
+      continue
+    fi
+    NEED_RECONNECT=0
+    publish waiting_stream111
+    sleep 1
+    continue
+  fi
+
   if [ "$CUR" != "streaming" ] || [ ! -r "$SOURCE_HB" ]; then
     publish waiting_stream111
     sleep 1
@@ -312,10 +403,12 @@ while enabled; do
     echo "diagnostics_statistics=$STATS_ON source=$(cfg_source "$STATS_CFG_TEMP" "$STATS_CFG_PERSIST")"
     echo "sd_log_root=$LOGROOT"
   } >> "$SESSION_LOG" 2>/dev/null
+  echo "SESSION_START session=$SESSION mode=$SESSION_MODE dir=$RUN" >> "$MASTER_LOG" 2>/dev/null || true
 
   "$RUNNER" "$BRIDGE" tcp://127.0.0.1:19820 /dev/mlb/isoTX2 "$SECONDS_PER_SESSION" >> "$SESSION_LOG" 2>&1
   RC=$?
   echo "PARITY_DRIVE_SESSION_DONE rc=$RC" >> "$SESSION_LOG" 2>/dev/null
+  echo "SESSION_DONE session=$SESSION rc=$RC dir=$RUN" >> "$MASTER_LOG" 2>/dev/null || true
 
   [ -z "$EPID" ] || wait "$EPID" 2>/dev/null || true
   [ -r "$PARITY_STATUS" ] && cp "$PARITY_STATUS" "$RUN/parity-final.status" 2>/dev/null || true
