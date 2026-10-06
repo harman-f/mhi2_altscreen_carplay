@@ -207,10 +207,24 @@ Guarded long-run/drive mode (optional, disabled until explicitly enabled):
 Drive mode launches no stock-process restart. It waits for Stream-111, then
 runs the same token-bound parity owner in until-stop mode and re-enters only
 after a confirmed stock handback. The owner/watchdog remain fail-safe: bridge
-exit, gate-proof loss, explicit token stop or supervisor failure restores stock. One-second telemetry is persisted to a writable SD first
-(/net/mmx/fs/sda0/esd/mibr-parity-drive-logs), with 30-second syncs and
-internal-storage fallback. It records source FPS/IDRs plus parity IDR/non-IDR
-accepted output, queue, MOST block and driver-backpressure counters.
+exit, gate-proof loss, explicit token stop or supervisor failure restores stock.
+
+Drive evidence is SD-only. The supervisor remounts
+/net/mmx/fs/sda0 writable and verifies a real write before starting parity.
+Logs are stored under:
+  /net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive/
+The SD is synced periodically and remounted read-only on supervisor cleanup.
+
+Raw status snapshots and compact one-second statistics are independently
+switchable for future sessions:
+  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh all-on persistent
+  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh status-off persistent
+  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh statistics-off persistent
+  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh clear-temp
+Statistics require the live parity status producer. They record source FPS,
+GEN2 source/IDR counters, parity IDR/non-IDR and passive H.264 P/B/I slice
+classes through accepted TS output, queue/MOST counters and driver-backpressure
+timing.
 
 Stop uses the current owner ticket; PID hints never authorize signals.
 Parent and independent watchdog retain the exact bridge process identity.
