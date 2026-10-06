@@ -6,6 +6,7 @@ set -u
 BASE=/mnt/app/root/altscreen-u2
 RUNNER=$BASE/bin/parity-session
 ENABLE=/mnt/app/root/mibr-parity-drive.enabled
+PROFILE_MARKER=/tmp/mibr-parity-drive-profile-applied
 
 mount -uw /mnt/app 2>/dev/null || { echo "PARITY_DRIVE_DISABLE=FAIL_APP_RW"; exit 20; }
 echo 0 > "$ENABLE" || { mount -ur /mnt/app 2>/dev/null || true; echo "PARITY_DRIVE_DISABLE=FAIL_WRITE"; exit 21; }
@@ -25,6 +26,7 @@ while [ "$N" -lt 20 ] && [ -r /tmp/mibr-parity-drive-supervisor.pid ]; do
   N=$((N+1))
 done
 
+rm -f "$PROFILE_MARKER" 2>/dev/null || true
 sync 2>/dev/null || true
 mount -ur /net/mmx/fs/sda0 2>/dev/null || true
 
