@@ -48,11 +48,23 @@ static int bound_process_dead(int fd)
     if(fd<0)return 0;
 #ifdef __QNXNTO__
     procfs_status status;
+    int rc;
     memset(&status,0,sizeof(status));status.tid=1;
-    /* STATUS alone can report ESRCH for a departed high-numbered current
-     * thread while lower threads still run. TIDSTATUS starts at the first
-     * possible thread and asks procfs for the next existing thread. */
-    return devctl(fd,DCMD_PROC_TIDSTATUS,&status,sizeof(status),NULL)==ESRCH;
+    /*
+     * Exact MU1440/QNX 6.5 vehicle semantics:
+     * - a live bound child returns EOK from TIDSTATUS;
+     * - DCMD_PROC_SIGNAL can move it to the procfs debugger termination
+     *   point while the O_RDWR handle's RLC flag keeps the process object
+     *   present, so TIDSTATUS still returns EOK with why=TERMINATED;
+     * - ESRCH means the process object is already gone.
+     *
+     * TERMINATED is writer-quiescent even though waitpid() cannot reap until
+     * the last O_RDWR procfs handle is closed.
+     */
+    rc=devctl(fd,DCMD_PROC_TIDSTATUS,&status,sizeof(status),NULL);
+    if(rc==ESRCH)return 1;
+    if(rc!=0)return 0;
+    return status.why==_DEBUG_WHY_TERMINATED;
 #else
     struct pollfd p;
     memset(&p,0,sizeof(p));p.fd=fd;p.events=POLLIN;
