@@ -62,12 +62,16 @@ with tempfile.TemporaryDirectory() as td:
     proc=subprocess.Popen([binary,f"tcp://127.0.0.1:{port}",str(output)],stderr=subprocess.PIPE)
     try:
         until=time.monotonic()+3
+        first_size=0
         while time.monotonic()<until:
-            data=output.read_bytes() if output.exists() else b""
-            if any(pid(data[i:i+188])==0x11 for i in range(0,len(data)-187,188)):break
-            time.sleep(.001)
+            try:first_size=output.stat().st_size
+            except FileNotFoundError:first_size=0
+            if first_size>=12032:break
+            time.sleep(.0005)
         else:raise AssertionError("large PES did not begin")
-        assert len(data)<len(large),"stop test missed in-flight PES"
+        # Size polling avoids repeatedly copying the growing file and gives the
+        # signal path a deterministic chance to interrupt the ~250 KiB PES.
+        assert first_size<len(large),"stop test missed in-flight PES"
         proc.send_signal(signal.SIGTERM)
         _,errors=proc.communicate(timeout=3)
         assert proc.returncode in (1,130),errors  # Interrupted input is not clean EOF.
