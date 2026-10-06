@@ -127,7 +127,7 @@ sd_make_rw(){
   [ -d "$CARD" ] || return 1
   # Exact MU1440/M.I.B. contract used in the vehicle: remount this SD volume
   # writable directly. Do not rely on an optional SD-side helper script.
-  mount -uw "$CARD" 2>/dev/null || return 1
+  mount -uw /net/mmx/fs/sda0 2>/dev/null || return 1
   SD_RW=1
   mkdir -p "$LOGROOT" 2>/dev/null || return 1
   T="$LOGROOT/.write-test-parity-drive"
@@ -140,7 +140,7 @@ sd_make_rw(){
 sd_make_ro(){
   [ "$SD_RW" -eq 1 ] || return 0
   sync 2>/dev/null || true
-  mount -ur "$CARD" 2>/dev/null || return 1
+  mount -ur /net/mmx/fs/sda0 2>/dev/null || return 1
   SD_RW=0
   return 0
 }
