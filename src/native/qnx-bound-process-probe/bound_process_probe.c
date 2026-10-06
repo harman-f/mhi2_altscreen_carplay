@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Diagnostic-only QNX procfs process-handle probe v2.
+ * Diagnostic-only MU1440 QNX bound-process probe v3.
+ * Mirrors parity-session identity_self_test with the stock SignalKill path.
  * No MOST, DisplayManager, routing or persistent-state access.
  */
 #include <devctl.h>
@@ -8,23 +9,47 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/neutrino.h>
 #include <sys/procfs.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-static void print_syscall(const char *name, long rc)
+static void print_wait(const char *name, pid_t rc, int st)
 {
-    int e = errno;
-    printf("%s rc=%ld errno=%d strerror=%s\n",
-           name, rc, e, rc < 0 ? strerror(e) : "OK");
+    if (rc > 0) {
+        printf("%s=reaped pid=%ld status=%d signaled=%d signal=%d exited=%d exit=%d\n",
+               name, (long)rc, st,
+               WIFSIGNALED(st) ? 1 : 0,
+               WIFSIGNALED(st) ? WTERMSIG(st) : 0,
+               WIFEXITED(st) ? 1 : 0,
+               WIFEXITED(st) ? WEXITSTATUS(st) : 0);
+    } else {
+        printf("%s=not_reaped rc=%ld errno=%d strerror=%s\n",
+               name, (long)rc, errno, errno ? strerror(errno) : "OK");
+    }
     fflush(stdout);
 }
 
-static void print_devctl(const char *name, int rc)
+static int status_fd(int fd, const char *tag, procfs_status *out)
 {
-    printf("%s rc=%d strerror=%s\n", name, rc, rc ? strerror(rc) : "OK");
+    procfs_status st;
+    int rc;
+    memset(&st, 0, sizeof(st));
+    st.tid = 1;
+    errno = 0;
+    rc = devctl(fd, DCMD_PROC_TIDSTATUS, &st, sizeof(st), NULL);
+    printf("%s rc=%d errno=%d strerror=%s", tag, rc, errno,
+           rc ? strerror(rc) : "OK");
+    if (rc == 0) {
+        printf(" pid=%ld tid=%ld flags=0x%08lx why=%u what=%u",
+               (long)st.pid, (long)st.tid, (unsigned long)st.flags,
+               (unsigned)st.why, (unsigned)st.what);
+        if (out) *out = st;
+    }
+    putchar('\n');
     fflush(stdout);
+    return rc;
 }
 
 static pid_t spawn_child(void)
@@ -32,32 +57,22 @@ static pid_t spawn_child(void)
     int ready[2];
     char token = 0;
     pid_t child;
-
-    if (pipe(ready)) {
-        print_syscall("pipe", -1);
-        return -1;
-    }
+    if (pipe(ready) != 0) return -1;
     child = fork();
-    if (child < 0) {
-        print_syscall("fork_child", -1);
-        close(ready[0]);
-        close(ready[1]);
-        return -1;
-    }
+    if (child < 0) return -1;
     if (child == 0) {
         close(ready[0]);
         signal(SIGTERM, SIG_DFL);
-        signal(SIGINT, SIG_DFL);
-        token = 'R';
+        signal(SIGKILL, SIG_DFL);
+        token='R';
         if (write(ready[1], &token, 1) != 1) _exit(2);
         close(ready[1]);
         for (;;) pause();
     }
-
     close(ready[1]);
     if (read(ready[0], &token, 1) != 1 || token != 'R') {
         close(ready[0]);
-        kill(child, SIGKILL);
+        (void)SignalKill(0, child, 0, SIGKILL, SI_USER, 0);
         waitpid(child, NULL, 0);
         return -1;
     }
@@ -65,174 +80,89 @@ static pid_t spawn_child(void)
     return child;
 }
 
-static int wait_bounded(pid_t child, unsigned timeout_ms, int *st)
-{
-    unsigned elapsed = 0;
-    for (;;) {
-        pid_t rc;
-        errno = 0;
-        rc = waitpid(child, st, WNOHANG);
-        if (rc == child) return 1;
-        if (rc < 0) return -1;
-        if (elapsed >= timeout_ms) return 0;
-        usleep(100000);
-        elapsed += 100;
-    }
-}
-
-static void print_wait_result(const char *name, int rc, int st)
-{
-    if (rc == 1) {
-        printf("%s=reaped status=%d signaled=%d signal=%d exited=%d exit=%d\n",
-               name, st,
-               WIFSIGNALED(st) ? 1 : 0,
-               WIFSIGNALED(st) ? WTERMSIG(st) : 0,
-               WIFEXITED(st) ? 1 : 0,
-               WIFEXITED(st) ? WEXITSTATUS(st) : 0);
-    } else if (rc == 0) {
-        printf("%s=alive_after_timeout\n", name);
-    } else {
-        printf("%s=waitpid_error errno=%d strerror=%s\n", name, errno, strerror(errno));
-    }
-    fflush(stdout);
-}
-
-static int proc_status(int fd, const char *name)
-{
-    procfs_status status;
-    int rc;
-    memset(&status, 0, sizeof(status));
-    status.tid = 1;
-    errno = 0;
-    rc = devctl(fd, DCMD_PROC_TIDSTATUS, &status, sizeof(status), NULL);
-    print_devctl(name, rc);
-    if (rc == 0) {
-        printf("%s_detail pid=%ld tid=%ld flags=0x%08lx why=%u what=%u\n",
-               name,
-               (long)status.pid,
-               (long)status.tid,
-               (unsigned long)status.flags,
-               (unsigned)status.why,
-               (unsigned)status.what);
-        fflush(stdout);
-    }
-    return rc;
-}
-
-static int proc_signal(int fd, int signo, const char *name)
-{
-    procfs_signal request;
-    int rc;
-    memset(&request, 0, sizeof(request));
-    request.tid = 0;
-    request.signo = signo;
-    request.code = 0;
-    request.value = 0;
-    errno = 0;
-    rc = devctl(fd, DCMD_PROC_SIGNAL, &request, sizeof(request), NULL);
-    print_devctl(name, rc);
-    return rc;
-}
-
-static int proc_run(int fd, const char *name)
-{
-    procfs_run run;
-    int rc;
-    memset(&run, 0, sizeof(run));
-    errno = 0;
-    rc = devctl(fd, DCMD_PROC_RUN, &run, sizeof(run), NULL);
-    print_devctl(name, rc);
-    return rc;
-}
-
-static void cleanup_child(pid_t child, int fd)
-{
-    int st = 0, rc;
-    if (fd >= 0) (void)proc_run(fd, "cleanup_proc_run");
-    errno = 0;
-    rc = kill(child, SIGKILL);
-    print_syscall("cleanup_kill_SIGKILL", rc);
-    rc = wait_bounded(child, 1500, &st);
-    print_wait_result("cleanup_wait", rc, st);
-    if (fd >= 0) close(fd);
-}
-
-static void case_kill_control(void)
-{
-    pid_t child;
-    int st = 0, rc;
-
-    puts("=== CASE kill_control ===");
-    child = spawn_child();
-    if (child < 0) {
-        puts("kill_control_spawn=FAIL");
-        return;
-    }
-    printf("child_pid=%ld child_ready=YES\n", (long)child);
-    errno = 0;
-    rc = kill(child, SIGTERM);
-    print_syscall("kill_SIGTERM", rc);
-    rc = wait_bounded(child, 1500, &st);
-    print_wait_result("kill_control_wait", rc, st);
-    if (rc != 1) cleanup_child(child, -1);
-}
-
-static void case_procfs(const char *label, int flags, int do_run)
-{
-    pid_t child;
-    int fd = -1, st = 0, wr;
-    char path[64];
-
-    printf("=== CASE %s ===\n", label);
-    child = spawn_child();
-    if (child < 0) {
-        printf("%s_spawn=FAIL\n", label);
-        return;
-    }
-    printf("child_pid=%ld child_ready=YES\n", (long)child);
-
-    snprintf(path, sizeof(path), "/proc/%ld/as", (long)child);
-    errno = 0;
-    fd = open(path, flags);
-    print_syscall("open_proc_as", fd);
-    if (fd < 0) {
-        cleanup_child(child, -1);
-        return;
-    }
-
-    errno = 0;
-    print_syscall("fcntl_FD_CLOEXEC", fcntl(fd, F_SETFD, FD_CLOEXEC));
-    (void)proc_status(fd, "tidstatus_before_signal");
-    (void)proc_signal(fd, SIGTERM, "proc_signal_SIGTERM");
-
-    wr = wait_bounded(child, 1000, &st);
-    print_wait_result("wait_after_proc_signal", wr, st);
-    if (wr == 1) {
-        close(fd);
-        return;
-    }
-
-    (void)proc_status(fd, "tidstatus_after_signal");
-
-    if (do_run) {
-        (void)proc_run(fd, "proc_run_after_signal");
-        wr = wait_bounded(child, 1500, &st);
-        print_wait_result("wait_after_proc_run", wr, st);
-        if (wr == 1) {
-            close(fd);
-            return;
-        }
-        (void)proc_status(fd, "tidstatus_after_run");
-    }
-
-    cleanup_child(child, fd);
-}
-
 int main(void)
 {
-    case_kill_control();
-    case_procfs("procfs_RDONLY", O_RDONLY, 0);
-    case_procfs("procfs_RDWR_signal_then_RUN", O_RDWR, 1);
+    pid_t child, observer, w;
+    int fd, st=0, ost=0, rc, i;
+    char path[64];
+    procfs_status ps;
+
+    child=spawn_child();
+    if(child<0){puts("spawn=FAIL");return 1;}
+    printf("child_pid=%ld child_ready=YES\n",(long)child);
+
+    snprintf(path,sizeof(path),"/proc/%ld/as",(long)child);
+    errno=0;
+    fd=open(path,O_RDWR);
+    printf("open_proc_as rc=%d errno=%d strerror=%s\n",fd,errno,
+           fd<0?strerror(errno):"OK");
+    if(fd<0)return 1;
+    printf("fcntl_FD_CLOEXEC rc=%d\n",fcntl(fd,F_SETFD,FD_CLOEXEC));
+
+    (void)status_fd(fd,"parent_status_before",&ps);
+
+    observer=fork();
+    if(observer<0){close(fd);return 1;}
+    if(observer==0){
+        procfs_status os;
+        int src;
+        puts("observer_started=YES");
+        if(status_fd(fd,"observer_status_before",&os)!=0)_exit(11);
+        errno=0;
+        src=SignalKill(0,(pid_t)os.pid,0,SIGTERM,SI_USER,0);
+        printf("observer_SignalKill_SIGTERM rc=%d errno=%d strerror=%s target_pid=%ld\n",
+               src,errno,src<0?strerror(errno):"OK",(long)os.pid);
+        fflush(stdout);
+        if(src!=0)_exit(12);
+        for(i=0;i<30;i++){
+            procfs_status after;
+            usleep(100000);
+            rc=status_fd(fd,i==0?"observer_status_100ms":"observer_status_poll",&after);
+            if(rc==ESRCH){
+                printf("observer_terminal=ESRCH after_ms=%d\n",(i+1)*100);
+                _exit(0);
+            }
+            if(rc==0 && after.why==_DEBUG_WHY_TERMINATED){
+                printf("observer_terminal=WHY_TERMINATED after_ms=%d flags=0x%08lx tid=%ld\n",
+                       (i+1)*100,(unsigned long)after.flags,(long)after.tid);
+                _exit(0);
+            }
+        }
+        puts("observer_terminal=NONE_3000");
+        _exit(13);
+    }
+
+    w=waitpid(observer,&ost,0);
+    print_wait("observer_wait",w,ost);
+
+    (void)status_fd(fd,"parent_status_after_observer",&ps);
+
+    errno=0;
+    w=waitpid(child,&st,WNOHANG);
+    print_wait("child_wait_before_close",w,st);
+
+    printf("parent_close_proc_handle rc=%d\n",close(fd));
+    fd=-1;
+
+    for(i=0;i<20;i++){
+        errno=0;
+        w=waitpid(child,&st,WNOHANG);
+        if(w==child)break;
+        usleep(100000);
+    }
+    print_wait("child_wait_after_close",w,st);
+
+    if(w!=child){
+        puts("cleanup=SignalKill_SIGKILL");
+        (void)SignalKill(0,child,0,SIGKILL,SI_USER,0);
+        for(i=0;i<10;i++){
+            w=waitpid(child,&st,WNOHANG);
+            if(w==child)break;
+            usleep(100000);
+        }
+        print_wait("cleanup_wait",w,st);
+    }
+
     puts("PROBE_DONE=YES");
     return 0;
 }
