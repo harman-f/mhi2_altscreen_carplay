@@ -40,7 +40,7 @@ STATS_CFG_TEMP=/tmp/mibr-parity-statistics-enabled
 STATS_CFG_PERSIST=/mnt/app/root/mibr-parity-statistics-enabled
 
 CARD=/net/mmx/fs/sda0
-LOGROOT=$CARD/esd/carplay-test/logs/omonob790-parity-drive
+LOGROOT=/net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive
 SD_RW=0
 
 # 0 means true until-stop operation. Finite 60..7200 second sessions remain
