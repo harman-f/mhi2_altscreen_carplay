@@ -1263,7 +1263,7 @@ int main(int argc,char **argv) {
     fprintf(stderr,"PARITY_START input=%s output=%s transport_bps=%u block=%u pids=pat:0x0,pmt:0x10,pcr:0x1000,video:0x11\n",input,output,TRANSPORT_BPS,MOST_BLOCK_BYTES);
 
     while(!g_stop){
-        uint8_t h[M1AU_HEADER_BYTES];uint32_t flags,payload_n,frac,sec;uint64_t stream,codec,consumer,seq,pts;uint8_t *payload=NULL,*norm=NULL,*packets=NULL;size_t norm_n=0,packet_count=0;int rr,idr,rebased=0;struct ts_au au;
+        uint8_t h[M1AU_HEADER_BYTES];uint32_t flags,payload_n,frac,sec;uint64_t stream,codec,consumer,seq,pts;uint8_t *payload=NULL,*norm=NULL,*packets=NULL;size_t norm_n=0,packet_count=0;int rr,idr,rebased=0;unsigned slice_class=AU_SLICE_UNKNOWN;struct ts_au au;
         rr=recv_exact(in_fd,h,sizeof(h));if(rr<=0){if(rr==0&&!g_stop)rc=0;break;}
         if(memcmp(h,"M1AU",4)||be16(h+4)!=1u||be16(h+6)!=M1AU_HEADER_BYTES){fprintf(stderr,"ERROR invalid M1AU header\n");break;}
         flags=be32(h+8);payload_n=be32(h+12);stream=be64(h+16);codec=be64(h+24);consumer=be64(h+32);seq=be64(h+40);frac=le32(h+48);sec=le32(h+52);idr=(flags&M1AU_FLAG_IDR)?1:0;
@@ -1277,7 +1277,9 @@ int main(int argc,char **argv) {
             fprintf(stderr,"PARITY_DROP oversized AU bytes=%u\n",payload_n);
             continue;
         }
+        slice_class=h264_slice_class(payload,payload_n);
         pthread_mutex_lock(&stats.lock);++stats.input_records;stats.input_bytes+=payload_n;stats.input_idrs+=idr;stats.last_sequence=seq;stats.last_frac=frac;stats.last_sec=sec;pthread_mutex_unlock(&stats.lock);
+        stats_note_input_slice(&stats,slice_class);
         if ((prev_stream && stream != prev_stream) || (prev_codec && codec != prev_codec) ||
             (prev_consumer && consumer != prev_consumer)) {
             uint64_t da=0,dp=0,pp=0;
@@ -1316,7 +1318,7 @@ int main(int argc,char **argv) {
         pts=assign_pts_presence(&clock,frac,sec,
             flags&M1AU_FLAG_TIME_KNOWN ? !!(flags&M1AU_FLAG_TIME_PRESENT) : -1,&rebased);
         if(packetize_pes(norm,norm_n,pts,idr,discontinuity,&cc_video,&packets,&packet_count)!=0){free(norm);break;}free(norm);discontinuity=0;
-        memset(&au,0,sizeof(au));au.packets=packets;au.packet_count=packet_count;au.sequence=seq;au.pts90k=pts;au.idr=idr;
+        memset(&au,0,sizeof(au));au.packets=packets;au.packet_count=packet_count;au.sequence=seq;au.pts90k=pts;au.idr=idr;au.slice_class=slice_class;
         if(queue_push(&queue,&au)!=0){free(au.packets);break;}
         pthread_mutex_lock(&stats.lock);++stats.aus_queued;stats.pes_packets+=packet_count;stats.last_pts=pts;pthread_mutex_unlock(&stats.lock);
         if(rebased)fprintf(stderr,"PARITY_PTS_REBASE seq=%llu pcr=%llu pts=%llu\n",(unsigned long long)seq,(unsigned long long)clock_pcr_now(&clock),(unsigned long long)pts);
