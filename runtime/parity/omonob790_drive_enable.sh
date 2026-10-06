@@ -74,4 +74,20 @@ echo "boot_hook=present"
 echo "parity_drive_enabled=1"
 echo "legacy_autodirect_persistent=0"
 echo "next_boot_autostart=YES"
+
+if [ "${MIBR_PREPARE_ONLY:-0}" = "1" ]; then
+  echo "runtime_start=SKIPPED"
+  exit 0
+fi
+
+if pidin ar 2>/dev/null | grep -F 'omonob790_drive_supervisor.sh' | grep -v grep >/dev/null 2>&1; then
+  echo "runtime_start=ALREADY_RUNNING"
+  exit 0
+fi
+
+if on -d -f mmx /bin/ksh "$SUP" >/tmp/mibr-parity-drive-launch.log 2>&1; then
+  echo "runtime_start=REQUESTED"
+else
+  echo "PARITY_DRIVE_ENABLE=WARN_START_FAILED_BOOT_AUTOSTART_STILL_ENABLED"
+fi
 exit 0
