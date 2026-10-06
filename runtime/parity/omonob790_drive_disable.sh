@@ -25,6 +25,9 @@ while [ "$N" -lt 20 ] && [ -r /tmp/mibr-parity-drive-supervisor.pid ]; do
   N=$((N+1))
 done
 
+sync 2>/dev/null || true
+mount -ur /net/mmx/fs/sda0 2>/dev/null || true
+
 echo "PARITY_DRIVE_DISABLE=PASS"
 echo "parity_drive_enabled=0"
 echo "active_session=$( [ -e /tmp/mibr-parity-session.lock ] && echo 1 || echo 0 )"
