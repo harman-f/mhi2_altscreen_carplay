@@ -75,6 +75,17 @@
 #define AU_EVENT_STARTED 0x01u
 #define AU_EVENT_COMPLETED 0x02u
 #define AU_EVENT_IDR 0x04u
+#define AU_EVENT_SLICE_SHIFT 8u
+#define AU_EVENT_SLICE_MASK (0x0fu << AU_EVENT_SLICE_SHIFT)
+
+enum au_slice_class {
+    AU_SLICE_UNKNOWN = 0u,
+    AU_SLICE_P = 1u,
+    AU_SLICE_B = 2u,
+    AU_SLICE_I = 3u,
+    AU_SLICE_SP = 4u,
+    AU_SLICE_SI = 5u
+};
 #define KEYFRAME_MARKER "/tmp/mibr-alt111-keyframe-only"
 #define DRIVER_DCMD_FLUSH 0x40040506
 #define DRIVER_DCMD_START 0x80040509
@@ -94,6 +105,7 @@ struct ts_au {
     uint64_t sequence;
     uint64_t pts90k;
     int idr;
+    unsigned slice_class;
 };
 
 struct au_queue {
@@ -133,6 +145,12 @@ struct bridge_stats {
     uint64_t input_records;
     uint64_t input_bytes;
     uint64_t input_idrs;
+    uint64_t input_slice_p;
+    uint64_t input_slice_b;
+    uint64_t input_slice_i;
+    uint64_t input_slice_sp;
+    uint64_t input_slice_si;
+    uint64_t input_slice_unknown;
     uint64_t sequence_gaps;
     uint64_t dropped_wait_idr;
     uint64_t safe_recoveries;
@@ -149,6 +167,18 @@ struct bridge_stats {
     uint64_t output_non_idr_aus_started;
     uint64_t output_idr_aus_completed;
     uint64_t output_non_idr_aus_completed;
+    uint64_t output_slice_p_started;
+    uint64_t output_slice_b_started;
+    uint64_t output_slice_i_started;
+    uint64_t output_slice_sp_started;
+    uint64_t output_slice_si_started;
+    uint64_t output_slice_unknown_started;
+    uint64_t output_slice_p_completed;
+    uint64_t output_slice_b_completed;
+    uint64_t output_slice_i_completed;
+    uint64_t output_slice_sp_completed;
+    uint64_t output_slice_si_completed;
+    uint64_t output_slice_unknown_completed;
     uint64_t blocks_written;
     uint64_t bytes_written;
     uint64_t write_eagain;
@@ -449,6 +479,90 @@ static size_t annexb_find_next_start(const uint8_t *p, size_t n, size_t from) {
     return n;
 }
 
+struct h264_bit_reader {
+    const uint8_t *p;
+    size_t bits;
+    size_t pos;
+};
+
+static int h264_read_bit(struct h264_bit_reader *b, unsigned *out) {
+    size_t byte;
+    unsigned shift;
+    if(!b || !out || b->pos >= b->bits)return -1;
+    byte=b->pos >> 3;
+    shift=7u-(unsigned)(b->pos & 7u);
+    *out=(unsigned)((b->p[byte]>>shift)&1u);
+    ++b->pos;
+    return 0;
+}
+
+static int h264_read_ue(struct h264_bit_reader *b, unsigned *out) {
+    unsigned bit=zeros=0u, value=0u, i;
+    while(1) {
+        if(h264_read_bit(b,&bit))return -1;
+        if(bit)break;
+        if(++zeros>31u)return -1;
+    }
+    for(i=0u;i<zeros;++i) {
+        if(h264_read_bit(b,&bit))return -1;
+        value=(value<<1)|bit;
+    }
+    if(zeros==31u && value==0xffffffffu)return -1;
+    *out=((1u<<zeros)-1u)+value;
+    return 0;
+}
+
+static unsigned h264_slice_class(const uint8_t *p, size_t n) {
+    size_t sc=0,nal=0,next,i,used;
+    int type;
+    uint8_t rbsp[64];
+    while((type=annexb_nal_type(p,n,&sc,&nal))>=0) {
+        if(type==1 || type==5) {
+            struct h264_bit_reader br;
+            unsigned zeros=0u, first_mb, slice_type;
+            next=annexb_find_next_start(p,n,nal+1u);
+            used=0u;
+            for(i=nal+1u;i<next && used<sizeof(rbsp);++i) {
+                uint8_t v=p[i];
+                if(zeros>=2u && v==0x03u) {
+                    zeros=2u;
+                    continue;
+                }
+                rbsp[used++]=v;
+                if(v==0u) { if(zeros<2u)++zeros; }
+                else zeros=0u;
+            }
+            br.p=rbsp;br.bits=used*8u;br.pos=0u;
+            if(h264_read_ue(&br,&first_mb) || h264_read_ue(&br,&slice_type))
+                return AU_SLICE_UNKNOWN;
+            (void)first_mb;
+            switch(slice_type % 5u) {
+                case 0u:return AU_SLICE_P;
+                case 1u:return AU_SLICE_B;
+                case 2u:return AU_SLICE_I;
+                case 3u:return AU_SLICE_SP;
+                case 4u:return AU_SLICE_SI;
+            }
+            return AU_SLICE_UNKNOWN;
+        }
+        sc=nal+1u;
+    }
+    return AU_SLICE_UNKNOWN;
+}
+
+static void stats_note_input_slice(struct bridge_stats *stats, unsigned cls) {
+    pthread_mutex_lock(&stats->lock);
+    switch(cls) {
+        case AU_SLICE_P:++stats->input_slice_p;break;
+        case AU_SLICE_B:++stats->input_slice_b;break;
+        case AU_SLICE_I:++stats->input_slice_i;break;
+        case AU_SLICE_SP:++stats->input_slice_sp;break;
+        case AU_SLICE_SI:++stats->input_slice_si;break;
+        default:++stats->input_slice_unknown;break;
+    }
+    pthread_mutex_unlock(&stats->lock);
+}
+
 static int extract_param_sets(const uint8_t *p, size_t n, uint8_t **out, size_t *out_n) {
     size_t sc = 0, nal = 0;
     uint8_t *buf = NULL; size_t used = 0;
@@ -688,6 +802,7 @@ static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
     if (a->packet_pos == 0) {
         ev|=AU_EVENT_STARTED;
         if(a->idr)ev|=AU_EVENT_IDR;
+        ev|=(a->slice_class & 0x0fu) << AU_EVENT_SLICE_SHIFT;
     }
     if (clock && a->packet_pos == 0) {
         /* Guard the complete PES deadline at emission, including PSI/PCR
@@ -709,6 +824,7 @@ static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
     if (a->packet_pos == a->packet_count) {
         ev|=AU_EVENT_COMPLETED;
         if(a->idr)ev|=AU_EVENT_IDR;
+        ev|=(a->slice_class & 0x0fu) << AU_EVENT_SLICE_SHIFT;
         free(a->packets); memset(a, 0, sizeof(*a));
         q->head = (q->head + 1u) % AU_QUEUE_CAP; --q->count;
     }
