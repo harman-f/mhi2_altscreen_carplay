@@ -116,6 +116,20 @@ sys.exit(1 if mode and cmd==mode else 0)
         assert cp.returncode==0,cp.stderr
         parent.communicate(timeout=5)
         assert parent.returncode==130 and not paths["LOCK_PATH"].exists();stock()
+
+        # Zero means until-stop: no deadline-driven handback, but the same
+        # token-bound stop path must restore stock and reap the watchdog.
+        bridge_delay(60)
+        zero_command=command[:-1]+["0"]
+        parent=subprocess.Popen(zero_command,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+        wait_for(paths["STATE_PATH"],"direct")
+        time.sleep(1.2)
+        assert parent.poll() is None,"until-stop session exited without an explicit/failure stop"
+        cp=subprocess.run([str(binary),"--stop"],capture_output=True,timeout=5)
+        assert cp.returncode==0,cp.stderr
+        parent.communicate(timeout=5)
+        assert parent.returncode==130 and not paths["LOCK_PATH"].exists();stock()
+
         bridge_delay(.1);run_probe()
         cfg("set","--key","ownership.backend","--value","writev_gate")
         log.write_text("")
@@ -192,4 +206,4 @@ sys.exit(1 if mode and cmd==mode else 0)
             cp=subprocess.run([str(binary),"--restore-stock"],capture_output=True,timeout=4)
             assert cp.returncode==0,cp.stderr
     finally:halt.set();thread.join(timeout=2)
-print("PARITY_SESSION_LIFECYCLE=PASS gate_only dmdt_probe_no_writer frozen_backend typed_stop parallel parent_kill watchdog_kill foreign_pid inflight_barrier stale_proof proof_loss partial_release restore_failure timeout")
+print("PARITY_SESSION_LIFECYCLE=PASS gate_only dmdt_probe_no_writer frozen_backend typed_stop until_stop parallel parent_kill watchdog_kill foreign_pid inflight_barrier stale_proof proof_loss partial_release restore_failure timeout")
