@@ -62,16 +62,26 @@ with tempfile.TemporaryDirectory() as td:
     proc=subprocess.Popen([binary,f"tcp://127.0.0.1:{port}",str(output)],stderr=subprocess.PIPE)
     try:
         until=time.monotonic()+3
-        first_size=0
+        checked=0
+        began=False
         while time.monotonic()<until:
-            try:first_size=output.stat().st_size
-            except FileNotFoundError:first_size=0
-            if first_size>=12032:break
+            try:size=output.stat().st_size
+            except FileNotFoundError:size=0
+            complete=size-(size%12032)
+            if complete>checked:
+                with output.open("rb") as fh:
+                    fh.seek(checked)
+                    chunk=fh.read(complete-checked)
+                checked=complete
+                if any(pid(chunk[i:i+188])==0x11 for i in range(0,len(chunk)-187,188)):
+                    began=True
+                    break
             time.sleep(.0005)
-        else:raise AssertionError("large PES did not begin")
-        # Size polling avoids repeatedly copying the growing file and gives the
-        # signal path a deterministic chance to interrupt the ~250 KiB PES.
-        assert first_size<len(large),"stop test missed in-flight PES"
+        if not began:raise AssertionError("large PES did not begin")
+        # Trigger only after a physically written block contains video. The
+        # remaining ~250 KiB PES is then still in flight under regular-file
+        # pacing, making this a real started-PES shutdown test.
+        assert checked<len(large),"stop test missed in-flight PES"
         proc.send_signal(signal.SIGTERM)
         _,errors=proc.communicate(timeout=3)
         assert proc.returncode in (1,130),errors  # Interrupted input is not clean EOF.
