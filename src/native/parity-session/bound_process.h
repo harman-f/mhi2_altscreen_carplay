@@ -11,6 +11,7 @@
 #ifdef __QNXNTO__
 #include <devctl.h>
 #include <sys/procfs.h>
+#include <sys/neutrino.h>
 #elif defined(__linux__)
 #include <poll.h>
 #include <sys/syscall.h>
@@ -36,9 +37,24 @@ static int bound_process_open(pid_t pid)
 static int bound_process_signal(int fd,int signo)
 {
 #ifdef __QNXNTO__
-    procfs_signal request;
-    memset(&request,0,sizeof(request));request.signo=signo;
-    return devctl(fd,DCMD_PROC_SIGNAL,&request,sizeof(request),NULL);
+    procfs_status status;
+    int rc;
+    if(fd<0)return EBADF;
+    memset(&status,0,sizeof(status));status.tid=1;
+    /*
+     * Match the stock MHI2/QNX slay signal path instead of the procfs
+     * debugger DCMD_PROC_SIGNAL path.  The target PID is never taken from a
+     * PID file: it is re-derived from the already-bound /proc/<pid>/as
+     * handle immediately before SignalKill().  While that O_RDWR handle is
+     * open QNX keeps the process object/PID pinned via RLC, preventing PID
+     * reuse between identity lookup and signal delivery.
+     */
+    rc=devctl(fd,DCMD_PROC_TIDSTATUS,&status,sizeof(status),NULL);
+    if(rc!=0)return rc;
+    if(status.why==_DEBUG_WHY_TERMINATED)return ESRCH;
+    if(status.pid<=1)return ESRCH;
+    errno=0;
+    return SignalKill(0,(pid_t)status.pid,0,signo,SI_USER,0)==0 ? 0 : errno;
 #else
     return syscall(SYS_pidfd_send_signal,fd,signo,NULL,0)==0 ? 0 : errno;
 #endif
@@ -53,9 +69,9 @@ static int bound_process_dead(int fd)
     /*
      * Exact MU1440/QNX 6.5 vehicle semantics:
      * - a live bound child returns EOK from TIDSTATUS;
-     * - DCMD_PROC_SIGNAL can move it to the procfs debugger termination
-     *   point while the O_RDWR handle's RLC flag keeps the process object
-     *   present, so TIDSTATUS still returns EOK with why=TERMINATED;
+     * - SignalKill (the stock slay path) can move it to termination while
+     *   the O_RDWR handle's RLC flag keeps the process object present, so
+     *   TIDSTATUS may still return EOK with why=TERMINATED;
      * - ESRCH means the process object is already gone.
      *
      * TERMINATED is writer-quiescent even though waitpid() cannot reap until
