@@ -24,7 +24,7 @@ esac
 # No tuning scalar is hard-coded here. The shared validator reads one complete
 # layered snapshot; the native owner independently freezes its backend.
 if [ "$LIMIT" -ne 0 ]; then
-  [ "$LIMIT" -ge 5 ] && [ "$LIMIT" -le 7200 ] || exit 2
+  [ "$LIMIT" -eq 0 ] || { [ "$LIMIT" -ge 5 ] && [ "$LIMIT" -le 7200 ]; } || exit 2
 fi
 "$HELPER" status || exit 20
 [ "$LIMIT" -eq 0 ] && MODE=until-stop || MODE=bounded
