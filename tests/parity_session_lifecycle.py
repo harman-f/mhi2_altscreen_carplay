@@ -119,6 +119,10 @@ sys.exit(1 if mode and cmd==mode else 0)
 
         # Zero means until-stop: no deadline-driven handback, but the same
         # token-bound stop path must restore stock and reap the watchdog.
+        # The previous frozen-backend case deliberately changed the desired
+        # setting while its writev session was live. Restore writev_gate for
+        # this new session before expecting the direct state.
+        cfg("set","--key","ownership.backend","--value","writev_gate")
         bridge_delay(60)
         zero_command=command[:-1]+["0"]
         parent=subprocess.Popen(zero_command,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
@@ -130,6 +134,7 @@ sys.exit(1 if mode and cmd==mode else 0)
         parent.communicate(timeout=5)
         assert parent.returncode==130 and not paths["LOCK_PATH"].exists();stock()
 
+        cfg("set","--key","ownership.backend","--value","dmdt_reference")
         bridge_delay(.1);run_probe()
         cfg("set","--key","ownership.backend","--value","writev_gate")
         log.write_text("")
