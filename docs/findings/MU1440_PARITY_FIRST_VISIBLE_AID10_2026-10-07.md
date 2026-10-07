@@ -129,9 +129,11 @@ Persistent drive evidence is SD-only:
 ```
 
 The supervisor must make the SD writable and verify a real write before starting a parity session.
-It records source/GEN2 cadence, IDR counts, parity IDR/non-IDR AU progress, queue state, exact MOST
-block counters and QNX write/backpressure timing. Raw status snapshots and compact statistics are
-independently switchable for future use.
+It records source/GEN2 cadence, IDR counts, parity IDR/non-IDR AU progress, passive H.264 P/B/I
+slice classes, queue state, exact MOST block counters and QNX write/backpressure timing. Raw status
+and compact statistics are independently switchable for future use. Status produces
+`current.status` and per-session `status-snapshots.log`; statistics produces
+`current.statistics` and per-session `telemetry.tsv`.
 
 ## What is proven / still open
 
