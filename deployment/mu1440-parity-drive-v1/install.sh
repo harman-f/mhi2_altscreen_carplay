@@ -28,8 +28,8 @@ GUARD=/mnt/app/eso/lib/libmibr_isotx2_guard.so
 OLD_GATE_LINE='        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
 NEW_GATE_LINE='        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_guard.so:/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
 STOCK_FALLBACK_LINE='    MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
-GATE_BEGIN='# MIBR ISOTX2 GATE BEGIN'
-GATE_END='# MIBR ISOTX2 GATE END'
+GATE_BEGIN='    # MIBR ISOTX2 GATE BEGIN'
+GATE_END='    # MIBR ISOTX2 GATE END'
 PATCHED_STARTUP=/tmp/mibr-parity-startup.$$
 
 EXPECTED_AIRPLAY=193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5
