@@ -790,6 +790,7 @@ static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
                                 struct clock_state *clock, uint64_t pcr,
                                 unsigned *event) {
     struct ts_au *a;
+    (void)pcr;
     unsigned ev=0u;
     pthread_mutex_lock(&q->lock);
     if (!q->count) { pthread_mutex_unlock(&q->lock); if(event)*event=0u; return 0; }
