@@ -157,6 +157,9 @@ jobs:
           grep -Fq '/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive' runtime/parity/parity_drive_status.sh
           ! grep -E 'classic_single_view_drive_supervisor\.sh|omonob790_drive_supervisor\.sh|classic_single_view-parity-drive|\[o\]parity_drive_supervisor\.sh' runtime/parity/parity_drive_*.sh
           grep -Fq 'mibr-parity-statistics-enabled' runtime/parity/parity_drive_status.sh
+          grep -Fq 'EXPECTED_BASE_GEN2_VEHICLE_CURRENT=0406c607ef4e3b32a9b793cc83a7baffd7228437d18fd4671a464c2bf74439ac' deployment/mu1440-parity-drive-v1/install.sh
+          grep -Fq '[ "$HH" = "$GH" ] || fail "base_hook_gen2_mismatch gen2=$GH hook=$HH"' deployment/mu1440-parity-drive-v1/install.sh
+          grep -Fq 'accepted_vehicle_current_base_gen2_sha256=0406c607ef4e3b32a9b793cc83a7baffd7228437d18fd4671a464c2bf74439ac' tools/prepare_mu1440_parity_drive_v1_overlay.sh
           grep -Fq 'output_non_idr_aus_completed' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'output_slice_p_completed' src/native/direct-ts-parity/direct_ts_parity.c
           bash -n runtime/diagnostics/gen2_compat_profile.sh
