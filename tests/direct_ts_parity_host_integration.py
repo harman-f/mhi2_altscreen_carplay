@@ -161,9 +161,19 @@ def main():
             header_end = 9 + raw[8]
             pes_payloads.append(bytes(raw[header_end:]))
 
-        # 1/240 second at 90 kHz is exactly 375 ticks.
+        # 1/240 second at 90 kHz is exactly 375 ticks. The bridge may
+        # add a positive emission-shift rebase when the queued PES would
+        # otherwise violate the minimum PTS lead at the actual TS emission
+        # boundary. That safety shift is persistent and may occur at a
+        # scheduler-dependent AU, so the integration contract is:
+        #   - source cadence is never compressed below the 240-Hz step;
+        #   - any additional emission shift is monotonic/non-negative.
+        # The pure source-time conversion itself is covered by --self-test.
         diffs = [b - a for a, b in zip(pts, pts[1:])]
-        assert all(abs(delta - 375) <= 1 for delta in diffs), (pts, diffs)
+        assert all(delta >= 374 for delta in diffs), (pts, diffs)
+        ideal = [pts[0] + i * 375 for i in range(len(pts))]
+        shifts = [p - q for p, q in zip(pts, ideal)]
+        assert all(b + 1 >= a for a, b in zip(shifts, shifts[1:])), (pts, shifts)
 
         # One complete AU becomes one PES; AUD is explicit; IDR carries SPS/PPS.
         assert pes_payloads[0].startswith(b"\x00\x00\x00\x01\x09\xf0")
