@@ -11,16 +11,30 @@ import tempfile
 from pathlib import Path
 
 def sha(data):return hashlib.sha256(data).hexdigest()
-for scenario in ("normal","interrupted"):
+for scenario in ("normal","interrupted","pre_guarded"):
     with tempfile.TemporaryDirectory() as td:
         root=Path(td);pkg=root/"package";app=root/"app";system=root/"system";state=root/"state";binpath=root/"host-bin"
         for p in (pkg,pkg/"payload",pkg/"runtime",app/"root/altscreen-u2/bin",app/"root/altscreen-u2/scripts",app/"eso/lib",system/"etc/eso/production",system/"etc/boot",state,binpath):p.mkdir(parents=True,exist_ok=True)
         dst=app/"root/altscreen-u2";backup=app/"root/mibr-parity-drive-v1-backup"
-        old_gen=b"exact old GEN2";old_remux=b"exact old remux";airplay=b"exact target airplay";gate=b"exact stable gate"
+        old_gen=b"exact old GEN2";old_remux=b"exact old remux";airplay=b"exact target airplay";gate=b"exact stable gate";guard_payload=b"new standalone guard"
         fixtures={dst/"bin/libaltscreen111.so":old_gen,app/"eso/lib/libmibr_carplay111.so":old_gen,
                   dst/"bin/direct-ts-remux":old_remux,app/"eso/lib/libairplay.so":airplay,
                   app/"eso/lib/libmibr_isotx2_gate.so":gate,app/"root/mibr-carplay-autodirect":b"1\n"}
-        startup=b'#!/bin/sh\n        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &\n'
+        if scenario=="pre_guarded":
+            startup=b'''#!/bin/sh
+    # MIBR ISOTX2 GATE BEGIN
+    # Preload is enabled by default. A persistent disable marker or a missing
+    # gate library forces the exact stock DisplayManager command.
+    if [ -f /mnt/app/root/mibr-isotx2-gate-disable ] || [ ! -r /mnt/app/eso/lib/libmibr_isotx2_gate.so ]; then
+    MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &
+    else
+        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_guard.so:/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &
+    fi
+    # MIBR ISOTX2 GATE END
+'''
+            fixtures[app/"eso/lib/libmibr_isotx2_guard.so"]=guard_payload
+        else:
+            startup=b'#!/bin/sh\n        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &\n'
         fixtures[system/"etc/boot/startup.sh"]=startup.replace(b"/mnt/app",str(app).encode())
         fixtures[state/"mibr-carplay111-fps"]=b"old valid legacy fps\n"
         fixtures[state/"mibr-carplay111-nav.conf"]=b"exact pre-install legacy nav\n"
@@ -32,7 +46,7 @@ for scenario in ("normal","interrupted"):
         (pkg/"payload/direct-ts-parity").write_bytes(b"new bridge")
         (pkg/"payload/parity-session").write_text("#!/bin/sh\nexit 0\n")
         (pkg/"payload/alt111-settings").write_text("#!/bin/sh\nexit 0\n")
-        (pkg/"payload/libmibr_isotx2_guard.so").write_bytes(b"new standalone guard")
+        (pkg/"payload/libmibr_isotx2_guard.so").write_bytes(guard_payload)
         (pkg/"payload/sha256sum").write_text("#!/bin/sh\nexec /usr/bin/sha256sum \"$@\"\n")
         for path in (pkg/"payload").iterdir():path.chmod(0o755)
         for name in ("parity_profile.sh","parity_session.sh","parity_status.sh",
@@ -79,12 +93,20 @@ exec /bin/cp "$@"
         def run(name,arg=None):
             return subprocess.run(["bash",str(pkg/name)]+([arg] if arg else []),env=env,capture_output=True,text=True,timeout=8)
         cp=run("install.sh","--check");assert cp.returncode==0,cp.stdout+cp.stderr
+        if scenario=="pre_guarded":
+            assert "startup_mode=ALREADY_GUARDED_VERIFIED" in cp.stdout,cp.stdout
+            (app/"eso/lib/libmibr_isotx2_guard.so").write_bytes(b"wrong guard")
+            cp_bad=run("install.sh","--check")
+            assert cp_bad.returncode!=0 and "startup_guard_binary_mismatch" in cp_bad.stdout,cp_bad.stdout+cp_bad.stderr
+            (app/"eso/lib/libmibr_isotx2_guard.so").write_bytes(guard_payload)
+        else:
+            assert "startup_mode=PATCH_KNOWN_GATE" in cp.stdout,cp.stdout
         (app/"eso/lib/libmibr_isotx2_gate.so").write_bytes(b"unknown gate")
         assert run("install.sh","--check").returncode!=0,"unidentified gate accepted"
         (app/"eso/lib/libmibr_isotx2_gate.so").write_bytes(gate)
         if scenario=="interrupted":env["PARITY_TEST_INTERRUPT"]="1"
         cp=run("install.sh","--apply")
-        if scenario=="normal":
+        if scenario in ("normal","pre_guarded"):
             assert cp.returncode==0,cp.stdout+cp.stderr
             assert b"libmibr_isotx2_guard.so:" in (system/"etc/boot/startup.sh").read_bytes()
             assert (backup/"temp/mibr-carplay111-fps").read_bytes()==fixtures[state/"mibr-carplay111-fps"]
@@ -103,9 +125,10 @@ exec /bin/cp "$@"
         assert not (dst/"bin/direct-ts-parity").exists()
         assert not (dst/"bin/parity-session").exists()
         assert not (dst/"bin/alt111-settings").exists()
-        assert not (app/"eso/lib/libmibr_isotx2_guard.so").exists()
+        if scenario=="pre_guarded":assert (app/"eso/lib/libmibr_isotx2_guard.so").read_bytes()==guard_payload
+        else:assert not (app/"eso/lib/libmibr_isotx2_guard.so").exists()
         assert not (state/"mibr-carplay111-ownership.conf").exists()
         assert (state/"mibr-parity-rollback.pending").exists()
         assert (backup/"RESTORE_VERIFIED").exists()
         assert (backup/"bin/libaltscreen111.so").read_bytes()==old_gen
-print("PARITY_OVERLAY_ROLLBACK=PASS base_gate standalone_guard boot_preload shared_helper idempotency corrupt_backup interrupted_apply exact_restore temp_ABSENT reader_barrier retained_evidence")
+print("PARITY_OVERLAY_ROLLBACK=PASS base_gate standalone_guard boot_preload pre_guarded_vehicle_state guard_identity_gate shared_helper idempotency corrupt_backup interrupted_apply exact_restore temp_ABSENT reader_barrier retained_evidence")
