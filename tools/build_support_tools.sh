@@ -32,3 +32,11 @@ mkdir -p "$OUTDIR"
   -O2 -g -std=gnu99 -Wall -Wextra \
   src/native/qnx-bound-process-probe/bound_process_probe.c \
   -o "$OUTDIR/bound-process-probe"
+
+
+"$QCC" \
+  -mfloat-abi=softfp \
+  -O2 -g -std=gnu99 -Wall -Wextra \
+  src/native/tcp-capture/tcp_capture.c \
+  -lsocket \
+  -o "$OUTDIR/tcp-capture"
