@@ -30,27 +30,40 @@ int main(void) {
     first=assign_pts(&c,0xc0000000u,0xffffffffu,&rb);
     next=assign_pts(&c,0x40000000u,0u,&rb);
     assert(next-first==45000u);assert(c.source_rebases==0);
-    c.have_origin=0;c.have_previous_source=0;
-    first=assign_pts(&c,0xe0000000u,0xffffffffu,&rb);
-    next=assign_pts(&c,0u,0u,&rb);
-    assert(next-first==11250u); /* exact zero is valid at rollover */
-    c.have_origin=0;c.have_previous_source=0;
-    (void)assign_pts(&c,0,100,&rb);
-    (void)assign_pts(&c,0x40000000u,100,&rb);
+    c.have_origin=0;
+    first=assign_pts_presence(&c,0xe0000000u,0xffffffffu,1,&rb);
+    next=assign_pts_presence(&c,0u,0u,1,&rb);
+    assert(next-first==11250u); /* explicit exact-zero timestamp is valid at rollover */
+
+    c.have_origin=0;
+    (void)assign_pts_presence(&c,0,100,1,&rb);
+    (void)assign_pts_presence(&c,0x40000000u,100,1,&rb);
     rebases=c.source_rebases;
-    (void)assign_pts(&c,0x20000000u,100,&rb);
-    assert(c.source_rebases>rebases); /* rollback above the original origin */
+    next=assign_pts_presence(&c,0x20000000u,100,1,&rb);
+    assert(c.source_rebases==rebases); /* reference only re-anchors below the origin */
+    assert(next>0);                    /* monotonic clamp handles local rollback */
+
     rebases=c.source_rebases;
-    next=assign_pts(&c,0,3700,&rb);
-    assert(c.source_rebases>rebases);assert(next<c.transport_pcr90k+90000u);
-    c.have_origin=0;c.have_previous_source=0;
+    next=assign_pts_presence(&c,0,3700,1,&rb);
+    assert(c.source_rebases==rebases); /* no local-wall forward-jump heuristic */
+
+    c.have_origin=0;
     first=assign_pts_presence(&c,0,0,1,&rb);
-    assert(c.origin_is_source && c.have_previous_source);
+    assert(c.origin_is_source);
     next=assign_pts_presence(&c,0x40000000u,0,1,&rb);
     assert(next-first==22500u);
     (void)assign_pts_presence(&c,0,0,0,&rb);
-    assert(!c.origin_is_source && !c.have_previous_source);
+    assert(!c.origin_is_source);
+
+    c.have_origin=0;c.transport_pcr90k=45000;
+    first=assign_pts_presence(&c,0,200,1,&rb);
+    c.transport_pcr90k=first+30000u;
+    rebases=c.pts_rebases;
+    next=assign_pts_presence(&c,0x10000000u,200,1,&rb);
+    assert(rb);
+    assert(c.pts_rebases==rebases+1u);
+    assert(next>=c.transport_pcr90k+PTS_MIN_LEAD_90K);
     pthread_mutex_destroy(&c.lock);
-    puts("PARITY_BOUNDARY_REGRESSIONS=PASS AUD SPS_PPS borrow rollover rollback forward_jump zero_present null_absent");
+    puts("PARITY_BOUNDARY_REGRESSIONS=PASS AUD SPS_PPS borrow rollover origin_relative_rollback forward_jump_passthrough zero_present null_absent minimum_lead");
     return 0;
 }
