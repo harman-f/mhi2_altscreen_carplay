@@ -1213,7 +1213,7 @@ static int host_self_test(void) {
     memset(&c,0,sizeof(c)); pthread_mutex_init(&c.lock,NULL); c.transport_pcr90k=45000;
     p1=assign_pts(&c,0x80000000u,100,&rb); if(p1!=54000u)return 9;
     c.transport_pcr90k=45705; p2=assign_pts(&c,0xc0000000u,100,&rb); if(p2-p1!=22500u)return 10;
-    c.transport_pcr90k=p2+10000u;
+    c.transport_pcr90k=p2+30000u;
     {
         uint64_t before_rebases=c.pts_rebases;
         uint64_t p3=assign_pts(&c,0x00000000u,101,&rb);
