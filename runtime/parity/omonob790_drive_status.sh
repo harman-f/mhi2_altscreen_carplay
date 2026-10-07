@@ -152,9 +152,16 @@ echo "=== GATE ==="
 
 echo
 echo "=== SD EVIDENCE ==="
-if [ -d /net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive ]; then
+SDROOT=/net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive
+if [ -d "$SDROOT" ]; then
   echo "sd_logs=present"
-  ls -lt /net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive 2>/dev/null | head -8 || true
+  echo "sd_log_root=$SDROOT"
+  [ -r "$SDROOT/current.status" ] && echo "current_status=$SDROOT/current.status" || echo "current_status=missing"
+  [ -r "$SDROOT/current.statistics" ] && {
+    echo "current_statistics=$SDROOT/current.statistics"
+    cat "$SDROOT/current.statistics" 2>/dev/null || true
+  } || echo "current_statistics=missing"
+  ls -lt "$SDROOT" 2>/dev/null | head -8 || true
 else
   echo "sd_logs=missing"
 fi
