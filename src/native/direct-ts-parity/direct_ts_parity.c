@@ -134,6 +134,15 @@ struct clock_state {
     uint64_t pts_rebases;
     uint64_t source_rebases;
     uint64_t emitted_pts90k;
+    /* Observations only: acceptance is not proof of physical device drain. */
+    uint64_t writer_epoch_us;
+    uint64_t accepted_mono_us;
+    uint64_t accepted_pts90k;
+    uint64_t accepted_write_us_total;
+    uint64_t assigned_mono_us;
+    uint32_t assigned_frac;
+    uint32_t assigned_sec;
+    int assigned_source_present;
 };
 
 struct bridge_stats {
@@ -217,6 +226,7 @@ struct writer_ctx {
 };
 
 static volatile sig_atomic_t g_stop;
+static volatile sig_atomic_t g_stop_signal;
 static int g_status_enabled = 1;
 static pthread_mutex_t g_status_publish_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -237,7 +247,7 @@ static uint32_t le32(const uint8_t *p) {
            ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 
-static void on_signal(int sig) { (void)sig; g_stop = 1; }
+static void on_signal(int sig) { g_stop_signal = sig; g_stop = 1; }
 
 static uint32_t crc32_mpeg(const uint8_t *p, size_t n) {
     uint32_t crc = 0xffffffffu;
@@ -433,6 +443,10 @@ static uint64_t assign_pts_presence(struct clock_state *c, uint32_t frac, uint32
 
     if (pts <= c->last_pts90k) pts = c->last_pts90k + 1u;
     c->last_pts90k = pts;
+    c->assigned_mono_us = now_us;
+    c->assigned_frac = frac;
+    c->assigned_sec = sec;
+    c->assigned_source_present = source_valid;
     pthread_mutex_unlock(&c->lock);
     return pts;
 }
@@ -859,10 +873,13 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     unsigned qcount;
     size_t qpkts;
     if(!g_status_enabled)return;
-    struct bridge_stats snap; uint64_t pcr, rebase, source_rebase;
+    struct bridge_stats snap; struct clock_state clock_snap; uint64_t snapshot_mono_us;
     pthread_mutex_lock(&g_status_publish_lock);
     pthread_mutex_lock(&s->lock); snap = *s; pthread_mutex_unlock(&s->lock);
-    pthread_mutex_lock(&c->lock); pcr=c->transport_pcr90k; rebase=c->pts_rebases; source_rebase=c->source_rebases; pthread_mutex_unlock(&c->lock);
+    pthread_mutex_lock(&c->lock);
+    clock_snap = *c;
+    snapshot_mono_us = monotonic_us();
+    pthread_mutex_unlock(&c->lock);
     pthread_mutex_lock(&q->lock); qcount=q->count; qpkts=q->packets_queued; pthread_mutex_unlock(&q->lock);
     /*
      * Exact MU1440: /tmp aliases /dev/shmem and native temp+rename publication
@@ -879,13 +896,22 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"transport_pacer=device_driver_backpressure_file_absolute\n");
     fprintf(f,"transport_clock_model=accepted_12032_byte_blocks\n");
     fprintf(f,"hardware_drain_validation=required\n");
-    pthread_mutex_lock(&c->lock);
     fprintf(f,"last_emitted_pts90k=%llu\nemission_shift90k=0\n",
-        (unsigned long long)c->emitted_pts90k);
+        (unsigned long long)clock_snap.emitted_pts90k);
     fprintf(f,"pts_pcr_lead90k=%lld\npts_pcr_lead_ms=%lld\n",
-        (long long)c->emitted_pts90k - (long long)c->transport_pcr90k,
-        ((long long)c->emitted_pts90k - (long long)c->transport_pcr90k) * 1000ll / 90000ll);
-    pthread_mutex_unlock(&c->lock);
+        (long long)clock_snap.emitted_pts90k - (long long)clock_snap.transport_pcr90k,
+        ((long long)clock_snap.emitted_pts90k - (long long)clock_snap.transport_pcr90k) * 1000ll / 90000ll);
+    fprintf(f,"clock_snapshot_mono_us=%llu\nwriter_epoch_mono_us=%llu\naccepted_mono_us=%llu\naccepted_blocks=%llu\naccepted_pts90k=%llu\naccepted_write_us_total=%llu\n",
+        (unsigned long long)snapshot_mono_us,
+        (unsigned long long)clock_snap.writer_epoch_us,
+        (unsigned long long)clock_snap.accepted_mono_us,
+        (unsigned long long)(clock_snap.physical_packets/MOST_BLOCK_PACKETS),
+        (unsigned long long)clock_snap.accepted_pts90k,
+        (unsigned long long)clock_snap.accepted_write_us_total);
+    fprintf(f,"assigned_mono_us=%llu\nassigned_pts90k=%llu\nassigned_source_frac=0x%08x\nassigned_source_sec=0x%08x\nassigned_source_present=%d\n",
+        (unsigned long long)clock_snap.assigned_mono_us,
+        (unsigned long long)clock_snap.last_pts90k,
+        clock_snap.assigned_frac,clock_snap.assigned_sec,clock_snap.assigned_source_present);
     fprintf(f,"transport_bps=%u\n",TRANSPORT_BPS);
     fprintf(f,"pat_pid=0x%04x\npmt_pid=0x%04x\npcr_pid=0x%04x\nvideo_pid=0x%04x\n",PID_PAT,PID_PMT,PID_PCR,PID_VIDEO);
     fprintf(f,"most_block_bytes=%u\n",MOST_BLOCK_BYTES);
@@ -896,8 +922,8 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"driver_packet_size_rc=%d\ndriver_packet_size_value=%u\n",snap.driver_packet_size_rc,snap.driver_packet_size_value);
     fprintf(f,"driver_block_count_rc=%d\ndriver_block_count_value=%u\n",snap.driver_block_count_rc,snap.driver_block_count_value);
     fprintf(f,"driver_flush_rc=%d\ndriver_start_rc=%d\n",snap.driver_flush_rc,snap.driver_start_rc);
-    fprintf(f,"transport_pcr90k=%llu\n",(unsigned long long)pcr);
-    fprintf(f,"pts_rebases=%llu\nsource_rebases=%llu\n",(unsigned long long)rebase,(unsigned long long)source_rebase);
+    fprintf(f,"transport_pcr90k=%llu\n",(unsigned long long)clock_snap.transport_pcr90k);
+    fprintf(f,"pts_rebases=%llu\nsource_rebases=%llu\n",(unsigned long long)clock_snap.pts_rebases,(unsigned long long)clock_snap.source_rebases);
     fprintf(f,"input_records=%llu\ninput_bytes=%llu\ninput_idrs=%llu\ninput_non_idr_aus=%llu\nsequence_gaps=%llu\n",
         (unsigned long long)snap.input_records,(unsigned long long)snap.input_bytes,
         (unsigned long long)snap.input_idrs,
@@ -980,9 +1006,13 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
     return off==n?0:-1;
 }
 
-static void update_transport_clock(struct clock_state *c, uint64_t packets) {
+static void update_transport_clock(struct clock_state *c, uint64_t packets,
+                                   uint64_t accepted_us, uint64_t write_us) {
     pthread_mutex_lock(&c->lock);
     c->physical_packets = packets;
+    c->accepted_mono_us = accepted_us;
+    c->accepted_pts90k = c->emitted_pts90k;
+    c->accepted_write_us_total += write_us;
     c->transport_pcr90k = TRANSPORT_PCR_BASE + (packets * TRANSPORT_TICKS_NUM) / TRANSPORT_TICKS_DEN;
     pthread_mutex_unlock(&c->lock);
 }
@@ -991,6 +1021,9 @@ static void *writer_main(void *arg) {
     struct writer_ctx *w=(struct writer_ctx*)arg;
     uint8_t block[MOST_BLOCK_BYTES]; uint64_t packet_index=0;
     uint64_t epoch = monotonic_us(), max_device_write_us = 0;
+    pthread_mutex_lock(&w->clock->lock);
+    w->clock->writer_epoch_us = epoch;
+    pthread_mutex_unlock(&w->clock->lock);
     w->next_pat_packet=0; w->next_pmt_packet=1; w->next_pcr_packet=2;
     for (;;) {
         unsigned i;
@@ -1020,7 +1053,7 @@ static void *writer_main(void *arg) {
             uint64_t block_starts=0u,block_completes=0u,block_idr_starts=0u,block_non_idr_starts=0u;
             uint64_t block_idr_completes=0u,block_non_idr_completes=0u;
             uint64_t slice_start[6]={0,0,0,0,0,0},slice_complete[6]={0,0,0,0,0,0};
-            uint64_t write_start,write_us,blocks_now;
+            uint64_t write_start,write_end,write_us,blocks_now;
             for(i=0;i<MOST_BLOCK_PACKETS;++i) {
                 uint8_t *p=block+i*TS_SIZE;
                 uint64_t pcr=TRANSPORT_PCR_BASE + (packet_index * TRANSPORT_TICKS_NUM) / TRANSPORT_TICKS_DEN;
@@ -1050,7 +1083,8 @@ static void *writer_main(void *arg) {
             }
             write_start = monotonic_us();
             if(write_full(w->fd,block,sizeof(block),w->stats)!=0) goto failed;
-            write_us = monotonic_us() - write_start;
+            write_end = monotonic_us();
+            write_us = write_end - write_start;
             pthread_mutex_lock(&w->stats->lock);
             w->stats->last_write_us=write_us;
             if(write_us>w->stats->max_write_us)w->stats->max_write_us=write_us;
@@ -1083,7 +1117,7 @@ static void *writer_main(void *arg) {
                             (unsigned long long)write_us,
                             (unsigned long long)(packet_index / MOST_BLOCK_PACKETS));
             }
-            update_transport_clock(w->clock,packet_index);
+            update_transport_clock(w->clock,packet_index,write_end,write_us);
             if((blocks_now & 127u)==0u)publish_status(w->stats,w->clock,w->queue,"running");
         }
         /* EOF is acknowledged only after the writer-local block is committed. */
@@ -1237,7 +1271,7 @@ static int host_self_test(void) {
 }
 
 int main(int argc,char **argv) {
-    const char *input,*output;int in_fd=-1,out_fd=-1,regular_file=0,rc=1;
+    const char *input,*output,*exit_reason="startup_error";int in_fd=-1,out_fd=-1,regular_file=0,rc=1;
     struct stat st;pthread_t writer;int writer_started=0;
     struct au_queue queue;struct clock_state clock;struct bridge_stats stats;struct writer_ctx wctx;
     uint8_t *param_cache=NULL;size_t param_cache_n=0;uint64_t prev_seq=0;
@@ -1270,14 +1304,26 @@ int main(int argc,char **argv) {
     publish_status(&stats,&clock,&queue,"running");
     fprintf(stderr,"PARITY_START input=%s output=%s transport_bps=%u block=%u pids=pat:0x0,pmt:0x10,pcr:0x1000,video:0x11\n",input,output,TRANSPORT_BPS,MOST_BLOCK_BYTES);
 
+    exit_reason="running";
     while(!g_stop){
         uint8_t h[M1AU_HEADER_BYTES];uint32_t flags,payload_n,frac,sec;uint64_t stream,codec,consumer,seq,pts;uint8_t *payload=NULL,*norm=NULL,*packets=NULL;size_t norm_n=0,packet_count=0;int rr,idr,rebased=0;unsigned slice_class=AU_SLICE_UNKNOWN;struct ts_au au;
-        rr=recv_exact(in_fd,h,sizeof(h));if(rr<=0){if(rr==0&&!g_stop)rc=0;break;}
-        if(memcmp(h,"M1AU",4)||be16(h+4)!=1u||be16(h+6)!=M1AU_HEADER_BYTES){fprintf(stderr,"ERROR invalid M1AU header\n");break;}
+        rr=recv_exact(in_fd,h,sizeof(h));
+        if(rr<=0){
+            if(g_stop_signal){rc=128+g_stop_signal;exit_reason="signal_stop";}
+            else if(rr==0&&!g_stop){rc=0;exit_reason="input_eof";}
+            else exit_reason="input_header_read_error";
+            break;
+        }
+        if(memcmp(h,"M1AU",4)||be16(h+4)!=1u||be16(h+6)!=M1AU_HEADER_BYTES){fprintf(stderr,"ERROR invalid M1AU header\n");exit_reason="invalid_header";break;}
         flags=be32(h+8);payload_n=be32(h+12);stream=be64(h+16);codec=be64(h+24);consumer=be64(h+32);seq=be64(h+40);frac=le32(h+48);sec=le32(h+52);idr=(flags&M1AU_FLAG_IDR)?1:0;
-        if(!payload_n||payload_n>M1AU_MAX_PAYLOAD){fprintf(stderr,"ERROR invalid M1AU payload=%u\n",payload_n);break;}
-        payload=(uint8_t*)malloc(payload_n);if(!payload)break;
-        rr=recv_exact(in_fd,payload,payload_n);if(rr<=0){free(payload);break;}
+        if(!payload_n||payload_n>M1AU_MAX_PAYLOAD){fprintf(stderr,"ERROR invalid M1AU payload=%u\n",payload_n);exit_reason="invalid_payload_size";break;}
+        payload=(uint8_t*)malloc(payload_n);if(!payload){exit_reason="allocation_error";break;}
+        rr=recv_exact(in_fd,payload,payload_n);if(rr<=0){
+            free(payload);
+            if(g_stop_signal){rc=128+g_stop_signal;exit_reason="signal_stop";}
+            else exit_reason="input_payload_read_error";
+            break;
+        }
         if(!prev_stream)request_keyframe(ALT111_KF_BRIDGE_READY,stream,codec,consumer,seq);
         if(payload_n>REFERENCE_PRODUCER_PAYLOAD_LIMIT) {
             free(payload); waiting_idr=1; discontinuity=1;
@@ -1322,31 +1368,39 @@ int main(int argc,char **argv) {
          * decisions. This bridge requests only startup/gap/latency recovery. */
         if(waiting_idr&&!idr){pthread_mutex_lock(&stats.lock);++stats.dropped_wait_idr;pthread_mutex_unlock(&stats.lock);free(payload);publish_status(&stats,&clock,&queue,"waiting_idr");continue;}
         if(idr&&waiting_idr){waiting_idr=0;pthread_mutex_lock(&stats.lock);stats.waiting_idr=0;pthread_mutex_unlock(&stats.lock);}
-        if(normalize_au(payload,payload_n,idr,&param_cache,&param_cache_n,&norm,&norm_n)!=0){free(payload);break;}free(payload);
+        if(normalize_au(payload,payload_n,idr,&param_cache,&param_cache_n,&norm,&norm_n)!=0){free(payload);exit_reason="normalization_error";break;}free(payload);
         pts=assign_pts_presence(&clock,frac,sec,
             flags&M1AU_FLAG_TIME_KNOWN ? !!(flags&M1AU_FLAG_TIME_PRESENT) : -1,&rebased);
-        if(packetize_pes(norm,norm_n,pts,idr,discontinuity,&cc_video,&packets,&packet_count)!=0){free(norm);break;}free(norm);discontinuity=0;
+        if(packetize_pes(norm,norm_n,pts,idr,discontinuity,&cc_video,&packets,&packet_count)!=0){free(norm);exit_reason="packetization_error";break;}free(norm);discontinuity=0;
         memset(&au,0,sizeof(au));au.packets=packets;au.packet_count=packet_count;au.sequence=seq;au.pts90k=pts;au.idr=idr;au.slice_class=slice_class;
-        if(queue_push(&queue,&au)!=0){free(au.packets);break;}
+        if(queue_push(&queue,&au)!=0){
+            free(au.packets);
+            if(g_stop_signal){rc=128+g_stop_signal;exit_reason="signal_stop";}
+            else exit_reason="queue_stopped";
+            break;
+        }
         pthread_mutex_lock(&stats.lock);++stats.aus_queued;stats.pes_packets+=packet_count;stats.last_pts=pts;pthread_mutex_unlock(&stats.lock);
         if(rebased)fprintf(stderr,"PARITY_PTS_REBASE seq=%llu pcr=%llu pts=%llu\n",(unsigned long long)seq,(unsigned long long)clock_pcr_now(&clock),(unsigned long long)pts);
         publish_status(&stats,&clock,&queue,"running");
+    }
+    if(g_stop_signal && !strcmp(exit_reason,"running")) {
+        rc=128+g_stop_signal;exit_reason="signal_stop";
     }
     /* A clean input EOF must not discard complete AUs that are already queued.
      * Drain the AU/PES queue before stopping the continuous writer. */
     if (!g_stop && queue_wait_empty(&queue, 10000u) != 0) {
         fprintf(stderr,"ERROR graceful queue drain timeout\n");
-        rc=1;
+        rc=1;exit_reason="queue_drain_timeout";
     }
 
 done:
-    if (g_stop && rc==0) rc=130;
+    if (g_stop_signal && rc==0) {rc=128+g_stop_signal;exit_reason="signal_stop";}
     if (rc!=0) queue_recover_au_boundary(&queue,NULL,NULL,NULL);
     pthread_mutex_lock(&queue.lock); queue.input_done=1; pthread_mutex_unlock(&queue.lock);
     g_stop=1;
     queue_stop(&queue);
     if(writer_started)pthread_join(writer,NULL);
-    if(stats.write_errors)rc=1;
+    if(stats.write_errors){rc=1;exit_reason="writer_error";}
     publish_status(&stats,&clock,&queue,rc==0?"done":"error");
     if(in_fd>=0)close(in_fd);
     if(out_fd>=0)close(out_fd);
@@ -1354,6 +1408,8 @@ done:
     queue_destroy(&queue);
     pthread_mutex_destroy(&clock.lock);
     pthread_mutex_destroy(&stats.lock);
+    fprintf(stderr,"PARITY_EXIT reason=%s signal=%d rc=%d write_errors=%llu\n",
+        exit_reason,(int)g_stop_signal,rc,(unsigned long long)stats.write_errors);
     fprintf(stderr,"PARITY_DONE rc=%d\n",rc);
     return rc;
 }
