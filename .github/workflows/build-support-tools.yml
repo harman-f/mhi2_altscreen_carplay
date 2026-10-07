@@ -11,6 +11,7 @@ on:
       - 'src/native/tee-compat/**'
       - 'src/native/qnx-shmem-probe/**'
       - 'src/native/qnx-bound-process-probe/**'
+      - 'src/native/tcp-capture/**'
       - 'tools/build_support_tools.sh'
   push:
     branches: [ main ]
@@ -20,6 +21,7 @@ on:
       - 'src/native/most-ts-writer/**'
       - 'src/native/sha256sum-compat/**'
       - 'src/native/tee-compat/**'
+      - 'src/native/tcp-capture/**'
       - 'tools/build_support_tools.sh'
 
 permissions:
@@ -191,7 +193,7 @@ jobs:
         run: |
           set -euxo pipefail
 
-          for f in libmibr_isotx2_gate.so gate_selftest_qnx most-ts-writer sha256sum tee shmem-fs-probe bound-process-probe; do
+          for f in libmibr_isotx2_gate.so gate_selftest_qnx most-ts-writer sha256sum tee shmem-fs-probe bound-process-probe tcp-capture; do
             file "build/support-tools/$f"
 
             docker run --rm --platform=linux/amd64 \
