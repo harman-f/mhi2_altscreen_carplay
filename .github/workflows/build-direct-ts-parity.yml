@@ -1,4 +1,4 @@
-name: Build MU1440 Omonob790 functional-parity bridge
+name: Build MU1440 parity-drive bridge
 
 on:
   workflow_dispatch:
@@ -22,10 +22,10 @@ on:
       - 'tools/generate_alt111_settings.py'
       - 'tools/build_alt111_settings.sh'
       - 'tests/alt111_*'
-      - 'deployment/mu1440-omonob790-parity-v1/**'
-      - 'tools/prepare_mu1440_omonob790_parity_v1_overlay.sh'
+      - 'deployment/mu1440-parity-drive-v1/**'
+      - 'tools/prepare_mu1440_parity_drive_v1_overlay.sh'
   push:
-    branches: [ main, codex/omonob790-regression-hardening-v1 ]
+    branches: [ main, codex/mu1440-parity-drive-v1 ]
     paths:
       - '.github/workflows/build-direct-ts-parity.yml'
       - 'src/native/direct-ts-parity/**'
@@ -45,14 +45,14 @@ on:
       - 'tools/generate_alt111_settings.py'
       - 'tools/build_alt111_settings.sh'
       - 'tests/alt111_*'
-      - 'deployment/mu1440-omonob790-parity-v1/**'
-      - 'tools/prepare_mu1440_omonob790_parity_v1_overlay.sh'
+      - 'deployment/mu1440-parity-drive-v1/**'
+      - 'tools/prepare_mu1440_parity_drive_v1_overlay.sh'
 
 permissions:
   contents: read
 
 concurrency:
-  group: mu1440-omonob790-parity-${{ github.ref }}
+  group: mu1440-parity-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -135,27 +135,27 @@ jobs:
           grep -Fq 'restore=/eso/bin/apps/dmdt dc 70 33 ; /eso/bin/apps/dmdt sc 4 70' /tmp/parity-session-selftest.txt
           grep -Fq 'dmdt_timeout_ms=5000' /tmp/parity-session-selftest.txt
           grep -Fq 'watchdog_margin_seconds=20' /tmp/parity-session-selftest.txt
-          bash -n runtime/parity/omonob790_profile.sh
-          bash -n runtime/parity/omonob790_session.sh
-          bash -n runtime/parity/omonob790_status.sh
-          bash -n runtime/parity/omonob790_drive_supervisor.sh
-          bash -n runtime/parity/omonob790_drive_enable.sh
-          bash -n runtime/parity/omonob790_drive_disable.sh
-          bash -n runtime/parity/omonob790_drive_status.sh
-          ! grep -Eq '(^|[;&|[:space:]])kill([[:space:]]|$)' runtime/parity/omonob790_drive_*.sh
-          grep -Fq 'mount -uw /net/mmx/fs/sda0' runtime/parity/omonob790_drive_supervisor.sh
-          grep -Fq '/net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive' runtime/parity/omonob790_drive_supervisor.sh
-          grep -Fq 'DEFAULT_SECONDS=0' runtime/parity/omonob790_drive_supervisor.sh
-          grep -Fq 'status-snapshots.log' runtime/parity/omonob790_drive_supervisor.sh
-          grep -Fq 'current.status' runtime/parity/omonob790_drive_supervisor.sh
-          grep -Fq 'current.statistics' runtime/parity/omonob790_drive_supervisor.sh
-          grep -Fq 'gen2_source_fps' runtime/parity/omonob790_drive_supervisor.sh
-          grep -Fq 'parity_input_non_idr_fps' runtime/parity/omonob790_drive_supervisor.sh
-          grep -Fq 'mibr-parity-statistics-enabled' runtime/parity/omonob790_drive_status.sh
+          bash -n runtime/parity/parity_profile.sh
+          bash -n runtime/parity/parity_session.sh
+          bash -n runtime/parity/parity_status.sh
+          bash -n runtime/parity/parity_drive_supervisor.sh
+          bash -n runtime/parity/parity_drive_enable.sh
+          bash -n runtime/parity/parity_drive_disable.sh
+          bash -n runtime/parity/parity_drive_status.sh
+          ! grep -Eq '(^|[;&|[:space:]])kill([[:space:]]|$)' runtime/parity/parity_drive_*.sh
+          grep -Fq 'mount -uw /net/mmx/fs/sda0' runtime/parity/parity_drive_supervisor.sh
+          grep -Fq '/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive' runtime/parity/parity_drive_supervisor.sh
+          grep -Fq 'DEFAULT_SECONDS=0' runtime/parity/parity_drive_supervisor.sh
+          grep -Fq 'status-snapshots.log' runtime/parity/parity_drive_supervisor.sh
+          grep -Fq 'current.status' runtime/parity/parity_drive_supervisor.sh
+          grep -Fq 'current.statistics' runtime/parity/parity_drive_supervisor.sh
+          grep -Fq 'gen2_source_fps' runtime/parity/parity_drive_supervisor.sh
+          grep -Fq 'parity_input_non_idr_fps' runtime/parity/parity_drive_supervisor.sh
+          grep -Fq 'mibr-parity-statistics-enabled' runtime/parity/parity_drive_status.sh
           grep -Fq 'output_non_idr_aus_completed' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'output_slice_p_completed' src/native/direct-ts-parity/direct_ts_parity.c
           bash -n runtime/diagnostics/gen2_compat_profile.sh
-          grep -Fq '"$HELPER" preset --preset omonob790' runtime/parity/omonob790_profile.sh
+          grep -Fq '"$HELPER" preset --preset classic_single_view' runtime/parity/parity_profile.sh
           grep -Fq 'alt111_policy_au(&g2_policy,g2_video.stream' src/native/altscreen111-gen2/libaltscreen111_gen2.c
           grep -Fq 'O_WRONLY|O_NONBLOCK' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'DRIVER_DCMD_GET_INTERFACE 0x4004050c' src/native/direct-ts-parity/direct_ts_parity.c
@@ -250,7 +250,7 @@ jobs:
           grep -q 'Machine:.*ARM' "$OUTDIR/GUARD_ELF_HEADER.txt"
           EXPECTED_BRIDGE=$(sha256sum "$BIN" | awk '{print $1}')
           grep -Fq "$EXPECTED_BRIDGE" "$OUTDIR/SESSION_STRINGS.txt"
-          grep -Fq 'architecture=omonob790-functional-parity-cleanroom' "$OUTDIR/STRINGS.txt"
+          grep -Fq 'architecture=mu1440-parity-cleanroom' "$OUTDIR/STRINGS.txt"
           grep -Fq 'source_clock=stream111-32.32' "$OUTDIR/STRINGS.txt"
           grep -Fq 'pts_clock=source-derived-90khz' "$OUTDIR/STRINGS.txt"
           grep -Fq 'frame_pacer=none' "$OUTDIR/STRINGS.txt"
@@ -272,7 +272,7 @@ jobs:
           sha256sum "$SESSION" | tee "$OUTDIR/parity-session.sha256"
           cat > "$OUTDIR/BUILDINFO.txt" <<INFO
           artifact=direct-ts-parity
-          architecture=omonob790-functional-parity-cleanroom
+          architecture=mu1440-parity-cleanroom
           target=$TARGET_FIRMWARE
           qnx=6.5-armv7-softfp
           source_commit=${{ github.event.pull_request.head.sha || github.sha }}
@@ -297,11 +297,11 @@ jobs:
           SOURCE_HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          bash tools/prepare_mu1440_omonob790_parity_v1_overlay.sh "$OUTDIR/package" "$OUTDIR/libaltscreen111.so" "$OUTDIR/direct-ts-parity" "$OUTDIR/parity-session"
+          bash tools/prepare_mu1440_parity_drive_v1_overlay.sh "$OUTDIR/package" "$OUTDIR/libaltscreen111.so" "$OUTDIR/direct-ts-parity" "$OUTDIR/parity-session"
           (cd "$OUTDIR/package"; sha256sum -c PACKAGE-SHA256SUMS.txt)
           while IFS= read -r script; do bash -n "$script"; done < <(find "$OUTDIR/package" -name '*.sh' -type f)
           grep -Fxq "source_head_commit=$SOURCE_HEAD_COMMIT" "$OUTDIR/package/CANDIDATE-MANIFEST.txt"
-          tar -czf "$OUTDIR/omonob790-hardened-candidate.tar.gz" -C "$OUTDIR" package
+          tar -czf "$OUTDIR/mu1440-parity-drive-candidate.tar.gz" -C "$OUTDIR" package
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -324,4 +324,4 @@ jobs:
             ${{ env.OUTDIR }}/libmibr_isotx2_guard.so
             ${{ env.OUTDIR }}/GUARD_ELF_HEADER.txt
             ${{ env.OUTDIR }}/decode-evidence/
-            ${{ env.OUTDIR }}/omonob790-hardened-candidate.tar.gz
+            ${{ env.OUTDIR }}/mu1440-parity-drive-candidate.tar.gz

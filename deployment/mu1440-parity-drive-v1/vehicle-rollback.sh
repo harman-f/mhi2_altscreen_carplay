@@ -15,7 +15,7 @@ cd "$ROOT" || exit 2
 . "$ROOT/runtime/package-logging.sh" || exit 20
 package_log_init master-rollback || { echo "PACKAGE_LOG_BOOTSTRAP=FAIL"; exit 20; }
 
-echo "=== OMONOB790 PARITY VEHICLE ROLLBACK ==="
+echo "=== PARITY DRIVE VEHICLE ROLLBACK ==="
 mibr_run_logged "$ROOT/uninstall.sh"
 RC=$?
 if [ "$RC" -ne 0 ]; then

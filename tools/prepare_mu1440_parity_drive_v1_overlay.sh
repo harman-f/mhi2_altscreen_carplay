@@ -3,9 +3,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="${1:-}"
-GEN2="${2:-build/omonob790-parity/libaltscreen111.so}"
-BRIDGE="${3:-build/omonob790-parity/direct-ts-parity}"
-SESSION="${4:-build/omonob790-parity/parity-session}"
+GEN2="${2:-build/mu1440-parity-drive/libaltscreen111.so}"
+BRIDGE="${3:-build/mu1440-parity-drive/direct-ts-parity}"
+SESSION="${4:-build/mu1440-parity-drive/parity-session}"
 SETTINGS="${5:-$(dirname "$GEN2")/alt111-settings}"
 GUARD="${6:-$(dirname "$GEN2")/libmibr_isotx2_guard.so}"
 
@@ -23,7 +23,7 @@ done
 mkdir -p "$DEST/payload" "$DEST/runtime"
 
 for f in install.sh uninstall.sh status.sh collect-logs.sh vehicle-install.sh vehicle-rollback.sh; do
-  cp "$ROOT/deployment/mu1440-omonob790-parity-v1/$f" "$DEST/$f"
+  cp "$ROOT/deployment/mu1440-parity-drive-v1/$f" "$DEST/$f"
 done
 
 cp "$GEN2" "$DEST/payload/libaltscreen111.so"
@@ -33,15 +33,15 @@ cp "$SETTINGS" "$DEST/payload/alt111-settings"
 cp "$GUARD" "$DEST/payload/libmibr_isotx2_guard.so"
 cp "$SHAHELP" "$DEST/payload/sha256sum"
 
-cp "$ROOT/deployment/mu1440-omonob790-parity-v1/session-logging.sh" "$DEST/runtime/session-logging.sh"
-cp "$ROOT/deployment/mu1440-omonob790-parity-v1/package-logging.sh" "$DEST/runtime/package-logging.sh"
-cp "$ROOT/runtime/parity/omonob790_profile.sh" "$DEST/runtime/omonob790_profile.sh"
-cp "$ROOT/runtime/parity/omonob790_session.sh" "$DEST/runtime/omonob790_session.sh"
-cp "$ROOT/runtime/parity/omonob790_status.sh" "$DEST/runtime/omonob790_status.sh"
-cp "$ROOT/runtime/parity/omonob790_drive_supervisor.sh" "$DEST/runtime/omonob790_drive_supervisor.sh"
-cp "$ROOT/runtime/parity/omonob790_drive_enable.sh" "$DEST/runtime/omonob790_drive_enable.sh"
-cp "$ROOT/runtime/parity/omonob790_drive_disable.sh" "$DEST/runtime/omonob790_drive_disable.sh"
-cp "$ROOT/runtime/parity/omonob790_drive_status.sh" "$DEST/runtime/omonob790_drive_status.sh"
+cp "$ROOT/deployment/mu1440-parity-drive-v1/session-logging.sh" "$DEST/runtime/session-logging.sh"
+cp "$ROOT/deployment/mu1440-parity-drive-v1/package-logging.sh" "$DEST/runtime/package-logging.sh"
+cp "$ROOT/runtime/parity/parity_profile.sh" "$DEST/runtime/parity_profile.sh"
+cp "$ROOT/runtime/parity/parity_session.sh" "$DEST/runtime/parity_session.sh"
+cp "$ROOT/runtime/parity/parity_status.sh" "$DEST/runtime/parity_status.sh"
+cp "$ROOT/runtime/parity/parity_drive_supervisor.sh" "$DEST/runtime/parity_drive_supervisor.sh"
+cp "$ROOT/runtime/parity/parity_drive_enable.sh" "$DEST/runtime/parity_drive_enable.sh"
+cp "$ROOT/runtime/parity/parity_drive_disable.sh" "$DEST/runtime/parity_drive_disable.sh"
+cp "$ROOT/runtime/parity/parity_drive_status.sh" "$DEST/runtime/parity_drive_status.sh"
 cp "$ROOT/runtime/diagnostics/gen2_compat_profile.sh" "$DEST/runtime/gen2_compat_profile.sh"
 cp "$ROOT/runtime/master/master_settings.sh" "$DEST/runtime/master_settings.sh"
 cp "$ROOT/runtime/master/direct_fps.sh" "$DEST/runtime/direct_fps.sh"
@@ -62,7 +62,7 @@ chmod +x "$DEST/"*.sh "$DEST/payload/"* "$DEST/runtime/"*.sh
 
 (
   cd "$DEST"
-  sha256sum     payload/libaltscreen111.so     payload/direct-ts-parity     payload/parity-session     payload/alt111-settings     payload/libmibr_isotx2_guard.so     payload/sha256sum     install.sh     uninstall.sh     status.sh     collect-logs.sh     vehicle-install.sh     vehicle-rollback.sh     runtime/omonob790_profile.sh     runtime/omonob790_session.sh     runtime/omonob790_status.sh     runtime/omonob790_drive_supervisor.sh     runtime/omonob790_drive_enable.sh     runtime/omonob790_drive_disable.sh     runtime/omonob790_drive_status.sh     runtime/gen2_compat_profile.sh     runtime/settings-basenames.sh     runtime/session-logging.sh     runtime/package-logging.sh     runtime/master-script-basenames.sh     runtime/master_settings.sh runtime/direct_fps.sh runtime/gen2_sourceversion.sh runtime/gen2_enabled.sh runtime/gen2_display.sh runtime/gen2_keyframes.sh runtime/gen2_viewareas.sh runtime/gen2_safearea.sh runtime/gen2_nav_config.sh runtime/gen2_url.sh runtime/gen2_ui_urls.sh     HMI-BINDINGS.json     > PAYLOAD.sha256
+  sha256sum     payload/libaltscreen111.so     payload/direct-ts-parity     payload/parity-session     payload/alt111-settings     payload/libmibr_isotx2_guard.so     payload/sha256sum     install.sh     uninstall.sh     status.sh     collect-logs.sh     vehicle-install.sh     vehicle-rollback.sh     runtime/parity_profile.sh     runtime/parity_session.sh     runtime/parity_status.sh     runtime/parity_drive_supervisor.sh     runtime/parity_drive_enable.sh     runtime/parity_drive_disable.sh     runtime/parity_drive_status.sh     runtime/gen2_compat_profile.sh     runtime/settings-basenames.sh     runtime/session-logging.sh     runtime/package-logging.sh     runtime/master-script-basenames.sh     runtime/master_settings.sh runtime/direct_fps.sh runtime/gen2_sourceversion.sh runtime/gen2_enabled.sh runtime/gen2_display.sh runtime/gen2_keyframes.sh runtime/gen2_viewareas.sh runtime/gen2_safearea.sh runtime/gen2_nav_config.sh runtime/gen2_url.sh runtime/gen2_ui_urls.sh     HMI-BINDINGS.json     > PAYLOAD.sha256
 )
 
 GEN2_SHA=$(sha256sum "$GEN2" | awk '{print $1}')
@@ -72,7 +72,7 @@ SOURCE_HEAD_COMMIT_VALUE=${SOURCE_HEAD_COMMIT:-${GITHUB_SHA:-local}}
 CI_MERGE_COMMIT_VALUE=${CI_MERGE_COMMIT:-}
 
 cat > "$DEST/CANDIDATE-MANIFEST.txt" <<EOF
-candidate=omonob790-functional-parity-v1
+candidate=mu1440-parity-drive-v1
 target=MHI2_ER_SKG13_P4526_MU1440
 cluster=AID10-class
 source_head_commit=$SOURCE_HEAD_COMMIT_VALUE
@@ -128,7 +128,7 @@ dmdt_timeout_ms=5000
 session_watchdog_margin_seconds=20
 session_until_stop_supported=1
 drive_default_session_seconds=0
-drive_sd_log_root=/net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive
+drive_sd_log_root=/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive
 drive_sd_write_required=1
 diagnostics_status_default=1
 diagnostics_statistics_default=1
@@ -139,7 +139,7 @@ recovery=au_pes_boundary_safe
 reference_mid_pes_flush=deliberately_not_reproduced
 navignore=existing_control_plane_substrate_not_part_of_media_parity
 runtime_state=flat_tmp_files
-sd_log_export=/net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity
+sd_log_export=/net/mmx/fs/sda0/esd/carplay-test/logs/parity
 EOF
 
 if [[ -n "$CI_MERGE_COMMIT_VALUE" ]]; then
@@ -171,16 +171,16 @@ logging bootstrap or logger failure prevents a successful result.
 
 After reboot, before connecting CarPlay:
   ksh ./status.sh
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_profile.sh dual-temp
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_profile.sh dual-temp
 
 The dual preset advertises both areas. Keep selected area 0 for ownership/media
 qualification. The reference one-area preset is available through 'temp'.
 Preset application is one shared transaction and requires real CarPlay reconnect.
 Connect CarPlay, open Maps/Waze, confirm Stream-111 streaming, then:
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_session.sh 60
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_session.sh 60
 
 For a guarded until-stop manual session:
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_session.sh 0
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_session.sh 0
 
 The native owner reads one validated backend snapshot. writev_gate is initial:
 it requires current native FD tracking, completed in-flight writes and a new
@@ -196,13 +196,13 @@ Its result is OWNERSHIP_UNPROVEN, followed by dc70-33/sc4-70 restore.
 No automatic gate fallback or composed DMDT+gate comparison is provided.
 
 Stop and explicit reconciliation:
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_session.sh stop
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_session.sh restore-stock
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_session.sh stop
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_session.sh restore-stock
 
 Guarded long-run/drive mode (optional, disabled until explicitly enabled):
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_enable.sh
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_disable.sh
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_drive_enable.sh
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_drive_status.sh
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_drive_disable.sh
 
 Drive mode launches no stock-process restart. It waits for Stream-111, then
 runs the same token-bound parity owner in until-stop mode and re-enters only
@@ -212,15 +212,15 @@ exit, gate-proof loss, explicit token stop or supervisor failure restores stock.
 Drive evidence is SD-only. The supervisor remounts
 /net/mmx/fs/sda0 writable and verifies a real write before starting parity.
 Logs are stored under:
-  /net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive/
+  /net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive/
 The SD is synced periodically and remounted read-only on supervisor cleanup.
 
 Raw status snapshots and compact one-second statistics are independently
 switchable for future sessions:
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh all-on persistent
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh status-off persistent
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh statistics-off persistent
-  ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh clear-temp
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_drive_status.sh all-on persistent
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_drive_status.sh status-off persistent
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_drive_status.sh statistics-off persistent
+  ksh /mnt/app/root/altscreen-u2/scripts/parity_drive_status.sh clear-temp
 With status enabled the SD keeps current.status plus per-session
 status-snapshots.log. With statistics enabled it keeps current.statistics plus
 per-session telemetry.tsv. Statistics require the live parity status producer,
@@ -270,7 +270,7 @@ EOF
   sha256sum $(find . -type f ! -name PACKAGE-SHA256SUMS.txt -print | sort) > PACKAGE-SHA256SUMS.txt
 )
 
-echo "prepared Omonob790 functional-parity overlay: $DEST"
+echo "prepared MU1440 parity-drive overlay: $DEST"
 echo "GEN2:   $GEN2_SHA"
 echo "BRIDGE: $BRIDGE_SHA"
 echo "SESSION:$SESSION_SHA"

@@ -881,7 +881,7 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
      */
     f=fopen(STATUS_PATH,"w"); if(!f){pthread_mutex_unlock(&g_status_publish_lock);return;}
     fprintf(f,"state=%s\n",state);
-    fprintf(f,"architecture=omonob790-functional-parity-cleanroom\n");
+    fprintf(f,"architecture=mu1440-parity-cleanroom\n");
     fprintf(f,"input_mode=m1au-complete-au\n");
     fprintf(f,"source_clock=stream111-32.32\n");
     fprintf(f,"pts_clock=source-derived-90khz\n");

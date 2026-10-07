@@ -12,8 +12,8 @@ DST=/mnt/app/root/altscreen-u2
 HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
 STARTUP=/mnt/system/etc/boot/startup.sh
 GUARD=/mnt/app/eso/lib/libmibr_isotx2_guard.so
-BACK=/mnt/app/root/mibr-omonob790-parity-v1-backup
-ACTIVE=/mnt/app/root/mibr-omonob790-parity-v1-active
+BACK=/mnt/app/root/mibr-parity-v1-backup
+ACTIVE=/mnt/app/root/mibr-parity-v1-active
 STATE_AUTODIRECT=/mnt/app/root/mibr-carplay-autodirect
 APP_RW=0
 SYSTEM_RW=0
@@ -24,7 +24,7 @@ SHA=$ROOT/payload/sha256sum
 hashf(){ set -- $("$SHA" "$1" 2>/dev/null); [ -n "${1:-}" ] || return 1; echo "$1"; }
 
 fail(){
-  echo "MIBR_OMONOB790_PARITY_UNINSTALL=FAIL $*"
+  echo "MIBR_PARITY_DRIVE_UNINSTALL=FAIL $*"
   system_ro || echo "SYSTEM_MOUNT_STATE=UNCONFIRMED"
   app_ro || echo "APP_MOUNT_STATE=UNCONFIRMED"
   exit 20
@@ -54,12 +54,12 @@ restore_one(){
 }
 
 if [ ! -e "$ACTIVE" ] && [ ! -e "$BACK/BACKUP_COMPLETE" ]; then
-  echo "MIBR_OMONOB790_PARITY_UNINSTALL=NOT_ACTIVE"
+  echo "MIBR_PARITY_DRIVE_UNINSTALL=NOT_ACTIVE"
   exit 0
 fi
 [ -d "$BACK" ] || fail "backup_dir_missing"
 [ -e "$BACK/BACKUP_COMPLETE" ] || fail "backup_incomplete_refusing_automatic_restore"
-[ -e "$ACTIVE" ] || echo "MIBR_OMONOB790_PARITY_UNINSTALL=RECOVERY_FROM_INTERRUPTED_INSTALL"
+[ -e "$ACTIVE" ] || echo "MIBR_PARITY_DRIVE_UNINSTALL=RECOVERY_FROM_INTERRUPTED_INSTALL"
 [ -x "$SHA" ] && [ -r "$BACK/BACKUP.sha256" ] || fail "backup_verification_missing"
 while read EXPECT REL; do
   if [ "$EXPECT" = ABSENT ]; then
@@ -91,7 +91,7 @@ ksh "$ROOT/collect-logs.sh" || fail "sd_log_pre_restore"
 echo "canonical_reboot_required" > /tmp/mibr-parity-rollback.pending || fail "rollback_reader_barrier"
 app_rw || fail "mount_app_rw"
 
-for SPEC in   "bin/libaltscreen111.so:$DST/bin/libaltscreen111.so:755"   "hook/libmibr_carplay111.so:$HOOK:755"   "bin/direct-ts-parity:$DST/bin/direct-ts-parity:755"   "bin/parity-session:$DST/bin/parity-session:755"   "scripts/omonob790_profile.sh:$DST/scripts/omonob790_profile.sh:755"   "scripts/omonob790_session.sh:$DST/scripts/omonob790_session.sh:755"   "scripts/omonob790_status.sh:$DST/scripts/omonob790_status.sh:755"   "scripts/gen2_compat_profile.sh:$DST/scripts/gen2_compat_profile.sh:755"   "state/mibr-carplay-autodirect:$STATE_AUTODIRECT:644"
+for SPEC in   "bin/libaltscreen111.so:$DST/bin/libaltscreen111.so:755"   "hook/libmibr_carplay111.so:$HOOK:755"   "bin/direct-ts-parity:$DST/bin/direct-ts-parity:755"   "bin/parity-session:$DST/bin/parity-session:755"   "scripts/parity_profile.sh:$DST/scripts/parity_profile.sh:755"   "scripts/parity_session.sh:$DST/scripts/parity_session.sh:755"   "scripts/parity_status.sh:$DST/scripts/parity_status.sh:755"   "scripts/gen2_compat_profile.sh:$DST/scripts/gen2_compat_profile.sh:755"   "state/mibr-carplay-autodirect:$STATE_AUTODIRECT:644"
 do
   REL=${SPEC%%:*}
   REST=${SPEC#*:}
@@ -141,5 +141,5 @@ echo 0 > /tmp/mibr-carplay-autodirect 2>/dev/null || true
 
 rm -f /tmp/mibr-alt111-au-framing.enabled /tmp/mibr-parity-session.pid /tmp/mibr-parity-session-bridge.pid 2>/dev/null || true
 
-echo "MIBR_OMONOB790_PARITY_UNINSTALL=PASS"
+echo "MIBR_PARITY_DRIVE_UNINSTALL=PASS"
 echo "REBOOT_REQUIRED=YES"

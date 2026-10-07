@@ -15,7 +15,7 @@ cd "$ROOT" || exit 2
 . "$ROOT/runtime/package-logging.sh" || exit 20
 package_log_init master-install || { echo "PACKAGE_LOG_BOOTSTRAP=FAIL"; exit 20; }
 
-echo "=== OMONOB790 PARITY VEHICLE INSTALL ==="
+echo "=== PARITY DRIVE VEHICLE INSTALL ==="
 echo "phase=preflight"
 mibr_run_logged "$ROOT/install.sh" --check || {
   echo "PARITY_VEHICLE_INSTALL=FAIL_PRECHECK"

@@ -35,8 +35,8 @@ EXPECTED_BASE_REMUX=3f0e730523bd290608dc13e186baa962eeb9c46f117d4d4976be523c0cd9
 EXPECTED_GATE=05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957
 BASE_ACTIVE=/mnt/app/root/mibr-framing-v1-active
 
-BACK=/mnt/app/root/mibr-omonob790-parity-v1-backup
-ACTIVE=/mnt/app/root/mibr-omonob790-parity-v1-active
+BACK=/mnt/app/root/mibr-parity-v1-backup
+ACTIVE=/mnt/app/root/mibr-parity-v1-active
 STATE_AUTODIRECT=/mnt/app/root/mibr-carplay-autodirect
 APP_RW=0
 SYSTEM_RW=0
@@ -49,12 +49,12 @@ hashf(){
 }
 
 fail(){
-  echo "MIBR_OMONOB790_PARITY=FAIL $*"
+  echo "MIBR_PARITY_DRIVE=FAIL $*"
   system_ro || echo "SYSTEM_MOUNT_STATE=UNCONFIRMED"
   app_ro || echo "APP_MOUNT_STATE=UNCONFIRMED"
   if [ "$MUTATING" -eq 1 ]; then
-    echo "MIBR_OMONOB790_PARITY=ROLLBACK_AFTER_FAILED_APPLY"
-    ksh "$ROOT/uninstall.sh" || echo "MIBR_OMONOB790_PARITY=ROLLBACK_FAILED backups_retained=$BACK"
+    echo "MIBR_PARITY_DRIVE=ROLLBACK_AFTER_FAILED_APPLY"
+    ksh "$ROOT/uninstall.sh" || echo "MIBR_PARITY_DRIVE=ROLLBACK_FAILED backups_retained=$BACK"
   fi
   exit 20
 }
@@ -152,7 +152,7 @@ check_tmp_root(){
 }
 
 show_plan(){
-  echo "=== MU1440 Omonob790 functional-parity candidate ==="
+  echo "=== MU1440 MU1440 parity-drive candidate ==="
   echo "target=MHI2_ER_SKG13_P4526_MU1440"
   echo "base_gen2_sha256=$EXPECTED_BASE_GEN2"
   echo "base_remux_sha256=$EXPECTED_BASE_REMUX"
@@ -229,15 +229,15 @@ if [ -e "$ACTIVE" ]; then
      same_as_package "$DST/bin/parity-session" "$PAYLOAD/parity-session" &&
      same_as_package "$DST/bin/alt111-settings" "$PAYLOAD/alt111-settings" &&
      same_as_package "$GUARD" "$PAYLOAD/libmibr_isotx2_guard.so" &&
-     same_as_package "$DST/scripts/omonob790_profile.sh" "$RUNTIME/omonob790_profile.sh" &&
-     same_as_package "$DST/scripts/omonob790_session.sh" "$RUNTIME/omonob790_session.sh" &&
-     same_as_package "$DST/scripts/omonob790_status.sh" "$RUNTIME/omonob790_status.sh" &&
+     same_as_package "$DST/scripts/parity_profile.sh" "$RUNTIME/parity_profile.sh" &&
+     same_as_package "$DST/scripts/parity_session.sh" "$RUNTIME/parity_session.sh" &&
+     same_as_package "$DST/scripts/parity_status.sh" "$RUNTIME/parity_status.sh" &&
      same_as_package "$DST/scripts/gen2_compat_profile.sh" "$RUNTIME/gen2_compat_profile.sh"; then
     [ "$(awk -v line="$NEW_GATE_LINE" '$0==line {n++} END {print n+0}' "$STARTUP")" = 1 ] || fail "active_startup_guard_missing"
     for SCRIPT in $ALT111_MASTER_SCRIPTS; do
       same_as_package "$DST/scripts/$SCRIPT" "$RUNTIME/$SCRIPT" || fail "active_script_mismatch=$SCRIPT"
     done
-    echo "MIBR_OMONOB790_PARITY=ALREADY_INSTALLED"
+    echo "MIBR_PARITY_DRIVE=ALREADY_INSTALLED"
     exit 0
   fi
   fail "active_marker_with_different_runtime"
@@ -255,7 +255,7 @@ if [ -d "$BACK" ] && [ ! -e "$ACTIVE" ]; then
 fi
 
 if [ "${1:---check}" = --check ]; then
-  echo "MIBR_OMONOB790_PARITY_CHECK=PASS"
+  echo "MIBR_PARITY_DRIVE_CHECK=PASS"
   echo "next=./install.sh --apply"
   exit 0
 fi
@@ -268,7 +268,7 @@ ksh "$ROOT/collect-logs.sh" || fail "sd_log_preflight"
 app_rw || fail "mount_app_rw"
 mkdir -p "$BACK" || fail "backup_dir"
 
-for SPEC in   "$DST/bin/libaltscreen111.so:bin/libaltscreen111.so"   "$HOOK:hook/libmibr_carplay111.so"   "$DST/bin/direct-ts-parity:bin/direct-ts-parity"   "$DST/bin/parity-session:bin/parity-session"   "$DST/bin/alt111-settings:bin/alt111-settings"   "$GUARD:guard/libmibr_isotx2_guard.so"   "$STARTUP:boot/startup.sh"   "$DST/scripts/omonob790_profile.sh:scripts/omonob790_profile.sh"   "$DST/scripts/omonob790_session.sh:scripts/omonob790_session.sh"   "$DST/scripts/omonob790_status.sh:scripts/omonob790_status.sh"   "$DST/scripts/omonob790_drive_supervisor.sh:scripts/omonob790_drive_supervisor.sh"   "$DST/scripts/omonob790_drive_enable.sh:scripts/omonob790_drive_enable.sh"   "$DST/scripts/omonob790_drive_disable.sh:scripts/omonob790_drive_disable.sh"   "$DST/scripts/omonob790_drive_status.sh:scripts/omonob790_drive_status.sh"   "$DST/scripts/gen2_compat_profile.sh:scripts/gen2_compat_profile.sh"   "$STATE_AUTODIRECT:state/mibr-carplay-autodirect"
+for SPEC in   "$DST/bin/libaltscreen111.so:bin/libaltscreen111.so"   "$HOOK:hook/libmibr_carplay111.so"   "$DST/bin/direct-ts-parity:bin/direct-ts-parity"   "$DST/bin/parity-session:bin/parity-session"   "$DST/bin/alt111-settings:bin/alt111-settings"   "$GUARD:guard/libmibr_isotx2_guard.so"   "$STARTUP:boot/startup.sh"   "$DST/scripts/parity_profile.sh:scripts/parity_profile.sh"   "$DST/scripts/parity_session.sh:scripts/parity_session.sh"   "$DST/scripts/parity_status.sh:scripts/parity_status.sh"   "$DST/scripts/parity_drive_supervisor.sh:scripts/parity_drive_supervisor.sh"   "$DST/scripts/parity_drive_enable.sh:scripts/parity_drive_enable.sh"   "$DST/scripts/parity_drive_disable.sh:scripts/parity_drive_disable.sh"   "$DST/scripts/parity_drive_status.sh:scripts/parity_drive_status.sh"   "$DST/scripts/gen2_compat_profile.sh:scripts/gen2_compat_profile.sh"   "$STATE_AUTODIRECT:state/mibr-carplay-autodirect"
 do
   SRC=${SPEC%%:*}
   REL=${SPEC#*:}
@@ -289,13 +289,13 @@ install_one "$PAYLOAD/direct-ts-parity" "$DST/bin/direct-ts-parity"
 install_one "$PAYLOAD/parity-session" "$DST/bin/parity-session"
 install_one "$PAYLOAD/alt111-settings" "$DST/bin/alt111-settings"
 install_one "$PAYLOAD/libmibr_isotx2_guard.so" "$GUARD"
-install_one "$RUNTIME/omonob790_profile.sh" "$DST/scripts/omonob790_profile.sh"
-install_one "$RUNTIME/omonob790_session.sh" "$DST/scripts/omonob790_session.sh"
-install_one "$RUNTIME/omonob790_status.sh" "$DST/scripts/omonob790_status.sh"
-install_one "$RUNTIME/omonob790_drive_supervisor.sh" "$DST/scripts/omonob790_drive_supervisor.sh"
-install_one "$RUNTIME/omonob790_drive_enable.sh" "$DST/scripts/omonob790_drive_enable.sh"
-install_one "$RUNTIME/omonob790_drive_disable.sh" "$DST/scripts/omonob790_drive_disable.sh"
-install_one "$RUNTIME/omonob790_drive_status.sh" "$DST/scripts/omonob790_drive_status.sh"
+install_one "$RUNTIME/parity_profile.sh" "$DST/scripts/parity_profile.sh"
+install_one "$RUNTIME/parity_session.sh" "$DST/scripts/parity_session.sh"
+install_one "$RUNTIME/parity_status.sh" "$DST/scripts/parity_status.sh"
+install_one "$RUNTIME/parity_drive_supervisor.sh" "$DST/scripts/parity_drive_supervisor.sh"
+install_one "$RUNTIME/parity_drive_enable.sh" "$DST/scripts/parity_drive_enable.sh"
+install_one "$RUNTIME/parity_drive_disable.sh" "$DST/scripts/parity_drive_disable.sh"
+install_one "$RUNTIME/parity_drive_status.sh" "$DST/scripts/parity_drive_status.sh"
 install_one "$RUNTIME/gen2_compat_profile.sh" "$DST/scripts/gen2_compat_profile.sh"
 
 for SCRIPT in $ALT111_MASTER_SCRIPTS; do
@@ -312,7 +312,7 @@ install_one "$PATCHED_STARTUP" "$STARTUP" 755
 system_ro || fail "mount_system_ro"
 
 {
-  echo "candidate=omonob790-functional-parity-v1"
+  echo "candidate=mu1440-parity-drive-v1"
   echo "gen2_sha256=$(candidate_hash gen2)"
   echo "bridge_sha256=$(candidate_hash bridge)"
   echo "session_sha256=$(candidate_hash session)"
@@ -338,10 +338,10 @@ same_as_package "$GUARD" "$PAYLOAD/libmibr_isotx2_guard.so" || fail "post_guard_
 [ "$RH" = "$EXPECTED_BASE_REMUX" ] || fail "base_remux_changed=$RH"
 [ -r "$STATE_AUTODIRECT" ] && [ "$(cat "$STATE_AUTODIRECT" 2>/dev/null)" = 0 ] || fail "autodirect_not_disabled"
 
-echo "MIBR_OMONOB790_PARITY=PASS"
+echo "MIBR_PARITY_DRIVE=PASS"
 ksh "$ROOT/collect-logs.sh" || fail "sd_log_post_install"
 echo "legacy_autodirect=0"
 echo "base_direct_ts_remux=UNCHANGED"
 echo "REBOOT_REQUIRED=YES"
-echo "after_reboot=ksh $DST/scripts/omonob790_status.sh"
-echo "then_apply_temp_profile_before_carplay_connect=ksh $DST/scripts/omonob790_profile.sh temp"
+echo "after_reboot=ksh $DST/scripts/parity_status.sh"
+echo "then_apply_temp_profile_before_carplay_connect=ksh $DST/scripts/parity_profile.sh temp"

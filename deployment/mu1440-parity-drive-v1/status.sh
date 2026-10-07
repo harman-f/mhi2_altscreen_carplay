@@ -15,7 +15,7 @@ ROOT=$(cd "$ROOT" 2>/dev/null && pwd) || exit 2
 SHA=$ROOT/payload/sha256sum
 DST=/mnt/app/root/altscreen-u2
 HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
-ACTIVE=/mnt/app/root/mibr-omonob790-parity-v1-active
+ACTIVE=/mnt/app/root/mibr-parity-v1-active
 BASE_REMUX_EXPECTED=3f0e730523bd290608dc13e186baa962eeb9c46f117d4d4976be523c0cd94c09
 
 hashf(){
@@ -40,7 +40,7 @@ compare(){
   [ -n "${LH:-}" ] && [ "$LH" = "$PH" ] && echo "$LABEL=PASS_CANDIDATE" || echo "$LABEL=FAIL_HASH"
 }
 
-echo "=== MU1440 OMONOB790 PARITY OVERLAY ==="
+echo "=== MU1440 PARITY DRIVE OVERLAY ==="
 [ -e "$ACTIVE" ] && { echo "candidate_active=1"; cat "$ACTIVE" 2>/dev/null || true; } || echo "candidate_active=0"
 
 compare gen2 "$DST/bin/libaltscreen111.so" "$ROOT/payload/libaltscreen111.so"
@@ -76,7 +76,7 @@ else
   echo "autodirect=1"
 fi
 
-if [ -x "$DST/scripts/omonob790_status.sh" ]; then
+if [ -x "$DST/scripts/parity_status.sh" ]; then
   echo
-  ksh "$DST/scripts/omonob790_status.sh"
+  ksh "$DST/scripts/parity_status.sh"
 fi

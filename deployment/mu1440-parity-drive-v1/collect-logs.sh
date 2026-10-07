@@ -15,7 +15,7 @@ ROOT=$(cd "$ROOT" 2>/dev/null && pwd) || exit 2
 CARD=/net/mmx/fs/sda0
 WORK=$CARD/esd/carplay-test
 PKG=$ROOT
-LOGROOT=$WORK/logs/omonob790-parity
+LOGROOT=$WORK/logs/parity
 MOUNTER=$CARD/apps/mounts
 CARD_RW=0
 
@@ -42,7 +42,7 @@ trap 'card_ro; exit 143' 15
 . "$MOUNTER" -usb >/dev/null 2>&1 || fail "sd_mount_rw"
 CARD_RW=1
 
-TEST=$CARD/.mibr-omonob790-parity-write-test-$$
+TEST=$CARD/.mibr-parity-write-test-$$
 touch "$TEST" 2>/dev/null || fail "sd_write_test_create"
 [ -f "$TEST" ] || fail "sd_write_test_verify"
 rm -f "$TEST" 2>/dev/null || fail "sd_write_test_remove"
