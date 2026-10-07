@@ -152,7 +152,7 @@ int alt111_settings_defaults(struct alt111_settings *s, const char *preset)
     unsigned i;
     int mode;
     if (!s || !preset) return -1;
-    mode = !strcmp(preset, "omonob790") ? 0 : !strcmp(preset, "mibr_dual_view") ? 1 :
+    mode = !strcmp(preset, "classic_single_view") ? 0 : !strcmp(preset, "mibr_dual_view") ? 1 :
            (!strcmp(preset, "mibr_legacy") || !strcmp(preset, "mibr")) ? 2 : -1;
     if (mode < 0) return -1;
     memset(s, 0, sizeof(*s));

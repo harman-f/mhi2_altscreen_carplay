@@ -905,18 +905,18 @@ static unsigned master_enabled(void)
 }
 
 
-static int compat_profile_omonob790(void)
+static int compat_profile_classic_single_view(void)
 {
     char b[48];
     return read_layered_value(g_compat_profile_config_name,b,sizeof(b),NULL)==0 &&
-           (strcmp(b,"omonob790")==0 || strcmp(b,"mibr_dual_view")==0);
+           (strcmp(b,"classic_single_view")==0 || strcmp(b,"mibr_dual_view")==0);
 }
 
 static int compat_profile_exact_reference(void)
 {
     char b[48];
     return read_layered_value(g_compat_profile_config_name,b,sizeof(b),NULL)==0 &&
-           strcmp(b,"omonob790")==0;
+           strcmp(b,"classic_single_view")==0;
 }
 
 
@@ -1017,7 +1017,7 @@ static void set_reference_enabled_features(CFMutableDictionaryRef response)
 {
     CFStringRef k=NULL,alt=NULL,va=NULL,iap=NULL;
     CFMutableArrayRef a=NULL;
-    int omonob790=compat_profile_omonob790();
+    int classic_single_view=compat_profile_classic_single_view();
     struct mibr_viewareas_config cfg;
     if(!response)return;
     load_viewareas_config(&cfg);
@@ -1025,7 +1025,7 @@ static void set_reference_enabled_features(CFMutableDictionaryRef response)
     k=s_cf("enabledFeatures");
     alt=s_cf("altScreen");
     va=s_cf("viewAreas");
-    if(omonob790)iap=s_cf("iAPChannel");
+    if(classic_single_view)iap=s_cf("iAPChannel");
     a=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
     if(a&&iap)p_CFArrayAppendValue(a,iap);
     if(a&&va&&cfg.enabled)p_CFArrayAppendValue(a,va);
@@ -2908,10 +2908,10 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         char active_url[384];
         active_alt_url_copy(active_url,sizeof(active_url));
         /* Exact reference removal set before AltScreen-specific overrides.
-         * The Omonob790 parity profile advertises primaryInputDevice=3 exactly
-         * like the audited Free790/Paid lineage; the default M.I.B. profile
+         * The classic single-view profile advertises primaryInputDevice=3 exactly
+         * as required by the strict classic single-view compatibility profile; the default M.I.B. profile
          * remains no-HID. */
-        if(compat_profile_omonob790())set_i64(alt,"primaryInputDevice",3);
+        if(compat_profile_classic_single_view())set_i64(alt,"primaryInputDevice",3);
         else remove_key(alt,"primaryInputDevice");
         remove_key(alt,"edid");
         remove_key(alt,"platformLayer");
@@ -2928,14 +2928,14 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
          */
         set_i64(alt,"type",(int64_t)g2_profile.type);
         set_i64(alt,"maxFPS",(int64_t)advertised_fps);
-        set_i64(alt,"features",(int64_t)(compat_profile_omonob790()?10u:g2_profile.features));
+        set_i64(alt,"features",(int64_t)(compat_profile_classic_single_view()?10u:g2_profile.features));
         set_i64(alt,"widthPixels",(int64_t)display.width);
         set_i64(alt,"heightPixels",(int64_t)display.height);
         set_i64(alt,"widthPhysical",(int64_t)display.width_mm);
         set_i64(alt,"heightPhysical",(int64_t)display.height_mm);
         set_str(alt,"uuid",display.uuid);
         set_str(alt,"initialURL",active_url);
-        /* Free790 does not advertise altScreenSuggestUIURLs. Keep the M.I.B.
+        /* The strict single-view profile does not advertise altScreenSuggestUIURLs. Keep the M.I.B.
          * extension available outside the strict parity profile. */
         if(!compat_profile_exact_reference())add_alt_suggest_ui_urls(alt);
         if(views.enabled && !add_reference_viewarea(alt)){
@@ -2948,11 +2948,11 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         p_CFDictionarySetValue(info,kdisplays,displays);
         if(settings_scope())settings_scope()->descriptor_complete=1u;
         logf_u2("GEN2 /info ready: profile=%s root=altScreen%s type=%u maxFPS=%u features=%u primaryInput=%s geometry=%ux%u physical=%ux%u uuid=%s url=%s",
-                compat_profile_omonob790()?"omonob790":"mibr",
+                compat_profile_classic_single_view()?"classic_single_view":"mibr",
                 views.enabled?"+viewAreas":"",
                 g2_profile.type,(unsigned)advertised_fps,
-                compat_profile_omonob790()?10u:g2_profile.features,
-                compat_profile_omonob790()?"3":"none",
+                compat_profile_classic_single_view()?10u:g2_profile.features,
+                compat_profile_classic_single_view()?"3":"none",
                 display.width,display.height,display.width_mm,display.height_mm,
                 display.uuid,active_url);
     }else{

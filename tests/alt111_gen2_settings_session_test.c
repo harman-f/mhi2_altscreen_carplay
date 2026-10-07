@@ -47,7 +47,7 @@ int main(void)
     snprintf(log,sizeof(log),"%s/log",root);g_log_path=log;
     snprintf(recovery_path,sizeof(recovery_path),"%s/recovery",root);
     assert(alt111_control_init(&g2_control,1)==ALT111_OK);
-    assert(!alt111_settings_defaults(&g_settings_desired,"omonob790"));
+    assert(!alt111_settings_defaults(&g_settings_desired,"classic_single_view"));
     g_settings_have=g_settings_valid=1;
     assert(!gen2_control_projection_on(session)); /* No fabricated advertisement. */
     g_settings_advertised=g_settings_desired;g_settings_have_advertised=1;

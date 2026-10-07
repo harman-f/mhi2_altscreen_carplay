@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory() as td:
     barrier=temp/'mibr-parity-rollback.pending'
     barrier.write_text('canonical_reboot_required\n')
     before = snapshot()
-    for args in [('status',), ('preset','--preset','omonob790'),
+    for args in [('status',), ('preset','--preset','classic_single_view'),
                  ('set','--key','maxFPS','--value','40'),
                  ('clear','--key','maxFPS'), ('clear-temp',), ('reconcile',)]:
         assert 'rollback_requires_canonical_reboot' in run(*args,success=False).stdout
@@ -55,7 +55,7 @@ with tempfile.TemporaryDirectory() as td:
         assert not (temp/'mibr-alt111-settings.journal-armed').exists()
     barrier.unlink()
     barrier.symlink_to(temp/'absent-rollback-target')
-    assert 'rollback_requires_canonical_reboot' in run('preset','--preset','omonob790',success=False).stdout
+    assert 'rollback_requires_canonical_reboot' in run('preset','--preset','classic_single_view',success=False).stdout
     assert snapshot() == before
     barrier.unlink()
     run('status')
@@ -96,7 +96,7 @@ with tempfile.TemporaryDirectory() as td:
     run('clear', '--key', 'ownership.backend')
     for after in range(1, len(basenames) + 1):
         before = snapshot()
-        rc = run('preset', '--preset', 'omonob790', success=False,
+        rc = run('preset', '--preset', 'classic_single_view', success=False,
                  extra={'ALT111_SETTINGS_TEST_CRASH_AFTER_ACTIVE_WRITE': str(after)})
         assert rc.returncode == -signal.SIGKILL
         assert (temp / 'mibr-alt111-settings.journal').exists()
@@ -139,7 +139,7 @@ with tempfile.TemporaryDirectory() as td:
 
     # An altered backup must stop BEFORE any restore mutation, retaining the
     # armed journal and remaining secured originals for inspection/retry.
-    rc = run('preset', '--preset', 'omonob790', success=False,
+    rc = run('preset', '--preset', 'classic_single_view', success=False,
              extra={'ALT111_SETTINGS_TEST_CRASH_AFTER_ACTIVE_WRITE': '1'})
     journal = temp / 'mibr-alt111-settings.journal'
     hash_line = next(line for line in journal.read_text().splitlines() if ':' in line)

@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-source = Path('deployment/mu1440-omonob790-parity-v1/session-logging.sh').resolve()
+source = Path('deployment/mu1440-parity-drive-v1/session-logging.sh').resolve()
 with tempfile.TemporaryDirectory() as td:
     root = Path(td)
     child = root/'action'

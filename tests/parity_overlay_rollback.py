@@ -15,7 +15,7 @@ for scenario in ("normal","interrupted"):
     with tempfile.TemporaryDirectory() as td:
         root=Path(td);pkg=root/"package";app=root/"app";system=root/"system";state=root/"state";binpath=root/"host-bin"
         for p in (pkg,pkg/"payload",pkg/"runtime",app/"root/altscreen-u2/bin",app/"root/altscreen-u2/scripts",app/"eso/lib",system/"etc/eso/production",system/"etc/boot",state,binpath):p.mkdir(parents=True,exist_ok=True)
-        dst=app/"root/altscreen-u2";backup=app/"root/mibr-omonob790-parity-v1-backup"
+        dst=app/"root/altscreen-u2";backup=app/"root/mibr-parity-drive-v1-backup"
         old_gen=b"exact old GEN2";old_remux=b"exact old remux";airplay=b"exact target airplay";gate=b"exact stable gate"
         fixtures={dst/"bin/libaltscreen111.so":old_gen,app/"eso/lib/libmibr_carplay111.so":old_gen,
                   dst/"bin/direct-ts-remux":old_remux,app/"eso/lib/libairplay.so":airplay,
@@ -35,9 +35,9 @@ for scenario in ("normal","interrupted"):
         (pkg/"payload/libmibr_isotx2_guard.so").write_bytes(b"new standalone guard")
         (pkg/"payload/sha256sum").write_text("#!/bin/sh\nexec /usr/bin/sha256sum \"$@\"\n")
         for path in (pkg/"payload").iterdir():path.chmod(0o755)
-        for name in ("omonob790_profile.sh","omonob790_session.sh","omonob790_status.sh",
-                     "omonob790_drive_supervisor.sh","omonob790_drive_enable.sh",
-                     "omonob790_drive_disable.sh","omonob790_drive_status.sh",
+        for name in ("parity_profile.sh","parity_session.sh","parity_status.sh",
+                     "parity_drive_supervisor.sh","parity_drive_enable.sh",
+                     "parity_drive_disable.sh","parity_drive_status.sh",
                      "gen2_compat_profile.sh"):
             (pkg/"runtime"/name).write_text("#!/bin/sh\nexit 0\n")
         script_inventory=Path("runtime/parity/master-script-basenames.sh").read_text()
@@ -48,7 +48,7 @@ for scenario in ("normal","interrupted"):
             (dst/"scripts"/name).write_bytes(fixtures[dst/"scripts"/name])
         (pkg/"runtime/settings-basenames.sh").write_text(Path("settings/runtime-basenames.generated.sh").read_text())
         for name in ("install.sh","uninstall.sh"):
-            text=Path("deployment/mu1440-omonob790-parity-v1",name).read_text()
+            text=Path("deployment/mu1440-parity-drive-v1",name).read_text()
             text=re.sub(r"# BEGIN_TARGET_ENV.*?# END_TARGET_ENV\n", "", text, flags=re.S)
             for old,new in (("/tmp/",str(state)+"/"),("/mnt/app",str(app)),("/mnt/system",str(system))):text=text.replace(old,new)
             assert f"DST={dst}" in text,(name,"DST rewrite",dst)

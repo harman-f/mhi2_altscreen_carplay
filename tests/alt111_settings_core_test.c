@@ -10,7 +10,7 @@ int main(void)
     char blob[2049], error[256];
     unsigned group, i;
     int n;
-    assert(!alt111_settings_defaults(&s, "omonob790"));
+    assert(!alt111_settings_defaults(&s, "classic_single_view"));
     assert(!alt111_settings_validate(&s, error, sizeof(error)) && s.reference_match);
     assert(!alt111_settings_defaults(&s, "mibr_dual_view"));
     assert(!alt111_settings_validate(&s, error, sizeof(error)) && !s.reference_match);
@@ -57,7 +57,7 @@ int main(void)
     s = before;
     alt111_settings_policy(&s, &policy);
     assert(policy.mode == ALT111_SOURCE_FRAMES && policy.interval_frames == 20);
-    assert(!alt111_settings_defaults(&before, "omonob790"));
+    assert(!alt111_settings_defaults(&before, "classic_single_view"));
     assert(!alt111_settings_defaults(&s, "mibr_dual_view"));
     assert(!alt111_settings_set(&s, ALTSET_SOURCEVERSION, "1.2.3", ALT111_TEMP));
     assert(!alt111_settings_set(&s, ALTSET_KEYFRAME_INTERVAL_FRAMES, "37", ALT111_TEMP));
