@@ -107,6 +107,9 @@ jobs:
             -o /tmp/direct-ts-parity-host
           /tmp/direct-ts-parity-host --self-test | tee /tmp/parity-selftest.txt
           grep -Fxq 'PARITY_SELFTEST=PASS' /tmp/parity-selftest.txt
+          cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
+            tests/direct_ts_parity_clock_review.c -pthread -o /tmp/parity-clock-review
+          /tmp/parity-clock-review
           python3 tests/direct_ts_parity_host_integration.py /tmp/direct-ts-parity-host \
             | tee /tmp/parity-integration.txt
           grep -Fq 'PARITY_INTEGRATION=PASS' /tmp/parity-integration.txt
@@ -116,6 +119,7 @@ jobs:
           cc -O2 -g -std=gnu99 -Wall -Wextra -Werror tests/direct_ts_parity_regressions.c -pthread -o /tmp/parity-regressions
           /tmp/parity-regressions
           python3 tests/direct_ts_parity_eof_integration.py /tmp/direct-ts-parity-host
+          python3 tests/direct_ts_parity_exit_review.py /tmp/direct-ts-parity-host
           if ! command -v ffmpeg >/dev/null; then sudo apt-get update; sudo apt-get install -y ffmpeg; fi
           python3 tests/direct_ts_parity_decode_integration.py /tmp/direct-ts-parity-host "$OUTDIR/decode-evidence"
           python3 tests/parity_session_lifecycle.py
