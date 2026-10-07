@@ -341,7 +341,7 @@ if [ -r "$PIDFILE" ]; then
     exit 0
   fi
 fi
-SELF_PID=$(pidin ar 2>/dev/null | awk '/[o]monob790_drive_supervisor.sh/ {p=$1} END {print p}')
+SELF_PID=$(pidin ar 2>/dev/null | awk '/[p]arity_drive_supervisor.sh/ {p=$1} END {print p}')
 [ -n "$SELF_PID" ] || exit 4
 echo "$SELF_PID" > "$PIDFILE" 2>/dev/null || exit 4
 
