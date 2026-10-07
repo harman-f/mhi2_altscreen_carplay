@@ -187,7 +187,7 @@ evidence_loop(){
   PREV_PIN=
 
   if [ "$STATS_ON" = "1" ]; then
-    echo "sample\telapsed_s\tstream_state\tstream_hb\tgen2_source_aus\tgen2_source_idrs\tgen2_delivered_aus\tgen2_dropped_aus\tsource_fps_x100\tsource_input_bps\tsource_last_us\tsource_min_us\tsource_max_us\tparity_input_aus\tparity_input_idrs\tparity_input_non_idr\tparity_output_started\tparity_output_completed\tparity_output_idr_started\tparity_output_non_idr_started\tparity_output_idr_completed\tparity_output_non_idr_completed\tinput_slice_p\tinput_slice_b\tinput_slice_i\tinput_slice_unknown\toutput_slice_p_started\toutput_slice_b_started\toutput_slice_i_started\toutput_slice_unknown_started\toutput_slice_p_completed\toutput_slice_b_completed\toutput_slice_i_completed\toutput_slice_unknown_completed\tsequence_gaps\tdropped_wait_idr\tsafe_recoveries\tqueue_aus\tqueue_packets\tblocks_written\tbytes_written\twrite_eagain\twrite_errors\tlast_write_us\tmax_write_us\tgate_raw" > "$TELEMETRY" 2>/dev/null || return
+    echo "sample\telapsed_s\tstream_state\tstream_hb\tgen2_source_aus\tgen2_source_idrs\tgen2_delivered_aus\tgen2_dropped_aus\tgen2_source_fps\tparity_input_fps\tparity_input_idr_fps\tparity_input_non_idr_fps\tsource_fps_x100\tsource_input_bps\tsource_last_us\tsource_min_us\tsource_max_us\tparity_input_aus\tparity_input_idrs\tparity_input_non_idr\tparity_output_started\tparity_output_completed\tparity_output_idr_started\tparity_output_non_idr_started\tparity_output_idr_completed\tparity_output_non_idr_completed\tinput_slice_p\tinput_slice_b\tinput_slice_i\tinput_slice_unknown\toutput_slice_p_started\toutput_slice_b_started\toutput_slice_i_started\toutput_slice_unknown_started\toutput_slice_p_completed\toutput_slice_b_completed\toutput_slice_i_completed\toutput_slice_unknown_completed\tsequence_gaps\tdropped_wait_idr\tsafe_recoveries\tqueue_aus\tqueue_packets\tblocks_written\tbytes_written\twrite_eagain\twrite_errors\tlast_write_us\tmax_write_us\tgate_raw" > "$TELEMETRY" 2>/dev/null || return
   fi
   [ "$STATUS_ON" = "1" ] && : > "$SNAPSHOTS" 2>/dev/null || true
 
@@ -282,7 +282,7 @@ evidence_loop(){
       GR=missing
       [ -r "$GATE_STATUS" ] && GR=$(cat "$GATE_STATUS" 2>/dev/null | tr '\t' ' ')
 
-      echo "$N\t$N\t$SS\t$SH\t$GA\t$GI\t$GD\t$GX\t$SF\t$SB\t$SL\t$SMIN\t$SMAX\t$PI\t$PII\t$PIN\t$POS\t$POC\t$POI\t$PON\t$POIC\t$PONC\t$ISP\t$ISB\t$ISI\t$ISU\t$OSP\t$OSB\t$OSI\t$OSU\t$OCP\t$OCB\t$OCI\t$OCU\t$PG\t$PD\t$PR\t$QA\t$QP\t$BW\t$BY\t$WE\t$WERR\t$LW\t$MW\t$GR" >> "$TELEMETRY" 2>/dev/null || true
+      echo "$N\t$N\t$SS\t$SH\t$GA\t$GI\t$GD\t$GX\t$GAFPS\t$PIFPS\t$PIIFPS\t$PINFPS\t$SF\t$SB\t$SL\t$SMIN\t$SMAX\t$PI\t$PII\t$PIN\t$POS\t$POC\t$POI\t$PON\t$POIC\t$PONC\t$ISP\t$ISB\t$ISI\t$ISU\t$OSP\t$OSB\t$OSI\t$OSU\t$OCP\t$OCB\t$OCI\t$OCU\t$PG\t$PD\t$PR\t$QA\t$QP\t$BW\t$BY\t$WE\t$WERR\t$LW\t$MW\t$GR" >> "$TELEMETRY" 2>/dev/null || true
 
       {
         echo "sample=$N"
