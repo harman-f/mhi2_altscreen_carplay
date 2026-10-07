@@ -108,6 +108,14 @@ Historical MIB2 LSD Java/HMI patching lineage.
 
 Useful adjacent MHI2/Virtual-Cockpit Java/HMI evidence.
 
+## Naming boundary for comparator evidence
+
+Comparator and upstream names are intentionally retained here and in provenance/evidence documents
+because precise attribution matters. They should not become project-owned runtime, profile, branch,
+artifact or UI identifiers. Implementation-facing names describe behavior (for example, a classic
+single-view profile or a parity-drive runtime), while this catalog records whose prior work informed
+the research.
+
 ## How third-party/commercial comparators are handled
 
 The project may study lawfully obtained binaries/packages to understand architecture or behavior.

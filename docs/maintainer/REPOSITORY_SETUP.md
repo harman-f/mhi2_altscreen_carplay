@@ -210,3 +210,39 @@ Before switching the repository to public:
 - [ ] No VIN/address/credential/personal data in screenshots, logs or history
 - [ ] Prior-art links/attribution checked
 - [ ] README current-state section matches the actual implementation
+
+
+## Public naming and attribution boundary
+
+Public implementation identifiers must be project-neutral.
+
+Use descriptive project names for:
+
+- branch names;
+- pull-request development lines;
+- runtime and deployment script names;
+- profile IDs;
+- log directories;
+- build artifacts;
+- status prefixes;
+- architecture/runtime identifiers.
+
+Do not name project-owned implementation surfaces after a comparator, commercial package, upstream
+author or third-party build simply because that source informed the research.
+
+This does **not** reduce attribution. External projects and comparator identities belong in:
+
+- `docs/research/PUBLIC_REFERENCES.md`;
+- provenance notes;
+- evidence/finding documents where the identity is materially relevant;
+- commit/issue discussion when tracing the origin of a specific observation.
+
+The intended boundary is:
+
+```text
+research/provenance: specific and attributable
+project runtime/API/UI: semantic and project-neutral
+```
+
+Historical public names already present in immutable Git history do not need destructive rewriting.
+New branches and new project-owned identifiers must follow this rule.

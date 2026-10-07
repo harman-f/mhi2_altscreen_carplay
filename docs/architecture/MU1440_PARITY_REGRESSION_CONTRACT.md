@@ -6,7 +6,7 @@ Draft / DO NOT MERGE. Source identity comes from the exact candidate manifest.
 Historical review baseline:
 `ee82305beae00612755113c387e09270a8905836`,
 [harman-f/mhi2_altscreen_carplay#14](https://github.com/harman-f/mhi2_altscreen_carplay/issues/14).
-Correction branch: `codex/omonob790-regression-hardening-v1`.
+Current continuation branch: `codex/mu1440-parity-drive-v1`.
 The earlier vehicle-tested artifacts and reviewed source are preserved.
 
 ## Candidate identity

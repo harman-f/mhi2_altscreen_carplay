@@ -10,7 +10,7 @@ Target vehicle and unit:
 - AlternateScreen / CarPlay type 111
 
 This document freezes the decisions made after the first visible AID10 output through the
-Omonob790 clean-room parity path. It is also a regression guard for future implementation and
+clean-room parity-drive path. It is also a regression guard for future implementation and
 handoffs.
 
 ## 1. Positive vehicle evidence
@@ -235,7 +235,7 @@ Live status and persistent statistics are independently user-switchable for futu
 Control script:
 
 ```text
-/mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh
+/mnt/app/root/altscreen-u2/scripts/parity_drive_status.sh
 ```
 
 Supported controls:
@@ -271,7 +271,7 @@ Drive evidence must not silently fall back to volatile `/tmp`.
 Exact root:
 
 ```text
-/net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive
+/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive
 ```
 
 Before a drive session the supervisor must successfully execute and verify:

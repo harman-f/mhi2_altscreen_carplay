@@ -38,7 +38,7 @@ rules. Older Auto-Direct and MHI1Q command examples must not override it.
 
 ## MU1440 master candidate — 2026-10-05
 
-The current development line is draft [harman-f/mhi2_altscreen_carplay#15](https://github.com/harman-f/mhi2_altscreen_carplay/pull/15), branch `codex/omonob790-regression-hardening-v1`. Keep it unmerged. Its exact source identity is recorded in each generated candidate manifest; the historical vehicle PoC below does not qualify this new combination.
+The current development line is draft [harman-f/mhi2_altscreen_carplay#18](https://github.com/harman-f/mhi2_altscreen_carplay/pull/18), branch `codex/mu1440-parity-drive-v1`. Keep it unmerged. PR #15 is retained only as the historical pre-neutralization checkpoint. Its exact source identity is recorded in each generated candidate manifest; the historical vehicle PoC below does not qualify this new combination.
 
 The code now includes a shared settings registry, target-qualified SHMEM transactions and crash reconciliation, source-frame/source-time keyframe policy, generation-bound recovery, frozen negotiated geometry/UUID/source version, and a native owner with bound process handles and an independent watchdog. On the exact MU1440, `/tmp` aliases `/dev/shmem`; `F_SETLK` and native temp+rename publication are not valid runtime primitives there, so current owner/status paths use O_EXCL inode ownership plus direct truncate/write where appropriate. The separate native guard runs in DisplayManager; GEN2 runs in smartphone_integrator. Initial ownership is `writev_gate`. The DMDT backend is a routing probe that starts no custom payload until independently qualified on the target.
 
