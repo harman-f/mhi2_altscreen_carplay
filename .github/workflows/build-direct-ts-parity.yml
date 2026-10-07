@@ -151,6 +151,11 @@ jobs:
           grep -Fq 'current.statistics' runtime/parity/parity_drive_supervisor.sh
           grep -Fq 'gen2_source_fps' runtime/parity/parity_drive_supervisor.sh
           grep -Fq 'parity_input_non_idr_fps' runtime/parity/parity_drive_supervisor.sh
+          grep -Fq 'SUP=$BASE/scripts/parity_drive_supervisor.sh' runtime/parity/parity_drive_enable.sh
+          grep -Fq '/bin/ksh /mnt/app/root/altscreen-u2/scripts/parity_drive_supervisor.sh' runtime/parity/parity_drive_enable.sh
+          grep -Fq '/[p]arity_drive_supervisor.sh/' runtime/parity/parity_drive_supervisor.sh
+          grep -Fq '/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive' runtime/parity/parity_drive_status.sh
+          ! grep -E 'classic_single_view_drive_supervisor\.sh|omonob790_drive_supervisor\.sh|classic_single_view-parity-drive|\[o\]parity_drive_supervisor\.sh' runtime/parity/parity_drive_*.sh
           grep -Fq 'mibr-parity-statistics-enabled' runtime/parity/parity_drive_status.sh
           grep -Fq 'output_non_idr_aus_completed' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'output_slice_p_completed' src/native/direct-ts-parity/direct_ts_parity.c
@@ -300,6 +305,9 @@ jobs:
           bash tools/prepare_mu1440_parity_drive_v1_overlay.sh "$OUTDIR/package" "$OUTDIR/libaltscreen111.so" "$OUTDIR/direct-ts-parity" "$OUTDIR/parity-session"
           (cd "$OUTDIR/package"; sha256sum -c PACKAGE-SHA256SUMS.txt)
           while IFS= read -r script; do bash -n "$script"; done < <(find "$OUTDIR/package" -name '*.sh' -type f)
+          ! grep -R -E 'classic_single_view_drive_supervisor\.sh|omonob790_drive_supervisor\.sh|classic_single_view-parity-drive|\[o\]parity_drive_supervisor\.sh' "$OUTDIR/package/runtime"
+          grep -Fq '/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive' "$OUTDIR/package/runtime/parity_drive_supervisor.sh"
+          grep -Fq '/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive' "$OUTDIR/package/runtime/parity_drive_status.sh"
           grep -Fxq "source_head_commit=$SOURCE_HEAD_COMMIT" "$OUTDIR/package/CANDIDATE-MANIFEST.txt"
           tar -czf "$OUTDIR/mu1440-parity-drive-candidate.tar.gz" -C "$OUTDIR" package
 
