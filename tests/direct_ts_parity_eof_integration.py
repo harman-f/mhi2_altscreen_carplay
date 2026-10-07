@@ -89,7 +89,8 @@ with tempfile.TemporaryDirectory() as td:
         assert checked<len(large),"stop test missed in-flight PES"
         proc.send_signal(signal.SIGTERM)
         _,errors=proc.communicate(timeout=3)
-        assert proc.returncode in (1,130),errors  # Interrupted input is not clean EOF.
+        assert proc.returncode==128+signal.SIGTERM,errors  # Distinct planned signal stop.
+        assert b"PARITY_EXIT reason=signal_stop signal=15 rc=143 write_errors=0" in errors
         data=output.read_bytes()
         video=[data[i:i+188] for i in range(0,len(data),188) if pid(data[i:i+188])==0x11]
         raw=b"".join(p[payload_offset(p):] for p in video)
