@@ -21,7 +21,7 @@ def outputs():
         identifier = 'ALTSET_' + re.sub('[^A-Z0-9]', '_', x['key'].upper())
         enum.append(f'    {identifier} = {i},')
         fields = [x['key'], x['basename'], x.get('field', ''), x['type'],
-                  '|'.join(x.get('allowed', [])), x['default']['omonob790'],
+                  '|'.join(x.get('allowed', [])), x['default']['classic_single_view'],
                   x['default']['mibr_dual_view'], x['default']['mibr_legacy'],
                   x['apply'], x['hmi']]
         assert all(isinstance(v, str) for v in fields)
