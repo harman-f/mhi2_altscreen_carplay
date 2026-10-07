@@ -37,6 +37,10 @@ int main(void) {
     c.have_origin=0;
     first=assign_pts_presence(&c,0,0,1,&rb);
     assert(c.origin_is_source); /* explicit zero remains a valid source timestamp */
+    next=assign_pts_presence(&c,0x40000000u,0,1,&rb);
+    assert(next-first==22500u);
+    (void)assign_pts_presence(&c,0,0,0,&rb);
+    assert(!c.origin_is_source);
 
     c.have_origin=0;
     (void)assign_pts_presence(&c,0,100,1,&rb);
@@ -49,11 +53,6 @@ int main(void) {
     rebases=c.source_rebases;
     next=assign_pts_presence(&c,0,3700,1,&rb);
     assert(c.source_rebases==rebases); /* no local-wall forward-jump heuristic */
-
-    next=assign_pts_presence(&c,0x40000000u,0,1,&rb);
-    assert(next-first==22500u);
-    (void)assign_pts_presence(&c,0,0,0,&rb);
-    assert(!c.origin_is_source);
 
     c.have_origin=0;c.transport_pcr90k=45000;
     first=assign_pts_presence(&c,0,200,1,&rb);
