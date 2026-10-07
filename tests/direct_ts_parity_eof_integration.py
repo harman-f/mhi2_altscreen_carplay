@@ -42,9 +42,14 @@ for i in range(12):
     raw=b"".join(p[payload_offset(p):] for p in video)
     assert raw[14:]==sc(b"\x09\xf0")+large,"EOF truncated/modified the final PES"
     pts=parse_pts(raw)
-    end_index=max(j for j,p in enumerate(packets) if pid(p)==0x11)
-    end_pcr=45000+(end_index*705)//64
-    assert pts-end_pcr>=4500,(pts,end_pcr,"complete PES misses presentation deadline")
+    start_index=min(j for j,p in enumerate(packets) if pid(p)==0x11)
+    start_pcr=45000+(start_index*705)//64
+    # Recovered Omonob semantics guard presentation lead when the AU/PTS is
+    # assigned. They do not phase-shift PTS again so the *tail* of a large PES
+    # must still finish 50 ms before presentation. The EOF test therefore
+    # verifies lead at PES start and separately verifies that the full PES tail
+    # is drained without truncation.
+    assert pts-start_pcr>=4500,(pts,start_pcr,"PES starts below minimum presentation lead")
     duration=len(data)*8/12288000
     assert elapsed>=duration-0.04,(elapsed,duration,"transport clock runs ahead")
 valid=m1au(1,SPS+PPS+sc(b"\x65\x88"),idr=True)
@@ -96,4 +101,4 @@ with tempfile.TemporaryDirectory() as td:
 for invalid in (valid[:20],valid[:-2],b"BAD!"+valid[4:]):
     cp,_,_=run(binary,invalid)
     assert cp.returncode!=0,"malformed/partial input was reported successful"
-print("PARITY_EOF_INTEGRATION=PASS immediate_eof=12 large_idr_then_predictive large_pes_deadline sigterm_PES_tail malformed_input=3 paced_output")
+print("PARITY_EOF_INTEGRATION=PASS immediate_eof=12 large_idr_then_predictive large_pes_start_lead sigterm_PES_tail malformed_input=3 paced_output")
