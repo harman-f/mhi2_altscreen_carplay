@@ -133,11 +133,7 @@ struct clock_state {
     int origin_is_source;
     uint64_t pts_rebases;
     uint64_t source_rebases;
-    uint64_t previous_source;
-    uint64_t previous_arrival_us;
-    int have_previous_source;
     uint64_t emitted_pts90k;
-    uint64_t emission_shift90k;
 };
 
 struct bridge_stats {
@@ -383,49 +379,47 @@ static uint64_t monotonic_us(void) {
 static uint64_t assign_pts_presence(struct clock_state *c, uint32_t frac, uint32_t sec,
                                     int presence, int *rebased) {
     uint64_t pcr, pts, floor, target, shift, now_us;
-    uint64_t raw = ((uint64_t)sec << 32) | frac;
-    int discontinuous = 0;
     int source_valid;
     *rebased = 0;
     now_us = monotonic_us();
     pthread_mutex_lock(&c->lock);
-    /* New GEN2 records explicitly distinguish a present exact zero from NULL.
-     * presence=-1 retains compatibility with historical M1AU-v1 producers. */
-    source_valid = presence < 0 ? frac != 0u || sec != 0u || c->have_previous_source : presence != 0;
+
+    /*
+     * Recovered Omonob/QCDWJ clock semantics. The Apple words form a
+     * relative 32.32-second presentation clock. The first valid source
+     * timestamp is anchored at transport PCR + 9000 ticks (100 ms).
+     * A source rewind or source-presence domain change establishes a new
+     * origin. If presentation lead falls below PCR + 4500 ticks (50 ms),
+     * rebase to the nominal PCR + 9000 target. Finally keep PTS monotonic.
+     *
+     * Deliberately absent here: local-wall/source-speed heuristics and any
+     * second emission-time PTS phase shifter. Neither is part of the
+     * recovered reference timing model.
+     */
+    source_valid = presence < 0 ? (frac != 0u || sec != 0u) : (presence != 0);
     pcr = c->transport_pcr90k;
-    if (source_valid && c->have_previous_source) {
-        /* Unsigned 64-bit subtraction followed by signed interpretation also
-         * handles the seconds-word rollover. Compare successive source times,
-         * not the original session epoch. Idle time is allowed. */
-        int64_t delta = (int64_t)(raw - c->previous_source);
-        uint64_t wall_us = now_us - c->previous_arrival_us;
-        uint64_t allowed = ((wall_us / 1000u + 500u) << 32) / 1000u;
-        discontinuous = delta < 0 || (uint64_t)delta > allowed;
-    }
+
     if (!c->have_origin || c->origin_is_source != source_valid ||
-        discontinuous) {
+        (source_valid && (sec < c->origin_sec ||
+         (sec == c->origin_sec && frac < c->origin_frac)))) {
         c->origin_frac = frac;
         c->origin_sec = sec;
         c->local_origin_us = now_us;
         c->pts_origin90k = pcr + PTS_LEAD_90K;
-        if (c->pts_origin90k <= c->last_pts90k) c->pts_origin90k = c->last_pts90k + 1u;
+        if (c->pts_origin90k <= c->last_pts90k)
+            c->pts_origin90k = c->last_pts90k + 1u;
         if (c->have_origin) ++c->source_rebases;
         c->have_origin = 1;
         c->origin_is_source = source_valid;
     }
-    c->previous_source = raw;
-    c->previous_arrival_us = now_us;
-    c->have_previous_source = source_valid;
-    if (source_valid) {
-        pts = c->pts_origin90k + source_delta_90k(c->origin_frac, c->origin_sec, frac, sec);
-        if (source_delta_90k(c->origin_frac, c->origin_sec, frac, sec) >
-                ((now_us - c->local_origin_us) * 90u) / 1000u + 45000u) {
-            c->origin_frac = frac; c->origin_sec = sec; c->local_origin_us = now_us;
-            c->pts_origin90k = pcr + PTS_LEAD_90K;
-            pts = c->pts_origin90k; ++c->source_rebases; *rebased = 1;
-        }
-    } else
-        pts = c->pts_origin90k + ((now_us - c->local_origin_us) * 90ull) / 1000ull;
+
+    if (source_valid)
+        pts = c->pts_origin90k +
+              source_delta_90k(c->origin_frac, c->origin_sec, frac, sec);
+    else
+        pts = c->pts_origin90k +
+              ((now_us - c->local_origin_us) * 90ull) / 1000ull;
+
     floor = pcr + PTS_MIN_LEAD_90K;
     if (pts < floor) {
         target = pcr + PTS_LEAD_90K;
@@ -436,6 +430,7 @@ static uint64_t assign_pts_presence(struct clock_state *c, uint32_t frac, uint32
         ++c->pts_rebases;
         *rebased = 1;
     }
+
     if (pts <= c->last_pts90k) pts = c->last_pts90k + 1u;
     c->last_pts90k = pts;
     pthread_mutex_unlock(&c->lock);
@@ -805,19 +800,13 @@ static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
         ev|=(a->slice_class & 0x0fu) << AU_EVENT_SLICE_SHIFT;
     }
     if (clock && a->packet_pos == 0) {
-        /* Guard the complete PES deadline at emission, including PSI/PCR
-         * slots and two physical blocks of scheduling/driver margin. */
-        uint64_t budget = a->packet_count + (a->packet_count / 300u + 1u) * 3u + 128u;
-        uint64_t floor = pcr + (budget * TRANSPORT_TICKS_NUM + 63u) / 64u + PTS_MIN_LEAD_90K;
-        uint64_t pts;
-        size_t offset = 5u + a->packets[4];
+        /*
+         * Keep the AU's already-assigned reference PTS unchanged at physical
+         * emission. Omonob does not apply a second queue-budget phase shift.
+         */
         pthread_mutex_lock(&clock->lock);
-        pts = a->pts90k + clock->emission_shift90k;
-        if (pts < floor) { clock->emission_shift90k += floor - pts; pts = floor; ++clock->pts_rebases; }
-        if (pts <= clock->emitted_pts90k) pts = clock->emitted_pts90k + 1u;
-        clock->emitted_pts90k = pts;
+        clock->emitted_pts90k = a->pts90k;
         pthread_mutex_unlock(&clock->lock);
-        encode_pts(a->packets + offset + 9u, pts);
     }
     memcpy(p, a->packets + a->packet_pos * TS_SIZE, TS_SIZE);
     ++a->packet_pos; --q->packets_queued;
@@ -890,8 +879,11 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"transport_clock_model=accepted_12032_byte_blocks\n");
     fprintf(f,"hardware_drain_validation=required\n");
     pthread_mutex_lock(&c->lock);
-    fprintf(f,"last_emitted_pts90k=%llu\nemission_shift90k=%llu\n",
-        (unsigned long long)c->emitted_pts90k,(unsigned long long)c->emission_shift90k);
+    fprintf(f,"last_emitted_pts90k=%llu\nemission_shift90k=0\n",
+        (unsigned long long)c->emitted_pts90k);
+    fprintf(f,"pts_pcr_lead90k=%lld\npts_pcr_lead_ms=%lld\n",
+        (long long)c->emitted_pts90k - (long long)c->transport_pcr90k,
+        ((long long)c->emitted_pts90k - (long long)c->transport_pcr90k) * 1000ll / 90000ll);
     pthread_mutex_unlock(&c->lock);
     fprintf(f,"transport_bps=%u\n",TRANSPORT_BPS);
     fprintf(f,"pat_pid=0x%04x\npmt_pid=0x%04x\npcr_pid=0x%04x\nvideo_pid=0x%04x\n",PID_PAT,PID_PMT,PID_PCR,PID_VIDEO);
@@ -1220,6 +1212,13 @@ static int host_self_test(void) {
     memset(&c,0,sizeof(c)); pthread_mutex_init(&c.lock,NULL); c.transport_pcr90k=45000;
     p1=assign_pts(&c,0x80000000u,100,&rb); if(p1!=54000u)return 9;
     c.transport_pcr90k=45705; p2=assign_pts(&c,0xc0000000u,100,&rb); if(p2-p1!=22500u)return 10;
+    c.transport_pcr90k=p2+10000u;
+    {
+        uint64_t before_rebases=c.pts_rebases;
+        uint64_t p3=assign_pts(&c,0x00000000u,101,&rb);
+        if(!rb || p3<c.transport_pcr90k+PTS_MIN_LEAD_90K ||
+           c.pts_rebases!=before_rebases+1u)return 19;
+    }
     c.transport_pcr90k=90000; p2=assign_pts(&c,0x10000000u,99,&rb); if(!rb && c.source_rebases==0)return 11;
     pthread_mutex_destroy(&c.lock);
 
@@ -1293,7 +1292,7 @@ int main(int argc,char **argv) {
             uint64_t da=0,dp=0,pp=0;
             queue_recover_au_boundary(&queue,&da,&dp,&pp);
             record_safe_recovery(&stats,"generation",da,dp,pp);
-            pthread_mutex_lock(&clock.lock); clock.have_origin=0; clock.have_previous_source=0; ++clock.source_rebases; pthread_mutex_unlock(&clock.lock);
+            pthread_mutex_lock(&clock.lock); clock.have_origin=0; ++clock.source_rebases; pthread_mutex_unlock(&clock.lock);
             free(param_cache); param_cache=NULL; param_cache_n=0;
             prev_seq=0;
             waiting_idr=1; discontinuity=1;
