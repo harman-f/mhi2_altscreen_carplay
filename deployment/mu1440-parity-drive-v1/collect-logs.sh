@@ -27,7 +27,7 @@ card_ro(){
   fi
 }
 fail(){
-  echo "OMONOB790_PARITY_LOG_EXPORT=FAIL $*"
+  echo "PARITY_DRIVE_LOG_EXPORT=FAIL $*"
   card_ro
   exit 20
 }
@@ -67,5 +67,5 @@ done
 card_ro || fail "sd_mount_ro"
 trap - 0 1 2 15
 
-echo "OMONOB790_PARITY_LOG_EXPORT=PASS"
+echo "PARITY_DRIVE_LOG_EXPORT=PASS"
 echo "path=$OUT"
