@@ -31,6 +31,7 @@ PATCHED_STARTUP=/tmp/mibr-parity-startup.$$
 
 EXPECTED_AIRPLAY=193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5
 EXPECTED_BASE_GEN2=8cccf1cb1764952acd973cbb4f881cfd70f3312e7f6a29cdef7fec930c83d25c
+EXPECTED_BASE_GEN2_VEHICLE_CURRENT=0406c607ef4e3b32a9b793cc83a7baffd7228437d18fd4671a464c2bf74439ac
 EXPECTED_BASE_REMUX=3f0e730523bd290608dc13e186baa962eeb9c46f117d4d4976be523c0cd94c09
 EXPECTED_GATE=05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957
 BASE_ACTIVE=/mnt/app/root/mibr-framing-v1-active
@@ -134,8 +135,11 @@ check_base(){
   GH=$(hashf "$DST/bin/libaltscreen111.so") || fail "base_gen2_hash_failed"
   HH=$(hashf "$HOOK") || fail "base_hook_hash_failed"
   RH=$(hashf "$DST/bin/direct-ts-remux") || fail "base_remux_hash_failed"
-  [ "$GH" = "$EXPECTED_BASE_GEN2" ] || fail "wrong_base_gen2=$GH"
-  [ "$HH" = "$EXPECTED_BASE_GEN2" ] || fail "wrong_base_hook=$HH"
+  case "$GH" in
+    "$EXPECTED_BASE_GEN2"|"$EXPECTED_BASE_GEN2_VEHICLE_CURRENT") ;;
+    *) fail "wrong_base_gen2=$GH" ;;
+  esac
+  [ "$HH" = "$GH" ] || fail "base_hook_gen2_mismatch gen2=$GH hook=$HH"
   [ "$RH" = "$EXPECTED_BASE_REMUX" ] || fail "wrong_base_remux=$RH"
 
   for LEGACY_STATE in /tmp/mibr-direct-auto-supervisor.pid /tmp/mibr-direct-auto-watchdog.pid /tmp/mibr-direct-auto-bridge.pid; do
@@ -155,6 +159,7 @@ show_plan(){
   echo "=== MU1440 MU1440 parity-drive candidate ==="
   echo "target=MHI2_ER_SKG13_P4526_MU1440"
   echo "base_gen2_sha256=$EXPECTED_BASE_GEN2"
+  echo "base_gen2_vehicle_current_sha256=$EXPECTED_BASE_GEN2_VEHICLE_CURRENT"
   echo "base_remux_sha256=$EXPECTED_BASE_REMUX"
   echo "candidate_gen2_sha256=$(candidate_hash gen2)"
   echo "candidate_bridge_sha256=$(candidate_hash bridge)"
