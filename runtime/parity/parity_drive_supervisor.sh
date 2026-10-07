@@ -40,7 +40,7 @@ STATS_CFG_TEMP=/tmp/mibr-parity-statistics-enabled
 STATS_CFG_PERSIST=/mnt/app/root/mibr-parity-statistics-enabled
 
 CARD=/net/mmx/fs/sda0
-LOGROOT=/net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive
+LOGROOT=/net/mmx/fs/sda0/esd/carplay-test/logs/classic_single_view-parity-drive
 SD_RW=0
 
 # 0 means true until-stop operation. Finite 60..7200 second sessions remain
@@ -336,7 +336,7 @@ trap cleanup 0 1 2 15
 # This PID file is diagnostic only; it is never authority for signalling.
 if [ -r "$PIDFILE" ]; then
   OLD=$(cat "$PIDFILE" 2>/dev/null)
-  if [ -n "$OLD" ] && pidin ar 2>/dev/null | grep -E "^[[:space:]]*$OLD[[:space:]]" | grep -F 'omonob790_drive_supervisor.sh' >/dev/null 2>&1; then
+  if [ -n "$OLD" ] && pidin ar 2>/dev/null | grep -E "^[[:space:]]*$OLD[[:space:]]" | grep -F 'classic_single_view_drive_supervisor.sh' >/dev/null 2>&1; then
     echo "PARITY_DRIVE_SUPERVISOR=ALREADY_RUNNING pid=$OLD"
     exit 0
   fi

@@ -9,7 +9,7 @@ unset LD_PRELOAD
 export GEM=1
 # END_TARGET_ENV
 
-echo "=== OMONOB790 PARITY SESSION ==="
+echo "=== CLASSIC_SINGLE_VIEW PARITY SESSION ==="
 for F in /tmp/mibr-parity-session.backend /tmp/mibr-parity-session.ticket /tmp/mibr-alt111-native-gate.status /tmp/mibr-alt111-gen2.status; do
   [ ! -r "$F" ] || { echo "$F"; cat "$F"; }
 done

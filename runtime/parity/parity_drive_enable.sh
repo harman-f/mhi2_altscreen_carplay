@@ -4,7 +4,7 @@
 
 set -u
 BASE=/mnt/app/root/altscreen-u2
-SUP=$BASE/scripts/omonob790_drive_supervisor.sh
+SUP=$BASE/scripts/classic_single_view_drive_supervisor.sh
 RUNNER=$BASE/bin/parity-session
 BRIDGE=$BASE/bin/direct-ts-parity
 LSD=/mnt/app/eso/hmi/lsd/lsd.sh
@@ -13,7 +13,7 @@ LEGACY=/mnt/app/root/mibr-carplay-autodirect
 TMP=/mnt/app/root/lsd.sh.mibr-parity-drive.$$
 BEGIN="# MIBR PARITY-DRIVE BEGIN"
 END="# MIBR PARITY-DRIVE END"
-BOOTCMD='/bin/ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_supervisor.sh >/tmp/mibr-parity-drive-boot.log 2>&1 &'
+BOOTCMD='/bin/ksh /mnt/app/root/altscreen-u2/scripts/classic_single_view_drive_supervisor.sh >/tmp/mibr-parity-drive-boot.log 2>&1 &'
 RW=0
 
 fail(){
@@ -80,7 +80,7 @@ if [ "${MIBR_PREPARE_ONLY:-0}" = "1" ]; then
   exit 0
 fi
 
-if pidin ar 2>/dev/null | grep -F 'omonob790_drive_supervisor.sh' | grep -v grep >/dev/null 2>&1; then
+if pidin ar 2>/dev/null | grep -F 'classic_single_view_drive_supervisor.sh' | grep -v grep >/dev/null 2>&1; then
   echo "runtime_start=ALREADY_RUNNING"
   exit 0
 fi

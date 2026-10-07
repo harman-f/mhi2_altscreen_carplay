@@ -1,6 +1,6 @@
 /* Generated private descriptors. Do not edit. */
 static const struct alt111_setting_descriptor registry[] = {
-    {"preset.id", "mibr-carplay111-compat-profile", "", "enum", "omonob790|mibr_dual_view|mibr_legacy|mibr", "omonob790", "mibr_dual_view", "mibr_legacy", "reconnect", "advanced", 0, 0, 0, 0},
+    {"preset.id", "mibr-carplay111-compat-profile", "", "enum", "classic_single_view|mibr_dual_view|mibr_legacy|mibr", "classic_single_view", "mibr_dual_view", "mibr_legacy", "reconnect", "advanced", 0, 0, 0, 0},
     {"carplay.enabled", "mibr-carplay111-enabled", "", "integer", "", "1", "1", "1", "session", "normal", 0, 1, 1, 0},
     {"maxFPS", "mibr-carplay111-fps", "", "enum", "20|25|30|40", "40", "40", "30", "reconnect", "advanced", 0, 0, 2, 0},
     {"sourceVersion", "mibr-carplay111-sourceversion", "", "version", "", "950.7.1", "950.7.1", "1005.8.1", "reconnect", "advanced", 0, 0, 3, 0},

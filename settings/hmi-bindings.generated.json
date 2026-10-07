@@ -14,7 +14,7 @@
       "field": "",
       "type": "enum",
       "default": {
-        "omonob790": "omonob790",
+        "classic_single_view": "classic_single_view",
         "mibr_dual_view": "mibr_dual_view",
         "mibr_legacy": "mibr_legacy"
       },
@@ -23,7 +23,7 @@
       "read_only": false,
       "reference_override": "deviation_visible",
       "allowed": [
-        "omonob790",
+        "classic_single_view",
         "mibr_dual_view",
         "mibr_legacy",
         "mibr"
@@ -35,7 +35,7 @@
       "field": "",
       "type": "integer",
       "default": {
-        "omonob790": "1",
+        "classic_single_view": "1",
         "mibr_dual_view": "1",
         "mibr_legacy": "1"
       },
@@ -52,7 +52,7 @@
       "field": "",
       "type": "enum",
       "default": {
-        "omonob790": "40",
+        "classic_single_view": "40",
         "mibr_dual_view": "40",
         "mibr_legacy": "30"
       },
@@ -73,7 +73,7 @@
       "field": "",
       "type": "version",
       "default": {
-        "omonob790": "950.7.1",
+        "classic_single_view": "950.7.1",
         "mibr_dual_view": "950.7.1",
         "mibr_legacy": "1005.8.1"
       },
@@ -88,7 +88,7 @@
       "field": "mode",
       "type": "enum",
       "default": {
-        "omonob790": "source_frames",
+        "classic_single_view": "source_frames",
         "mibr_dual_view": "source_frames",
         "mibr_legacy": "source_frames"
       },
@@ -109,7 +109,7 @@
       "field": "interval_frames",
       "type": "integer",
       "default": {
-        "omonob790": "20",
+        "classic_single_view": "20",
         "mibr_dual_view": "20",
         "mibr_legacy": "20"
       },
@@ -126,7 +126,7 @@
       "field": "interval_ms",
       "type": "integer",
       "default": {
-        "omonob790": "2000",
+        "classic_single_view": "2000",
         "mibr_dual_view": "2000",
         "mibr_legacy": "2000"
       },
@@ -143,7 +143,7 @@
       "field": "showui",
       "type": "integer",
       "default": {
-        "omonob790": "1",
+        "classic_single_view": "1",
         "mibr_dual_view": "1",
         "mibr_legacy": "1"
       },
@@ -160,7 +160,7 @@
       "field": "gap_recovery",
       "type": "integer",
       "default": {
-        "omonob790": "1",
+        "classic_single_view": "1",
         "mibr_dual_view": "1",
         "mibr_legacy": "1"
       },
@@ -177,7 +177,7 @@
       "field": "latency_recovery",
       "type": "integer",
       "default": {
-        "omonob790": "1",
+        "classic_single_view": "1",
         "mibr_dual_view": "1",
         "mibr_legacy": "1"
       },
@@ -194,7 +194,7 @@
       "field": "backend",
       "type": "enum",
       "default": {
-        "omonob790": "writev_gate",
+        "classic_single_view": "writev_gate",
         "mibr_dual_view": "writev_gate",
         "mibr_legacy": "writev_gate"
       },
@@ -213,7 +213,7 @@
       "field": "",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
@@ -230,7 +230,7 @@
       "field": "enabled",
       "type": "integer",
       "default": {
-        "omonob790": "1",
+        "classic_single_view": "1",
         "mibr_dual_view": "1",
         "mibr_legacy": "1"
       },
@@ -247,7 +247,7 @@
       "field": "count",
       "type": "integer",
       "default": {
-        "omonob790": "1",
+        "classic_single_view": "1",
         "mibr_dual_view": "2",
         "mibr_legacy": "2"
       },
@@ -264,7 +264,7 @@
       "field": "initial",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
@@ -281,7 +281,7 @@
       "field": "transition_ms",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
@@ -298,7 +298,7 @@
       "field": "view0.x",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
@@ -315,7 +315,7 @@
       "field": "view0.y",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
@@ -332,7 +332,7 @@
       "field": "view0.w",
       "type": "integer",
       "default": {
-        "omonob790": "1010",
+        "classic_single_view": "1010",
         "mibr_dual_view": "1010",
         "mibr_legacy": "1010"
       },
@@ -349,7 +349,7 @@
       "field": "view0.h",
       "type": "integer",
       "default": {
-        "omonob790": "376",
+        "classic_single_view": "376",
         "mibr_dual_view": "376",
         "mibr_legacy": "376"
       },
@@ -366,7 +366,7 @@
       "field": "view0.safe.x",
       "type": "integer",
       "default": {
-        "omonob790": "202",
+        "classic_single_view": "202",
         "mibr_dual_view": "202",
         "mibr_legacy": "0"
       },
@@ -383,7 +383,7 @@
       "field": "view0.safe.y",
       "type": "integer",
       "default": {
-        "omonob790": "16",
+        "classic_single_view": "16",
         "mibr_dual_view": "16",
         "mibr_legacy": "0"
       },
@@ -400,7 +400,7 @@
       "field": "view0.safe.w",
       "type": "integer",
       "default": {
-        "omonob790": "606",
+        "classic_single_view": "606",
         "mibr_dual_view": "606",
         "mibr_legacy": "1010"
       },
@@ -417,7 +417,7 @@
       "field": "view0.safe.h",
       "type": "integer",
       "default": {
-        "omonob790": "344",
+        "classic_single_view": "344",
         "mibr_dual_view": "344",
         "mibr_legacy": "376"
       },
@@ -434,7 +434,7 @@
       "field": "view0.adjacent",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "1",
         "mibr_legacy": "1"
       },
@@ -451,7 +451,7 @@
       "field": "view1.x",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
@@ -468,7 +468,7 @@
       "field": "view1.y",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
@@ -485,7 +485,7 @@
       "field": "view1.w",
       "type": "integer",
       "default": {
-        "omonob790": "1010",
+        "classic_single_view": "1010",
         "mibr_dual_view": "1010",
         "mibr_legacy": "1010"
       },
@@ -502,7 +502,7 @@
       "field": "view1.h",
       "type": "integer",
       "default": {
-        "omonob790": "376",
+        "classic_single_view": "376",
         "mibr_dual_view": "376",
         "mibr_legacy": "376"
       },
@@ -519,7 +519,7 @@
       "field": "view1.safe.x",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
@@ -536,7 +536,7 @@
       "field": "view1.safe.y",
       "type": "integer",
       "default": {
-        "omonob790": "58",
+        "classic_single_view": "58",
         "mibr_dual_view": "58",
         "mibr_legacy": "58"
       },
@@ -553,7 +553,7 @@
       "field": "view1.safe.w",
       "type": "integer",
       "default": {
-        "omonob790": "1010",
+        "classic_single_view": "1010",
         "mibr_dual_view": "1010",
         "mibr_legacy": "1010"
       },
@@ -570,7 +570,7 @@
       "field": "view1.safe.h",
       "type": "integer",
       "default": {
-        "omonob790": "248",
+        "classic_single_view": "248",
         "mibr_dual_view": "248",
         "mibr_legacy": "248"
       },
@@ -587,7 +587,7 @@
       "field": "view1.adjacent",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
@@ -604,7 +604,7 @@
       "field": "widthPixels",
       "type": "integer",
       "default": {
-        "omonob790": "1010",
+        "classic_single_view": "1010",
         "mibr_dual_view": "1010",
         "mibr_legacy": "1010"
       },
@@ -621,7 +621,7 @@
       "field": "heightPixels",
       "type": "integer",
       "default": {
-        "omonob790": "376",
+        "classic_single_view": "376",
         "mibr_dual_view": "376",
         "mibr_legacy": "376"
       },
@@ -638,7 +638,7 @@
       "field": "widthPhysical",
       "type": "integer",
       "default": {
-        "omonob790": "202",
+        "classic_single_view": "202",
         "mibr_dual_view": "202",
         "mibr_legacy": "200"
       },
@@ -655,7 +655,7 @@
       "field": "heightPhysical",
       "type": "integer",
       "default": {
-        "omonob790": "75",
+        "classic_single_view": "75",
         "mibr_dual_view": "75",
         "mibr_legacy": "74"
       },
@@ -672,7 +672,7 @@
       "field": "uuid",
       "type": "uuid",
       "default": {
-        "omonob790": "b7e6c5a0-2222-4000-8000-000000000002",
+        "classic_single_view": "b7e6c5a0-2222-4000-8000-000000000002",
         "mibr_dual_view": "b7e6c5a0-2222-4000-8000-000000000002",
         "mibr_legacy": "b7e6c5a0-2222-4000-8000-000000000002"
       },
@@ -687,7 +687,7 @@
       "field": "",
       "type": "url",
       "default": {
-        "omonob790": "maps:/car/instrumentcluster/map",
+        "classic_single_view": "maps:/car/instrumentcluster/map",
         "mibr_dual_view": "auto",
         "mibr_legacy": "auto"
       },
@@ -702,7 +702,7 @@
       "field": "query",
       "type": "enum",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
@@ -721,7 +721,7 @@
       "field": "surface",
       "type": "enum",
       "default": {
-        "omonob790": "map",
+        "classic_single_view": "map",
         "mibr_dual_view": "map",
         "mibr_legacy": "base"
       },
@@ -741,7 +741,7 @@
       "field": "showETA",
       "type": "enum",
       "default": {
-        "omonob790": "yes",
+        "classic_single_view": "yes",
         "mibr_dual_view": "yes",
         "mibr_legacy": "yes"
       },
@@ -761,7 +761,7 @@
       "field": "showSpeedLimit",
       "type": "enum",
       "default": {
-        "omonob790": "user",
+        "classic_single_view": "user",
         "mibr_dual_view": "user",
         "mibr_legacy": "user"
       },
@@ -781,7 +781,7 @@
       "field": "showCompass",
       "type": "enum",
       "default": {
-        "omonob790": "user",
+        "classic_single_view": "user",
         "mibr_dual_view": "user",
         "mibr_legacy": "user"
       },
@@ -801,7 +801,7 @@
       "field": "maneuverLayout",
       "type": "enum",
       "default": {
-        "omonob790": "none",
+        "classic_single_view": "none",
         "mibr_dual_view": "none",
         "mibr_legacy": "none"
       },
@@ -822,7 +822,7 @@
       "field": "urls",
       "type": "urls",
       "default": {
-        "omonob790": "maps:/car/instrumentcluster/map",
+        "classic_single_view": "maps:/car/instrumentcluster/map",
         "mibr_dual_view": "maps:/car/instrumentcluster|maps:/car/instrumentcluster/map|maps:/car/instrumentcluster/instructioncard",
         "mibr_legacy": "maps:/car/instrumentcluster/map"
       },
@@ -837,7 +837,7 @@
       "field": "",
       "type": "integer",
       "default": {
-        "omonob790": "0",
+        "classic_single_view": "0",
         "mibr_dual_view": "0",
         "mibr_legacy": "0"
       },
