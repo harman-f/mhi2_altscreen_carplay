@@ -1,6 +1,6 @@
 # Current development status
 
-Last updated: **2026-10-05**
+Last updated: **2026-10-07**
 
 > The downloadable experimental GEN2 binary is intentionally **not the newest development build**.
 >
@@ -8,11 +8,39 @@ Last updated: **2026-10-05**
 > several steps beyond it, but those newer changes are still being used to isolate lifecycle edge
 > cases and are not published as the recommended binary yet.
 
+## MU1440 parity-drive vehicle milestone — 2026-10-07
+
+The current draft branch has now produced a **visible CarPlay image in the real AID10 through the
+clean-room parity path** after native ownership takeover. The matched owner/bridge pair passed the
+QNX bound-process identity self-test, exact driver readbacks and START. The exact MU1440 reports
+`ENOTTY (25)` for the optional queue-FLUSH command while START succeeds; only this exact FLUSH
+result is tolerated.
+
+The first visible run then exposed an application-side regression rather than a driver failure: an
+artificial 40-ms transport-lateness deadline aborted a valid driver-backpressured `isoTX2` path.
+The device path now trusts bounded QNX backpressure (500-ms write/EAGAIN limit) and records real
+write latency instead of inventing a physical-drain deadline.
+
+The new guarded parity-drive runtime supports true until-stop operation, boot autostart, token-bound
+stop and independent watchdog recovery without terminating stock DisplayManager,
+`smartphone_integrator` or `dio_manager`. Native DisplayManager payload is suppressed only by the
+qualified writev gate and is restored on every normal/error exit.
+
+Drive evidence is SD-only and fail-closed: the supervisor must successfully remount
+`/net/mmx/fs/sda0` writable and pass a write test before it starts custom ownership. Live status and
+persistent statistics are independently switchable with temp/persistent/default layering. Persistent
+telemetry includes measured/derived source FPS, IDR/non-IDR counts, P/B/I slice classification,
+post-write AU completion, MOST blocks, EAGAIN and write-latency metrics.
+
+See [the exact 2026-10-07 vehicle/runtime contract](../testing/MU1440_PARITY_DRIVE_VEHICLE_CONTRACT_2026-10-07.md).
+That document is the regression authority for MU1440 shell/process-control, SHMEM and matched-binary
+rules. Older Auto-Direct and MHI1Q command examples must not override it.
+
 ## MU1440 master candidate — 2026-10-05
 
 The current development line is draft [harman-f/mhi2_altscreen_carplay#15](https://github.com/harman-f/mhi2_altscreen_carplay/pull/15), branch `codex/omonob790-regression-hardening-v1`. Keep it unmerged. Its exact source identity is recorded in each generated candidate manifest; the historical vehicle PoC below does not qualify this new combination.
 
-The code now includes a shared 48-key settings registry, atomic temporary-file transactions and crash reconciliation, source-frame/source-time keyframe policy, generation-bound recovery, frozen negotiated geometry/UUID/source version, and a native owner with bound process handles and an independent watchdog. The separate native guard runs in DisplayManager; GEN2 runs in smartphone_integrator. Initial ownership is `writev_gate`. The DMDT backend is a routing probe that starts no custom payload until independently qualified on the target.
+The code now includes a shared settings registry, target-qualified SHMEM transactions and crash reconciliation, source-frame/source-time keyframe policy, generation-bound recovery, frozen negotiated geometry/UUID/source version, and a native owner with bound process handles and an independent watchdog. On the exact MU1440, `/tmp` aliases `/dev/shmem`; `F_SETLK` and native temp+rename publication are not valid runtime primitives there, so current owner/status paths use O_EXCL inode ownership plus direct truncate/write where appropriate. The separate native guard runs in DisplayManager; GEN2 runs in smartphone_integrator. Initial ownership is `writev_gate`. The DMDT backend is a routing probe that starts no custom payload until independently qualified on the target.
 
 Master-specific shell adapters use the same native settings helper. SafeArea, display and navigation batches commit together; stored values are not reported as runtime completion. The master installer backs up the exact boot command, all affected native components and scripts, and all 13 temporary configuration files, including absence. A rollback barrier prevents GEN2 from consuming a partially restored set until normal reboot. SD vehicle wrappers use the existing M.I.B. media bootstrap and MU1440 `tee` logger; every entry point establishes the proven target environment itself.
 
