@@ -154,6 +154,26 @@ configure_timing(){
   fi
 }
 
+publish_current_status(){
+  OUT=$1
+  SAMPLE=$2
+  {
+    echo "sample=$SAMPLE"
+    echo "supervisor_state=$(cat "$STATE" 2>/dev/null)"
+    echo "session_state=$(cat /tmp/mibr-parity-session.state 2>/dev/null)"
+    echo "stream111_state=$(cat "$SOURCE_STATE" 2>/dev/null)"
+    echo "stream111_heartbeat=$(cat "$SOURCE_HB" 2>/dev/null)"
+    echo "--- parity ---"
+    [ -r "$PARITY_STATUS" ] && cat "$PARITY_STATUS" 2>/dev/null || echo "parity_status=missing"
+    echo "--- gen2 ---"
+    [ -r "$GEN2_STATUS" ] && cat "$GEN2_STATUS" 2>/dev/null || echo "gen2_status=missing"
+    echo "--- source timing ---"
+    [ -r "$SOURCE_TIMING" ] && cat "$SOURCE_TIMING" 2>/dev/null || echo "source_timing=missing"
+    echo "--- gate ---"
+    [ -r "$GATE_STATUS" ] && cat "$GATE_STATUS" 2>/dev/null || echo "gate_status=missing"
+  } > "$OUT" 2>/dev/null || true
+}
+
 append_raw_status(){
   OUT=$1
   SAMPLE=$2
@@ -205,6 +225,7 @@ evidence_loop(){
 
     if [ "$STATUS_ON" = "1" ]; then
       append_raw_status "$SNAPSHOTS" "$N"
+      publish_current_status "$LATEST_STATUS" "$N"
     fi
 
     if [ "$STATS_ON" = "1" ]; then
@@ -307,7 +328,7 @@ evidence_loop(){
         echo "last_write_us=$LW"
         echo "max_write_us=$MW"
         echo "gate=$GR"
-      } > "$LATEST_STATUS" 2>/dev/null || true
+      } > "$LATEST_STATS" 2>/dev/null || true
     fi
 
     if [ $((N % 30)) -eq 0 ]; then sync 2>/dev/null || true; fi
@@ -346,6 +367,7 @@ enabled || { publish disabled; exit 0; }
 
 MASTER_LOG="$LOGROOT/drive-supervisor.log"
 LATEST_STATUS="$LOGROOT/current.status"
+LATEST_STATS="$LOGROOT/current.statistics"
 echo "SUPERVISOR_START pid=$SELF_PID" >> "$MASTER_LOG" 2>/dev/null || true
 sync 2>/dev/null || true
 
