@@ -147,6 +147,10 @@ jobs:
           grep -Fq '/net/mmx/fs/sda0/esd/carplay-test/logs/omonob790-parity-drive' runtime/parity/omonob790_drive_supervisor.sh
           grep -Fq 'DEFAULT_SECONDS=0' runtime/parity/omonob790_drive_supervisor.sh
           grep -Fq 'status-snapshots.log' runtime/parity/omonob790_drive_supervisor.sh
+          grep -Fq 'current.status' runtime/parity/omonob790_drive_supervisor.sh
+          grep -Fq 'current.statistics' runtime/parity/omonob790_drive_supervisor.sh
+          grep -Fq 'gen2_source_fps' runtime/parity/omonob790_drive_supervisor.sh
+          grep -Fq 'parity_input_non_idr_fps' runtime/parity/omonob790_drive_supervisor.sh
           grep -Fq 'mibr-parity-statistics-enabled' runtime/parity/omonob790_drive_status.sh
           grep -Fq 'output_non_idr_aus_completed' src/native/direct-ts-parity/direct_ts_parity.c
           grep -Fq 'output_slice_p_completed' src/native/direct-ts-parity/direct_ts_parity.c
