@@ -221,10 +221,12 @@ switchable for future sessions:
   ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh status-off persistent
   ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh statistics-off persistent
   ksh /mnt/app/root/altscreen-u2/scripts/omonob790_drive_status.sh clear-temp
-Statistics require the live parity status producer. They record source FPS,
-GEN2 source/IDR counters, parity IDR/non-IDR and passive H.264 P/B/I slice
-classes through accepted TS output, queue/MOST counters and driver-backpressure
-timing.
+With status enabled the SD keeps current.status plus per-session
+status-snapshots.log. With statistics enabled it keeps current.statistics plus
+per-session telemetry.tsv. Statistics require the live parity status producer,
+so enabling statistics also enables status. They record source FPS, GEN2
+source/IDR counters, parity IDR/non-IDR and passive H.264 P/B/I slice classes
+through accepted TS output, queue/MOST counters and driver-backpressure timing.
 
 Stop uses the current owner ticket; PID hints never authorize signals.
 Parent and independent watchdog retain the exact bridge process identity.
