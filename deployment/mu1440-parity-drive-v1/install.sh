@@ -27,6 +27,9 @@ STARTUP=/mnt/system/etc/boot/startup.sh
 GUARD=/mnt/app/eso/lib/libmibr_isotx2_guard.so
 OLD_GATE_LINE='        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
 NEW_GATE_LINE='        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_guard.so:/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
+STOCK_FALLBACK_LINE='    MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
+GATE_BEGIN='# MIBR ISOTX2 GATE BEGIN'
+GATE_END='# MIBR ISOTX2 GATE END'
 PATCHED_STARTUP=/tmp/mibr-parity-startup.$$
 
 EXPECTED_AIRPLAY=193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5
@@ -89,11 +92,32 @@ trap 'cleanup; exit 143' 15
 prepare_startup(){
   [ -r "$STARTUP" ] || fail "startup_missing"
   [ ! -e /mnt/app/root/mibr-isotx2-gate-disable ] || fail "native_gate_disabled"
-  awk -v old="$OLD_GATE_LINE" -v replacement="$NEW_GATE_LINE" '
-    $0==old {print replacement; hits++; next}
-    {print}
-    END {if(hits!=1)exit 42}
-  ' "$STARTUP" > "$PATCHED_STARTUP" || fail "startup_not_exact_single_known_gate_command"
+
+  OLD_N=$(awk -v line="$OLD_GATE_LINE" '$0==line {n++} END {print n+0}' "$STARTUP")
+  NEW_N=$(awk -v line="$NEW_GATE_LINE" '$0==line {n++} END {print n+0}' "$STARTUP")
+
+  if [ "$OLD_N" = 1 ] && [ "$NEW_N" = 0 ]; then
+    awk -v old="$OLD_GATE_LINE" -v replacement="$NEW_GATE_LINE" '
+      $0==old {print replacement; hits++; next}
+      {print}
+      END {if(hits!=1)exit 42}
+    ' "$STARTUP" > "$PATCHED_STARTUP" || fail "startup_patch_failed"
+    echo "startup_mode=PATCH_KNOWN_GATE"
+  elif [ "$OLD_N" = 0 ] && [ "$NEW_N" = 1 ]; then
+    BEGIN_N=$(awk -v line="$GATE_BEGIN" '$0==line {n++} END {print n+0}' "$STARTUP")
+    END_N=$(awk -v line="$GATE_END" '$0==line {n++} END {print n+0}' "$STARTUP")
+    STOCK_N=$(awk -v line="$STOCK_FALLBACK_LINE" '$0==line {n++} END {print n+0}' "$STARTUP")
+    [ "$BEGIN_N" = 1 ] || fail "startup_guard_block_begin_count=$BEGIN_N"
+    [ "$END_N" = 1 ] || fail "startup_guard_block_end_count=$END_N"
+    [ "$STOCK_N" = 1 ] || fail "startup_guard_stock_fallback_count=$STOCK_N"
+    [ -r "$GUARD" ] || fail "startup_guard_present_guard_missing"
+    same_as_package "$GUARD" "$PAYLOAD/libmibr_isotx2_guard.so" || fail "startup_guard_binary_mismatch"
+    cp "$STARTUP" "$PATCHED_STARTUP" || fail "startup_guard_copy_failed"
+    echo "startup_mode=ALREADY_GUARDED_VERIFIED"
+  else
+    fail "startup_not_exact_single_known_gate_command old_count=$OLD_N new_count=$NEW_N"
+  fi
+
   ksh -n "$PATCHED_STARTUP" || fail "startup_generated_syntax"
 }
 
