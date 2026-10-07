@@ -15,7 +15,7 @@ ROOT=$(cd "$ROOT" 2>/dev/null && pwd) || exit 2
 SHA=$ROOT/payload/sha256sum
 DST=/mnt/app/root/altscreen-u2
 HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
-ACTIVE=/mnt/app/root/mibr-parity-v1-active
+ACTIVE=/mnt/app/root/mibr-parity-drive-v1-active
 BASE_REMUX_EXPECTED=3f0e730523bd290608dc13e186baa962eeb9c46f117d4d4976be523c0cd94c09
 
 hashf(){

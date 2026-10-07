@@ -35,8 +35,8 @@ EXPECTED_BASE_REMUX=3f0e730523bd290608dc13e186baa962eeb9c46f117d4d4976be523c0cd9
 EXPECTED_GATE=05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957
 BASE_ACTIVE=/mnt/app/root/mibr-framing-v1-active
 
-BACK=/mnt/app/root/mibr-parity-v1-backup
-ACTIVE=/mnt/app/root/mibr-parity-v1-active
+BACK=/mnt/app/root/mibr-parity-drive-v1-backup
+ACTIVE=/mnt/app/root/mibr-parity-drive-v1-active
 STATE_AUTODIRECT=/mnt/app/root/mibr-carplay-autodirect
 APP_RW=0
 SYSTEM_RW=0
@@ -144,7 +144,7 @@ check_base(){
 }
 
 check_tmp_root(){
-  T=/tmp/mibr-parity-v1-write-test
+  T=/tmp/mibr-parity-drive-v1-write-test
   rm -f "$T" 2>/dev/null || true
   touch "$T" 2>/dev/null || fail "tmp_root_not_writable"
   [ -f "$T" ] || fail "tmp_root_write_test_missing"
