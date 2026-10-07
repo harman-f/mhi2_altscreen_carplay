@@ -65,7 +65,7 @@ int main(int argc, char **argv)
     int s = -1, out = -1, rc = 1;
     struct sockaddr_in addr;
     uint8_t buf[65536];
-    uint64_t bytes = 0, chunks = 0, start_ms, deadline_ms = 0;
+    uint64_t bytes = 0, chunks = 0, start_ms = 0, deadline_ms = 0;
 
     if (argc != 4 && argc != 5) {
         fprintf(stderr, "usage: %s HOST PORT OUTPUT [SECONDS]\n", argv[0]);
@@ -182,6 +182,6 @@ done:
             rc == 0 ? "PASS" : "FAIL",
             (unsigned long long)bytes,
             (unsigned long long)chunks,
-            (unsigned long long)(monotonic_ms() - start_ms));
+            (unsigned long long)(start_ms ? monotonic_ms() - start_ms : 0));
     return rc;
 }
