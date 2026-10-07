@@ -28,12 +28,15 @@ int main(void) {
     assert_types(out,on);assert(au_has_type(cache,cn,7));assert(au_has_type(cache,cn,8));free(out);free(cache);
     memset(&c,0,sizeof(c));pthread_mutex_init(&c.lock,NULL);c.transport_pcr90k=45000;
     first=assign_pts(&c,0xc0000000u,0xffffffffu,&rb);
+    rebases=c.source_rebases;
     next=assign_pts(&c,0x40000000u,0u,&rb);
-    assert(next-first==45000u);assert(c.source_rebases==0);
+    assert(c.source_rebases==rebases+1u); /* reference re-anchors on seconds-word wrap */
+    assert(next==first+1u);               /* monotonic clamp keeps the PES timeline valid */
+    assert(source_delta_90k(0xe0000000u,0xffffffffu,0u,0u)==11250u);
+
     c.have_origin=0;
-    first=assign_pts_presence(&c,0xe0000000u,0xffffffffu,1,&rb);
-    next=assign_pts_presence(&c,0u,0u,1,&rb);
-    assert(next-first==11250u); /* explicit exact-zero timestamp is valid at rollover */
+    first=assign_pts_presence(&c,0,0,1,&rb);
+    assert(c.origin_is_source); /* explicit zero remains a valid source timestamp */
 
     c.have_origin=0;
     (void)assign_pts_presence(&c,0,100,1,&rb);
@@ -47,9 +50,6 @@ int main(void) {
     next=assign_pts_presence(&c,0,3700,1,&rb);
     assert(c.source_rebases==rebases); /* no local-wall forward-jump heuristic */
 
-    c.have_origin=0;
-    first=assign_pts_presence(&c,0,0,1,&rb);
-    assert(c.origin_is_source);
     next=assign_pts_presence(&c,0x40000000u,0,1,&rb);
     assert(next-first==22500u);
     (void)assign_pts_presence(&c,0,0,0,&rb);
