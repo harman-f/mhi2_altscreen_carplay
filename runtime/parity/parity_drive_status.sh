@@ -118,7 +118,7 @@ fi
 echo
 echo "=== DIAGNOSTICS ==="
 diagnostics_status
-echo "sd_log_root=/net/mmx/fs/sda0/esd/carplay-test/logs/classic_single_view-parity-drive"
+echo "sd_log_root=/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive"
 
 echo
 echo "=== PARITY SESSION ==="
@@ -152,7 +152,7 @@ echo "=== GATE ==="
 
 echo
 echo "=== SD EVIDENCE ==="
-SDROOT=/net/mmx/fs/sda0/esd/carplay-test/logs/classic_single_view-parity-drive
+SDROOT=/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive
 if [ -d "$SDROOT" ]; then
   echo "sd_logs=present"
   echo "sd_log_root=$SDROOT"
