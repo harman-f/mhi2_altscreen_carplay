@@ -116,6 +116,7 @@ sys.exit(1 if mode and cmd==mode else 0)
         assert cp.returncode==0,cp.stderr
         parent.communicate(timeout=5)
         assert parent.returncode==130 and not paths["LOCK_PATH"].exists();stock()
+        assert paths["STATE_PATH"].read_text().strip()=="complete_stock","intentional stop is not failed_stock"
 
         # Zero means until-stop: no deadline-driven handback, but the same
         # token-bound stop path must restore stock and reap the watchdog.
@@ -133,6 +134,7 @@ sys.exit(1 if mode and cmd==mode else 0)
         assert cp.returncode==0,cp.stderr
         parent.communicate(timeout=5)
         assert parent.returncode==130 and not paths["LOCK_PATH"].exists();stock()
+        assert paths["STATE_PATH"].read_text().strip()=="complete_stock","intentional stop is not failed_stock"
 
         cfg("set","--key","ownership.backend","--value","dmdt_reference")
         bridge_delay(.1);run_probe()
