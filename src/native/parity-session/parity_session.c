@@ -816,7 +816,7 @@ done:
     if(bridge_stopped)unlink(AU_MARKER);
 
     if (restore_ok) {
-        (void)write_text(STATE_PATH, rc == 0 ? "complete_stock\n" : rc==21 ? "ownership_unproven_stock\n" : "failed_stock\n");
+        (void)write_text(STATE_PATH,  (rc == 0 || rc == 130) ? "complete_stock\n" : rc==21 ? "ownership_unproven_stock\n" : "failed_stock\n");
         if (pipefd[1] >= 0) {
             char token = 'R';
             if (write(pipefd[1], &token, 1) != 1) {
