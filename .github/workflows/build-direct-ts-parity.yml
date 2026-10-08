@@ -242,12 +242,21 @@ jobs:
             bash -c 'bash ./tools/build_native_isotx2_guard.sh build/ci-direct-ts-parity/libmibr_isotx2_guard.so'
           sudo chown -R "$(id -u):$(id -g)" "$OUTDIR"
 
-      - name: Stage opt-in fixture operator script
+      - name: Stage exact-hash opt-in fixture replay toolkit
         shell: bash
         run: |
           set -euxo pipefail
           cp deployment/mu1440-fixture-replay-v1/MU1440_REPLAY_RUN.sh "$OUTDIR/MU1440_REPLAY_RUN.sh"
-          chmod 755 "$OUTDIR/MU1440_REPLAY_RUN.sh"
+          cp deployment/mu1440-fixture-replay-v1/MU1440_REPLAY_SWAP.sh "$OUTDIR/MU1440_REPLAY_SWAP.sh"
+          cp deployment/mu1440-fixture-replay-v1/README.md "$OUTDIR/REPLAY_README.md"
+          chmod 755 "$OUTDIR/MU1440_REPLAY_RUN.sh" "$OUTDIR/MU1440_REPLAY_SWAP.sh"
+          bash -n "$OUTDIR/MU1440_REPLAY_RUN.sh" "$OUTDIR/MU1440_REPLAY_SWAP.sh"
+          python3 -m py_compile tools/fixtures/generate_mu1440_motion_m1au.py
+          (cd "$OUTDIR"; sha256sum direct-ts-parity parity-session > PAIR_SHA256SUMS.txt; sha256sum -c PAIR_SHA256SUMS.txt)
+          grep -Fxq 'NEW_B=7fa78266b2df3106e1e6372c8873cdfca4d318999262e82b35291bb7ca8a0b8b' "$OUTDIR/MU1440_REPLAY_SWAP.sh"
+          grep -Fxq 'NEW_O=441cd1436a94e0a7f4f5f76820646c7f3195984ff1036771b909b6af3f2aaca7' "$OUTDIR/MU1440_REPLAY_SWAP.sh"
+          test "$(sha256sum "$OUTDIR/direct-ts-parity" | awk '{print $1}')" = 7fa78266b2df3106e1e6372c8873cdfca4d318999262e82b35291bb7ca8a0b8b
+          test "$(sha256sum "$OUTDIR/parity-session" | awk '{print $1}')" = 441cd1436a94e0a7f4f5f76820646c7f3195984ff1036771b909b6af3f2aaca7
 
       - name: Binary and contract audit
         shell: bash
