@@ -190,6 +190,15 @@ struct bridge_stats {
     uint64_t write_errors;
     uint64_t last_write_us;
     uint64_t max_write_us;
+    /* Diagnostic-only writer time budget; counter names describe observation. */
+    uint64_t writer_prepare_us_total;
+    uint64_t writer_post_write_us_total;
+    uint64_t writer_success_syscall_us_total;
+    uint64_t writer_eagain_syscall_us_total;
+    uint64_t writer_eagain_sleep_us_total;
+    uint64_t writer_success_syscalls;
+    uint64_t writer_max_prepare_us;
+    uint64_t writer_max_post_write_us;
     uint64_t null_packets;
     uint64_t pat_packets;
     uint64_t pmt_packets;
@@ -973,6 +982,16 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
         (unsigned long long)snap.blocks_written,(unsigned long long)snap.bytes_written,
         (unsigned long long)snap.write_eagain,(unsigned long long)snap.write_errors,
         (unsigned long long)snap.last_write_us,(unsigned long long)snap.max_write_us);
+    fprintf(f,"writer_timing_probe=%d\nwriter_prepare_us_total=%llu\nwriter_post_write_us_total=%llu\nwriter_success_syscall_us_total=%llu\nwriter_eagain_syscall_us_total=%llu\nwriter_eagain_sleep_us_total=%llu\nwriter_success_syscalls=%llu\nwriter_max_prepare_us=%llu\nwriter_max_post_write_us=%llu\n",
+        g_status_enabled ? 1 : 0,
+        (unsigned long long)snap.writer_prepare_us_total,
+        (unsigned long long)snap.writer_post_write_us_total,
+        (unsigned long long)snap.writer_success_syscall_us_total,
+        (unsigned long long)snap.writer_eagain_syscall_us_total,
+        (unsigned long long)snap.writer_eagain_sleep_us_total,
+        (unsigned long long)snap.writer_success_syscalls,
+        (unsigned long long)snap.writer_max_prepare_us,
+        (unsigned long long)snap.writer_max_post_write_us);
     fprintf(f,"null_packets=%llu\npat_packets=%llu\npmt_packets=%llu\npcr_packets=%llu\n",
         (unsigned long long)snap.null_packets,(unsigned long long)snap.pat_packets,
         (unsigned long long)snap.pmt_packets,(unsigned long long)snap.pcr_packets);
@@ -984,22 +1003,50 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     pthread_mutex_unlock(&g_status_publish_lock);
 }
 
-static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s) {
+/* Per-block probes avoid per-attempt lock contention and status-file I/O. */
+struct writer_timing_probe {
+    uint64_t success_syscall_us;
+    uint64_t eagain_syscall_us;
+    uint64_t eagain_sleep_us;
+    uint64_t success_syscalls;
+};
+
+static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s,
+                      struct writer_timing_probe *probe) {
     size_t off=0;
     uint64_t deadline = monotonic_us() + WRITE_TIMEOUT_US;
     while(off<n) {
         if(monotonic_us()>=deadline) { stats_add_u64(&s->write_errors,&s->lock,1); return -1; }
+        uint64_t attempt_start=0, attempt_end=0;
+        int saved_errno=0;
+        if(probe)attempt_start=monotonic_us();
         ssize_t w=write(fd,p+off,n-off);
+        if(w<0)saved_errno=errno;
+        if(probe){
+            attempt_end=monotonic_us();
+            if(w>0){
+                probe->success_syscall_us+=attempt_end-attempt_start;
+                ++probe->success_syscalls;
+            }else if(w<0&&(saved_errno==EAGAIN||saved_errno==EWOULDBLOCK)){
+                probe->eagain_syscall_us+=attempt_end-attempt_start;
+            }
+        }
         if(w>0) {
             /* An isoTX2 short acceptance breaks the 64-packet syscall
              * contract. Fail rather than silently submit a partial block. */
             if ((size_t)w != n) { stats_add_u64(&s->write_errors,&s->lock,1); return -1; }
             off+=(size_t)w; continue;
         }
-        if(w<0 && errno==EINTR)continue;
-        if(w<0 && (errno==EAGAIN||errno==EWOULDBLOCK)){
+        if(w<0 && saved_errno==EINTR)continue;
+        if(w<0 && (saved_errno==EAGAIN||saved_errno==EWOULDBLOCK)){
             if (monotonic_us() >= deadline) { stats_add_u64(&s->write_errors,&s->lock,1); return -1; }
-            stats_add_u64(&s->write_eagain,&s->lock,1); usleep(1000); continue;
+            stats_add_u64(&s->write_eagain,&s->lock,1);
+            if(probe){
+                uint64_t sleep_start=monotonic_us();
+                usleep(1000);
+                probe->eagain_sleep_us+=monotonic_us()-sleep_start;
+            }else usleep(1000);
+            continue;
         }
         stats_add_u64(&s->write_errors,&s->lock,1); return -1;
     }
@@ -1021,12 +1068,16 @@ static void *writer_main(void *arg) {
     struct writer_ctx *w=(struct writer_ctx*)arg;
     uint8_t block[MOST_BLOCK_BYTES]; uint64_t packet_index=0;
     uint64_t epoch = monotonic_us(), max_device_write_us = 0;
+    uint64_t previous_write_end=0;
     pthread_mutex_lock(&w->clock->lock);
     w->clock->writer_epoch_us = epoch;
     pthread_mutex_unlock(&w->clock->lock);
     w->next_pat_packet=0; w->next_pmt_packet=1; w->next_pcr_packet=2;
     for (;;) {
         unsigned i;
+        uint64_t block_begin = g_status_enabled ? monotonic_us() : 0;
+        uint64_t post_write_us = previous_write_end && block_begin>=previous_write_end ?
+                                 block_begin-previous_write_end : 0;
         uint64_t due = epoch + (packet_index * TS_SIZE * 8ull * 1000000ull) / TRANSPORT_BPS;
         /*
          * Regular-file output needs an application pacer.  The real MU1440
@@ -1054,6 +1105,7 @@ static void *writer_main(void *arg) {
             uint64_t block_idr_completes=0u,block_non_idr_completes=0u;
             uint64_t slice_start[6]={0,0,0,0,0,0},slice_complete[6]={0,0,0,0,0,0};
             uint64_t write_start,write_end,write_us,blocks_now;
+            struct writer_timing_probe probe={0};
             for(i=0;i<MOST_BLOCK_PACKETS;++i) {
                 uint8_t *p=block+i*TS_SIZE;
                 uint64_t pcr=TRANSPORT_PCR_BASE + (packet_index * TRANSPORT_TICKS_NUM) / TRANSPORT_TICKS_DEN;
@@ -1082,12 +1134,27 @@ static void *writer_main(void *arg) {
                 ++packet_index;
             }
             write_start = monotonic_us();
-            if(write_full(w->fd,block,sizeof(block),w->stats)!=0) goto failed;
+            if(write_full(w->fd,block,sizeof(block),w->stats,
+                          g_status_enabled ? &probe : NULL)!=0) goto failed;
             write_end = monotonic_us();
             write_us = write_end - write_start;
+            previous_write_end = write_end;
             pthread_mutex_lock(&w->stats->lock);
             w->stats->last_write_us=write_us;
             if(write_us>w->stats->max_write_us)w->stats->max_write_us=write_us;
+            if(g_status_enabled){
+                uint64_t prep_us=write_start-block_begin;
+                w->stats->writer_prepare_us_total+=prep_us;
+                w->stats->writer_post_write_us_total+=post_write_us;
+                w->stats->writer_success_syscall_us_total+=probe.success_syscall_us;
+                w->stats->writer_eagain_syscall_us_total+=probe.eagain_syscall_us;
+                w->stats->writer_eagain_sleep_us_total+=probe.eagain_sleep_us;
+                w->stats->writer_success_syscalls+=probe.success_syscalls;
+                if(prep_us>w->stats->writer_max_prepare_us)
+                    w->stats->writer_max_prepare_us=prep_us;
+                if(post_write_us>w->stats->writer_max_post_write_us)
+                    w->stats->writer_max_post_write_us=post_write_us;
+            }
             w->stats->output_aus_started+=block_starts;
             w->stats->output_aus_completed+=block_completes;
             w->stats->output_idr_aus_started+=block_idr_starts;
