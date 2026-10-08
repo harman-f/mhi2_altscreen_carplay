@@ -1393,6 +1393,14 @@ static int host_self_test(void) {
     if(tq.count!=1u || tq.packets_queued!=3u || da!=1u || dp!=3u || pp!=3u){ queue_destroy(&tq); return 15; }
     queue_destroy(&tq);
 
+    {
+        struct fixture_pacer fp={0};
+        /* 1/30 s in 32.32 is 0x08888889; frame 2 must be a P frame. */
+        if(fixture_pace(&fp,1u,0xdu,0u,364000u)!=0)return 31;
+        if(fixture_pace(&fp,2u,0xcu,0x08888889u,364000u)!=0)return 32;
+        if(fixture_pace(&fp,4u,0xcu,0x1999999au,364000u)==0)return 33;
+        if(fp.count!=2u)return 34;
+    }
     fprintf(stdout,"PARITY_SELFTEST=PASS\n");return 0;
 }
 
