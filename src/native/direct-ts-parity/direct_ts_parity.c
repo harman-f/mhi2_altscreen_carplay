@@ -1468,7 +1468,7 @@ done:
     queue_stop(&queue);
     if(writer_started)pthread_join(writer,NULL);
     if(stats.write_errors){rc=1;exit_reason="writer_error";}
-    publish_status(&stats,&clock,&queue,rc==0?"done":"error");
+    publish_status(&stats,&clock,&queue,rc==0?"done":(!stats.write_errors && !strcmp(exit_reason,"signal_stop")?"stopped":"error"));
     if(in_fd>=0)close(in_fd);
     if(out_fd>=0)close(out_fd);
     free(param_cache);
