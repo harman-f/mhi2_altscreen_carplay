@@ -64,6 +64,14 @@
 #define PROGRAM_NUMBER 1u
 #define M1AU_HEADER_BYTES 56u
 #define M1AU_MAX_PAYLOAD (3u * 1024u * 1024u)
+/* Fixed, opt-in bounded fixture; no general-purpose file-to-MOST interface. */
+#define MIBR_FIXTURE_PATH "/net/mmx/fs/sda0/esd/carplay-test/fixtures/mu1440-motion-v1/mu1440_motion_1010x376_30fps_gop20.m1au"
+#define MIBR_FIXTURE_URI "fixture:/net/mmx/fs/sda0/esd/carplay-test/fixtures/mu1440-motion-v1/mu1440_motion_1010x376_30fps_gop20.m1au"
+#define MIBR_FIXTURE_BYTES 23275739u
+#define MIBR_FIXTURE_FRAMES 3600u
+#define MIBR_FIXTURE_FPS 30u
+#define MIBR_FIXTURE_GOP 20u
+#define MIBR_FIXTURE_MAX_LATE_US 100000u
 #define M1AU_FLAG_IDR 0x00000001u
 #define M1AU_FLAG_TIME_KNOWN 0x00000004u
 #define M1AU_FLAG_TIME_PRESENT 0x00000008u
@@ -1215,10 +1223,61 @@ static int connect_input(const char *url) {
     return -1;
 }
 
-static int recv_exact(int fd, void *buf, size_t n) {
+static int open_fixture(const char *url) {
+    struct stat lst, st;
+    int fd;
+    if(strcmp(url,MIBR_FIXTURE_URI) || lstat(MIBR_FIXTURE_PATH,&lst)!=0 ||
+       !S_ISREG(lst.st_mode) || lst.st_size!=(off_t)MIBR_FIXTURE_BYTES)return -1;
+    fd=open(MIBR_FIXTURE_PATH,O_RDONLY|O_NONBLOCK);
+    if(fd<0)return -1;
+    if(fstat(fd,&st)!=0 || !S_ISREG(st.st_mode) ||
+       st.st_dev!=lst.st_dev || st.st_ino!=lst.st_ino ||
+       st.st_size!=(off_t)MIBR_FIXTURE_BYTES) {close(fd);return -1;}
+    return fd;
+}
+
+/* SOURCE is a regular SD file only in fixture mode, TCP in normal operation. */
+static int recv_exact(int fd, void *buf, size_t n, int fixture) {
     uint8_t *p=(uint8_t*)buf; size_t off=0;
-    while(off<n&&!g_stop){ssize_t r=recv(fd,p+off,n-off,0);if(r>0){off+=(size_t)r;continue;}if(r==0)return off ? -1 : 0;if(errno==EINTR)continue;if(errno==EAGAIN||errno==EWOULDBLOCK){usleep(5000);continue;}return -1;}
+    while(off<n&&!g_stop){ssize_t r=fixture ? read(fd,p+off,n-off) : recv(fd,p+off,n-off,0);if(r>0){off+=(size_t)r;continue;}if(r==0)return off ? -1 : 0;if(errno==EINTR)continue;if(!fixture&&(errno==EAGAIN||errno==EWOULDBLOCK)){usleep(5000);continue;}return -1;}
     return off==n?1:-1;
+}
+
+/*
+ * One AU is released every 33.333 ms against an absolute monotonic epoch.
+ * The original fixture 32.32 timestamps are passed unchanged to assign_pts.
+ * This function must not be called for live Stream-111 input.
+ */
+struct fixture_pacer {
+    uint64_t epoch_us;
+    uint64_t first_ts;
+    unsigned count;
+};
+static int fixture_pace(struct fixture_pacer *p, uint64_t sequence,
+                        uint32_t flags, uint32_t frac, uint32_t sec) {
+    uint64_t raw=((uint64_t)sec<<32)|frac, ticks, source_us, expected_us, due, now;
+    int expect_idr=(p->count%MIBR_FIXTURE_GOP)==0u;
+    if(p->count>=MIBR_FIXTURE_FRAMES || sequence!=(uint64_t)p->count+1u ||
+       !(flags&M1AU_FLAG_TIME_KNOWN) || !(flags&M1AU_FLAG_TIME_PRESENT) ||
+       !!(flags&M1AU_FLAG_IDR)!=expect_idr)return -1;
+    if(!p->count){p->first_ts=raw;p->epoch_us=monotonic_us();}
+    if(raw<p->first_ts)return -1;
+    ticks=raw-p->first_ts;
+    if((ticks>>32)>120u)return -1;
+    source_us=(ticks>>32)*1000000u+
+              (((ticks&0xffffffffull)*1000000ull+0x80000000ull)>>32);
+    expected_us=((uint64_t)p->count*1000000ull)/MIBR_FIXTURE_FPS;
+    if(source_us>expected_us+2u || source_us+2u<expected_us)return -1;
+    due=p->epoch_us+source_us;
+    while(!g_stop && (now=monotonic_us())<due){
+        uint64_t left=due-now;
+        usleep((unsigned)(left>20000u?20000u:left));
+    }
+    if(g_stop)return -1;
+    now=monotonic_us();
+    if(now>due+MIBR_FIXTURE_MAX_LATE_US)return -1;
+    ++p->count;
+    return 0;
 }
 
 static void request_keyframe(unsigned reasons,uint64_t stream,uint64_t codec,
@@ -1343,12 +1402,17 @@ int main(int argc,char **argv) {
     struct au_queue queue;struct clock_state clock;struct bridge_stats stats;struct writer_ctx wctx;
     uint8_t *param_cache=NULL;size_t param_cache_n=0;uint64_t prev_seq=0;
     uint64_t prev_stream=0,prev_codec=0,prev_consumer=0;
-    int waiting_idr=1;int discontinuity=1;
+    int waiting_idr=1;int discontinuity=1;int fixture_mode=0;
+    struct fixture_pacer fixture={0};
     uint8_t cc_video=0;
 
     if(argc==2 && !strcmp(argv[1],"--self-test"))return host_self_test();
     if(argc!=3){fprintf(stderr,"usage: %s tcp://127.0.0.1:PORT OUTPUT\n",argv[0]);return 64;}
     input=argv[1];output=argv[2];
+    fixture_mode=!strncmp(input,"fixture:",8);
+    if(fixture_mode && (strcmp(input,MIBR_FIXTURE_URI) || strcmp(output,"/dev/mlb/isoTX2"))) {
+        fprintf(stderr,"ERROR invalid fixture path or output; MOST remains untouched\n");return 64;
+    }
     signal(SIGINT,on_signal);signal(SIGTERM,on_signal);signal(SIGHUP,on_signal);
     g_status_enabled=load_status_enabled();
     if(!g_status_enabled)(void)unlink(STATUS_PATH);
@@ -1361,11 +1425,12 @@ int main(int argc,char **argv) {
     if(out_fd<0){perror("open output");goto done;}
     if(fstat(out_fd,&st)==0 && S_ISREG(st.st_mode))regular_file=1;
     if(driver_init(out_fd,regular_file,&stats)!=0){fprintf(stderr,"ERROR driver start failed errno=%d\n",errno);goto done;}
-    in_fd=connect_input(input);if(in_fd<0){fprintf(stderr,"ERROR cannot connect input %s\n",input);goto done;}
-    {
+    in_fd=fixture_mode ? open_fixture(input) : connect_input(input);
+    if(in_fd<0){fprintf(stderr,"ERROR cannot open verified input %s\n",input);goto done;}
+    if(!fixture_mode){
         struct timeval tv; tv.tv_sec=0; tv.tv_usec=100000;
         if(setsockopt(in_fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv))!=0){perror("input timeout");goto done;}
-    }
+    }else fprintf(stderr,"PARITY_FIXTURE_START frames=3600 fps=30 gop=20 source_clock=32.32\n");
     memset(&wctx,0,sizeof(wctx));wctx.fd=out_fd;wctx.input_fd=in_fd;wctx.regular_file=regular_file;wctx.queue=&queue;wctx.clock=&clock;wctx.stats=&stats;
     if(pthread_create(&writer,NULL,writer_main,&wctx)!=0){fprintf(stderr,"ERROR writer thread\n");goto done;}writer_started=1;
     publish_status(&stats,&clock,&queue,"running");
@@ -1374,10 +1439,14 @@ int main(int argc,char **argv) {
     exit_reason="running";
     while(!g_stop){
         uint8_t h[M1AU_HEADER_BYTES];uint32_t flags,payload_n,frac,sec;uint64_t stream,codec,consumer,seq,pts;uint8_t *payload=NULL,*norm=NULL,*packets=NULL;size_t norm_n=0,packet_count=0;int rr,idr,rebased=0;unsigned slice_class=AU_SLICE_UNKNOWN;struct ts_au au;
-        rr=recv_exact(in_fd,h,sizeof(h));
+        rr=recv_exact(in_fd,h,sizeof(h),fixture_mode);
         if(rr<=0){
             if(g_stop_signal){rc=128+g_stop_signal;exit_reason="signal_stop";}
-            else if(rr==0&&!g_stop){rc=0;exit_reason="input_eof";}
+            else if(rr==0&&!g_stop){
+                if(!fixture_mode || fixture.count==MIBR_FIXTURE_FRAMES){
+                    rc=0;exit_reason=fixture_mode?"fixture_complete":"input_eof";
+                }else {rc=1;exit_reason="fixture_early_eof";}
+            }
             else exit_reason="input_header_read_error";
             break;
         }
@@ -1385,13 +1454,17 @@ int main(int argc,char **argv) {
         flags=be32(h+8);payload_n=be32(h+12);stream=be64(h+16);codec=be64(h+24);consumer=be64(h+32);seq=be64(h+40);frac=le32(h+48);sec=le32(h+52);idr=(flags&M1AU_FLAG_IDR)?1:0;
         if(!payload_n||payload_n>M1AU_MAX_PAYLOAD){fprintf(stderr,"ERROR invalid M1AU payload=%u\n",payload_n);exit_reason="invalid_payload_size";break;}
         payload=(uint8_t*)malloc(payload_n);if(!payload){exit_reason="allocation_error";break;}
-        rr=recv_exact(in_fd,payload,payload_n);if(rr<=0){
+        rr=recv_exact(in_fd,payload,payload_n,fixture_mode);if(rr<=0){
             free(payload);
             if(g_stop_signal){rc=128+g_stop_signal;exit_reason="signal_stop";}
             else exit_reason="input_payload_read_error";
             break;
         }
-        if(!prev_stream)request_keyframe(ALT111_KF_BRIDGE_READY,stream,codec,consumer,seq);
+        if(fixture_mode && fixture_pace(&fixture,seq,flags,frac,sec)!=0){
+            fprintf(stderr,"ERROR fixture sequence/timing anomaly frame=%u\n",fixture.count);
+            free(payload);rc=1;exit_reason="fixture_timing_invalid";break;
+        }
+        if(!fixture_mode && !prev_stream)request_keyframe(ALT111_KF_BRIDGE_READY,stream,codec,consumer,seq);
         if(payload_n>REFERENCE_PRODUCER_PAYLOAD_LIMIT) {
             free(payload); waiting_idr=1; discontinuity=1;
             request_keyframe(ALT111_KF_SOURCE_GAP,stream,codec,consumer,seq);
@@ -1469,6 +1542,8 @@ done:
     if(writer_started)pthread_join(writer,NULL);
     if(stats.write_errors){rc=1;exit_reason="writer_error";}
     publish_status(&stats,&clock,&queue,rc==0?"done":(!stats.write_errors && !strcmp(exit_reason,"signal_stop")?"stopped":"error"));
+    if(fixture_mode)fprintf(stderr,"PARITY_FIXTURE_END frames=%u expected=%u rc=%d reason=%s\n",
+            fixture.count,MIBR_FIXTURE_FRAMES,rc,exit_reason);
     if(in_fd>=0)close(in_fd);
     if(out_fd>=0)close(out_fd);
     free(param_cache);
