@@ -121,6 +121,7 @@ jobs:
           python3 tests/direct_ts_parity_eof_integration.py /tmp/direct-ts-parity-host
           python3 tests/direct_ts_parity_exit_review.py /tmp/direct-ts-parity-host
           python3 tests/test_mu1440_clock_domains.py
+          python3 tests/test_mu1440_writer_timing.py
           if ! command -v ffmpeg >/dev/null; then sudo apt-get update; sudo apt-get install -y ffmpeg; fi
           python3 tests/direct_ts_parity_decode_integration.py /tmp/direct-ts-parity-host "$OUTDIR/decode-evidence"
           python3 tests/parity_session_lifecycle.py
