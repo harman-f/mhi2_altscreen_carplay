@@ -34,6 +34,7 @@ for mode,data in (("idle",valid),("partial_header",valid[:20]),("partial_payload
             assert proc.returncode==expected,(mode,proc.returncode,errors)
             if not a.baseline:
                 assert b"PARITY_EXIT reason=signal_stop signal=15 rc=143 write_errors=0" in errors,errors
+                assert "state=stopped" in Path("/tmp/mibr-parity-ts.status").read_text(), "signal stop must not be a transport failure"
             print(f"SIGNAL_EXIT={mode} rc={proc.returncode} PASS")
         finally:
             halt.set();thread.join(1)
