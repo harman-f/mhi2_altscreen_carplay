@@ -47,6 +47,11 @@
 #define DMDT_TERM_GRACE_MS 500u
 #define WATCHDOG_MARGIN_SECONDS 20u
 #define MAX_SESSION_SECONDS 7200L
+#define FIXTURE_URI "fixture:/net/mmx/fs/sda0/esd/carplay-test/fixtures/mu1440-motion-v1/mu1440_motion_1010x376_30fps_gop20.m1au"
+#define FIXTURE_PATH "/net/mmx/fs/sda0/esd/carplay-test/fixtures/mu1440-motion-v1/mu1440_motion_1010x376_30fps_gop20.m1au"
+#define FIXTURE_BYTES 23275739u
+#define FIXTURE_MIN_SECONDS 125L
+#define FIXTURE_MAX_SECONDS 180L
 
 static volatile sig_atomic_t g_stop;
 static int session_lock_fd=-1;
@@ -429,6 +434,27 @@ static int source_ready(void) {
     return access(SOURCE_HB, R_OK) == 0;
 }
 
+/* Only the exact validated SD fixture, never an arbitrary input file. */
+static int fixture_ready(const char *uri){
+    struct stat path,fdstat;unsigned char h[56];size_t off=0;
+    int fd;
+    if(strcmp(uri,FIXTURE_URI)!=0 || lstat(FIXTURE_PATH,&path)!=0 ||
+       !S_ISREG(path.st_mode) || path.st_size!=(off_t)FIXTURE_BYTES)return 0;
+    fd=open(FIXTURE_PATH,O_RDONLY|O_NONBLOCK);if(fd<0)return 0;
+    if(fstat(fd,&fdstat)!=0 || !S_ISREG(fdstat.st_mode) ||
+       fdstat.st_dev!=path.st_dev || fdstat.st_ino!=path.st_ino ||
+       fdstat.st_size!=(off_t)FIXTURE_BYTES){close(fd);return 0;}
+    while(off<sizeof(h)){
+        ssize_t n=read(fd,h+off,sizeof(h)-off);
+        if(n<0&&errno==EINTR)continue;
+        if(n<=0){close(fd);return 0;}
+        off+=(size_t)n;
+    }
+    close(fd);
+    return !memcmp(h,"M1AU",4) && h[4]==0 && h[5]==1 &&
+           h[6]==0 && h[7]==56 && h[43]==1;
+}
+
 static int bridge_identity(const char *path) {
 #ifdef ALT111_SESSION_TEST
     /* Lifecycle fixtures exercise fork/exec/signals without shipping an OEM
@@ -583,6 +609,7 @@ static int self_test(void) {
 
 int main(int argc, char **argv) {
     const char *bridge, *input, *output;
+    int fixture_mode=0;
     long max_seconds;
     char *end = NULL, b[64];
     int pipefd[2] = {-1,-1}, st = 0, rc = 1, route_owned = 0, restore_ok = 0;
@@ -655,15 +682,26 @@ int main(int argc, char **argv) {
         close(session_lock_fd);session_lock_fd=-1;
         return rr==0 ? 0 : 20;
     }
-    if (argc != 5) {
-        fprintf(stderr, "usage: %s BRIDGE INPUT OUTPUT MAX_SECONDS(0=until-stop)\n", argv[0]);
+    fixture_mode=(argc==6 && !strcmp(argv[1],"--fixture"));
+    if (!fixture_mode && argc!=5) {
+        fprintf(stderr,"usage: %s BRIDGE INPUT OUTPUT SECONDS | --fixture BRIDGE FIXTURE_URI OUTPUT 125..180\n",argv[0]);
         return 64;
     }
-    bridge = argv[1]; input = argv[2]; output = argv[3];
-    errno = 0; max_seconds = strtol(argv[4], &end, 10);
-    if (errno || end == argv[4] || *end ||
-        (max_seconds != 0 && (max_seconds < 5 || max_seconds > MAX_SESSION_SECONDS)))
-        return 65;
+    bridge=argv[fixture_mode?2:1];
+    input=argv[fixture_mode?3:2];
+    output=argv[fixture_mode?4:3];
+    errno=0; max_seconds=strtol(argv[fixture_mode?5:4],&end,10);
+    if(errno || end==argv[fixture_mode?5:4] || *end ||
+       (fixture_mode ? (max_seconds<FIXTURE_MIN_SECONDS ||
+                        max_seconds>FIXTURE_MAX_SECONDS)
+                     : (max_seconds!=0 && (max_seconds<5 ||
+                        max_seconds>MAX_SESSION_SECONDS))))return 65;
+    if(fixture_mode && (strcmp(input,FIXTURE_URI) ||
+                        strcmp(output,"/dev/mlb/isoTX2") ||
+                        !fixture_ready(input))) {
+        fprintf(stderr,"ERROR fixture path/header/size unsupported; no ownership mutation\n");
+        return 64;
+    }
 
     if(settings_backend())return 13;
     if (!gate_backend && access(DMDT, X_OK) != 0) { fprintf(stderr, "ERROR missing dmdt\n"); return 10; }
@@ -671,7 +709,18 @@ int main(int argc, char **argv) {
     if(bridge_identity(bridge)) {
         fprintf(stderr,"ERROR bridge does not match this owner build; no ownership mutation\n");return 11;
     }
-    if (!source_ready()) { fprintf(stderr, "ERROR stream111 not ready\n"); return 12; }
+    if(fixture_mode){
+        if(!gate_backend) {
+            fprintf(stderr,"ERROR fixture requires verified writev_gate backend\n");
+            return 13;
+        }
+        if(source_ready()) {
+            fprintf(stderr,"ERROR fixture requires disconnected CarPlay source\n");
+            return 12;
+        }
+    }else if(!source_ready()) {
+        fprintf(stderr,"ERROR stream111 not ready\n"); return 12;
+    }
     if (pid_alive_from_file(OLD_AUTO_PID) ||
         pid_alive_from_file("/tmp/mibr-direct-auto-watchdog.pid") ||
         pid_alive_from_file("/tmp/mibr-direct-auto-bridge.pid")) {
@@ -771,6 +820,10 @@ int main(int argc, char **argv) {
     deadline=max_seconds ? monotonic_ms()+(uint64_t)max_seconds*1000u : 0u;
     while (!g_stop && (!deadline || monotonic_ms() < deadline)) {
         if(read_ticket(STOP_REQUEST_PATH)==owner_token){g_stop=1;break;}
+        if(fixture_mode && source_ready()) {
+            fprintf(stderr,"ERROR live CarPlay source appeared during fixture; stopping\n");
+            rc=24;break;
+        }
         if(!gate_owned()) {fprintf(stderr,"ERROR native gate proof lost; stopping custom writer\n");rc=23;break;}
         pid_t ww=waitpid(watchdog,&st,WNOHANG);
         if(ww==watchdog || (ww<0&&errno!=EINTR)) {watchdog_reaped=1;rc=17;break;}
