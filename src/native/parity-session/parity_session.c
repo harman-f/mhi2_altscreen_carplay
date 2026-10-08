@@ -452,7 +452,7 @@ static int fixture_ready(const char *uri){
     }
     close(fd);
     return !memcmp(h,"M1AU",4) && h[4]==0 && h[5]==1 &&
-           h[6]==0 && h[7]==56 && h[43]==1;
+           h[6]==0 && h[7]==56 && h[47]==1;
 }
 
 static int bridge_identity(const char *path) {
