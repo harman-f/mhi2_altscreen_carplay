@@ -23,6 +23,8 @@ on:
       - 'tools/build_alt111_settings.sh'
       - 'tests/alt111_*'
       - 'deployment/mu1440-parity-drive-v1/**'
+      - 'deployment/mu1440-fixture-replay-v1/**'
+      - 'tests/test_mu1440_fixture_replay.py'
       - 'tools/prepare_mu1440_parity_drive_v1_overlay.sh'
   push:
     branches: [ main, codex/mu1440-parity-drive-v1 ]
@@ -46,6 +48,8 @@ on:
       - 'tools/build_alt111_settings.sh'
       - 'tests/alt111_*'
       - 'deployment/mu1440-parity-drive-v1/**'
+      - 'deployment/mu1440-fixture-replay-v1/**'
+      - 'tests/test_mu1440_fixture_replay.py'
       - 'tools/prepare_mu1440_parity_drive_v1_overlay.sh'
 
 permissions:
@@ -136,6 +140,8 @@ jobs:
             -o /tmp/parity-session-host
           /tmp/parity-session-host --self-test | tee /tmp/parity-session-selftest.txt
           /tmp/parity-session-host --identity-self-test
+          python3 tests/test_mu1440_fixture_replay.py /tmp/direct-ts-parity-host /tmp/parity-session-host
+          bash -n deployment/mu1440-fixture-replay-v1/MU1440_REPLAY_RUN.sh
           grep -Fxq 'PARITY_SESSION_SELFTEST=PASS' /tmp/parity-session-selftest.txt
           grep -Fq 'release=/eso/bin/apps/dmdt dc 72 ; /eso/bin/apps/dmdt sc 4 72' /tmp/parity-session-selftest.txt
           grep -Fq 'restore=/eso/bin/apps/dmdt dc 70 33 ; /eso/bin/apps/dmdt sc 4 70' /tmp/parity-session-selftest.txt
@@ -235,6 +241,13 @@ jobs:
             -v "$PWD:/src" -w /src "$IMAGE" \
             bash -c 'bash ./tools/build_native_isotx2_guard.sh build/ci-direct-ts-parity/libmibr_isotx2_guard.so'
           sudo chown -R "$(id -u):$(id -g)" "$OUTDIR"
+
+      - name: Stage opt-in fixture operator script
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cp deployment/mu1440-fixture-replay-v1/MU1440_REPLAY_RUN.sh "$OUTDIR/MU1440_REPLAY_RUN.sh"
+          chmod 755 "$OUTDIR/MU1440_REPLAY_RUN.sh"
 
       - name: Binary and contract audit
         shell: bash
