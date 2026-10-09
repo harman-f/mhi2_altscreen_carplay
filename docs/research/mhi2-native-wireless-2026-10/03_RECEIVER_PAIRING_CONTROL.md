@@ -38,3 +38,7 @@ A working initial picture confirms neither secure reconnect nor correct iAP-over
 ## iOS version and feature negotiation are independent gates
 
 The investigated iOS sender distinguishes global AirPlay `CarPlayControl` feature bit 37 from a negotiated modern `iAPChannel` token. Neither advertised bit nor token alone proves receiver Pair Setup/Verify or a functioning specific iAP consumer. See [10_IOS_SENDER_BINARY_FINDINGS.md](10_IOS_SENDER_BINARY_FINDINGS.md).
+
+## Published receiver interface source and limitations
+
+The analyzed stock `libairplay.so` and `dio_manager` binaries are **not redistributed**. The project did publish the [reconstructed MU1440 receiver/delegate C ABI header](prototype/contracts/mu1440_receiver_control.h); it contains declarations and target-layout assertions, **not** a complete CarPlayControl, Pair Setup/Verify, or `iAPSendMessage` implementation. The [MFi dynamic adapter](prototype/probe/src/mhi2_mfi_airplay.c) is a separate stock-API wrapper, not the missing encrypted Control bridge. See the [firmware/source cross-reference](FIRMWARE_SOURCE_CROSS_REFERENCE.md).
