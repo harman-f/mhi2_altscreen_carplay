@@ -36,3 +36,7 @@ This is a **research checklist, not a reverse-engineered complete target state m
 5. BT disconnect occurs during a pending send: discard late callbacks from the previous generation and cleanly detach the QNX endpoint.
 
 See [RFC 6763](https://www.rfc-editor.org/rfc/rfc6763.html) for DNS-SD instance/TXT/SRV semantics and [Apple's DNS-SD programming guide](https://developer.apple.com/library/archive/documentation/Networking/Conceptual/dns_discovery_api/Introduction.html) for browser/resolve APIs; these are public protocol references, not proof of private CarPlay pairing semantics.
+
+## Published observer source and tests
+
+This chapter's B0 findings refer directly to the original [B0 DNS-SD observer](prototype/probe/b0-discovery/mhi2_wcp_b0_discovery.c), its [host state test](prototype/probe/tests/test_b0_state.c) and the [earlier read-only endpoint observer](prototype/probe/endpoint-observer/mhi2_iap_endpoint_observer.c). Neither program is a trusted Controller implementation. [Firmware/source cross-reference](FIRMWARE_SOURCE_CROSS_REFERENCE.md).
