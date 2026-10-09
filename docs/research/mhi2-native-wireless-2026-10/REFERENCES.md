@@ -13,10 +13,10 @@
 
 These references support **generic DNS-SD and QNX concepts**. They do not independently establish reverse-engineered Apple CarPlay pairing fields, secret cryptographic values, private stack method IDs or exact proprietary target ABIs.
 
-## Primary research evidence (not public source dumps)
+## Primary research evidence and published prototype
 
 The original project studied the following exact target component classes: Bluetooth services, `btstack`, `connectionmanager`, `mm-ipod`, `ipod-drvr-iap2.so`, `libairplay.so` and the DIO/control consumer. Key internal report titles include *MU1440 BTSTACK SERVICEGRAPH ACTIVATION CLOSURE* (2026-10-03), *MU1440 GENERIC RFCOMM SERVER ABI* (2026-10-02), *MU1440 STOCK IAP2 TRANSPORT ABI AND CONFIG* (2026-10-01), *MU1440 RECEIVER DIO CONTRACT* (2026-10-07), and the *MH2P/MU1440 TRANSFER AUDIT* (2026-10-07). A separate independent control review and corrected-control validation (2026-10-05/06) establish the limits of the project-built candidate.
 
-A full internal file/commit/blob index is maintained outside this candidate public tree. This public documentation intentionally contains no private repository URLs, private account identifiers, proprietary binaries, log captures, extracted functions or competitor-package names. Relevant source-code licensing notices must be supplied **if and when actual source is legally cleared and included**, rather than erasing mandatory attribution.
+The published prototype source and its per-file commit/blob/hash inventory are linked from the research handoff. This public material contains no private repository URLs, private account identifiers, proprietary binaries, log captures, extracted OEM functions or competitor-package names. Relevant source-code attribution and licensing are recorded in the prototype publication manifest and review.
 
 The iOS-side targeted research also used the documented title *CarPlay negotiation and iOS 27.2 sender audit* (2026-10-02), *sourceVersion compatibility gates* and *AirPlaySender binary provenance closure* (2026-10-03); see [10_IOS_SENDER_BINARY_FINDINGS.md](10_IOS_SENDER_BINARY_FINDINGS.md) for scope limits.

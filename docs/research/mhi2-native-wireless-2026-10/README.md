@@ -19,7 +19,7 @@ This material may be useful to developers who already have Wireless CarPlay conn
 5. [Symptom-driven debugging](05_DEBUG_MATRIX.md) — evidence gates to compare with an independently working implementation.
 6. [QNX process lifecycle](06_QNX_RECOVERY.md) — only for native Bluetooth/iAP resource management.
 7. [Validation, limitations and provenance](07_EVIDENCE_PROVENANCE.md) — which statements are static, offline-tested or actually observed.
-8. [Source and test eligibility](08_SOURCE_TEST_CANDIDATES.md) — what could be shared later after clearance.
+8. [Published prototype source and tests](08_SOURCE_TEST_CANDIDATES.md) — source inventory, hashes, publication scope and limits.
 9. [End-to-end native Wireless architecture](09_END_TO_END_ARCHITECTURE.md) — detailed owners, boundaries, transport handoff and per-stage proof.
 10. [iOS sender binary findings](10_IOS_SENDER_BINARY_FINDINGS.md) — independent capability namespaces, `iAPChannel`, CarPlayControl and version gates.
 11. [Classic vs simplified Wireless connection](11_CONNECTION_FLOW_VARIANTS.md) — Bonjour and iAP2 endpoint delivery are distinct alternatives.
@@ -50,4 +50,4 @@ Current Controller identity / peer state
 
 The endpoint and servicegraph portions exist as offline research/prototype code; *the lower secure-session portion has not been implemented and validated end to end by this project*. Working UI photos from another implementation do not validate the present code.
 
-**Publication note:** this is a clean documentation draft only. Original C sources and tests have not been cleared or copied into this public staging directory; see `08_SOURCE_TEST_CANDIDATES.md`. No OEM firmware, protected decompiled function bodies, keys, credentials, vehicle identifiers or commercial/third-party binary payloads are included.
+**Publication note:** the reviewed prototype source and offline tests are published under [prototype/](prototype/README.md), with per-file hashes and the single export exception recorded there. No OEM firmware, protected decompiled function bodies, keys, real credentials, vehicle identifiers or commercial/third-party binary payloads are included.
