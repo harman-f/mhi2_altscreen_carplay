@@ -28,7 +28,7 @@
 >
 > SafeArea/ViewArea tuning, reduced-view layout handling, lifecycle hardening and cadence/jitter analysis are still active work.
 
-[**Roadmap**](ROADMAP.md) · [**Current research preview**](docs/research/CURRENT_RESEARCH_PREVIEW_2026-10-05.md) · [Research index](docs/research/README.md) · [Cluster / display KB](docs/research/MIB2_CLUSTER_DISPLAY_TRANSPORT_KNOWLEDGE_BASE.md) · [FPK firmware/control](docs/research/FPK_FIRMWARE_AND_CONTROL_ACCESS.md) · [Installation](docs/INSTALLATION.md) · [Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) · [Security & privacy](SECURITY.md)
+[**Roadmap**](ROADMAP.md) · [**Current research preview**](docs/research/CURRENT_RESEARCH_PREVIEW_2026-10-05.md) · [Research index](docs/research/README.md) · [**Native Wireless CarPlay research & prototype**](docs/research/mhi2-native-wireless-2026-10/README.md) · [**Firmware/binary ↔ published source map**](docs/research/mhi2-native-wireless-2026-10/FIRMWARE_SOURCE_CROSS_REFERENCE.md) · [Cluster / display KB](docs/research/MIB2_CLUSTER_DISPLAY_TRANSPORT_KNOWLEDGE_BASE.md) · [FPK firmware/control](docs/research/FPK_FIRMWARE_AND_CONTROL_ACCESS.md) · [Installation](docs/INSTALLATION.md) · [Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) · [Security & privacy](SECURITY.md)
 
 > [!CAUTION]
 > ## NOT SD-CARD READY — ACTIVE DEVELOPMENT / HELP WANTED
