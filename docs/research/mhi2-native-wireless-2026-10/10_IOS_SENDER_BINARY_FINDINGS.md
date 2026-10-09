@@ -62,3 +62,7 @@ Do **not** transfer research on `altScreen`, `viewAreas`, instrument clusters, a
 Internal primary authorities (titles supplied as research lineage only; **no private repository link**): *CarPlay negotiation and iOS sender audit* (2 October 2026), *sourceVersion compatibility gates* (2–3 October 2026), *iOS 27.2 AirPlaySender provenance closure* (3 October 2026), and *MU1440 Receiver/DIO Control contract* (7 October 2026). Exact firmware version and iOS build are essential qualifiers; numeric fields here come from static reconstruction.
 
 Public standards/background: [Apple WWDC 2017: Developing Wireless CarPlay Systems](https://developer.apple.com/videos/play/wwdc2017/717/), [Apple WWDC 2023: Optimize CarPlay for vehicle systems](https://developer.apple.com/videos/play/wwdc2023/10150/), and the publicly documented DNS-SD specifications. Apple developer presentations describe intended system behavior; they do not verify an unobserved MU1440 implementation.
+
+## Firmware and source navigation
+
+The underlying iOS CarKit/AirPlaySender binaries are **not** part of this public repository. Their findings are connected to exact MU1440 `libairplay.so`/DIO receiver analysis and the published [receiver ABI declarations](prototype/contracts/mu1440_receiver_control.h) in the [firmware and iOS binary ↔ source table](FIRMWARE_SOURCE_CROSS_REFERENCE.md). No iOS sender code or working secure-session implementation is supplied.
