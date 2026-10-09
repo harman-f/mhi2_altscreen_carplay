@@ -10,6 +10,17 @@ This material may be useful to developers who already have Wireless CarPlay conn
 
 **Excluded entirely:** Virtual Cockpit, instrument cluster, MOST, auxiliary/alternate displays, Stream111, video decoding/encoding, H.264, MPEG-TS, FPS, clock/PTS/PCR, stutter, navigation maps, RGI, UI feature experiments and unrelated emulation. None of those results is evidence of Wireless CarPlay connectivity and none is part of this contribution.
 
+## Navigation: firmware evidence ↔ experimental source
+
+**[Firmware / binary findings ↔ published source cross-reference](FIRMWARE_SOURCE_CROSS_REFERENCE.md)** — a file-level table connecting the actual MU1440 / older Audi and Škoda / newer Audi MHI2P components studied with the relevant research chapters, original C/H/INC prototype files and tests. The analyzed OEM and iOS binaries themselves are **not** distributed.
+
+- [Full experimental prototype and its limitations](prototype/README.md)
+- [Published source manifest, paths and SHA-256 hashes](prototype/SOURCE_MANIFEST.tsv)
+- [Publication review and excluded patch-builder](prototype/PUBLICATION_REVIEW.md)
+- [Makefile / test entry point](prototype/probe/Makefile) · [offline tests](prototype/probe/tests/)
+
+The prototype is **not vehicle-validated Wireless CarPlay**; the separate Virtual Cockpit proof of concept does not validate it.
+
 ## Start here
 
 1. [Bluetooth servicegraph and RFCOMM](01_BLUETOOTH_RFCOMM.md) — where native iAP registration and byte ownership happen.
@@ -19,12 +30,13 @@ This material may be useful to developers who already have Wireless CarPlay conn
 5. [Symptom-driven debugging](05_DEBUG_MATRIX.md) — evidence gates to compare with an independently working implementation.
 6. [QNX process lifecycle](06_QNX_RECOVERY.md) — only for native Bluetooth/iAP resource management.
 7. [Validation, limitations and provenance](07_EVIDENCE_PROVENANCE.md) — which statements are static, offline-tested or actually observed.
-8. [Published prototype source and tests](08_SOURCE_TEST_CANDIDATES.md) — source inventory, hashes, publication scope and limits.
+8. [Published prototype source and tests](08_SOURCE_TEST_CANDIDATES.md) — source inventory, hashes, publication scope and limits. See also the [direct source index](prototype/README.md).
 9. [End-to-end native Wireless architecture](09_END_TO_END_ARCHITECTURE.md) — detailed owners, boundaries, transport handoff and per-stage proof.
 10. [iOS sender binary findings](10_IOS_SENDER_BINARY_FINDINGS.md) — independent capability namespaces, `iAPChannel`, CarPlayControl and version gates.
 11. [Classic vs simplified Wireless connection](11_CONNECTION_FLOW_VARIANTS.md) — Bonjour and iAP2 endpoint delivery are distinct alternatives.
 12. [Regression-test definitions](REGRESSION_CASES.tsv) — 22 diagnostic cases; **not executed as passing tests**.
-13. [Public reference sources](REFERENCES.md).
+13. [Firmware/binary-to-source map](FIRMWARE_SOURCE_CROSS_REFERENCE.md) — **which stock binaries and research findings correspond to which published files**.
+14. [Public reference sources](REFERENCES.md).
 
 ## Short architecture map (research, not a completed feature)
 
