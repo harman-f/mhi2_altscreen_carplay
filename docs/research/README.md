@@ -16,6 +16,14 @@ This directory collects research that is useful to contributors before it become
   - HMI settings registry;
   - menu/ViewHandler and steering-wheel findings.
 
+## Native Wireless CarPlay (separate, experimental project)
+
+- [Wireless research handoff](mhi2-native-wireless-2026-10/README.md) — one starting point for the October 2026 study.
+- **[Firmware and iOS binary findings ↔ actual prototype source](mhi2-native-wireless-2026-10/FIRMWARE_SOURCE_CROSS_REFERENCE.md)** — module-by-module links to research and project-authored C/H/INC/tests.
+- [Prototype source and publication review](mhi2-native-wireless-2026-10/prototype/README.md) · [source hash manifest](mhi2-native-wireless-2026-10/prototype/SOURCE_MANIFEST.tsv).
+
+**Scope warning:** this Wireless bootstrap/session prototype is not vehicle-validated; it is independent of the vehicle-tested Stream-111 / Virtual Cockpit path below. Proprietary firmware binaries are not included.
+
 ## CarPlay / Stream-111 / control plane
 
 - [Stream-111 protocol](STREAM111_PROTOCOL.md)
