@@ -13,3 +13,7 @@ The early native wireless bootstrap prototype uses QNX Resource Manager callback
 No build should be started on a real head unit without matching the target firmware components, safe management access and a known rollback plan. This research package contains no vehicle-side installer, preload binary, shell patcher or operational activation instructions.
 
 Publicly documented QNX concepts: [QNX resource manager overview](https://qnx.com/developers/docs/6.4.0/neutrino/prog/resmgr.html) and [Resource Manager IO function table](https://qdn.qnx.com/developers/docs/7.1/com.qnx.doc.neutrino.lib_ref/topic/r/resmgr_io_funcs_t.html). These general manuals do not validate the MU1440-specific internal servicegraph ABI.
+
+## Published historical QNX source (review only)
+
+The code underlying these findings is available for inspection: [RFCOMM QNX endpoint implementation](prototype/probe/rfcomm-provider/mhi2_rfcomm_provider_qnx.inc), [lifecycle implementation](prototype/probe/rfcomm-provider/mhi2_rfcomm_provider_lifecycle.inc), [QNX dispatch test](prototype/probe/tests/test_qnx_dispatch.c), [QNX notification test](prototype/probe/tests/test_qnx_notify.c) and [historical btstack wrapper script](prototype/probe/btstack-preload/mhi2_wcp_btstack_wrapper.sh). These are **experimental source files**, not a packaged or validated vehicle installer. [Full binary-to-source map](FIRMWARE_SOURCE_CROSS_REFERENCE.md).
