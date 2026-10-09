@@ -11,3 +11,7 @@ All source candidates were reviewed for credentials and personal data, private r
 The A3 parser still has the known Protocol=2/WEP misclassification and stale-field risk. B0 is not an authenticated controller directory. Pairing/Secure Session remains incomplete: no validated Pair Setup/Verify server, trusted peerstore, target DIO iAP command consumer or bidirectional encrypted iAP-over-AirPlay path is provided. Host tests are offline evidence only; `make test` could not pass its first compile step in the publication environment because `cc` is unavailable, so no test case ran. No vehicle validation is claimed.
 
 The excluded `probe/ident-param24-test/make_candidate.py` is explicitly classified as `PATCH_SCRIPT_DO_NOT_EXPORT`; it creates a firmware patch candidate and is not a dependency of the exported prototype. No source file was withheld solely because the prototype is unvalidated.
+
+## Per-firmware cross-reference
+
+For the link from each analyzed stock **firmware or iOS binary** to our original C/H/INC prototype files and corresponding research/test chapters, use [Firmware / binary findings ↔ published prototype source](FIRMWARE_SOURCE_CROSS_REFERENCE.md). The [prototype README](prototype/README.md) now links directly to each major source module.
