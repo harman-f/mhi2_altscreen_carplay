@@ -39,3 +39,7 @@ On stop, link loss or peer replacement, invalidate the current generation and dr
 - Does one generation own the session and QNX endpoint, including detach/reload?
 
 A visible SDP record alone does not prove that the receiver has an openable bidirectional byte stream or a complete iAP2 session.
+
+## Related published source and binary evidence
+
+The **stock firmware comparison** is described above; the **project's experimental replacement/adapter source** is in [servicegraph adapter C](prototype/probe/servicegraph-adapter/mhi2_iap_servicegraph_adapter.c) / [header](prototype/probe/servicegraph-adapter/mhi2_iap_servicegraph_adapter.h), [owner hook](prototype/probe/btstack-owner-hook/mhi2_btstack_owner_hook.c), and the [RFCOMM provider C](prototype/probe/rfcomm-provider/mhi2_rfcomm_provider.c) / [header](prototype/probe/rfcomm-provider/mhi2_rfcomm_provider.h) with [events](prototype/probe/rfcomm-provider/mhi2_rfcomm_provider_events.inc), [lifecycle](prototype/probe/rfcomm-provider/mhi2_rfcomm_provider_lifecycle.inc) and [QNX implementation](prototype/probe/rfcomm-provider/mhi2_rfcomm_provider_qnx.inc). See [complete six-part provider map and target/donor binary references](FIRMWARE_SOURCE_CROSS_REFERENCE.md).
