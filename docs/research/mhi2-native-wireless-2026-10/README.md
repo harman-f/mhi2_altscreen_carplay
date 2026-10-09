@@ -23,7 +23,8 @@ This material may be useful to developers who already have Wireless CarPlay conn
 9. [End-to-end native Wireless architecture](09_END_TO_END_ARCHITECTURE.md) — detailed owners, boundaries, transport handoff and per-stage proof.
 10. [iOS sender binary findings](10_IOS_SENDER_BINARY_FINDINGS.md) — independent capability namespaces, `iAPChannel`, CarPlayControl and version gates.
 11. [Classic vs simplified Wireless connection](11_CONNECTION_FLOW_VARIANTS.md) — Bonjour and iAP2 endpoint delivery are distinct alternatives.
-12. [Public reference sources](REFERENCES.md).
+12. [Regression-test definitions](REGRESSION_CASES.tsv) — 22 diagnostic cases; **not executed as passing tests**.
+13. [Public reference sources](REFERENCES.md).
 
 ## Short architecture map (research, not a completed feature)
 
