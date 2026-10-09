@@ -4,18 +4,24 @@
 
 This directory publishes source snapshot commit `14fd533a67e3c0f54d553a2bb4f092c4b7ae04a7`. It contains 42 of the 43 manifest candidates. The sole omitted file is `probe/ident-param24-test/make_candidate.py`, explicitly classified `PATCH_SCRIPT_DO_NOT_EXPORT` / `EXCLUDE`; it is a hash-gated firmware patch builder and is outside this source publication. Both MFi adapter files were included as requested. See [publication review](PUBLICATION_REVIEW.md) and [source manifest](SOURCE_MANIFEST.tsv) for the per-file inventory, provenance and SHA-256 values.
 
+## Related firmware research and source navigation
+
+This experimental source is the implementation companion to the [Wireless research handoff](../README.md). For a **direct firmware-binary → research-finding → original source/test** lookup, use the **[firmware/source cross-reference table](../FIRMWARE_SOURCE_CROSS_REFERENCE.md)**. The underlying OEM firmware binaries and iOS framework binaries were analyzed but are not redistributed here.
+
+Relevant chapters: [Bluetooth servicegraph/RFCOMM](../01_BLUETOOTH_RFCOMM.md) · [stock iAP2/MFi/WLAN](../02_IAP2_MFI_WIFI.md) · [receiver/DIO and secure-session gap](../03_RECEIVER_PAIRING_CONTROL.md) · [Bonjour discovery](../04_DISCOVERY_RECONNECT.md) · [QNX recovery](../06_QNX_RECOVERY.md) · [end-to-end architecture](../09_END_TO_END_ARCHITECTURE.md).
+
 ## Architecture and component map
 
 The prototype explores an offline/native path around the stock MHI2 Bluetooth/iAP stack:
 
-1. `probe/servicegraph-adapter/` registers the iAP Bluetooth service in an owner process; `probe/btstack-owner-hook/` is the integration hook.
-2. `probe/rfcomm-provider/` provides SDP/RFCOMM callbacks and a QNX resource-manager endpoint. The C wrapper includes all six adjacent `.inc` modules (`prelude`, `setup`, `lifecycle`, `streams`, `events`, `qnx`); keep this directory intact.
-3. `probe/transport-btstream/` adapts a raw endpoint to the stock Type-3 `ipod_transport` ABI.
-4. `probe/src/` contains protocol/ABI fixtures and the MFi adapter that dynamically calls the stock `libairplay.so`. It does not contain a stock library, certificate, key or authentication response.
-5. `probe/a3-credentials/`, `probe/runtime-iap2-config/` and `probe/a3-network-preflight/` explore WLAN credential/configuration handoff and diagnostics.
-6. `probe/b0-discovery/` is a read-only DNS-SD discovery observer. It does not authenticate or own a trusted controller.
-7. `probe/tests/` contains offline host/mock tests, including RFCOMM lifecycle and QNX callback fixtures. The Makefile preserves the source extraction rules for its generated QNX test fixtures.
-8. `contracts/` holds a reconstructed interface header; it is a declaration-level ABI aid, not copied OEM implementation code.
+1. [Servicegraph adapter](probe/servicegraph-adapter/mhi2_iap_servicegraph_adapter.c) registers the iAP Bluetooth service in an owner process; the [btstack owner hook](probe/btstack-owner-hook/mhi2_btstack_owner_hook.c) is the integration hook.
+2. The [RFCOMM provider](probe/rfcomm-provider/mhi2_rfcomm_provider.c) provides SDP/RFCOMM callbacks and a QNX resource-manager endpoint. The C wrapper includes all six adjacent `.inc` modules (`prelude`, `setup`, `lifecycle`, `streams`, `events`, `qnx`); keep this directory intact. [Component-by-component links](../FIRMWARE_SOURCE_CROSS_REFERENCE.md).
+3. The [btstream transport](probe/transport-btstream/ipod_transport_btstream.c) adapts a raw endpoint to the stock Type-3 `ipod_transport` ABI.
+4. [Protocol fixture](probe/src/wcp_probe.c) and [MFi dynamic adapter](probe/src/mhi2_mfi_airplay.c) reuse stock interfaces; neither includes a stock library, certificate, key or authentication response.
+5. [A3 parser](probe/a3-credentials/mhi2_wcp_a3_credentials.c), [runtime iAP2 config](probe/runtime-iap2-config/mhi2_wcp_iap2_runtime_config.c) and [network preflight](probe/a3-network-preflight/mhi2_wcp_a3_network_preflight.sh) explore WLAN handoff and diagnostics.
+6. The [B0 DNS-SD observer](probe/b0-discovery/mhi2_wcp_b0_discovery.c) is read-only. It does not authenticate or own a trusted controller.
+7. [Host/mock tests](probe/tests/) include RFCOMM lifecycle and QNX callback fixtures. The [Makefile](probe/Makefile) preserves source extraction rules for generated QNX test fixtures.
+8. [Receiver control ABI declarations](contracts/mu1440_receiver_control.h) are an interface aid, not copied OEM implementation code or a working secure-session adapter.
 
 ## Known defects and incomplete work
 
