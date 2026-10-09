@@ -1,0 +1,23 @@
+id	stage	input_class	precondition	assertion	evidence_grade
+A3-01	AP_SECURITY	WEP_Protocol_2	Producer exposes Protocol=2, no supported WPA profile	REJECT unsupported security; never classify as OPEN	STATIC_SOURCE_DEFECT
+A3-02	AP_SECURITY	WPA2_VALID_ACTIVE	One coherent current AP snapshot with supported WPA2 and valid passphrase	ACCEPT only supported active mapping with associated channel/interface	CONTRACT_PROPOSAL
+A3-03	AP_SECURITY	CONFLICTING_FIELDS	Protocol/Cipher/PSK fields conflict within one snapshot	REJECT; do not infer default OPEN	CONTRACT_PROPOSAL
+A3-04	AP_FRESHNESS	GENERATION_CHANGED	AP generation or channel changes between read and 0x5703 use	REJECT stale snapshot	CONTRACT_PROPOSAL
+A3-05	AP_CHANNEL	COMPOUND_CHANNEL	Producer emits Channel=<number>,<suffix>	Parse validated producer grammar; verify active channel	STATIC_FORMAT_FINDING
+B0-01	DISCOVERY	SERVICE_REMOVED	Resolve target disappears before Controller connection	Invalidate candidate and stop stale connect	SOURCE_GAP
+B0-02	DISCOVERY	MULTIPLE_PHONES	Two services, one current RFCOMM peer	Do not use first result absent peer identity match	SOURCE_GAP
+B0-03	DISCOVERY	IPV6_LINK_LOCAL	IPv6 scoped address available	Retain interface scope for connecting	SOURCE_GAP
+B0-04	DISCOVERY	TXT_IDENTITY	MAC formatting and TXT field keys differ	Require typed key + current peer binding, not substring	SOURCE_GAP
+RFC-01	RFCOMM_RX	BORROWED_BUFFER	Native event RX payload expires after callback	Copy before asynchronous queue	STATIC_ABI_OFFLINE_TEST
+RFC-02	RFCOMM_TX	ASYNC_COMPLETION	Native send returns before TX completion	Retain buffer until appropriate completion/cancel	STATIC_ABI_OFFLINE_TEST
+RFC-03	RFCOMM_OWNER	STALE_GENERATION	Disconnect then immediate reconnect with outstanding callback	Never route old callback to new owner	CONTRACT_PROPOSAL
+CTRL-01	PAIRING	VERIFY_COMPLETION	Verify HTTP response has not completed yet	Do not install encrypted transport prematurely	COMPARATIVE_STATIC
+CTRL-02	IAP_COMMAND	UNHANDLED_SELECTOR	Generic /command is accepted but DIO lacks specific iAP consumer	Do not claim accepted iAP command on generic routing alone	TARGET_STATIC
+CTRL-03	PEER_STORE	RECONNECT_IDENTITY	Previously trusted peer reconnects after owner replacement	Verify peer/generation/trust binding before accepting	CONTRACT_PROPOSAL
+IOS-01	VERSION_IDENTITY	SENDER_VS_RECEIVER_VERSION	Receiver reports 210.81; iOS sender reports its own independently derived version	Do not label phone sourceVersion as head-unit software identity	BINARY_STATIC
+IOS-02	FEATURE_NEGOTIATION	GLOBAL_BIT_37_VS_IAPCHANNEL	Receiver advertises global CarPlayControl bit 37; SETUP iAPChannel is absent	Do not infer modern iAPChannel was negotiated from global feature mask	IOS_STATIC
+IOS-03	FEATURE_NEGOTIATION	IAPCHANNEL_REQUESTED_NOT_ACCEPTED	iPhone proposes iAPChannel but receiver SETUP response excludes token	Treat token as not accepted; do not use it to claim iAP relay	IOS_STATIC
+IOS-04	ENDPOINT_DISCOVERY	BONJOUR_SERVICE_REMOVED	Classic DNS-SD controller endpoint removed before connection	Invalidate old endpoint; do not infer successful secure Controller	PLATFORM_DOC_AND_SOURCE_GAP
+IOS-05	ENDPOINT_DISCOVERY	SIMPLIFIED_IAP2_PORT_ROUTE	Design claims newer iAP2-delivered IP address and port	Require actual compatible stock or adapter message handler; not automatic on MU1440	APPLE_PLATFORM_DOC_TARGET_UNPROVEN
+IOS-06	TRANSPORT_HANDOFF	BT_DISCONNECT_TOO_EARLY	Phone has associated to WLAN but Controller/iAP relay not established	Do not close BT iAP2 solely because WLAN association occurred	APPLE_CLASSIC_GUIDANCE
+IOS-07	PAIRING_SECURITY	WPA3_ONLY_WITH_UNSUPPORTED_AP	Simplified flow is supported by phone but active target AP/security parser is unverified	Block claims of MU1440 WPA3 readiness absent current target evidence	APPLE_PLATFORM_DOC_TARGET_UNPROVEN
