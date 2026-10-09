@@ -34,3 +34,7 @@ The project's repaired source was only conditionally reviewed for a narrow A3/B0
 ## Endpoint discovery is a separate, potentially version-dependent step
 
 An older classic flow proceeds from WLAN association to Bonjour/DNS-SD Controller discovery. Apple also documents a newer simplified flow that can convey Controller IP address and port over iAP2, without Bonjour. This target prototype has only a B0 Bonjour observer; it does **not** prove support for the simplified route. See [11_CONNECTION_FLOW_VARIANTS.md](11_CONNECTION_FLOW_VARIANTS.md).
+
+## Related published source and stock component mapping
+
+The analyzed stock modules were `mm-ipod`, `ipod-drvr-iap2.so`, the ACP/MFi path and the AP configuration producer; **no OEM binary is published**. Our source counterparts are the [Type-3 transport adapter](prototype/probe/transport-btstream/ipod_transport_btstream.c) / [ABI header](prototype/probe/transport-btstream/ipod_transport_v2.h), [MFi dynamic adapter](prototype/probe/src/mhi2_mfi_airplay.c), [A3 credential parser](prototype/probe/a3-credentials/mhi2_wcp_a3_credentials.c) and [runtime iAP2 config](prototype/probe/runtime-iap2-config/mhi2_wcp_iap2_runtime_config.c). [Complete binary-to-source map](FIRMWARE_SOURCE_CROSS_REFERENCE.md).
