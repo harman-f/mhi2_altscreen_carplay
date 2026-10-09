@@ -28,3 +28,7 @@ T+....ms: inbound iAP command completed / reconnect or stop
 ```
 
 Do **not** log or request Wi-Fi passwords, SSIDs, MAC addresses, VIN, phone identifiers, pairing keys, certificate bytes, private key material, HTTP secrets or proprietary firmware dumps. Redact addresses and personal data before any public submission.
+
+## Related code and test artifacts
+
+Inspect the published [RFCOMM provider](prototype/probe/rfcomm-provider/mhi2_rfcomm_provider.c), [A3 credentials parser](prototype/probe/a3-credentials/mhi2_wcp_a3_credentials.c), [B0 discovery observer](prototype/probe/b0-discovery/mhi2_wcp_b0_discovery.c) and the [host/mock tests](prototype/probe/tests/) when following the symptom table. The [22 additional regression cases](REGRESSION_CASES.tsv) are test definitions, **not** passing runs. [Firmware/source matrix](FIRMWARE_SOURCE_CROSS_REFERENCE.md).
