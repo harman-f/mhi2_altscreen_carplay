@@ -40,8 +40,8 @@ snapshot(){
   # All counters in one sample block: no additional sampler thread or per-AU logging.
   { echo "===== sample=$2 ====="
     echo '--- stream111 ---'
-    [ -r /tmp/mibr-carplay111.state ] && cat /tmp/mibr-carplay111.state || echo 'source_state=missing'
-    [ -r /tmp/mibr-carplay111.heartbeat ] && cat /tmp/mibr-carplay111.heartbeat || echo 'source_heartbeat=missing'
+    [ -r /tmp/mibr-carplay111.state ] && echo "source_state=$(cat /tmp/mibr-carplay111.state)" || echo 'source_state=missing'
+    [ -r /tmp/mibr-carplay111.heartbeat ] && echo "source_heartbeat=$(cat /tmp/mibr-carplay111.heartbeat)" || echo 'source_heartbeat=missing'
     echo '--- gen2-source-timing ---'
     [ -r "$SOURCE_TIMING_STATUS" ] && cat "$SOURCE_TIMING_STATUS" || echo 'source_timing=missing'
     echo '--- gen2 ---'
