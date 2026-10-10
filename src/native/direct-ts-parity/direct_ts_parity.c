@@ -1205,6 +1205,8 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
                 }
                 if(!poll_wait_should_disable(poll_rc,pfd.revents,
                         poll_end-poll_start,&wait_state->immediate_ready)){
+                    wait_state->poll_ready_pending=
+                        poll_rc>0 && !!(pfd.revents&POLLOUT);
                     /* Readiness is advisory: only a complete nonblocking
                      * 12032-byte write constitutes driver acceptance. */
                     continue;
