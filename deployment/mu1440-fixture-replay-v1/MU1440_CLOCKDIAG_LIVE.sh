@@ -18,15 +18,15 @@ MARK=
 SAMPLER=
 RW=0
 fail(){ echo "CLOCKDIAG_LIVE=FAIL reason=$1"; exit 1; }
-hash(){ "$SHA" "$1" 2>/dev/null | awk '{print $1}'; }
+hashfile(){ "$SHA" "$1" 2>/dev/null | awk '{print $1}'; }
 pair(){
   [ -x "$SHA" ] || fail sha_helper
   [ -r "$PKG/PAIR_SHA256SUMS.txt" ] || fail manifest_missing
   B=$(awk '$2=="direct-ts-parity"{print $1}' "$PKG/PAIR_SHA256SUMS.txt")
   O=$(awk '$2=="parity-session"{print $1}' "$PKG/PAIR_SHA256SUMS.txt")
   [ -n "$B" ] && [ -n "$O" ] || fail manifest_invalid
-  [ "$(hash "$BRIDGE")" = "$B" ] || fail bridge_not_diagd_pair
-  [ "$(hash "$OWNER")" = "$O" ] || fail owner_not_diag_pair
+  [ "$(hashfile "$BRIDGE")" = "$B" ] || fail bridge_not_diagd_pair
+  [ "$(hashfile "$OWNER")" = "$O" ] || fail owner_not_diag_pair
 }
 snapshot(){
   { echo "===== sample=$2 ====="
