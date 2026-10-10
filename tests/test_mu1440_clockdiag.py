@@ -175,3 +175,62 @@ assert 'parity-session.poll-recover' in poll_swap
 assert 'recover || RC=4' in poll_swap
 assert poll_swap.index('backup_sync') < poll_swap.index('ALTERED=1')
 print("MU1440_POLL_ROLLBACK=PASS immutable known pair and staged recovery")
+
+# Pollwait-v2 diagnoses the real QNX fallback, but must not loosen the
+# established poll policy or touch the known-good v1 artifact and its backup.
+for needle in (
+    'POLL_DIAG_SAMPLES 4u',
+    'PARITY_POLL_FALLBACK reason=%s',
+    'PARITY_POLL_SAMPLE n=%u',
+    'poll_rc=%d poll_errno=%d revents=0x%x',
+    'followup_seen=%d followup_requested=%lu',
+    'followup_rc=%lld followup_errno=%d',
+    'followup_gap_us=%llu followup_syscall_us=%llu',
+    'writer_poll_disable_reason=%s',
+    'writer_poll_diag_samples=%llu',
+    'POLL_REASON_IMMEDIATE_3', 'POLL_REASON_FALSE_READY_3',
+    'poll_diag_emit(&wait_state);',
+    'wait_state->pending_idx=-1;',
+    'if(++(*immediate_ready)>=3u)return 1;',
+    'if(++wait_state->false_ready>=3u && !wait_state->disabled)',
+    'int timeout_ms=remaining<2000u ? 1 : 2;',
+    'uint64_t deadline = monotonic_us() + WRITE_TIMEOUT_US;',
+    'if ((size_t)w != n)',
+):
+    assert needle in writer, needle
+assert writer.count('poll(&pfd,1,timeout_ms)') == 1
+assert writer.count('poll_diag_emit(&wait_state);') == 2
+assert writer.count('PARITY_POLL_SAMPLE n=%u') == 1
+p2 = Path('deployment/mu1440-fixture-replay-v1')
+p2swap = (p2/'MU1440_POLL2_SWAP.sh').read_text()
+p2live = (p2/'MU1440_POLL2_LIVE.sh').read_text()
+p2fixture = (p2/'MU1440_POLL2_FIXTURE.sh').read_text()
+for script in ('MU1440_POLL2_SWAP.sh','MU1440_POLL2_LIVE.sh','MU1440_POLL2_FIXTURE.sh'):
+    content = (p2/script).read_text()
+    check = subprocess.run(['bash','-n',str(p2/script)],capture_output=True,text=True)
+    assert check.returncode == 0, (script,check.stderr)
+    assert 'pollwait-v2' in content
+    assert 'pollwait-v1' not in content
+    assert 'clockdiag-v1' not in content
+assert 'mibr-pollwait-v2-backup' in p2swap
+assert 'mibr-pollwait-v1-backup' not in p2swap
+assert 'POLL1_B=10350fb7dc715ec9b99c6b2acadb2a1b3e2ac7342c9281ca57e889fd7d3a4e31' in p2swap
+assert 'POLL1_O=232cc5f76feb105230712afd902d0c053339a94051ed8c6910a4e79c388b90ec' in p2swap
+assert 'CI314_B=' not in p2swap and 'CI295_B=' not in p2swap and 'CI305_B=' not in p2swap
+assert 'fail current_pair_not_qualified' in p2swap
+assert 'fail backup_pair_unqualified' in p2swap
+assert 'fail existing_backup_corrupt' in p2swap
+assert 'fail orphaned_backup' in p2swap
+assert 'fail gate_not_stock' in p2swap
+assert 'fail owner_lock' in p2swap
+assert 'fail parity_running' in p2swap
+assert 'MIBR_PARITY_EAGAIN_WAIT' in p2live
+assert 'MIBR_PARITY_EAGAIN_WAIT' not in p2fixture
+assert 'pollwait2-live-' in p2live
+assert (p2/'POLLWAIT2_README.md').is_file()
+workflow = Path('.github/workflows/build-direct-ts-parity.yml').read_text()
+assert '"$OUTDIR/pollwait-v2"' in workflow
+assert 'MU1440_POLL2_*.sh' in workflow
+assert 'pollwait-v2"; sha256sum -c PAIR_SHA256SUMS.txt' in workflow
+assert 'env.OUTDIR }}/pollwait-v2/' in workflow
+print('MU1440_POLL2_DIAG=PASS bounded fallback trace, immutable v1 baseline and isolated packaging')

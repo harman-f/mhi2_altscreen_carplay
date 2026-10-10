@@ -219,6 +219,8 @@ struct bridge_stats {
     uint64_t writer_poll_fallbacks;
     uint64_t writer_poll_wait_us;
     uint64_t writer_poll_disabled;
+    uint64_t writer_poll_diag_samples;
+    int writer_poll_disable_reason;
     uint64_t writer_max_prepare_us;
     uint64_t writer_max_post_write_us;
     uint64_t null_packets;
@@ -261,6 +263,21 @@ static volatile sig_atomic_t g_stop_signal;
 static int g_status_enabled = 1;
 /* Deliberate runtime-only research opt-in, never enabled by SD scripts. */
 static int g_poll_wait_enabled = 0;
+enum poll_diag_reason {
+    POLL_REASON_NONE=0,POLL_REASON_SYSCALL,POLL_REASON_REVENTS,
+    POLL_REASON_NO_POLLOUT,POLL_REASON_IMMEDIATE_3,POLL_REASON_FALSE_READY_3
+};
+static const char *poll_reason_text(int reason) {
+    switch(reason){
+    case POLL_REASON_NONE:return "none";
+    case POLL_REASON_SYSCALL:return "poll_syscall_error";
+    case POLL_REASON_REVENTS:return "poll_error_revents";
+    case POLL_REASON_NO_POLLOUT:return "poll_missing_pollout";
+    case POLL_REASON_IMMEDIATE_3:return "immediate_ready_3";
+    case POLL_REASON_FALSE_READY_3:return "ready_then_eagain_3";
+    default:return "unknown";
+    }
+}
 static pthread_mutex_t g_status_publish_lock = PTHREAD_MUTEX_INITIALIZER;
 /* A 1Hz file-write budget shared by source and writer threads. */
 static pthread_mutex_t g_status_rate_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -1093,10 +1110,11 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
         (unsigned long long)snap.writer_success_syscalls,
         (unsigned long long)snap.writer_max_prepare_us,
         (unsigned long long)snap.writer_max_post_write_us);
-    fprintf(f,"writer_poll_calls=%llu\nwriter_poll_ready=%llu\nwriter_poll_timeouts=%llu\nwriter_poll_fallbacks=%llu\nwriter_poll_wait_us=%llu\nwriter_poll_disabled=%llu\n",
+    fprintf(f,"writer_poll_calls=%llu\nwriter_poll_ready=%llu\nwriter_poll_timeouts=%llu\nwriter_poll_fallbacks=%llu\nwriter_poll_wait_us=%llu\nwriter_poll_disabled=%llu\nwriter_poll_diag_samples=%llu\nwriter_poll_disable_reason=%s\n",
         (unsigned long long)snap.writer_poll_calls,(unsigned long long)snap.writer_poll_ready,
         (unsigned long long)snap.writer_poll_timeouts,(unsigned long long)snap.writer_poll_fallbacks,
-        (unsigned long long)snap.writer_poll_wait_us,(unsigned long long)snap.writer_poll_disabled);
+        (unsigned long long)snap.writer_poll_wait_us,(unsigned long long)snap.writer_poll_disabled,
+        (unsigned long long)snap.writer_poll_diag_samples,poll_reason_text(snap.writer_poll_disable_reason));
     fprintf(f,"null_packets=%llu\npat_packets=%llu\npmt_packets=%llu\npcr_packets=%llu\n",
         (unsigned long long)snap.null_packets,(unsigned long long)snap.pat_packets,
         (unsigned long long)snap.pmt_packets,(unsigned long long)snap.pcr_packets);
@@ -1134,9 +1152,43 @@ struct writer_timing_probe {
     uint64_t poll_calls,poll_ready,poll_timeouts,poll_fallbacks,poll_wait_us;
 };
 
-/* Writer-thread only: disable POLLOUT polling for this session if unsupported
- * or if the resource manager repeatedly reports immediately writable. */
-struct writer_wait_state {int enabled,disabled,poll_ready_pending;unsigned immediate_ready,false_ready;};
+/* Bounded first-four-polls history; emitted once at fallback (never per EAGAIN).
+ * followup_seen=0 means a poll decision itself disabled the experiment. */
+#define POLL_DIAG_SAMPLES 4u
+struct poll_diag_sample {
+    int poll_rc,poll_errno,timeout_ms,followup_seen,followup_errno;
+    short revents;
+    uint64_t poll_elapsed_us,poll_end_us,followup_gap_us,followup_syscall_us;
+    ssize_t followup_rc;
+    size_t requested_bytes;
+};
+struct writer_wait_state {
+    int enabled,disabled,poll_ready_pending,disable_reason,pending_idx,diag_emitted;
+    unsigned immediate_ready,false_ready,diag_count;
+    struct poll_diag_sample diag[POLL_DIAG_SAMPLES];
+};
+static int poll_failure_reason(int rc,short revents) {
+    if(rc<0)return POLL_REASON_SYSCALL;
+    if(revents&(POLLERR|POLLHUP|POLLNVAL))return POLL_REASON_REVENTS;
+    if(!(revents&POLLOUT))return POLL_REASON_NO_POLLOUT;
+    return POLL_REASON_IMMEDIATE_3;
+}
+static void poll_diag_emit(struct writer_wait_state *st) {
+    unsigned i;
+    if(st->diag_emitted || !st->disabled)return;
+    st->diag_emitted=1;
+    fprintf(stderr,"PARITY_POLL_FALLBACK reason=%s samples=%u immediate_ready=%u false_ready=%u\n",
+            poll_reason_text(st->disable_reason),st->diag_count,
+            st->immediate_ready,st->false_ready);
+    for(i=0;i<st->diag_count;++i){
+        const struct poll_diag_sample *d=&st->diag[i];
+        fprintf(stderr,"PARITY_POLL_SAMPLE n=%u timeout_ms=%d poll_rc=%d poll_errno=%d revents=0x%x poll_elapsed_us=%llu followup_seen=%d followup_requested=%lu followup_rc=%lld followup_errno=%d followup_gap_us=%llu followup_syscall_us=%llu\n",
+                i+1u,d->timeout_ms,d->poll_rc,d->poll_errno,(unsigned)(unsigned short)d->revents,
+                (unsigned long long)d->poll_elapsed_us,d->followup_seen,
+                (unsigned long)d->requested_bytes,(long long)d->followup_rc,d->followup_errno,
+                (unsigned long long)d->followup_gap_us,(unsigned long long)d->followup_syscall_us);
+    }
+}
 
 /* Side-effect-free; the host C self-test checks all terminal branches. */
 static int poll_wait_should_disable(int rc,short revents,uint64_t elapsed_us,
@@ -1159,11 +1211,23 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
         if(monotonic_us()>=deadline) { stats_add_u64(&s->write_errors,&s->lock,1); return -1; }
         uint64_t attempt_start=0, attempt_end=0;
         int saved_errno=0;
-        if(probe)attempt_start=monotonic_us();
+        if(probe || (wait_state && wait_state->pending_idx>=0))
+            attempt_start=monotonic_us();
         ssize_t w=write(fd,p+off,n-off);
         if(w<0)saved_errno=errno;
+        if(probe)attempt_end=monotonic_us();
+        if(wait_state && wait_state->pending_idx>=0) {
+            struct poll_diag_sample *d=&wait_state->diag[wait_state->pending_idx];
+            uint64_t followup_end=probe ? attempt_end : monotonic_us();
+            d->followup_seen=1;d->requested_bytes=n-off;
+            d->followup_rc=w;d->followup_errno=saved_errno;
+            d->followup_gap_us=attempt_start>=d->poll_end_us ?
+                attempt_start-d->poll_end_us : 0u;
+            d->followup_syscall_us=followup_end>=attempt_start ?
+                followup_end-attempt_start : 0u;
+            wait_state->pending_idx=-1;
+        }
         if(probe){
-            attempt_end=monotonic_us();
             if(w>0){
                 probe->success_syscall_us+=attempt_end-attempt_start;
                 ++probe->success_syscalls;
@@ -1186,6 +1250,7 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
                 wait_state->poll_ready_pending=0;
                 if(++wait_state->false_ready>=3u && !wait_state->disabled){
                     wait_state->disabled=1;
+                    wait_state->disable_reason=POLL_REASON_FALSE_READY_3;
                     if(probe)++probe->poll_fallbacks;
                 }
             }
@@ -1194,10 +1259,19 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
                 uint64_t poll_start=monotonic_us(),poll_end;
                 uint64_t remaining=poll_start<deadline ? deadline-poll_start : 0u;
                 int timeout_ms=remaining<2000u ? 1 : 2;
-                int poll_rc;
+                int poll_rc,poll_errno=0,diag_idx=-1;
                 pfd.fd=fd;pfd.events=POLLOUT;pfd.revents=0;
                 poll_rc=poll(&pfd,1,timeout_ms);
+                if(poll_rc<0)poll_errno=errno;
                 poll_end=monotonic_us();
+                if(wait_state->diag_count<POLL_DIAG_SAMPLES) {
+                    struct poll_diag_sample *d;
+                    diag_idx=(int)wait_state->diag_count++;
+                    d=&wait_state->diag[diag_idx];
+                    d->poll_rc=poll_rc;d->poll_errno=poll_errno;
+                    d->timeout_ms=timeout_ms;d->revents=pfd.revents;
+                    d->poll_elapsed_us=poll_end-poll_start;d->poll_end_us=poll_end;
+                }
                 if(probe){
                     ++probe->poll_calls;probe->poll_wait_us+=poll_end-poll_start;
                     if(poll_rc==0)++probe->poll_timeouts;
@@ -1207,11 +1281,13 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
                         poll_end-poll_start,&wait_state->immediate_ready)){
                     wait_state->poll_ready_pending=
                         poll_rc>0 && !!(pfd.revents&POLLOUT);
+                    wait_state->pending_idx=diag_idx;
                     /* Readiness is advisory: only a complete nonblocking
                      * 12032-byte write constitutes driver acceptance. */
                     continue;
                 }
                 wait_state->disabled=1; /* permanent safe fallback this session */
+                wait_state->disable_reason=poll_failure_reason(poll_rc,pfd.revents);
                 if(probe)++probe->poll_fallbacks;
             }
             if(probe){
@@ -1243,6 +1319,7 @@ static void *writer_main(void *arg) {
     uint64_t epoch = monotonic_us(), max_device_write_us = 0;
     uint64_t previous_write_end=0;
     struct writer_wait_state wait_state={0};
+    wait_state.pending_idx=-1;
     wait_state.enabled=g_poll_wait_enabled && !w->regular_file;
     pthread_mutex_lock(&w->clock->lock);
     w->clock->writer_epoch_us = epoch;
@@ -1331,6 +1408,8 @@ static void *writer_main(void *arg) {
                 w->stats->writer_poll_fallbacks+=probe.poll_fallbacks;
                 w->stats->writer_poll_wait_us+=probe.poll_wait_us;
                 w->stats->writer_poll_disabled=wait_state.disabled?1u:0u;
+                w->stats->writer_poll_disable_reason=wait_state.disable_reason;
+                w->stats->writer_poll_diag_samples=wait_state.diag_count;
                 if(prep_us>w->stats->writer_max_prepare_us)
                     w->stats->writer_max_prepare_us=prep_us;
                 if(post_write_us>w->stats->writer_max_post_write_us)
@@ -1371,8 +1450,12 @@ static void *writer_main(void *arg) {
         /* EOF is acknowledged only after the writer-local block is committed. */
         if (queue_finished(w->queue)) break;
     }
+    /* Write the bounded trace at teardown, outside the device write deadline
+     * and moving picture path; status counters were updated per block. */
+    poll_diag_emit(&wait_state);
     return NULL;
 failed:
+    poll_diag_emit(&wait_state);
     g_stop=1; queue_stop(w->queue); shutdown(w->input_fd,SHUT_RDWR);
     return NULL;
 }
@@ -1609,6 +1692,12 @@ static int host_self_test(void) {
         if(!poll_wait_should_disable(1,POLLERR|POLLOUT,500u,&immediate))return 44;
         if(!poll_wait_should_disable(-1,0,0u,&immediate))return 45;
         if(poll_wait_should_disable(1,POLLOUT,250u,&immediate)||immediate)return 46;
+        if(poll_failure_reason(-1,0)!=POLL_REASON_SYSCALL ||
+           poll_failure_reason(1,POLLNVAL)!=POLL_REASON_REVENTS ||
+           poll_failure_reason(1,0)!=POLL_REASON_NO_POLLOUT ||
+           poll_failure_reason(1,POLLOUT)!=POLL_REASON_IMMEDIATE_3)return 47;
+        if(strcmp(poll_reason_text(POLL_REASON_FALSE_READY_3),"ready_then_eagain_3") ||
+           strcmp(poll_reason_text(POLL_REASON_IMMEDIATE_3),"immediate_ready_3"))return 48;
     }
     fprintf(stdout,"PARITY_SELFTEST=PASS\n");return 0;
 }
