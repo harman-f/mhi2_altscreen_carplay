@@ -46,8 +46,8 @@ for name in ("MU1440_CLOCKDIAG_SWAP.sh", "MU1440_CLOCKDIAG_LIVE.sh",
 for name in ("MU1440_CLOCKDIAG_SWAP.sh", "MU1440_CLOCKDIAG_LIVE.sh",
              "MU1440_CLOCKDIAG_FIXTURE.sh"):
     qnx_script = (Path("deployment/mu1440-fixture-replay-v1") / name).read_text()
-    assert not re.search(r"(?m)^hash\\s*\\(\\)\\s*\\{", qnx_script), name
-    assert not re.search(r"\\$\\(hash\\s", qnx_script), name
+    assert not re.search(r"(?m)^hash\s*\(\)\s*\{", qnx_script), name
+    assert not re.search(r"\$\(hash\s", qnx_script), name
     assert "hashfile(){" in qnx_script, name
 
 swap = Path("deployment/mu1440-fixture-replay-v1/MU1440_CLOCKDIAG_SWAP.sh").read_text()
