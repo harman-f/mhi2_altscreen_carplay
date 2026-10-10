@@ -1136,7 +1136,7 @@ struct writer_timing_probe {
 
 /* Writer-thread only: disable POLLOUT polling for this session if unsupported
  * or if the resource manager repeatedly reports immediately writable. */
-struct writer_wait_state {int enabled,disabled;unsigned immediate_ready;};
+struct writer_wait_state {int enabled,disabled,poll_ready_pending;unsigned immediate_ready,false_ready;};
 
 /* Side-effect-free; the host C self-test checks all terminal branches. */
 static int poll_wait_should_disable(int rc,short revents,uint64_t elapsed_us,
