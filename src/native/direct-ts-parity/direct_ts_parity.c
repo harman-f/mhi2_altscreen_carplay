@@ -986,6 +986,43 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"driver_block_count_rc=%d\ndriver_block_count_value=%u\n",snap.driver_block_count_rc,snap.driver_block_count_value);
     fprintf(f,"driver_flush_rc=%d\ndriver_start_rc=%d\n",snap.driver_flush_rc,snap.driver_start_rc);
     fprintf(f,"transport_pcr90k=%llu\n",(unsigned long long)clock_snap.transport_pcr90k);
+    {
+        /* Accepted 12032-byte writes are NOT physical MOST drain. */
+        uint64_t elapsed=clock_snap.accepted_mono_us>clock_snap.writer_epoch_us?
+            clock_snap.accepted_mono_us-clock_snap.writer_epoch_us:0u;
+        uint64_t nominal=(clock_snap.physical_packets*705000000ull)/(64ull*90000ull);
+        long long ppm=elapsed?
+            ((long long)nominal-(long long)elapsed)*1000000ll/(long long)elapsed:0;
+        uint64_t source_span=0u;
+        if(snap.diag_source_samples>1u &&
+           snap.diag_last_source3232>=snap.diag_first_source3232){
+            uint64_t d=snap.diag_last_source3232-snap.diag_first_source3232;
+            source_span=(d>>32)*1000000ull+
+                (((d&0xffffffffull)*1000000ull)>>32);
+        }
+        fprintf(f,"diag_clock_accepted_elapsed_us=%llu\ndiag_clock_nominal_transport_us=%llu\ndiag_clock_accepted_model_ppm=%lld\n",
+            (unsigned long long)elapsed,(unsigned long long)nominal,ppm);
+        fprintf(f,"diag_source_elapsed_us=%llu\ndiag_arrival_elapsed_us=%llu\ndiag_last_arrival_age_us=%llu\n",
+            (unsigned long long)source_span,
+            (unsigned long long)(snap.diag_last_arrival_us>=snap.diag_first_arrival_us?
+                snap.diag_last_arrival_us-snap.diag_first_arrival_us:0u),
+            (unsigned long long)(snap.diag_last_arrival_us&&
+                 snapshot_mono_us>=snap.diag_last_arrival_us?
+                 snapshot_mono_us-snap.diag_last_arrival_us:0u));
+        fprintf(f,"diag_max_arrival_gap_us=%llu\ndiag_arrival_gaps_ge50ms=%llu\ndiag_arrival_gaps_ge100ms=%llu\ndiag_arrival_gaps_ge250ms=%llu\n",
+            (unsigned long long)snap.diag_max_arrival_gap_us,
+            (unsigned long long)snap.diag_gap50,
+            (unsigned long long)snap.diag_gap100,
+            (unsigned long long)snap.diag_gap250);
+        fprintf(f,"diag_max_source_gap_us=%llu\ndiag_source_rewinds=%llu\ndiag_source_samples=%llu\n",
+            (unsigned long long)snap.diag_max_source_gap_us,
+            (unsigned long long)snap.diag_source_rewinds,
+            (unsigned long long)snap.diag_source_samples);
+        fprintf(f,"diag_input_fps_x100=%llu\ndiag_fps_window_elapsed_us=%llu\ndiag_fps_window_count=%llu\n",
+            (unsigned long long)snap.diag_last_fps_x100,
+            (unsigned long long)snap.diag_window_elapsed_us,
+            (unsigned long long)snap.diag_window_completed);
+    }
     fprintf(f,"pts_rebases=%llu\nsource_rebases=%llu\n",(unsigned long long)clock_snap.pts_rebases,(unsigned long long)clock_snap.source_rebases);
     fprintf(f,"input_records=%llu\ninput_bytes=%llu\ninput_idrs=%llu\ninput_non_idr_aus=%llu\nsequence_gaps=%llu\n",
         (unsigned long long)snap.input_records,(unsigned long long)snap.input_bytes,
@@ -1055,6 +1092,23 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
         (unsigned long long)snap.last_pts,snap.waiting_idr);
     fclose(f);
     pthread_mutex_unlock(&g_status_publish_lock);
+}
+
+/* State changes / EOF remain immediate; steady state writes at most once/sec. */
+static int status_publish_allowed(uint64_t now, int state){
+    int allowed;
+    pthread_mutex_lock(&g_status_rate_lock);
+    allowed=!g_status_last_us || now<g_status_last_us ||
+            now-g_status_last_us>=1000000ull || state!=g_status_last_state;
+    if(allowed){g_status_last_us=now;g_status_last_state=state;}
+    pthread_mutex_unlock(&g_status_rate_lock);
+    return allowed;
+}
+static void publish_status_throttled(struct bridge_stats *s,struct clock_state *c,
+                                     struct au_queue *q,const char *state){
+    int id=!strcmp(state,"waiting_idr")?2:1;
+    if(g_status_enabled && status_publish_allowed(monotonic_us(),id))
+        publish_status(s,c,q,state);
 }
 
 /* Per-block probes avoid per-attempt lock contention and status-file I/O. */
@@ -1239,7 +1293,7 @@ static void *writer_main(void *arg) {
                             (unsigned long long)(packet_index / MOST_BLOCK_PACKETS));
             }
             update_transport_clock(w->clock,packet_index,write_end,write_us);
-            if((blocks_now & 127u)==0u)publish_status(w->stats,w->clock,w->queue,"running");
+            if((blocks_now & 127u)==0u)publish_status_throttled(w->stats,w->clock,w->queue,"running");
         }
         /* EOF is acknowledged only after the writer-local block is committed. */
         if (queue_finished(w->queue)) break;
@@ -1487,7 +1541,7 @@ int main(int argc,char **argv) {
     }else fprintf(stderr,"PARITY_FIXTURE_START frames=3600 fps=30 gop=20 source_clock=32.32\n");
     memset(&wctx,0,sizeof(wctx));wctx.fd=out_fd;wctx.input_fd=in_fd;wctx.regular_file=regular_file;wctx.queue=&queue;wctx.clock=&clock;wctx.stats=&stats;
     if(pthread_create(&writer,NULL,writer_main,&wctx)!=0){fprintf(stderr,"ERROR writer thread\n");goto done;}writer_started=1;
-    publish_status(&stats,&clock,&queue,"running");
+    publish_status_throttled(&stats,&clock,&queue,"running");
     fprintf(stderr,"PARITY_START input=%s output=%s transport_bps=%u block=%u pids=pat:0x0,pmt:0x10,pcr:0x1000,video:0x11\n",input,output,TRANSPORT_BPS,MOST_BLOCK_BYTES);
 
     exit_reason="running";
@@ -1526,7 +1580,7 @@ int main(int argc,char **argv) {
             continue;
         }
         slice_class=h264_slice_class(payload,payload_n);
-        pthread_mutex_lock(&stats.lock);++stats.input_records;stats.input_bytes+=payload_n;stats.input_idrs+=idr;stats.last_sequence=seq;stats.last_frac=frac;stats.last_sec=sec;pthread_mutex_unlock(&stats.lock);
+        pthread_mutex_lock(&stats.lock);++stats.input_records;stats.input_bytes+=payload_n;stats.input_idrs+=idr;stats.last_sequence=seq;stats.last_frac=frac;stats.last_sec=sec;diag_note_au(&stats,monotonic_us(),frac,sec,!!(flags&M1AU_FLAG_TIME_PRESENT));pthread_mutex_unlock(&stats.lock);
         stats_note_input_slice(&stats,slice_class);
         if ((prev_stream && stream != prev_stream) || (prev_codec && codec != prev_codec) ||
             (prev_consumer && consumer != prev_consumer)) {
@@ -1560,7 +1614,7 @@ int main(int argc,char **argv) {
         }
         /* Periodic reference requests are made in GEN2 before consumer/drop
          * decisions. This bridge requests only startup/gap/latency recovery. */
-        if(waiting_idr&&!idr){pthread_mutex_lock(&stats.lock);++stats.dropped_wait_idr;pthread_mutex_unlock(&stats.lock);free(payload);publish_status(&stats,&clock,&queue,"waiting_idr");continue;}
+        if(waiting_idr&&!idr){pthread_mutex_lock(&stats.lock);++stats.dropped_wait_idr;pthread_mutex_unlock(&stats.lock);free(payload);publish_status_throttled(&stats,&clock,&queue,"waiting_idr");continue;}
         if(idr&&waiting_idr){waiting_idr=0;pthread_mutex_lock(&stats.lock);stats.waiting_idr=0;pthread_mutex_unlock(&stats.lock);}
         if(normalize_au(payload,payload_n,idr,&param_cache,&param_cache_n,&norm,&norm_n)!=0){free(payload);exit_reason="normalization_error";break;}free(payload);
         pts=assign_pts_presence(&clock,frac,sec,
@@ -1575,7 +1629,7 @@ int main(int argc,char **argv) {
         }
         pthread_mutex_lock(&stats.lock);++stats.aus_queued;stats.pes_packets+=packet_count;stats.last_pts=pts;pthread_mutex_unlock(&stats.lock);
         if(rebased)fprintf(stderr,"PARITY_PTS_REBASE seq=%llu pcr=%llu pts=%llu\n",(unsigned long long)seq,(unsigned long long)clock_pcr_now(&clock),(unsigned long long)pts);
-        publish_status(&stats,&clock,&queue,"running");
+        publish_status_throttled(&stats,&clock,&queue,"running");
     }
     if(g_stop_signal && !strcmp(exit_reason,"running")) {
         rc=128+g_stop_signal;exit_reason="signal_stop";
