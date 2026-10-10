@@ -1501,6 +1501,29 @@ static int host_self_test(void) {
         if(fixture_pace(&fp,4u,0xcu,0x1999999au,364000u)==0)return 33;
         if(fp.count!=2u)return 34;
     }
+    {
+        struct bridge_stats dt;
+        memset(&dt,0,sizeof(dt));
+        /* Two 30fps arrivals, 15fps gap, 5fps gap, 1s silence. */
+        diag_note_au(&dt,1000000ull,0u,364000u,1);
+        diag_note_au(&dt,1033333ull,0x08888889u,364000u,1);
+        diag_note_au(&dt,1100000ull,0x1999999au,364000u,1);
+        diag_note_au(&dt,1300000ull,0x4ccccccdu,364000u,1);
+        diag_note_au(&dt,2300000ull,0x4ccccccdu,364001u,1);
+        if(dt.diag_max_arrival_gap_us!=1000000ull ||
+           dt.diag_gap50!=3u || dt.diag_gap100!=2u ||
+           dt.diag_gap250!=1u || dt.diag_max_source_gap_us<999000ull ||
+           dt.diag_source_samples!=5u || !dt.diag_window_completed)
+           return 35;
+        diag_note_au(&dt,2400000ull,0u,364000u,1);
+        if(dt.diag_source_rewinds!=1u)return 36;
+        g_status_last_us=0;g_status_last_state=0;
+        if(!status_publish_allowed(1000000ull,1) ||
+            status_publish_allowed(1500000ull,1) ||
+           !status_publish_allowed(1500000ull,2) ||
+            status_publish_allowed(1700000ull,2) ||
+           !status_publish_allowed(2600000ull,2))return 37;
+    }
     fprintf(stdout,"PARITY_SELFTEST=PASS\n");return 0;
 }
 
@@ -1580,7 +1603,7 @@ int main(int argc,char **argv) {
             continue;
         }
         slice_class=h264_slice_class(payload,payload_n);
-        pthread_mutex_lock(&stats.lock);++stats.input_records;stats.input_bytes+=payload_n;stats.input_idrs+=idr;stats.last_sequence=seq;stats.last_frac=frac;stats.last_sec=sec;diag_note_au(&stats,monotonic_us(),frac,sec,!!(flags&M1AU_FLAG_TIME_PRESENT));pthread_mutex_unlock(&stats.lock);
+        pthread_mutex_lock(&stats.lock);++stats.input_records;stats.input_bytes+=payload_n;stats.input_idrs+=idr;stats.last_sequence=seq;stats.last_frac=frac;stats.last_sec=sec;diag_note_au(&stats,monotonic_us(),frac,sec,flags&M1AU_FLAG_TIME_KNOWN ? !!(flags&M1AU_FLAG_TIME_PRESENT) : (frac!=0u||sec!=0u));pthread_mutex_unlock(&stats.lock);
         stats_note_input_slice(&stats,slice_class);
         if ((prev_stream && stream != prev_stream) || (prev_codec && codec != prev_codec) ||
             (prev_consumer && consumer != prev_consumer)) {
