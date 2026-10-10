@@ -109,6 +109,9 @@ if [ "$MODE" = install ]; then
   else fail current_pair_not_qualified
   fi
   if [ -e "$BACK/original.sha256" ]; then
+    [ -f "$BACK/direct-ts-parity" ] && [ -f "$BACK/parity-session" ] || fail backup_pair_missing
+    [ "$(hashfile "$BACK/direct-ts-parity")" = "$BASE_B" ] &&
+    [ "$(hashfile "$BACK/parity-session")" = "$BASE_O" ] || fail existing_backup_corrupt
     [ "$(awk '$2=="direct-ts-parity"{print $1}' "$BACK/original.sha256")" = "$BASE_B" ] &&
     [ "$(awk '$2=="parity-session"{print $1}' "$BACK/original.sha256")" = "$BASE_O" ] || fail existing_backup_conflict
   fi
@@ -139,11 +142,18 @@ mount -uw /mnt/app 2>/dev/null || fail app_rw
 RW=1
 if [ "$MODE" = install ]; then
   mkdir -p "$BACK" || fail backup_dir
-  cp "$DST/direct-ts-parity" "$BACK/direct-ts-parity" || fail backup_bridge
-  cp "$DST/parity-session" "$BACK/parity-session" || fail backup_owner
-  [ "$(hashfile "$BACK/direct-ts-parity")" = "$BASE_B" ] &&
-  [ "$(hashfile "$BACK/parity-session")" = "$BASE_O" ] || fail backup_bad
-  { echo "$BASE_B direct-ts-parity"; echo "$BASE_O parity-session"; } > "$BACK/original.sha256"
+  if [ ! -e "$BACK/original.sha256" ]; then
+    # Never overwrite an established rollback pair. Reject partial backups
+    # rather than treating orphaned files as a fresh recovery baseline.
+    [ ! -e "$BACK/direct-ts-parity" ] && [ ! -e "$BACK/parity-session" ] || fail orphaned_backup
+    cp "$DST/direct-ts-parity" "$BACK/direct-ts-parity" || fail backup_bridge
+    cp "$DST/parity-session" "$BACK/parity-session" || fail backup_owner
+    [ "$(hashfile "$BACK/direct-ts-parity")" = "$BASE_B" ] &&
+    [ "$(hashfile "$BACK/parity-session")" = "$BASE_O" ] || fail backup_bad
+    { echo "$BASE_B direct-ts-parity"; echo "$BASE_O parity-session"; } > "$BACK/original.sha256.tmp" || fail backup_manifest_write
+    mv "$BACK/original.sha256.tmp" "$BACK/original.sha256" || fail backup_manifest_commit
+    sync 2>/dev/null || fail backup_sync
+  fi
   FROM=$SD
   TARGET_B=$NEW_B;TARGET_O=$NEW_O
 else
