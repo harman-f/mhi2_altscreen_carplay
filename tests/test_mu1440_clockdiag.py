@@ -94,3 +94,20 @@ assert live.index('echo \'--- gen2-source-timing ---\'') < live.index('echo \'--
 assert live.index('if [ "$TIMING_ENABLE_OWNED" -eq 1 ]; then') < live.index('mount -ur "$SD"')
 assert live.count('snapshot "$2" "$N"') == 1
 print("MU1440_CLOCKDIAG_HOST=PASS 1Hz status, variable fps gaps, matched swap and no PCR mutation")
+
+# Experimental EAGAIN readiness wakeups: default unchanged and fail-safe fallback.
+for needle in (
+    '#include <poll.h>', 'MIBR_PARITY_EAGAIN_WAIT',
+    '!strcmp(opt,"poll")', 'g_poll_wait_enabled=!fixture_mode',
+    'poll_wait_should_disable(', 'writer_poll_fallbacks=',
+    'writer_poll_disabled=', 'wait_state->poll_ready_pending',
+    'wait_state->false_ready>=3u', 'wait_state->disabled=1',
+    'WRITE_TIMEOUT_US 500000u', 'usleep(1000);',
+):
+    assert needle in writer, needle
+assert writer.count('poll(&pfd,1,timeout_ms)') == 1
+for name in ("MU1440_CLOCKDIAG_SWAP.sh", "MU1440_CLOCKDIAG_LIVE.sh", "MU1440_CLOCKDIAG_FIXTURE.sh"):
+    assert "MIBR_PARITY_EAGAIN_WAIT" not in (
+        Path("deployment/mu1440-fixture-replay-v1") / name
+    ).read_text()
+print("MU1440_POLL_PROTO_HOST=PASS C selftest plus disabled-by-default policy")
