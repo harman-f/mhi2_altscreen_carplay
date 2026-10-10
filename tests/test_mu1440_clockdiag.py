@@ -94,3 +94,84 @@ assert live.index('echo \'--- gen2-source-timing ---\'') < live.index('echo \'--
 assert live.index('if [ "$TIMING_ENABLE_OWNED" -eq 1 ]; then') < live.index('mount -ur "$SD"')
 assert live.count('snapshot "$2" "$N"') == 1
 print("MU1440_CLOCKDIAG_HOST=PASS 1Hz status, variable fps gaps, matched swap and no PCR mutation")
+
+# Experimental EAGAIN readiness wakeups: default unchanged and fail-safe fallback.
+for needle in (
+    '#include <poll.h>', 'MIBR_PARITY_EAGAIN_WAIT',
+    '!strcmp(opt,"poll")', 'g_poll_wait_enabled=!fixture_mode',
+    'poll_wait_should_disable(', 'writer_poll_fallbacks=',
+    'writer_poll_disabled=', 'wait_state->poll_ready_pending',
+    'wait_state->false_ready>=3u', 'wait_state->disabled=1',
+    'WRITE_TIMEOUT_US 500000u', 'usleep(1000);',
+):
+    assert needle in writer, needle
+assert writer.count('poll(&pfd,1,timeout_ms)') == 1
+for name in ("MU1440_CLOCKDIAG_SWAP.sh", "MU1440_CLOCKDIAG_LIVE.sh", "MU1440_CLOCKDIAG_FIXTURE.sh"):
+    assert "MIBR_PARITY_EAGAIN_WAIT" not in (
+        Path("deployment/mu1440-fixture-replay-v1") / name
+    ).read_text()
+print("MU1440_POLL_PROTO_HOST=PASS C selftest plus disabled-by-default policy")
+
+# Idealized discrete-event test: readiness-capable vs unsupported poll.
+# This is a policy model, not physical isoTX2 validation.
+def replay_poll_policy(mode, notify, blocks=1000, service_us=7833):
+    now = 0
+    fallback = False
+    for block in range(blocks):
+        ready = block * service_us
+        while now < ready:
+            if mode == "poll" and not fallback:
+                if notify:
+                    now = ready
+                else:
+                    fallback = True
+            else:
+                now += 2000  # observed effective QNX 1ms usleep
+    return now, fallback
+
+legacy, _ = replay_poll_policy("legacy", False)
+ideal, ideal_fallback = replay_poll_policy("poll", True)
+unsupported, fallback = replay_poll_policy("poll", False)
+assert ideal <= legacy
+assert not ideal_fallback
+assert fallback
+assert unsupported <= legacy + 2000
+print("MU1440_POLL_SIMULATION=PASS coarse-timer model; no hardware claim")
+
+# Independent experimental SD package must never reuse clockdiag-v1 backup.
+poll_dir = Path("deployment/mu1440-fixture-replay-v1")
+poll_swap = (poll_dir / "MU1440_POLL_SWAP.sh").read_text()
+poll_live = (poll_dir / "MU1440_POLL_LIVE.sh").read_text()
+poll_fixture = (poll_dir / "MU1440_POLL_FIXTURE.sh").read_text()
+for script in ("MU1440_POLL_SWAP.sh","MU1440_POLL_LIVE.sh","MU1440_POLL_FIXTURE.sh"):
+    sh = poll_dir / script
+    assert subprocess.run(["bash","-n",str(sh)],capture_output=True).returncode == 0
+    assert "hash(){" not in sh.read_text()
+    assert "/omonob-clock-test/pollwait-v1" in sh.read_text()
+    assert "clockdiag-v1" not in sh.read_text()
+assert "mibr-pollwait-v1-backup" in poll_swap
+assert "mibr-clockdiag-v1-backup" not in poll_swap
+assert "CI314_B=74c39c205bdab2f5e894cf35e644bf7d9fe9c9b46dc71a27e26bb5c2b237f3e2" in poll_swap
+assert "CI314_O=c513ca1f7fb52df2d6ebb4e65b7bddc7b0aa3c1e455a2d1d614c63972794e370" in poll_swap
+assert 'fail current_pair_not_qualified' in poll_swap
+assert 'fail gate_not_stock' in poll_swap
+assert 'fail owner_lock' in poll_swap
+assert 'fail parity_running' in poll_swap
+assert 'MIBR_PARITY_EAGAIN_WAIT' in poll_live
+assert 'requested_eagain_wait=' in poll_live
+assert 'MIBR_PARITY_EAGAIN_WAIT' not in poll_fixture
+assert "owner_rc=" in poll_live
+assert (poll_dir/"POLLWAIT_README.md").is_file()
+print("MU1440_POLL_PAIRING=PASS separate CI314-aware swap, exact rollback, no autostart")
+
+# Regression contract for immutable pollwait rollback pair and staged recovery.
+assert 'fail existing_backup_corrupt' in poll_swap
+assert 'fail orphaned_backup' in poll_swap
+assert 'if [ ! -e "$BACK/original.sha256" ]; then' in poll_swap
+assert 'original.sha256.tmp' in poll_swap
+assert 'AUTORESTORE_STAGE_FAILED' in poll_swap
+assert 'direct-ts-parity.poll-recover' in poll_swap
+assert 'parity-session.poll-recover' in poll_swap
+assert 'recover || RC=4' in poll_swap
+assert poll_swap.index('backup_sync') < poll_swap.index('ALTERED=1')
+print("MU1440_POLL_ROLLBACK=PASS immutable known pair and staged recovery")
