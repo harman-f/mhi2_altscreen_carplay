@@ -22,7 +22,7 @@ ALTERED=0
 COMMITTED=0
 BASE_B=
 BASE_O=
-hash(){ "$SHA" "$1" 2>/dev/null | awk '{print $1}'; }
+hashfile(){ "$SHA" "$1" 2>/dev/null | awk '{print $1}'; }
 fail(){ echo "CLOCKDIAG_SWAP=FAIL reason=$1"; exit 1; }
 checkidle(){
   [ ! -e /tmp/mibr-parity-session.lock ] || fail owner_lock
@@ -43,8 +43,8 @@ recover(){
   cp "$BACK/direct-ts-parity" "$DST/direct-ts-parity" 2>/dev/null || true
   cp "$BACK/parity-session" "$DST/parity-session" 2>/dev/null || true
   chmod 755 "$DST/direct-ts-parity" "$DST/parity-session" 2>/dev/null || true
-  if [ "$(hash "$DST/direct-ts-parity")" = "$BASE_B" ] &&
-     [ "$(hash "$DST/parity-session")" = "$BASE_O" ]; then
+  if [ "$(hashfile "$DST/direct-ts-parity")" = "$BASE_B" ] &&
+     [ "$(hashfile "$DST/parity-session")" = "$BASE_O" ]; then
     echo CLOCKDIAG_SWAP=AUTORESTORE_PASS
   else
     echo CLOCKDIAG_SWAP=AUTORESTORE_FAILED_MANUAL_ACTION_REQUIRED
@@ -74,8 +74,8 @@ case "$MODE" in
     fi
     if [ "$MODE" = status ]; then
       echo ===CLOCKDIAG===
-      echo "bridge=$(hash "$DST/direct-ts-parity")"
-      echo "owner=$(hash "$DST/parity-session")"
+      echo "bridge=$(hashfile "$DST/direct-ts-parity")"
+      echo "owner=$(hashfile "$DST/parity-session")"
       [ -r /tmp/mibr-parity-session.state ] && cat /tmp/mibr-parity-session.state
       [ -r /tmp/mibr-alt111-native-gate.status ] && cat /tmp/mibr-alt111-native-gate.status
       [ -r /tmp/mibr-parity-ts.status ] && grep -E '^(state|diag_[^=]*|input_records|output_aus_completed|write_errors|pts_pcr_lead_ms)=' /tmp/mibr-parity-ts.status
@@ -83,18 +83,18 @@ case "$MODE" in
     fi
     exec "$DST/parity-session" --stop ;;
   verify)
-    [ "$(hash "$DST/direct-ts-parity")" = "$NEW_B" ] &&
-    [ "$(hash "$DST/parity-session")" = "$NEW_O" ] || fail new_pair_mismatch
+    [ "$(hashfile "$DST/direct-ts-parity")" = "$NEW_B" ] &&
+    [ "$(hashfile "$DST/parity-session")" = "$NEW_O" ] || fail new_pair_mismatch
     echo CLOCKDIAG_SWAP=VERIFY_PASS
     exit 0 ;;
   install|restore) : ;;
   *) echo 'usage: install|verify|live|fixture|status|stop|restore'; exit 2 ;;
 esac
-CUR_B=$(hash "$DST/direct-ts-parity")
-CUR_O=$(hash "$DST/parity-session")
+CUR_B=$(hashfile "$DST/direct-ts-parity")
+CUR_O=$(hashfile "$DST/parity-session")
 if [ "$MODE" = install ]; then
-  [ "$(hash "$SD/direct-ts-parity")" = "$NEW_B" ] &&
-  [ "$(hash "$SD/parity-session")" = "$NEW_O" ] || fail sd_pair_bad
+  [ "$(hashfile "$SD/direct-ts-parity")" = "$NEW_B" ] &&
+  [ "$(hashfile "$SD/parity-session")" = "$NEW_O" ] || fail sd_pair_bad
   if [ "$CUR_B" = "$NEW_B" ] && [ "$CUR_O" = "$NEW_O" ]; then
     echo CLOCKDIAG_SWAP=ALREADY_INSTALLED; exit 0
   fi
@@ -123,8 +123,8 @@ else
   elif [ "$BASE_B" = "$CI305_B" ] && [ "$BASE_O" = "$CI305_O" ]; then :
   else fail backup_pair_unqualified
   fi
-  [ "$(hash "$BACK/direct-ts-parity")" = "$BASE_B" ] &&
-  [ "$(hash "$BACK/parity-session")" = "$BASE_O" ] || fail backup_corrupt
+  [ "$(hashfile "$BACK/direct-ts-parity")" = "$BASE_B" ] &&
+  [ "$(hashfile "$BACK/parity-session")" = "$BASE_O" ] || fail backup_corrupt
 fi
 checkidle
 mount -uw /mnt/app 2>/dev/null || fail app_rw
@@ -133,8 +133,8 @@ if [ "$MODE" = install ]; then
   mkdir -p "$BACK" || fail backup_dir
   cp "$DST/direct-ts-parity" "$BACK/direct-ts-parity" || fail backup_bridge
   cp "$DST/parity-session" "$BACK/parity-session" || fail backup_owner
-  [ "$(hash "$BACK/direct-ts-parity")" = "$BASE_B" ] &&
-  [ "$(hash "$BACK/parity-session")" = "$BASE_O" ] || fail backup_bad
+  [ "$(hashfile "$BACK/direct-ts-parity")" = "$BASE_B" ] &&
+  [ "$(hashfile "$BACK/parity-session")" = "$BASE_O" ] || fail backup_bad
   { echo "$BASE_B direct-ts-parity"; echo "$BASE_O parity-session"; } > "$BACK/original.sha256"
   FROM=$SD
   TARGET_B=$NEW_B;TARGET_O=$NEW_O
@@ -145,13 +145,13 @@ fi
 cp "$FROM/direct-ts-parity" "$DST/direct-ts-parity.clockdiag-staged" || fail stage_bridge
 cp "$FROM/parity-session" "$DST/parity-session.clockdiag-staged" || fail stage_owner
 chmod 755 "$DST/direct-ts-parity.clockdiag-staged" "$DST/parity-session.clockdiag-staged" || fail chmod
-[ "$(hash "$DST/direct-ts-parity.clockdiag-staged")" = "$TARGET_B" ] &&
-[ "$(hash "$DST/parity-session.clockdiag-staged")" = "$TARGET_O" ] || fail stage_hash
+[ "$(hashfile "$DST/direct-ts-parity.clockdiag-staged")" = "$TARGET_B" ] &&
+[ "$(hashfile "$DST/parity-session.clockdiag-staged")" = "$TARGET_O" ] || fail stage_hash
 ALTERED=1
 mv "$DST/direct-ts-parity.clockdiag-staged" "$DST/direct-ts-parity" || fail replace_bridge
 mv "$DST/parity-session.clockdiag-staged" "$DST/parity-session" || fail replace_owner
-[ "$(hash "$DST/direct-ts-parity")" = "$TARGET_B" ] &&
-[ "$(hash "$DST/parity-session")" = "$TARGET_O" ] || fail installed_hash
+[ "$(hashfile "$DST/direct-ts-parity")" = "$TARGET_B" ] &&
+[ "$(hashfile "$DST/parity-session")" = "$TARGET_O" ] || fail installed_hash
 sync 2>/dev/null || fail sync
 mount -ur /mnt/app 2>/dev/null || fail app_ro
 RW=0
