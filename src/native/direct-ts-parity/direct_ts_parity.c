@@ -1215,9 +1215,10 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
             attempt_start=monotonic_us();
         ssize_t w=write(fd,p+off,n-off);
         if(w<0)saved_errno=errno;
+        if(probe)attempt_end=monotonic_us();
         if(wait_state && wait_state->pending_idx>=0) {
             struct poll_diag_sample *d=&wait_state->diag[wait_state->pending_idx];
-            uint64_t followup_end=monotonic_us();
+            uint64_t followup_end=probe ? attempt_end : monotonic_us();
             d->followup_seen=1;d->requested_bytes=n-off;
             d->followup_rc=w;d->followup_errno=saved_errno;
             d->followup_gap_us=attempt_start>=d->poll_end_us ?
@@ -1227,7 +1228,6 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
             wait_state->pending_idx=-1;
         }
         if(probe){
-            attempt_end=monotonic_us();
             if(w>0){
                 probe->success_syscall_us+=attempt_end-attempt_start;
                 ++probe->success_syscalls;
