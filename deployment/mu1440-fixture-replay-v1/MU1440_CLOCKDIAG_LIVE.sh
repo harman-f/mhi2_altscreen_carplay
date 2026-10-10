@@ -17,6 +17,14 @@ RUN=
 MARK=
 SAMPLER=
 RW=0
+# GEN2 already implements opt-in, one-second, source-side arrival telemetry.
+# These markers are temporary and never persist across reboot.
+SOURCE_TIMING_ENABLE=/tmp/mibr-alt111-source-timing.enabled
+SOURCE_TIMING_INTERVAL=/tmp/mibr-alt111-source-timing-interval-ms
+SOURCE_TIMING_STATUS=/tmp/mibr-alt111-source-timing.status
+GEN2_STATUS=/tmp/mibr-alt111-gen2.status
+TIMING_ENABLE_OWNED=0
+TIMING_INTERVAL_OWNED=0
 fail(){ echo "CLOCKDIAG_LIVE=FAIL reason=$1"; exit 1; }
 hashfile(){ "$SHA" "$1" 2>/dev/null | awk '{print $1}'; }
 pair(){
@@ -29,13 +37,21 @@ pair(){
   [ "$(hashfile "$OWNER")" = "$O" ] || fail owner_not_diag_pair
 }
 snapshot(){
+  # All counters in one sample block: no additional sampler thread or per-AU logging.
   { echo "===== sample=$2 ====="
+    echo '--- stream111 ---'
+    [ -r /tmp/mibr-carplay111.state ] && cat /tmp/mibr-carplay111.state || echo 'source_state=missing'
+    [ -r /tmp/mibr-carplay111.heartbeat ] && cat /tmp/mibr-carplay111.heartbeat || echo 'source_heartbeat=missing'
+    echo '--- gen2-source-timing ---'
+    [ -r "$SOURCE_TIMING_STATUS" ] && cat "$SOURCE_TIMING_STATUS" || echo 'source_timing=missing'
+    echo '--- gen2 ---'
+    [ -r "$GEN2_STATUS" ] && cat "$GEN2_STATUS" || echo 'gen2_status=missing'
     echo '--- parity ---'
-    [ -r /tmp/mibr-parity-ts.status ] && cat /tmp/mibr-parity-ts.status
+    [ -r /tmp/mibr-parity-ts.status ] && cat /tmp/mibr-parity-ts.status || echo 'parity_status=missing'
     echo '--- owner ---'
-    [ -r /tmp/mibr-parity-session.state ] && cat /tmp/mibr-parity-session.state
+    [ -r /tmp/mibr-parity-session.state ] && cat /tmp/mibr-parity-session.state || echo 'owner_state=missing'
     echo '--- gate ---'
-    [ -r /tmp/mibr-alt111-native-gate.status ] && cat /tmp/mibr-alt111-native-gate.status
+    [ -r /tmp/mibr-alt111-native-gate.status ] && cat /tmp/mibr-alt111-native-gate.status || echo 'gate_status=missing'
   } >> "$1/status-snapshots.log" 2>/dev/null
 }
 case "$MODE" in
@@ -71,6 +87,13 @@ cleanup(){
   trap - 0 1 2 15
   [ -z "$MARK" ] || rm -f "$MARK" 2>/dev/null || true
   [ -z "$SAMPLER" ] || wait "$SAMPLER" 2>/dev/null || true
+  # Never remove a marker / interval supplied by another diagnostic operator.
+  if [ "$TIMING_ENABLE_OWNED" -eq 1 ]; then
+    rm -f "$SOURCE_TIMING_ENABLE" 2>/dev/null || echo CLOCKDIAG_LIVE=WARNING_SOURCE_MARKER_CLEANUP
+  fi
+  if [ "$TIMING_INTERVAL_OWNED" -eq 1 ]; then
+    rm -f "$SOURCE_TIMING_INTERVAL" 2>/dev/null || echo CLOCKDIAG_LIVE=WARNING_SOURCE_INTERVAL_CLEANUP
+  fi
   if [ "$RW" -eq 1 ]; then
     sync 2>/dev/null || true
     if [ ! -e /tmp/mibr-parity-session.lock ]; then
@@ -92,6 +115,17 @@ RUN=$LOGROOT/clockdiag-live-$STAMP-$$
 mkdir -p "$RUN" || fail log_dir
 : > "$RUN/session.log" || fail session_log
 : > "$RUN/status-snapshots.log" || fail snapshots_log
+# Source-side measurements originate in GEN2 before the 19820 TCP tee.
+# Default 1000ms; an existing operator-defined 250..5000ms interval is preserved.
+if [ ! -e "$SOURCE_TIMING_INTERVAL" ]; then
+  echo 1000 > "$SOURCE_TIMING_INTERVAL" || fail source_interval_setup
+  TIMING_INTERVAL_OWNED=1
+fi
+if [ ! -e "$SOURCE_TIMING_ENABLE" ]; then
+  : > "$SOURCE_TIMING_ENABLE" || fail source_timing_enable
+  TIMING_ENABLE_OWNED=1
+fi
+echo "CLOCKDIAG_LIVE=SOURCE_TIMING_ENABLED marker_owned=$TIMING_ENABLE_OWNED interval_owned=$TIMING_INTERVAL_OWNED interval_ms=$(cat "$SOURCE_TIMING_INTERVAL" 2>/dev/null)"
 MARK=$RUN/.recording
 : > "$MARK" || fail marker
 /bin/ksh "$0" --sample "$RUN" &
@@ -104,6 +138,20 @@ rm -f "$MARK";MARK=
 wait "$SAMPLER" 2>/dev/null || true;SAMPLER=
 [ -r /tmp/mibr-parity-ts.status ] && cp /tmp/mibr-parity-ts.status "$RUN/parity-final.status"
 [ -r /tmp/mibr-alt111-native-gate.status ] && cp /tmp/mibr-alt111-native-gate.status "$RUN/gate-final.status"
-{ echo "owner_rc=$RC";echo "owner_state=$(cat /tmp/mibr-parity-session.state 2>/dev/null)"; } > "$RUN/summary.txt"
+[ -r "$SOURCE_TIMING_STATUS" ] && cp "$SOURCE_TIMING_STATUS" "$RUN/gen2-source-final.status"
+[ -r "$GEN2_STATUS" ] && cp "$GEN2_STATUS" "$RUN/gen2-final.status"
+{ echo "owner_rc=$RC"
+  echo "owner_state=$(cat /tmp/mibr-parity-session.state 2>/dev/null)"
+  if [ -r "$RUN/gen2-source-final.status" ]; then
+    echo source_timing_capture=present
+  else
+    echo source_timing_capture=missing
+  fi
+  if [ -r "$RUN/gen2-final.status" ]; then
+    echo gen2_capture=present
+  else
+    echo gen2_capture=missing
+  fi
+} > "$RUN/summary.txt"
 echo "CLOCKDIAG_LIVE=END owner_rc=$RC log=$RUN"
 exit "$RC"
