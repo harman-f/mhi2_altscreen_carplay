@@ -103,3 +103,17 @@ If you want the long-term CI295 vehicle baseline afterward but your actual pre-c
 Green pinned QNX ARMv7 CI, host self-tests for fps/gaps and 1Hz status limiter, matched bridge-owner binary hash and integrity proof, zero owner/gate ownership changes, stable 3600/3600 fixture, no new write errors. Compare real-world CPU load and output before/after; the changes are designed to be extremely light but no on-device CPU benchmark has yet been recorded. No PCR adjustments until vehicle timing observations justify one.
 
 Research decision: https://github.com/CaneTLOTW/M.I.B._Research/blob/main/projects/mhi2-altscreen-thirdparty-audit/analysis/MU1440_ADR_LOW_OVERHEAD_CLOCK_DIAGNOSTICS_2026-10-10.md
+
+## Experimental POLLOUT EAGAIN wait – OFF by default
+
+Research branch `work/mu1440-eagain-poll-proto-v1` carries a **non-qualified** writer experiment, built on the clockdiag-v1 results. **Do not replace the already vehicle-tested writer with this binary yet.** Current vehicle deployment, autostart, owner, gate, PCR/PTS and transport format are unchanged.
+
+- Normal operation: original `usleep(1000)` after EAGAIN; exact same timeout (`WRITE_TIMEOUT_US=500000`), nonblocking 12032-byte physical write and fail-closed handling.
+- Test-only environment setting `MIBR_PARITY_EAGAIN_WAIT=poll` selects `poll(POLLOUT)` wakeup hints, with a maximum 2-ms per-wait timeout. There is no permanent settings marker and no SD script enables the mode.
+- Poll does **not** prove full-block driver capacity. After each indication the next nonblocking write is authoritative. Three immediately-ready or three misleading ready-but-EAGAIN observations, POLLERR/HUP/NVAL, or a poll syscall error disable the experiment for the rest of the writer session and restore the original EAGAIN sleep.
+- Status fields: `eagain_wait`, `writer_poll_calls`, `writer_poll_ready`, `writer_poll_timeouts`, `writer_poll_fallbacks`, `writer_poll_wait_us`, `writer_poll_disabled`. In the default mode the new counters remain zero.
+- Host C `--self-test` checks poll decision/fallback branches; Python tests check disabled-by-default behavior and run an *illustrative*, deterministic 1ms-request/2ms-effective-sleep model. It does not prove MU1440 driver readiness notification works.
+- `/dev/mlb/isoTX2` QNX `poll`/`_IO_NOTIFY` implementation, actual physical drain, VC decoder clock and A/V smoothness remain unverified. A faster poll response cannot, by itself, prove the observed ~0.44% clock discrepancy is corrected.
+- No vehicle A/B runs until QNX ARMv7 builds, host/integration regressions and independent owner/native-gate safety review pass. Keep the known-good installation and matched hashes available for rollback.
+
+The clockdiag-v1 scripts built in this branch remain the same, but the paired bridge binary **is different** from the previously qualified artifact. Never copy its bridge into the old clockdiag-v1 directory while relying on previously installed hashes.
