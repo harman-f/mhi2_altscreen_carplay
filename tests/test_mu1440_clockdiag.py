@@ -163,3 +163,15 @@ assert 'MIBR_PARITY_EAGAIN_WAIT' not in poll_fixture
 assert "owner_rc=" in poll_live
 assert (poll_dir/"POLLWAIT_README.md").is_file()
 print("MU1440_POLL_PAIRING=PASS separate CI314-aware swap, exact rollback, no autostart")
+
+# Regression contract for immutable pollwait rollback pair and staged recovery.
+assert 'fail existing_backup_corrupt' in poll_swap
+assert 'fail orphaned_backup' in poll_swap
+assert 'if [ ! -e "$BACK/original.sha256" ]; then' in poll_swap
+assert 'original.sha256.tmp' in poll_swap
+assert 'AUTORESTORE_STAGE_FAILED' in poll_swap
+assert 'direct-ts-parity.poll-recover' in poll_swap
+assert 'parity-session.poll-recover' in poll_swap
+assert 'recover || RC=4' in poll_swap
+assert poll_swap.index('backup_sync') < poll_swap.index('ALTERED=1')
+print("MU1440_POLL_ROLLBACK=PASS immutable known pair and staged recovery")
