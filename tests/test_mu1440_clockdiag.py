@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Clock diagnostic host gate: real native C self-test and unchanged TS contract."""
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -40,6 +41,15 @@ for name in ("MU1440_CLOCKDIAG_SWAP.sh", "MU1440_CLOCKDIAG_LIVE.sh",
     path = Path("deployment/mu1440-fixture-replay-v1") / name
     out = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True)
     assert out.returncode == 0, (path, out.stderr)
+# bash -n accepts 'hash(){}', but the original QNX /bin/ksh rejects that
+# built-in name with 'syntax error: (' unexpected'. Guard actual on-car parse.
+for name in ("MU1440_CLOCKDIAG_SWAP.sh", "MU1440_CLOCKDIAG_LIVE.sh",
+             "MU1440_CLOCKDIAG_FIXTURE.sh"):
+    qnx_script = (Path("deployment/mu1440-fixture-replay-v1") / name).read_text()
+    assert not re.search(r"(?m)^hash\\s*\\(\\)\\s*\\{", qnx_script), name
+    assert not re.search(r"\\$\\(hash\\s", qnx_script), name
+    assert "hashfile(){" in qnx_script, name
+
 swap = Path("deployment/mu1440-fixture-replay-v1/MU1440_CLOCKDIAG_SWAP.sh").read_text()
 for needle in ("__NEW_BRIDGE_HASH__", "__NEW_OWNER_HASH__", "CI295_B=", "CI305_B=",
                "CLOCKDIAG_SWAP=AUTORESTORE_PASS", "checkidle", "ORIGINAL"):
