@@ -158,6 +158,13 @@ struct bridge_stats {
     uint64_t input_records;
     uint64_t input_bytes;
     uint64_t input_idrs;
+    /* O(1) input timing samples, updated only per AU (not per TS packet). */
+    uint64_t diag_first_arrival_us, diag_last_arrival_us, diag_max_arrival_gap_us;
+    uint64_t diag_gap50, diag_gap100, diag_gap250;
+    uint64_t diag_first_source3232, diag_last_source3232, diag_source_samples;
+    uint64_t diag_max_source_gap_us, diag_source_rewinds;
+    uint64_t diag_window_start_us, diag_window_count, diag_last_fps_x100;
+    uint64_t diag_window_elapsed_us, diag_window_completed;
     uint64_t input_slice_p;
     uint64_t input_slice_b;
     uint64_t input_slice_i;
@@ -246,6 +253,10 @@ static volatile sig_atomic_t g_stop;
 static volatile sig_atomic_t g_stop_signal;
 static int g_status_enabled = 1;
 static pthread_mutex_t g_status_publish_lock = PTHREAD_MUTEX_INITIALIZER;
+/* A 1Hz file-write budget shared by source and writer threads. */
+static pthread_mutex_t g_status_rate_lock = PTHREAD_MUTEX_INITIALIZER;
+static uint64_t g_status_last_us;
+static int g_status_last_state;
 
 static uint16_t be16(const uint8_t *p) {
     return (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
@@ -403,6 +414,41 @@ static uint64_t monotonic_us(void) {
     return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull;
 }
 
+/* Caller holds stats.lock; injected time makes synthetic host tests exact. */
+static void diag_note_au(struct bridge_stats *s, uint64_t now,
+                         uint32_t frac, uint32_t sec, int present) {
+    if(s->diag_last_arrival_us && now>=s->diag_last_arrival_us) {
+        uint64_t gap=now-s->diag_last_arrival_us;
+        if(gap>s->diag_max_arrival_gap_us)s->diag_max_arrival_gap_us=gap;
+        if(gap>=50000u)++s->diag_gap50;
+        if(gap>=100000u)++s->diag_gap100;
+        if(gap>=250000u)++s->diag_gap250;
+    }
+    if(!s->diag_first_arrival_us)s->diag_first_arrival_us=now;
+    s->diag_last_arrival_us=now;
+    if(!s->diag_window_start_us)s->diag_window_start_us=now;
+    ++s->diag_window_count;
+    if(now>=s->diag_window_start_us+1000000ull) {
+        uint64_t span=now-s->diag_window_start_us;
+        s->diag_last_fps_x100=(s->diag_window_count*100000000ull)/span;
+        s->diag_window_elapsed_us=span;
+        ++s->diag_window_completed;
+        s->diag_window_start_us=now;
+        s->diag_window_count=0;
+    }
+    if(present) {
+        uint64_t stamp=((uint64_t)sec<<32)|frac;
+        if(s->diag_source_samples && stamp>s->diag_last_source3232) {
+            uint64_t d=stamp-s->diag_last_source3232;
+            uint64_t us=(d>>32)*1000000ull+
+                (((d&0xffffffffull)*1000000ull)>>32);
+            if(us>s->diag_max_source_gap_us)s->diag_max_source_gap_us=us;
+        }else if(s->diag_source_samples)++s->diag_source_rewinds;
+        if(!s->diag_source_samples)s->diag_first_source3232=stamp;
+        s->diag_last_source3232=stamp;
+        ++s->diag_source_samples;
+    }
+}
 static uint64_t assign_pts_presence(struct clock_state *c, uint32_t frac, uint32_t sec,
                                     int presence, int *rebased) {
     uint64_t pcr, pts, floor, target, shift, now_us;
