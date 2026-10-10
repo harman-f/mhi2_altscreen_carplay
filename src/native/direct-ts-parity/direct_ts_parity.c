@@ -1172,6 +1172,7 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
             }
         }
         if(w>0) {
+            if(wait_state){wait_state->false_ready=0;wait_state->poll_ready_pending=0;}
             /* An isoTX2 short acceptance breaks the 64-packet syscall
              * contract. Fail rather than silently submit a partial block. */
             if ((size_t)w != n) { stats_add_u64(&s->write_errors,&s->lock,1); return -1; }
