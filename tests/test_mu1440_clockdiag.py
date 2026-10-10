@@ -111,3 +111,29 @@ for name in ("MU1440_CLOCKDIAG_SWAP.sh", "MU1440_CLOCKDIAG_LIVE.sh", "MU1440_CLO
         Path("deployment/mu1440-fixture-replay-v1") / name
     ).read_text()
 print("MU1440_POLL_PROTO_HOST=PASS C selftest plus disabled-by-default policy")
+
+# Idealized discrete-event test: readiness-capable vs unsupported poll.
+# This is a policy model, not physical isoTX2 validation.
+def replay_poll_policy(mode, notify, blocks=1000, service_us=7833):
+    now = 0
+    fallback = False
+    for block in range(blocks):
+        ready = block * service_us
+        while now < ready:
+            if mode == "poll" and not fallback:
+                if notify:
+                    now = ready
+                else:
+                    fallback = True
+            else:
+                now += 2000  # observed effective QNX 1ms usleep
+    return now, fallback
+
+legacy, _ = replay_poll_policy("legacy", False)
+ideal, ideal_fallback = replay_poll_policy("poll", True)
+unsupported, fallback = replay_poll_policy("poll", False)
+assert ideal <= legacy
+assert not ideal_fallback
+assert fallback
+assert unsupported <= legacy + 2000
+print("MU1440_POLL_SIMULATION=PASS coarse-timer model; no hardware claim")
