@@ -1182,6 +1182,13 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
         if(w<0 && (saved_errno==EAGAIN||saved_errno==EWOULDBLOCK)){
             if (monotonic_us() >= deadline) { stats_add_u64(&s->write_errors,&s->lock,1); return -1; }
             stats_add_u64(&s->write_eagain,&s->lock,1);
+            if(wait_state && wait_state->poll_ready_pending){
+                wait_state->poll_ready_pending=0;
+                if(++wait_state->false_ready>=3u && !wait_state->disabled){
+                    wait_state->disabled=1;
+                    if(probe)++probe->poll_fallbacks;
+                }
+            }
             if(wait_state && wait_state->enabled && !wait_state->disabled) {
                 struct pollfd pfd;
                 uint64_t poll_start=monotonic_us(),poll_end;
