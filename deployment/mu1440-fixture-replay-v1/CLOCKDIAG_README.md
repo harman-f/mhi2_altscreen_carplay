@@ -61,7 +61,32 @@ Status and stop (from a second SSH shell if required):
 
 The fixture replay owner in this version is retained for compatibility and may still return `rc=15` despite `fixture_complete rc=0` after clean EOF due to a QNX procfs child-reap classification defect; always inspect `session.log` and confirm gate 0, not infer automatic success from return code. **No blanket override of rc=15** or stock gate bypass is introduced. A separate safe fix remains tracked for that issue.
 
-Logs: `/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive/clockdiag-live-*/` for live and `fixture-*/` for synthetic clip. Copy the entire latest folder with `session.log`, `status-snapshots.log`, `parity-final.status`, `gate-final.status`, `summary.txt`.
+## Synchronized GEN2 + writer timing (script-only extension, Oct 2026)
+
+The 150-second live helper now enables the **already deployed** opt-in GEN2 source timing instrumentation using temporary QNX shmem markers. There are **no changes to QNX writer, owner, GEN2 video or MPEG-TS/PCR binaries**. Existing Stream111 source instrumentation only publishes a small status record about once per second; the SD sampler reads it every three seconds alongside the existing writer, gate and owner snapshots. No per-frame SD logging or additional background worker is introduced.
+
+- GEN2 source timing: `/tmp/mibr-alt111-source-timing.status`, opt-in marker `/tmp/mibr-alt111-source-timing.enabled`, interval `/tmp/mibr-alt111-source-timing-interval-ms` (1000 ms if unset).
+- GEN2 output/producer status: `/tmp/mibr-alt111-gen2.status` (best effort, may not publish every field or exist depending on installed GEN2).
+- Per-3s combined `status-snapshots.log` sections: `stream111`, `gen2-source-timing`, `gen2`, `parity`, `owner`, `gate`. Snapshot #1 can precede owner startup; exclude stale pre-owner status from measured comparisons.
+- End of run: `gen2-source-final.status` and `gen2-final.status` if present, `summary.txt` reports whether captures exist.
+- Source time samples are from **accepted Stream111 video AUs after GEN2 submit**, but before the local TCP 19820 tee. They are **not** iPhone compositor/vsync evidence. Comparing with writer input can localize added delivery jitter, not prove iPhone-side rendering.
+- Marker/interval creation occurs only in `start` after the normal source, hash, lock and native gate preflight. `status` and `preflight` do not alter markers. The helper deletes only files it created itself at cleanup; existing operator markers and measurement intervals are preserved.
+- Missing optional GEN2 counters are reported as missing rather than interpreted as zero. The writer and native gate safety conditions are unchanged.
+
+For an already successfully installed and verified `clockdiag-v1` pair (as on the CI #310 test), **copy the updated live shell script to SD only**. Reinstalling/replacing the writer and owner is unnecessary. Verify that the installed matched binary hashes remain valid with `MU1440_CLOCKDIAG_SWAP.sh verify`. Do not mix or overwrite the production binaries with another build casually.
+
+### Controlled stationary A/B protocol
+
+Keep the car stationary, an SSH session attached, supervisor disabled and the iPhone connected. Run each trial with `/bin/ksh MU1440_CLOCKDIAG_LIVE.sh preflight` first.
+
+1. **A, steady source:** 150 seconds in the same Maps view; no app or display switching. Repeated comparable manual map rotations/pans during approximately seconds 30–120.
+2. **B, switching load:** repeat, but deliberately switch apps around seconds 60–90, then return to Maps. Note visually when stutters occur.
+
+Use `/bin/ksh MU1440_CLOCKDIAG_SWAP.sh live` for each run. Label the resulting two distinct SD log folders A and B when transferring. Capture `status-snapshots.log`, `parity-final.status`, `gen2-source-final.status`, `gen2-final.status` (if present), `gate-final.status`, `summary.txt`, `session.log`. Always check `owner_rc=0`, `owner_state=complete_stock`, native gate `M1GATE1 0`, and no writer errors before repeating.
+
+A/B measurements test *source vs writer cadence correlation*. They do not establish physical VC decoder timestamps. Never change PCR, transport bitrate or gate behavior solely on this basis.
+
+Logs: `/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive/clockdiag-live-*/` for live and `fixture-*/` for synthetic clip. Copy the complete directory including `status-snapshots.log`, `parity-final.status`, `gate-final.status`, `summary.txt`, `session.log`; correlated source files are now included when available.
 
 **Return to exact previous version** after owner has fully ended and gate is stock:
 
