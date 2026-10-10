@@ -61,4 +61,36 @@ live = Path("deployment/mu1440-fixture-replay-v1/MU1440_CLOCKDIAG_LIVE.sh").read
 assert "parity_session.sh\" 150" in live
 assert "status-snapshots.log" in live
 assert "exec \"$OWNER\" --stop" in live
+# Correlated but low-overhead source-side evidence: no GEN2 binary change.
+# The vehicle sampler reads the existing 1Hz GEN2 status alongside the writer
+# every 3s and only removes markers created for this particular run.
+for needle in (
+    "SOURCE_TIMING_ENABLE=/tmp/mibr-alt111-source-timing.enabled",
+    "SOURCE_TIMING_INTERVAL=/tmp/mibr-alt111-source-timing-interval-ms",
+    "SOURCE_TIMING_STATUS=/tmp/mibr-alt111-source-timing.status",
+    "GEN2_STATUS=/tmp/mibr-alt111-gen2.status",
+    "TIMING_ENABLE_OWNED=0",
+    "TIMING_INTERVAL_OWNED=0",
+    "echo '--- stream111 ---'",
+    "echo '--- gen2-source-timing ---'",
+    "echo '--- gen2 ---'",
+    "echo '--- parity ---'",
+    'if [ ! -e "$SOURCE_TIMING_INTERVAL" ]; then',
+    'if [ ! -e "$SOURCE_TIMING_ENABLE" ]; then',
+    'if [ "$TIMING_ENABLE_OWNED" -eq 1 ]; then',
+    'if [ "$TIMING_INTERVAL_OWNED" -eq 1 ]; then',
+    'source_timing_capture=present',
+    'source_timing_capture=missing',
+    'gen2-source-final.status',
+    'gen2-final.status',
+):
+    assert needle in live, needle
+# Preflight must remain read-only: no temporary marker creation until after
+# pair/source/gate checks, the start-mode early exit, and SD log preparation.
+assert live.index('echo CLOCKDIAG_LIVE=PREFLIGHT_PASS') < live.index('TIMING_ENABLE_OWNED=1')
+assert live.index('[ "$MODE" = start ] || exit 0') < live.index('TIMING_ENABLE_OWNED=1')
+assert live.index('TIMING_ENABLE_OWNED=1') < live.index('MARK=$RUN/.recording')
+assert live.index('echo \'--- gen2-source-timing ---\'') < live.index('echo \'--- parity ---\'')
+assert live.index('if [ "$TIMING_ENABLE_OWNED" -eq 1 ]; then') < live.index('mount -ur "$SD"')
+assert live.count('snapshot "$2" "$N"') == 1
 print("MU1440_CLOCKDIAG_HOST=PASS 1Hz status, variable fps gaps, matched swap and no PCR mutation")
