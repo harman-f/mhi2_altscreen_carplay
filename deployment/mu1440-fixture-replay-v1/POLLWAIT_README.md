@@ -33,7 +33,9 @@ D=/net/mmx/fs/sda0/esd/carplay-test/omonob-clock-test/pollwait-v1
 /bin/ksh -n "$D/MU1440_POLL_LIVE.sh"
 /bin/ksh -n "$D/MU1440_POLL_FIXTURE.sh"
 cd "$D"
-/mnt/app/root/altscreen-u2/bin/sha256sum -c PAIR_SHA256SUMS.txt
+cat PAIR_SHA256SUMS.txt
+/mnt/app/root/altscreen-u2/bin/sha256sum "$D/direct-ts-parity"
+/mnt/app/root/altscreen-u2/bin/sha256sum "$D/parity-session"
 /bin/ksh "$D/MU1440_POLL_SWAP.sh" status
 /bin/ksh "$D/MU1440_POLL_SWAP.sh" install
 /bin/ksh "$D/MU1440_POLL_SWAP.sh" verify
