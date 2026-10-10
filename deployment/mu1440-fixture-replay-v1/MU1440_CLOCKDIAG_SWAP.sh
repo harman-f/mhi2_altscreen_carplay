@@ -32,7 +32,10 @@ checkidle(){
   done
   [ "$(cat /mnt/app/root/mibr-parity-drive.enabled 2>/dev/null)" != 1 ] || fail autostart_enabled
   case "$(cat /tmp/mibr-alt111-native-gate.status 2>/dev/null)" in 'M1GATE1 0 '*) : ;; *) fail gate_not_stock ;; esac
-  pidin ar 2>/dev/null | grep -E '(^|[/[:space:]])(direct-ts-parity|parity-session|parity_drive_supervisor\.sh)([[:space:]]|$)' >/dev/null 2>&1 && fail parity_running
+  PROCS=$(pidin ar 2>/dev/null) || fail pidin_unavailable
+  if echo "$PROCS" | grep -E '(^|[/[:space:]])(direct-ts-parity|parity-session|parity_drive_supervisor\\.sh)([[:space:]]|$)' >/dev/null 2>&1; then
+    fail parity_running
+  fi
   echo CLOCKDIAG_SWAP=IDLE_PASS
 }
 recover(){
