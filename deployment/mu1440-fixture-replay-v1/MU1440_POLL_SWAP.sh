@@ -42,8 +42,17 @@ checkidle(){
 }
 recover(){
   [ -n "$BASE_B" ] && [ -n "$BASE_O" ] || return 0
-  cp "$BACK/direct-ts-parity" "$DST/direct-ts-parity" 2>/dev/null || true
-  cp "$BACK/parity-session" "$DST/parity-session" 2>/dev/null || true
+  # Stage recovery independently: no in-place truncation of live binary paths.
+  cp "$BACK/direct-ts-parity" "$DST/direct-ts-parity.poll-recover" 2>/dev/null &&
+  cp "$BACK/parity-session" "$DST/parity-session.poll-recover" 2>/dev/null &&
+  chmod 755 "$DST/direct-ts-parity.poll-recover" "$DST/parity-session.poll-recover" 2>/dev/null &&
+  [ "$(hashfile "$DST/direct-ts-parity.poll-recover")" = "$BASE_B" ] &&
+  [ "$(hashfile "$DST/parity-session.poll-recover")" = "$BASE_O" ] || {
+    echo POLL_SWAP=AUTORESTORE_STAGE_FAILED
+    return 1
+  }
+  mv "$DST/direct-ts-parity.poll-recover" "$DST/direct-ts-parity" || return 1
+  mv "$DST/parity-session.poll-recover" "$DST/parity-session" || return 1
   chmod 755 "$DST/direct-ts-parity" "$DST/parity-session" 2>/dev/null || true
   if [ "$(hashfile "$DST/direct-ts-parity")" = "$BASE_B" ] &&
      [ "$(hashfile "$DST/parity-session")" = "$BASE_O" ]; then
@@ -56,8 +65,10 @@ cleanup(){
   RC=$?
   trap - 0 1 2 15
   if [ "$RW" -eq 1 ]; then
-    rm -f "$DST/direct-ts-parity.clockdiag-staged" "$DST/parity-session.clockdiag-staged"
-    [ "$ALTERED" -eq 0 ] || [ "$COMMITTED" -eq 1 ] || recover
+    rm -f "$DST/direct-ts-parity.clockdiag-staged" "$DST/parity-session.clockdiag-staged" "$DST/direct-ts-parity.poll-recover" "$DST/parity-session.poll-recover"
+    if [ "$ALTERED" -ne 0 ] && [ "$COMMITTED" -ne 1 ]; then
+      recover || RC=4
+    fi
     sync 2>/dev/null || true
     mount -ur /mnt/app 2>/dev/null || { echo POLL_SWAP=APP_MOUNT_RO_FAIL; RC=3; }
   fi
