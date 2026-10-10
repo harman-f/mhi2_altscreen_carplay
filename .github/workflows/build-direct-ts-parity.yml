@@ -25,6 +25,7 @@ on:
       - 'deployment/mu1440-parity-drive-v1/**'
       - 'deployment/mu1440-fixture-replay-v1/**'
       - 'tests/test_mu1440_fixture_replay.py'
+      - 'tests/test_mu1440_clockdiag.py'
       - 'tools/prepare_mu1440_parity_drive_v1_overlay.sh'
   push:
     branches: [ main, codex/mu1440-parity-drive-v1 ]
@@ -50,6 +51,7 @@ on:
       - 'deployment/mu1440-parity-drive-v1/**'
       - 'deployment/mu1440-fixture-replay-v1/**'
       - 'tests/test_mu1440_fixture_replay.py'
+      - 'tests/test_mu1440_clockdiag.py'
       - 'tools/prepare_mu1440_parity_drive_v1_overlay.sh'
 
 permissions:
@@ -141,6 +143,7 @@ jobs:
           /tmp/parity-session-host --self-test | tee /tmp/parity-session-selftest.txt
           /tmp/parity-session-host --identity-self-test
           python3 tests/test_mu1440_fixture_replay.py /tmp/direct-ts-parity-host /tmp/parity-session-host
+          python3 tests/test_mu1440_clockdiag.py /tmp/direct-ts-parity-host
           bash -n deployment/mu1440-fixture-replay-v1/MU1440_REPLAY_RUN.sh
           grep -Fxq 'PARITY_SESSION_SELFTEST=PASS' /tmp/parity-session-selftest.txt
           grep -Fq 'release=/eso/bin/apps/dmdt dc 72 ; /eso/bin/apps/dmdt sc 4 72' /tmp/parity-session-selftest.txt
@@ -242,21 +245,30 @@ jobs:
             bash -c 'bash ./tools/build_native_isotx2_guard.sh build/ci-direct-ts-parity/libmibr_isotx2_guard.so'
           sudo chown -R "$(id -u):$(id -g)" "$OUTDIR"
 
-      - name: Stage exact-hash opt-in fixture replay toolkit
+      - name: Stage paired low-overhead clock diagnostics toolkit
         shell: bash
         run: |
           set -euxo pipefail
-          cp deployment/mu1440-fixture-replay-v1/MU1440_REPLAY_RUN.sh "$OUTDIR/MU1440_REPLAY_RUN.sh"
-          cp deployment/mu1440-fixture-replay-v1/MU1440_REPLAY_SWAP.sh "$OUTDIR/MU1440_REPLAY_SWAP.sh"
-          cp deployment/mu1440-fixture-replay-v1/README.md "$OUTDIR/REPLAY_README.md"
-          chmod 755 "$OUTDIR/MU1440_REPLAY_RUN.sh" "$OUTDIR/MU1440_REPLAY_SWAP.sh"
-          bash -n "$OUTDIR/MU1440_REPLAY_RUN.sh" "$OUTDIR/MU1440_REPLAY_SWAP.sh"
+          cp deployment/mu1440-fixture-replay-v1/MU1440_CLOCKDIAG_FIXTURE.sh "$OUTDIR/MU1440_CLOCKDIAG_FIXTURE.sh"
+          cp deployment/mu1440-fixture-replay-v1/MU1440_CLOCKDIAG_LIVE.sh "$OUTDIR/MU1440_CLOCKDIAG_LIVE.sh"
+          cp deployment/mu1440-fixture-replay-v1/MU1440_CLOCKDIAG_SWAP.sh "$OUTDIR/MU1440_CLOCKDIAG_SWAP.sh"
+          cp deployment/mu1440-fixture-replay-v1/CLOCKDIAG_README.md "$OUTDIR/CLOCKDIAG_README.md"
+          chmod 755 "$OUTDIR"/MU1440_CLOCKDIAG_*.sh
+          bash -n "$OUTDIR"/MU1440_CLOCKDIAG_*.sh
           python3 -m py_compile tools/fixtures/generate_mu1440_motion_m1au.py
           (cd "$OUTDIR"; sha256sum direct-ts-parity parity-session > PAIR_SHA256SUMS.txt; sha256sum -c PAIR_SHA256SUMS.txt)
-          grep -Fxq 'NEW_B=7fa78266b2df3106e1e6372c8873cdfca4d318999262e82b35291bb7ca8a0b8b' "$OUTDIR/MU1440_REPLAY_SWAP.sh"
-          grep -Fxq 'NEW_O=441cd1436a94e0a7f4f5f76820646c7f3195984ff1036771b909b6af3f2aaca7' "$OUTDIR/MU1440_REPLAY_SWAP.sh"
-          test "$(sha256sum "$OUTDIR/direct-ts-parity" | awk '{print $1}')" = 7fa78266b2df3106e1e6372c8873cdfca4d318999262e82b35291bb7ca8a0b8b
-          test "$(sha256sum "$OUTDIR/parity-session" | awk '{print $1}')" = 441cd1436a94e0a7f4f5f76820646c7f3195984ff1036771b909b6af3f2aaca7
+          BRIDGE_HASH=$(sha256sum "$OUTDIR/direct-ts-parity" | awk '{print $1}')
+          OWNER_HASH=$(sha256sum "$OUTDIR/parity-session" | awk '{print $1}')
+          sed -i "s/__NEW_BRIDGE_HASH__/$BRIDGE_HASH/g;s/__NEW_OWNER_HASH__/$OWNER_HASH/g" "$OUTDIR/MU1440_CLOCKDIAG_SWAP.sh"
+          grep -Fxq "NEW_B=$BRIDGE_HASH" "$OUTDIR/MU1440_CLOCKDIAG_SWAP.sh"
+          grep -Fxq "NEW_O=$OWNER_HASH" "$OUTDIR/MU1440_CLOCKDIAG_SWAP.sh"
+          ! grep -q '__NEW_.*_HASH__' "$OUTDIR/MU1440_CLOCKDIAG_SWAP.sh"
+          bash -n "$OUTDIR"/MU1440_CLOCKDIAG_*.sh
+          (cd "$OUTDIR"; sha256sum -c PAIR_SHA256SUMS.txt)
+          mkdir -p "$OUTDIR/clockdiag-v1"
+          cp "$OUTDIR/direct-ts-parity" "$OUTDIR/parity-session" "$OUTDIR/PAIR_SHA256SUMS.txt" "$OUTDIR"/MU1440_CLOCKDIAG_*.sh "$OUTDIR/CLOCKDIAG_README.md" "$OUTDIR/clockdiag-v1/"
+          (cd "$OUTDIR/clockdiag-v1"; sha256sum -c PAIR_SHA256SUMS.txt)
+          test "$(find "$OUTDIR/clockdiag-v1" -maxdepth 1 -type f | wc -l)" -eq 7
 
       - name: Binary and contract audit
         shell: bash
@@ -350,6 +362,7 @@ jobs:
             ${{ env.OUTDIR }}/direct-ts-parity.sha256
             ${{ env.OUTDIR }}/parity-session
             ${{ env.OUTDIR }}/parity-session.sha256
+            ${{ env.OUTDIR }}/clockdiag-v1/
             ${{ env.OUTDIR }}/SESSION_FILE.txt
             ${{ env.OUTDIR }}/SESSION_ELF_HEADER.txt
             ${{ env.OUTDIR }}/BUILDINFO.txt
