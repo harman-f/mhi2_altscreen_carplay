@@ -64,7 +64,7 @@ trap 'exit 130' 1 2 15
 case "$MODE" in
   live|fixture|status|stop)
     if [ "$MODE" = fixture ]; then
-      exec /bin/ksh "$SD/MU1440_REPLAY_RUN.sh" start
+      exec /bin/ksh "$SD/MU1440_CLOCKDIAG_FIXTURE.sh" start
     fi
     if [ "$MODE" = live ]; then
       exec /bin/ksh "$SD/MU1440_CLOCKDIAG_LIVE.sh" start
@@ -75,7 +75,7 @@ case "$MODE" in
       echo "owner=$(hash "$DST/parity-session")"
       [ -r /tmp/mibr-parity-session.state ] && cat /tmp/mibr-parity-session.state
       [ -r /tmp/mibr-alt111-native-gate.status ] && cat /tmp/mibr-alt111-native-gate.status
-      [ -r /tmp/mibr-parity-ts.status ] && grep -E '^(state|diag_|input_records|output_aus_completed|write_errors|pts_pcr_lead_ms)=' /tmp/mibr-parity-ts.status
+      [ -r /tmp/mibr-parity-ts.status ] && grep -E '^(state|diag_[^=]*|input_records|output_aus_completed|write_errors|pts_pcr_lead_ms)=' /tmp/mibr-parity-ts.status
       exit 0
     fi
     exec "$DST/parity-session" --stop ;;
