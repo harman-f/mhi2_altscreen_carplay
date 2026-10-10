@@ -189,7 +189,7 @@ for needle in (
     'writer_poll_disable_reason=%s',
     'writer_poll_diag_samples=%llu',
     'POLL_REASON_IMMEDIATE_3', 'POLL_REASON_FALSE_READY_3',
-    'poll_diag_emit(wait_state);',
+    'poll_diag_emit(&wait_state);',
     'wait_state->pending_idx=-1;',
     'if(++(*immediate_ready)>=3u)return 1;',
     'if(++wait_state->false_ready>=3u && !wait_state->disabled)',
@@ -199,7 +199,7 @@ for needle in (
 ):
     assert needle in writer, needle
 assert writer.count('poll(&pfd,1,timeout_ms)') == 1
-assert writer.count('poll_diag_emit(wait_state);') == 2
+assert writer.count('poll_diag_emit(&wait_state);') == 2
 assert writer.count('PARITY_POLL_SAMPLE n=%u') == 1
 p2 = Path('deployment/mu1440-fixture-replay-v1')
 p2swap = (p2/'MU1440_POLL2_SWAP.sh').read_text()
