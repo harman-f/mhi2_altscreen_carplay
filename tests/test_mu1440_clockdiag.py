@@ -137,3 +137,29 @@ assert not ideal_fallback
 assert fallback
 assert unsupported <= legacy + 2000
 print("MU1440_POLL_SIMULATION=PASS coarse-timer model; no hardware claim")
+
+# Independent experimental SD package must never reuse clockdiag-v1 backup.
+poll_dir = Path("deployment/mu1440-fixture-replay-v1")
+poll_swap = (poll_dir / "MU1440_POLL_SWAP.sh").read_text()
+poll_live = (poll_dir / "MU1440_POLL_LIVE.sh").read_text()
+poll_fixture = (poll_dir / "MU1440_POLL_FIXTURE.sh").read_text()
+for script in ("MU1440_POLL_SWAP.sh","MU1440_POLL_LIVE.sh","MU1440_POLL_FIXTURE.sh"):
+    sh = poll_dir / script
+    assert subprocess.run(["bash","-n",str(sh)],capture_output=True).returncode == 0
+    assert "hash(){" not in sh.read_text()
+    assert "/omonob-clock-test/pollwait-v1" in sh.read_text()
+    assert "clockdiag-v1" not in sh.read_text()
+assert "mibr-pollwait-v1-backup" in poll_swap
+assert "mibr-clockdiag-v1-backup" not in poll_swap
+assert "CI314_B=74c39c205bdab2f5e894cf35e644bf7d9fe9c9b46dc71a27e26bb5c2b237f3e2" in poll_swap
+assert "CI314_O=c513ca1f7fb52df2d6ebb4e65b7bddc7b0aa3c1e455a2d1d614c63972794e370" in poll_swap
+assert 'fail current_pair_not_qualified' in poll_swap
+assert 'fail gate_not_stock' in poll_swap
+assert 'fail owner_lock' in poll_swap
+assert 'fail parity_running' in poll_swap
+assert 'MIBR_PARITY_EAGAIN_WAIT' in poll_live
+assert 'requested_eagain_wait=' in poll_live
+assert 'MIBR_PARITY_EAGAIN_WAIT' not in poll_fixture
+assert "owner_rc=" in poll_live
+assert (poll_dir/"POLLWAIT_README.md").is_file()
+print("MU1440_POLL_PAIRING=PASS separate CI314-aware swap, exact rollback, no autostart")
