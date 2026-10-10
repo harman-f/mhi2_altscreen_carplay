@@ -1175,7 +1175,7 @@ static int poll_failure_reason(int rc,short revents) {
 }
 static void poll_diag_emit(struct writer_wait_state *st) {
     unsigned i;
-    if(st->diag_emitted)return;
+    if(st->diag_emitted || !st->disabled)return;
     st->diag_emitted=1;
     fprintf(stderr,"PARITY_POLL_FALLBACK reason=%s samples=%u immediate_ready=%u false_ready=%u\n",
             poll_reason_text(st->disable_reason),st->diag_count,
@@ -1251,7 +1251,6 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
                 if(++wait_state->false_ready>=3u && !wait_state->disabled){
                     wait_state->disabled=1;
                     wait_state->disable_reason=POLL_REASON_FALSE_READY_3;
-                    poll_diag_emit(wait_state);
                     if(probe)++probe->poll_fallbacks;
                 }
             }
@@ -1289,7 +1288,6 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
                 }
                 wait_state->disabled=1; /* permanent safe fallback this session */
                 wait_state->disable_reason=poll_failure_reason(poll_rc,pfd.revents);
-                poll_diag_emit(wait_state);
                 if(probe)++probe->poll_fallbacks;
             }
             if(probe){
@@ -1452,8 +1450,12 @@ static void *writer_main(void *arg) {
         /* EOF is acknowledged only after the writer-local block is committed. */
         if (queue_finished(w->queue)) break;
     }
+    /* Write the bounded trace at teardown, outside the device write deadline
+     * and moving picture path; status counters were updated per block. */
+    poll_diag_emit(&wait_state);
     return NULL;
 failed:
+    poll_diag_emit(&wait_state);
     g_stop=1; queue_stop(w->queue); shutdown(w->input_fd,SHUT_RDWR);
     return NULL;
 }
