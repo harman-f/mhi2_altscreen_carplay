@@ -231,6 +231,6 @@ assert (p2/'POLLWAIT2_README.md').is_file()
 workflow = Path('.github/workflows/build-direct-ts-parity.yml').read_text()
 assert '"$OUTDIR/pollwait-v2"' in workflow
 assert 'MU1440_POLL2_*.sh' in workflow
-assert 'pollwait-v2; sha256sum -c PAIR_SHA256SUMS.txt' in workflow
+assert 'pollwait-v2"; sha256sum -c PAIR_SHA256SUMS.txt' in workflow
 assert 'env.OUTDIR }}/pollwait-v2/' in workflow
 print('MU1440_POLL2_DIAG=PASS bounded fallback trace, immutable v1 baseline and isolated packaging')
