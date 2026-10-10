@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdint.h>
@@ -212,6 +213,12 @@ struct bridge_stats {
     uint64_t writer_eagain_syscall_us_total;
     uint64_t writer_eagain_sleep_us_total;
     uint64_t writer_success_syscalls;
+    uint64_t writer_poll_calls;
+    uint64_t writer_poll_ready;
+    uint64_t writer_poll_timeouts;
+    uint64_t writer_poll_fallbacks;
+    uint64_t writer_poll_wait_us;
+    uint64_t writer_poll_disabled;
     uint64_t writer_max_prepare_us;
     uint64_t writer_max_post_write_us;
     uint64_t null_packets;
@@ -252,6 +259,8 @@ struct writer_ctx {
 static volatile sig_atomic_t g_stop;
 static volatile sig_atomic_t g_stop_signal;
 static int g_status_enabled = 1;
+/* Deliberate runtime-only research opt-in, never enabled by SD scripts. */
+static int g_poll_wait_enabled = 0;
 static pthread_mutex_t g_status_publish_lock = PTHREAD_MUTEX_INITIALIZER;
 /* A 1Hz file-write budget shared by source and writer threads. */
 static pthread_mutex_t g_status_rate_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -957,6 +966,7 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
     fprintf(f,"pts_clock=source-derived-90khz\n");
     fprintf(f,"frame_pacer=none\n");
     fprintf(f,"transport_pacer=device_driver_backpressure_file_absolute\n");
+    fprintf(f,"eagain_wait=%s\n",g_poll_wait_enabled?"poll_experimental":"legacy_usleep_1000");
     fprintf(f,"transport_clock_model=accepted_12032_byte_blocks\n");
     fprintf(f,"hardware_drain_validation=required\n");
     fprintf(f,"last_emitted_pts90k=%llu\nemission_shift90k=0\n",
@@ -1083,6 +1093,10 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
         (unsigned long long)snap.writer_success_syscalls,
         (unsigned long long)snap.writer_max_prepare_us,
         (unsigned long long)snap.writer_max_post_write_us);
+    fprintf(f,"writer_poll_calls=%llu\nwriter_poll_ready=%llu\nwriter_poll_timeouts=%llu\nwriter_poll_fallbacks=%llu\nwriter_poll_wait_us=%llu\nwriter_poll_disabled=%llu\n",
+        (unsigned long long)snap.writer_poll_calls,(unsigned long long)snap.writer_poll_ready,
+        (unsigned long long)snap.writer_poll_timeouts,(unsigned long long)snap.writer_poll_fallbacks,
+        (unsigned long long)snap.writer_poll_wait_us,(unsigned long long)snap.writer_poll_disabled);
     fprintf(f,"null_packets=%llu\npat_packets=%llu\npmt_packets=%llu\npcr_packets=%llu\n",
         (unsigned long long)snap.null_packets,(unsigned long long)snap.pat_packets,
         (unsigned long long)snap.pmt_packets,(unsigned long long)snap.pcr_packets);
@@ -1117,10 +1131,28 @@ struct writer_timing_probe {
     uint64_t eagain_syscall_us;
     uint64_t eagain_sleep_us;
     uint64_t success_syscalls;
+    uint64_t poll_calls,poll_ready,poll_timeouts,poll_fallbacks,poll_wait_us;
 };
 
+/* Writer-thread only: disable POLLOUT polling for this session if unsupported
+ * or if the resource manager repeatedly reports immediately writable. */
+struct writer_wait_state {int enabled,disabled;unsigned immediate_ready;};
+
+/* Side-effect-free; the host C self-test checks all terminal branches. */
+static int poll_wait_should_disable(int rc,short revents,uint64_t elapsed_us,
+                                    unsigned *immediate_ready) {
+    if(rc==0){*immediate_ready=0;return 0;}
+    if(rc<0 || (revents&(POLLERR|POLLHUP|POLLNVAL)) ||
+       !(revents&POLLOUT))return 1;
+    if(elapsed_us<250u){
+        if(++(*immediate_ready)>=3u)return 1;
+    }else *immediate_ready=0;
+    return 0;
+}
+
 static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s,
-                      struct writer_timing_probe *probe) {
+                      struct writer_timing_probe *probe,
+                      struct writer_wait_state *wait_state) {
     size_t off=0;
     uint64_t deadline = monotonic_us() + WRITE_TIMEOUT_US;
     while(off<n) {
@@ -1149,6 +1181,29 @@ static int write_full(int fd, const uint8_t *p, size_t n, struct bridge_stats *s
         if(w<0 && (saved_errno==EAGAIN||saved_errno==EWOULDBLOCK)){
             if (monotonic_us() >= deadline) { stats_add_u64(&s->write_errors,&s->lock,1); return -1; }
             stats_add_u64(&s->write_eagain,&s->lock,1);
+            if(wait_state && wait_state->enabled && !wait_state->disabled) {
+                struct pollfd pfd;
+                uint64_t poll_start=monotonic_us(),poll_end;
+                uint64_t remaining=poll_start<deadline ? deadline-poll_start : 0u;
+                int timeout_ms=remaining<2000u ? 1 : 2;
+                int poll_rc;
+                pfd.fd=fd;pfd.events=POLLOUT;pfd.revents=0;
+                poll_rc=poll(&pfd,1,timeout_ms);
+                poll_end=monotonic_us();
+                if(probe){
+                    ++probe->poll_calls;probe->poll_wait_us+=poll_end-poll_start;
+                    if(poll_rc==0)++probe->poll_timeouts;
+                    else if(poll_rc>0 && (pfd.revents&POLLOUT))++probe->poll_ready;
+                }
+                if(!poll_wait_should_disable(poll_rc,pfd.revents,
+                        poll_end-poll_start,&wait_state->immediate_ready)){
+                    /* Readiness is advisory: only a complete nonblocking
+                     * 12032-byte write constitutes driver acceptance. */
+                    continue;
+                }
+                wait_state->disabled=1; /* permanent safe fallback this session */
+                if(probe)++probe->poll_fallbacks;
+            }
             if(probe){
                 uint64_t sleep_start=monotonic_us();
                 usleep(1000);
@@ -1177,6 +1232,8 @@ static void *writer_main(void *arg) {
     uint8_t block[MOST_BLOCK_BYTES]; uint64_t packet_index=0;
     uint64_t epoch = monotonic_us(), max_device_write_us = 0;
     uint64_t previous_write_end=0;
+    struct writer_wait_state wait_state={0};
+    wait_state.enabled=g_poll_wait_enabled && !w->regular_file;
     pthread_mutex_lock(&w->clock->lock);
     w->clock->writer_epoch_us = epoch;
     pthread_mutex_unlock(&w->clock->lock);
@@ -1243,7 +1300,7 @@ static void *writer_main(void *arg) {
             }
             write_start = monotonic_us();
             if(write_full(w->fd,block,sizeof(block),w->stats,
-                          g_status_enabled ? &probe : NULL)!=0) goto failed;
+                          g_status_enabled ? &probe : NULL,&wait_state)!=0) goto failed;
             write_end = monotonic_us();
             write_us = write_end - write_start;
             previous_write_end = write_end;
@@ -1258,6 +1315,12 @@ static void *writer_main(void *arg) {
                 w->stats->writer_eagain_syscall_us_total+=probe.eagain_syscall_us;
                 w->stats->writer_eagain_sleep_us_total+=probe.eagain_sleep_us;
                 w->stats->writer_success_syscalls+=probe.success_syscalls;
+                w->stats->writer_poll_calls+=probe.poll_calls;
+                w->stats->writer_poll_ready+=probe.poll_ready;
+                w->stats->writer_poll_timeouts+=probe.poll_timeouts;
+                w->stats->writer_poll_fallbacks+=probe.poll_fallbacks;
+                w->stats->writer_poll_wait_us+=probe.poll_wait_us;
+                w->stats->writer_poll_disabled=wait_state.disabled?1u:0u;
                 if(prep_us>w->stats->writer_max_prepare_us)
                     w->stats->writer_max_prepare_us=prep_us;
                 if(post_write_us>w->stats->writer_max_post_write_us)
@@ -1524,6 +1587,19 @@ static int host_self_test(void) {
             status_publish_allowed(1700000ull,2) ||
            !status_publish_allowed(2600000ull,2))return 37;
     }
+    {
+        unsigned immediate=0u;
+        if(poll_wait_should_disable(0,0,2000u,&immediate)||immediate)return 38;
+        if(poll_wait_should_disable(1,POLLOUT,1200u,&immediate)||immediate)return 39;
+        if(poll_wait_should_disable(1,POLLOUT,50u,&immediate)||immediate!=1u)return 40;
+        if(poll_wait_should_disable(1,POLLOUT,50u,&immediate)||immediate!=2u)return 41;
+        if(!poll_wait_should_disable(1,POLLOUT,50u,&immediate)||immediate!=3u)return 42;
+        immediate=0u;
+        if(!poll_wait_should_disable(1,POLLNVAL,0u,&immediate))return 43;
+        if(!poll_wait_should_disable(1,POLLERR|POLLOUT,500u,&immediate))return 44;
+        if(!poll_wait_should_disable(-1,0,0u,&immediate))return 45;
+        if(poll_wait_should_disable(1,POLLOUT,250u,&immediate)||immediate)return 46;
+    }
     fprintf(stdout,"PARITY_SELFTEST=PASS\n");return 0;
 }
 
@@ -1547,7 +1623,13 @@ int main(int argc,char **argv) {
     signal(SIGINT,on_signal);signal(SIGTERM,on_signal);signal(SIGHUP,on_signal);
     g_status_enabled=load_status_enabled();
     if(!g_status_enabled)(void)unlink(STATUS_PATH);
+    {
+        const char *opt=getenv("MIBR_PARITY_EAGAIN_WAIT");
+        g_poll_wait_enabled=!fixture_mode && opt && !strcmp(opt,"poll");
+    }
     fprintf(stderr,"PARITY_DIAGNOSTICS status=%s\n",g_status_enabled?"on":"off");
+    fprintf(stderr,"PARITY_BACKPRESSURE wait=%s gate=experimental\n",
+            g_poll_wait_enabled?"poll_opt_in":"legacy");
     memset(&clock,0,sizeof(clock));pthread_mutex_init(&clock.lock,NULL);clock.transport_pcr90k=TRANSPORT_PCR_BASE;
     memset(&stats,0,sizeof(stats));pthread_mutex_init(&stats.lock,NULL);stats.waiting_idr=1;
     queue_init(&queue);
