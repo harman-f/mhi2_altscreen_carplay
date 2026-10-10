@@ -362,6 +362,7 @@ jobs:
             ${{ env.OUTDIR }}/direct-ts-parity.sha256
             ${{ env.OUTDIR }}/parity-session
             ${{ env.OUTDIR }}/parity-session.sha256
+            ${{ env.OUTDIR }}/clockdiag-v1/
             ${{ env.OUTDIR }}/SESSION_FILE.txt
             ${{ env.OUTDIR }}/SESSION_ELF_HEADER.txt
             ${{ env.OUTDIR }}/BUILDINFO.txt
