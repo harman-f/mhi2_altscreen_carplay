@@ -24,7 +24,7 @@ for needle in (
     "diag_source_rewinds=",
     "diag_input_fps_x100=",
     "now-g_status_last_us>=1000000ull",
-    "status!=g_status_last_state",
+    "state!=g_status_last_state",
 ):
     assert needle in writer, needle
 assert writer.count("diag_note_au(&stats,monotonic_us()") == 1
