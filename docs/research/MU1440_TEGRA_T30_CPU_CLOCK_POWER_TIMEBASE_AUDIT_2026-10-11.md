@@ -6,6 +6,23 @@
 
 **Exact reference:** `MHI2_ER_SKG13_P4526_MU1440`; QNX Neutrino 6.5.0; NVIDIA Tegra T30 (`nVidia_Tegra2(T30)_Boards armle` BSP identification); four online Cortex-A9 cores; direct CarPlay Type-111 -> H.264 -> MPEG-TS -> MOST150 -> AID10-class Virtual Cockpit. **Status:** exact-target live/read-only + exact-target offline binary analysis + comparison literature + explicitly marked hypotheses. No overclock was attempted.
 
+## Navigation and subsequent exact-target findings (R4–R14)
+
+**Start here for the CPU/overclocking research.** Sections below preserve the original R0–R3 live/static evidence as recorded on 2026-10-11. The *later* source-specific studies extend it; a previously open question is not still open if a linked later audit has closed that particular point. Evidence labels remain distinct: stock vehicle-readout, original-binary/static, offline wrapper roundtrip, and NOT validated on a modified boot or live overclock.
+
+| If you need to understand... | Read this exact source | Relation to this overview |
+| --- | --- | --- |
+| Measured stock 900 MHz, driver getters, 450-MHz qtime, temperature, generic NVIDIA parameter ceilings and CarPlay/VC load | **This consolidated R0–R3 report** | Original system baseline; 1.7-GHz library value is not a qualified operating point |
+| Board SKU/RAM strap and why `RAM_CODE=2` is not a known BCT SDRAM profile | [R4 SKU](MU1440_TEGRA_SKU_STATIC_AUDIT_R4_2026-10-11.md), [R5 RAM_CODE](MU1440_TEGRA_RAM_CODE_BOOT_MEMORY_CLOCK_AUDIT_R5_2026-10-11.md), [R6 memory-controller audit](MU1440_NVMEMCTRL_MC_ERROR_HANDLER_AUDIT_R6_2026-10-11.md) | Defines early boot/voltage/SDRAM uncertainty |
+| Original RAM map, startup-script/PMU handoff and later `clock_init` chronology | [R7 memory map](MU1440_QNX_ASINFO_BOOT_MEMORY_LAYOUT_AUDIT_R7_2026-10-11.md), [R8 script](MU1440_QNX_STARTUP_SCRIPT_PMU_HANDOFF_AUDIT_R8_2026-10-11.md), [R9 handoff](MU1440_QNX_CLOCK_INIT_STAGE2_IFS_AUDIT_R9_2026-10-11.md) | Distinguishes first-stage startup, QNX script, post-kernel clock initialization |
+| Exact post-kernel clock tables and the route from front API through daemon to Tegra clock backend | [R10 clock_init](MU1440_CLOCK_INIT_STATIC_AND_IFSLOADER_AUDIT_R10_2026-10-11.md), [R11 front/backend](MU1440_NVCLOCKAPI_FRONT_BACKEND_SPECIAL_CLOCK_AUDIT_R11_2026-10-11.md) | Confirms real clock-control capability but not safe live CPU/voltage retiming |
+| Location/provenance of the OEM first-stage startup and the absence of a validated original BCT | [R12 source audit](MU1440_BOOT_CHAIN_FIRST_STAGE_SOURCE_AUDIT_R12_2026-10-11.md) ([PR #38](https://github.com/harman-f/mhi2_altscreen_carplay/pull/38)) | Exact original 50/70 106,760-byte common startup; BCT remains open |
+| **Exact first-stage ARM instruction paths: PLLX read, CCLK selector and initial qtime = selected source / 2** | **[R13 ARM/XREF audit](MU1440_FIRST_STAGE_CPU_CLOCK_QTIME_XREF_AUDIT_R13_2026-10-11.md)** ([PR #40](https://github.com/harman-f/mhi2_altscreen_carplay/pull/40)) | Directly resolves the original qtime *initialization* dependency; dynamic recalibration, original pre-startup PLLX writer and electrical safety remain open |
+| Original **3-MiB Stage-1 wrapper**: formats, CRC, exact byte-identical original repack and inert one-byte offline test | [R13 packaging/NOR companion](MU1440_STAGE1_OEM_WRAPPER_ROUNDTRIP_AND_NOR_BOUNDARIES_2026-10-11.md) → [detailed Firmware Toolkit procedure on `main`](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/blob/main/docs/MU1440_STAGE1_OEM_OFFLINE_ROUNDTRIP.md) ([Toolkit PR #6 merged](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/pull/6)) | Proves **offline reconstruction**, NOT modified image boot/SWDL acceptance or a required full-64-MiB flash |
+| Existing private original Stage-1 variants, archived NOR provenance and **actual read-only CPU voltage source** still to collect | [R14 Codex data-only handoff, Issue #41](https://github.com/harman-f/mhi2_altscreen_carplay/issues/41) | Open collection task, **not** a completed NOR map, verified recovery, or CPU mV measurement |
+
+**Recommended reading order:** current report → R10/R11 (runtime setter) → R12 (exact OEM startup) → R13 (instruction-level initial clock/timebase) → Stage-1 packing/NOR companion and Toolkit guide → R14 data handoff. The runtime setting and permanent boot-image approaches are different hypotheses; no modified image or overclock has been approved for vehicle use.
+
 ## 0. Read this first — what is actually proven
 
 | Statement | Evidence class | Interpretation |
@@ -134,6 +151,8 @@ The 27,380-byte daemon is a QNX Resource Manager that exposes the `/dev/nvclock`
 
 On this unit `cat /dev/nvclock/clock_tree` displayed `0`; an output file contained 10 bytes. The wrapper suggests this is the print routine's return value rather than a serialized clock tree. The target shell lacks the usual Linux conveniences `od`, `hexdump`, `xxd`, `hd` and `busybox`; do not require them in vehicle-only diagnostics.
 
+**Later implementation trace:** [R11](MU1440_NVCLOCKAPI_FRONT_BACKEND_SPECIAL_CLOCK_AUDIT_R11_2026-10-11.md) independently follows the exact `clock_init → libnvclockapi.so → /dev/nvclock → devg-nvclock → libnvclockapi_impl.so` front-to-backend route and separates the default stock SCLK/HCLK/PCLK calls from possible CCLK/EMC backend handlers. [R10](MU1440_CLOCK_INIT_STATIC_AND_IFSLOADER_AUDIT_R10_2026-10-11.md) documents the original default clock table. These facts establish write-capable code paths, not an approved CPU tuning or automatic voltage/qtime adjustment.
+
 ## 5. Static reverse engineering: `libnvclockapi_impl.so`
 
 The 81,920-byte implementation library contains a concrete, hardware-affecting PLL control path. Key exported routines:
@@ -165,6 +184,8 @@ The internal configurator dereferences the per-source parameter block; one branc
 
 `NvQryClockSetMaxPLLClockSrcFreq` (`0x88b0–0x8bbb`) **also** reaches the same internal configurator. It is not an isolated software setting. The generic implementation is considerably more sophisticated than a naïve direct CAR register write, but external timing/voltage guarantees are not demonstrated.
 
+**Follow-up provenance:** [R8](MU1440_QNX_STARTUP_SCRIPT_PMU_HANDOFF_AUDIT_R8_2026-10-11.md) documents the original early `/dev/i2c5` handoff, and [R14 Issue #41](https://github.com/harman-f/mhi2_altscreen_carplay/issues/41) requests only already available original sources for a genuine *read-only* VDD_CPU measurement. The generic compiled `1200` return remains a stub constant, **not** measured voltage. No over-/undervolting path has been validated.
+
 ## 6. Power management: daemon versus stubbed Resource Manager
 
 `/sbin/devg-nvpower` (28,389 bytes) runs with no additional visible command-line arguments; a `pidin -p <pid> mem` snapshot had one thread and listed `libnvsku.so`, `libc.so.3` and `libm.so.2`, **not** `libnvclockapi_impl.so` or `libnvrm.so`. Static strings/control flow expose an I²C-facing PMU facility (binary defaults refer to `/dev/i2c5` and slave `0x5a`, not yet verified as the active board PMIC) and a configurable, optional `nvpm` CPU-management path referencing `/dev/nvt3pwr`.
@@ -193,6 +214,8 @@ Live `/dev/nvpower` enumeration:
 | `NvRmDfsGetClockUtilization` | `0x82a4` | Constant return |
 
 Do not describe the mere existence of `NvRmPmu*` or `NvRmDfs*` exports as validated DVFS on this QNX image. In particular, the `1200` constant must never be promoted to an actual measured CPU voltage.
+
+**Subsequent instruction-level resolution of initial setup (R13):** [the exact original first-stage ARM/XREF audit](MU1440_FIRST_STAGE_CPU_CLOCK_QTIME_XREF_AUDIT_R13_2026-10-11.md) directly traces `CAR+0xE0` PLLX read, `CAR+0x20` CCLK source selection and `qtime.cycles_per_sec = selected CPU source rate >> 1` with interrupt 27 during **boot initialization**. The stronger R13 result supersedes any implication below that the /2 dependency is based on numerical coincidence alone. **It does not demonstrate atomic dynamic timer recalibration after a live PLL change**, nor the early writer responsible for initial PLLX=900 MHz. See also [R12 OEM source provenance](MU1440_BOOT_CHAIN_FIRST_STAGE_SOURCE_AUDIT_R12_2026-10-11.md).
 
 ## 7. The most important blocker: QNX `ClockCycles()` / A9 Global Timer
 
@@ -250,6 +273,8 @@ CarPlay's own `GEN2`-negotiated maxFPS, source timestamp, optional direct-output
 
 In the tested shell `traceprinter`, `qcc`, `od`, `hexdump`, `xxd`, `hd` and `busybox` were unavailable. Modern Linux `nvidia-smi`, `tegrastats`, Linux cpufreq/governors and Jetson tooling are **not QNX 6.5 / Tegra T30 drop-in tools**. Porting a broad monitoring suite is unnecessary before exploiting existing read getters. The size-limited clock-tree virtual response yielding `0` is explained by the QNX wrapper (see `4), not evidence that the tree itself has no content.
 
+**Later handoff status:** A small private `mibr-tegradiag-r0.ksh` read-only shell prototype has been syntax-checked and simulated offline but **has not been run or validated on the Unit**; the proposed native QNX ARMLE implementation below is still a proposal. Voltage remains `UNAVAILABLE` until independently measured. R14's [original-data collection issue](https://github.com/harman-f/mhi2_altscreen_carplay/issues/41) is separate from instrument development.
+
 ## 10. Proposed research-only tooling
 
 ### `mibr-tegradiag` R0 (safe, not yet implemented or vehicle-tested)
@@ -269,6 +294,8 @@ mibr-tegradiag export
 ### `mibr-tegraclock` R0 (read-only capability audit, not yet implemented)
 
 `status`, `capabilities` and `verify` only. No ``echo value > setter`` examples or write-enabled payload should be distributed. Separate entirely from Stream-111 runtime so it cannot silently affect normal CarPlay or the stock multimedia firmware.
+
+**Current follow-up gates:** R12 establishes exact first-stage source, R13 directly establishes the **initial** CPU-to-qtime /2 path, and the original /50/ 3-MiB wrapper has passed an [exact byte-identical offline roundtrip](MU1440_STAGE1_OEM_WRAPPER_ROUNDTRIP_AND_NOR_BOUNDARIES_2026-10-11.md). Remaining gates are the original pre-startup PLLX writer, dynamic timebase/clocksource behavior, actual read-only VDD_CPU source, unknown wrapper integrity fields, exact-unit NOR/recovery mapping and modified-image acceptance. Existing backups and variant-/70/ validation are delegated as **data collection only** in [R14 Issue #41](https://github.com/harman-f/mhi2_altscreen_carplay/issues/41). Do not infer physical flash safety from a successful host-side unpack/repack.
 
 ## 11. Next gates, explicitly ordered
 
@@ -309,6 +336,6 @@ Take matched A (idle), B (main-display CarPlay only), C (CP+live VC 111) snapsho
 
 **External:** [Toradex industrial CPU/GPU/memory and voltage points](https://developer.toradex.com/windows-ce/knowledge-base/apaliscolibri-t30-temperature-monitoring/); [Toradex T30 per-core DVFS limits](https://developer.toradex.com/software/linux-resources/linux-features/cpu-frequency-and-dvfs-linux/); [Toradex Apalis T30 datasheet](https://docs.toradex.com/101024-apalis-t30-datasheet.pdf); [ARM Cortex-A9 MPCore TRM](https://developer.arm.com/documentation/ddi0407/h/); [QNX ClockCycles](https://qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_lib_ref/c/clockcycles.html). External module specs illustrate **other products**, not exact MU1440 approval.
 
-**Project:** [research index](README.md); [firmware profile map](MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md); [direct VC video path](../architecture/DIRECT_VC_VIDEO_PATH.md); [source frame-rate evidence](../findings/DIRECT_STREAM_FRAME_RATE_2026-09-27.md); [runtime/FPS controls](../architecture/ADVANCED_RUNTIME_SWITCHES.md); [native Most20FPS provenance](../../THIRD_PARTY/Most20FPS/README.md); [publication privacy](../PUBLICATION_PRIVACY.md).
+**Project / follow-ups:** [research index](README.md); [R12 OEM first-stage source](MU1440_BOOT_CHAIN_FIRST_STAGE_SOURCE_AUDIT_R12_2026-10-11.md); [R13 original ARM PLLX/qtime](MU1440_FIRST_STAGE_CPU_CLOCK_QTIME_XREF_AUDIT_R13_2026-10-11.md); [R13 exact Stage-1 packaging/NOR audit](MU1440_STAGE1_OEM_WRAPPER_ROUNDTRIP_AND_NOR_BOUNDARIES_2026-10-11.md); [Toolkit OEM repack guide](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/blob/main/docs/MU1440_STAGE1_OEM_OFFLINE_ROUNDTRIP.md); [R14 Codex source inventory issue](https://github.com/harman-f/mhi2_altscreen_carplay/issues/41); [firmware profile map](MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md); [direct VC video path](../architecture/DIRECT_VC_VIDEO_PATH.md); [source frame-rate evidence](../findings/DIRECT_STREAM_FRAME_RATE_2026-09-27.md); [runtime/FPS controls](../architecture/ADVANCED_RUNTIME_SWITCHES.md); [native Most20FPS provenance](../../THIRD_PARTY/Most20FPS/README.md); [publication privacy](../PUBLICATION_PRIVACY.md).
 
 **Audit lineage integrated here:** R0: daemon method mapping and stock getters; R1: exact clock library, PLLX parameter/configuration; R2: power daemon, libnvrm PMU/DFS stubs; R3: on-unit power-node and Global Timer/qtime read-only preflight. This consolidated report is the public handoff; no original vendor binaries or identifying local capture media are included.
