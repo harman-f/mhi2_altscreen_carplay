@@ -48,7 +48,15 @@ int alt111_zoom_context(struct alt111_zoom *z, uint64_t session,
     z->vc_map_focus = vc_map_focus;
     z->source_visible = source_visible;
     z->owner = current_owner;
-    if (!allowed(z)) discard(z);
+    if (!allowed(z)) {
+        discard(z);
+        /* Never resurrect stale proof after the projection or VC page changes.
+         * A later visibility recovery needs a NEW trusted focus/owner bind. */
+        if (!vc_map_focus || !source_visible || !current_owner) {
+            z->vc_map_focus = 0;
+            z->owner = 0;
+        }
+    }
     return ALT111_ZOOM_OK;
 }
 int alt111_zoom_polarity(struct alt111_zoom *z, uint64_t session, int positive_direction)
