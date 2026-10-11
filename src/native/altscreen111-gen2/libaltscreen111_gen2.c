@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include "alt111.h"
 #include "alt111_zoom.h"
+#include "alt111_zoom_adapter.h"
 #include "alt111_settings.h"
 #define ALT111_RECOVERY_POSIX 1
 #include "alt111_recovery.h"
@@ -4543,6 +4544,7 @@ static void altscreen111_init(void)
         publish_state("error");
         return;
     }
+    alt111_zoom_init(&g2_zoom);
     if(alt111_control_init(&g2_control,g2_profile.view_count)!=ALT111_OK){
         g_enabled=0;
         logf_u2("gen2 control init failed; disabled fail-closed");
