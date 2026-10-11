@@ -24,6 +24,8 @@ This directory collects research that is useful to contributors before it become
 
 - **[Consolidated baseline and navigation (R0–R14)](MU1440_TEGRA_T30_CPU_CLOCK_POWER_TIMEBASE_AUDIT_2026-10-11.md)** — measured four-core stock 900 MHz and 450-MHz qtime, genuine clock/power getters vs unvalidated voltage, CarPlay/VC load and a dated guide into R12/R13, the proven offline Stage-1 wrapper roundtrip, historical NOR boundaries and open R14 data collection. **Research only: no live overclock or boot qualification.**
 
+- **[TegraDiag R1: stock-only offline-prepared QNX reader and desktop analysis kit (2026-10-12)](MU1440_TEGRADIAG_R1_OFFLINE_PREP_2026-10-12.md)** — bounded known-getter recorder, 1–3-log CSV/JSON/Markdown comparison, nine parser tests and synthetic examples; private source kit archived and hashed. **Mock/syntax tested only; not yet QNX/vehicle-run, no VDD_CPU measurement or clock control.**
+
 ## Current cross-topic preview
 
 - [Current research preview — 2026-10-05](CURRENT_RESEARCH_PREVIEW_2026-10-05.md)
