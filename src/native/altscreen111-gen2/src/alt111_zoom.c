@@ -93,6 +93,30 @@ int alt111_zoom_encoder(struct alt111_zoom *z, uint64_t session,
     ++z->accepted;
     return ALT111_ZOOM_OK;
 }
+enum alt111_zoom_route alt111_zoom_route_map_action(
+    struct alt111_zoom *z, uint64_t session, unsigned semantic_action_verified,
+    int keyboard, int encoder_id, int signed_steps,
+    int extra, int effective_validity)
+{
+    int wanted;
+    /*
+     * A mere active source111 or raw DSI event is insufficient. This function
+     * is exclusively for a PROVEN wheel-origin semantic OEM map-zoom branch.
+     * All uncertainty and queue saturation leave the native branch intact.
+     */
+    if (!live(z, session) || semantic_action_verified != 1u ||
+        !allowed(z) || keyboard != 4 || encoder_id != 40 ||
+        extra != 0 || effective_validity != 1 ||
+        signed_steps == 0 || signed_steps < -ALT111_ZOOM_MAX_STEP ||
+        signed_steps > ALT111_ZOOM_MAX_STEP)
+        return ALT111_ZOOM_ROUTE_STOCK;
+    wanted = z->pending + signed_steps;
+    if (wanted > ALT111_ZOOM_BACKLOG || wanted < -ALT111_ZOOM_BACKLOG)
+        return ALT111_ZOOM_ROUTE_STOCK; /* never silently consume a detent */
+    return alt111_zoom_encoder(z, session, keyboard, encoder_id, signed_steps,
+                               extra, effective_validity) == ALT111_ZOOM_OK
+        ? ALT111_ZOOM_ROUTE_CARPLAY : ALT111_ZOOM_ROUTE_STOCK;
+}
 int alt111_zoom_next(struct alt111_zoom *z, uint64_t session,
                      uint64_t now_ms, struct alt111_zoom_command *out)
 {
