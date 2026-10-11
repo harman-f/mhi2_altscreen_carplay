@@ -19,6 +19,29 @@ Physical input measured from the user's private v1.4 raw trace: right `(4,40,+1,
 
 Primary comparator: **omonob/MHI2-Carplay-Maps** (owner omonob/QCDWJ), specifically `MU1440_SKODA/790_AID10.5` common 8,431-byte Free790 control JAR; its `updateKey2` KEY38/39-only bridge does not observe physical right-roller rotations. Other distinct architecture references are `Allemon/mib2-carplay-rgi-altscreen` and `yuedizhibo/MHI2Q-CarPlay-AltScreen` (Audi MHI2Q, not a Škoda/MHI2 binary donor). Full verified raw mapping: `docs/research/keypanel/MU1440_F902_FIVE_INT_ENCODER_CAPTURE_2026-10-11.md` on main.
 
+## Steering wheel takeover: source111 is necessary, not the only predicate
+
+**User-requested target:** when the CarPlay map actually owns the VC navigation pane, use right-wheel detents for *CarPlay* zoom **instead of** simultaneously changing the native Škoda scale; on returning to the native map, original OEM zoom/menu/volume behavior returns immediately. The negotiated/ongoing AirPlay source111 can remain alive in both modes and must NOT by itself be interpreted as visible VC map ownership. Even a `shown_ack` response alone is not proof that the parity/DIRECT map is physically visible.
+
+Candidate effective gate:
+
+```text
+CarPlayZoomOwnership =
+  live matched source111 session/generation AND showUI acknowledged AND
+  valid/primed stream111 video AND actual Parity DIRECT visual/payload owner AND
+  verified VC NAVIGATION/MAP focus (not an open VC menu) AND
+  independently calibrated signed-detent direction
+```
+
+**Observation seam versus selective suppression seam are distinct.** Passive `DSIKeyPanel.updateEncoder2(4,40,+/-1,0,1)` may identify the physical detent and prove its origin. Its global listener fan-out is NOT to be stopped: the right wheel can also scroll the stock AID menu and other consumers must remain intact. Only when an exact-target *semantic native map-scale side-effect* has been independently traced and wheel-origin correlated may the narrowly chosen pre-native-zoom branch use `alt111_zoom_route_map_action(..., semantic_action_verified=1,...)` to choose:
+
+- `ALT111_ZOOM_ROUTE_CARPLAY`: the bounded queue accepted the right-wheel detent under the complete current gate. Skip **only the actual native map-scale mutation/overlay side effect** at that proven OEM branch; preserve unrelated listener dispatch, protocol notification/confirmation, BAP request handling and required ACK/status.
+- `ALT111_ZOOM_ROUTE_STOCK`: execute stock native branch unchanged on inactive/hidden source111, native STOCK selected, VC menu, unknown focus, stale session, unrelated control, invalid step, missing semantic provenance, queue saturation or missing sender.
+
+The pure C99 `alt111_zoom_route_map_action()` and host regressions implement **this choice** but **do not locate/hook the real Škoda branch**. It must be invoked as the **one zoom-intent ingress**, not in addition to `alt111_zoom_encoder()` for the same detent (otherwise duplicate CarPlay zoom). `mibr_alt111_zoom_observe_encoder2` in v1 is a proposed separate candidate ingress only, currently has no caller; final integration must select one authoritative event path. The return value `CARPLAY` means *queued*, NOT that AirPlay / iPhone app completed a visual zoom; if actual app rejects a command after queue acceptance, later native fallback requires its own studied UX policy. Do not globally skip `super.setMapScale`: Audi Allemon's stock `super` currently causes the double-map-zoom behaviour precisely because it delegates the full native operation. No exact MU1440 equivalent is proven yet.
+
+**Safe switchback:** on owner STOCK, missing 111 video, VC page/menu transition, failed focus proof, repeated setup or session end, immediately disable future CarPlay zoom, discard queued detents and preserve normal stock dispatch. A previously handed-off asynchronous AirPlay command cannot be retracted and its callback is generation-checked; do not claim zero-frame instantaneous switching. iPhone AirPlay/CarPlay session can remain alive if presentation ownership permits. No separate AirPlay sender, fifth media component, or extra MOST writer is introduced.
+
 ## What must happen BEFORE a usable vehicle build
 
 1. Pin/reconstruct exact MU1440 Java/J9 DSI listener service/instance and, without suppressing normal listeners, bridge physical `updateEncoder2` 4/40 signed ticks to *our existing* source111 owner via a reviewed cross-process ingress. An exported native C function is **not itself an inter-process transport from Java**. Do not repackage or install a third-party JAR alongside our live Parity path.
