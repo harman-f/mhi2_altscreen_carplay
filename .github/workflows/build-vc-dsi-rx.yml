@@ -41,6 +41,14 @@ jobs:
             src/native/vc_trace/mibr_dsi_rx.c \
             -o tests/vc-trace/mibr-dsi-rx-host
           python3 tests/vc-trace/test_r2.py
+          gcc -O2 -std=gnu99 -Wall -Wextra -Werror \
+            src/native/vc_trace/mibr_fileeq.c -o build/vc-fileeq-host
+          printf 'same\000\n' > build/vc-eq1
+          cp build/vc-eq1 build/vc-eq2
+          build/vc-fileeq-host build/vc-eq1 build/vc-eq2
+          printf 'diff' > build/vc-eq2
+          if build/vc-fileeq-host build/vc-eq1 build/vc-eq2; then exit 71; fi
+          echo FILEEQ_HOST=PASS
           python3 -m py_compile tools/prepare_vc_trace_r2.py tools/merge_vc_r2_timeline.py
           bash -n tools/build_vc_dsi_rx.sh
       - name: Build pinned QNX ARMv7 toolchain
@@ -93,15 +101,25 @@ jobs:
           grep -Eq 'Machine:.*ARM' build/vc-dsi-rx/ELF.txt
           grep -Eq 'Class:.*ELF32' build/vc-dsi-rx/ELF.txt
           grep -Eq 'ELF 32-bit.*ARM' build/vc-dsi-rx/file.txt
-          sha256sum build/vc-dsi-rx/mibr-dsi-rx > build/vc-dsi-rx/SHA256SUMS.txt
+          file build/vc-dsi-rx/mibr-fileeq | tee build/vc-dsi-rx/fileeq-file.txt
+          docker run --rm --platform=linux/amd64 \
+            -v "$PWD:/src" -w /src "$IMAGE" \
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h build/vc-dsi-rx/mibr-fileeq \
+            > build/vc-dsi-rx/fileeq-ELF.txt
+          grep -Eq 'Machine:.*ARM' build/vc-dsi-rx/fileeq-ELF.txt
+          grep -Eq 'Class:.*ELF32' build/vc-dsi-rx/fileeq-ELF.txt
+          (cd build/vc-dsi-rx && sha256sum mibr-dsi-rx mibr-fileeq > SHA256SUMS.txt)
       - name: Upload research-only QNX artifact (NOT installation-ready)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mibr-vc-dsi-rx-R2-QNX65-ARMv7-WIP
           path: |
             build/vc-dsi-rx/mibr-dsi-rx
+            build/vc-dsi-rx/mibr-fileeq
             build/vc-dsi-rx/file.txt
             build/vc-dsi-rx/ELF.txt
             build/vc-dsi-rx/NEEDED.txt
             build/vc-dsi-rx/SHA256SUMS.txt
+            build/vc-dsi-rx/fileeq-file.txt
+            build/vc-dsi-rx/fileeq-ELF.txt
           if-no-files-found: error
