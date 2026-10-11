@@ -36,7 +36,7 @@ Do not enable all DSI scopes globally. **DO NOT install the staged files on the 
 ## Build + host regression
 
 ```sh
-cc -std=c99 -Wall -Wextra -Werror -O2 src/native/vc_trace/mibr_dsi_rx.c -o tests/vc-trace/mibr-dsi-rx-host
+cc -DMIBR_HOST_TEST -std=c99 -Wall -Wextra -Werror -O2 src/native/vc_trace/mibr_dsi_rx.c -o tests/vc-trace/mibr-dsi-rx-host
 python3 tests/vc-trace/test_r2.py
 ```
 
