@@ -3105,6 +3105,7 @@ static void gen2_publish_status(void)
     char b[8192],tmp[192];
     int fd, n;
     struct alt111_control cs;
+    struct alt111_zoom zs;
     struct alt111_video vs;
     struct alt111_resync rs;
     mibr_mode_state_t ms;
@@ -3125,6 +3126,7 @@ static void gen2_publish_status(void)
     unsigned i,reconnect_pending=0u,presentation_pending=0u,session_pending=0u;
     pthread_mutex_lock(&g2_core_lock);
     cs = g2_control;
+    zs = g2_zoom;
     vs = g2_video;
     rs = g2_resync;
     ms = g2_last_mode_state;
@@ -3229,6 +3231,21 @@ static void gen2_publish_status(void)
         ms.screen,ms.main_audio,ms.speech,ms.speech_detail,ms.phone,ms.turns,settings_status);
     if(n<=0)return;
     if((size_t)n>=sizeof(b))return;
+    {
+        int zn=snprintf(b+n,sizeof(b)-(size_t)n,
+            "\nzoom_session=%llu\nzoom_focus=%u\nzoom_source_visible=%u\nzoom_owner=%u\n"
+            "zoom_positive_is_in=%d\nzoom_pending=%d\nzoom_in_flight=%u\n"
+            "zoom_accepted=%llu\nzoom_rejected=%llu\nzoom_dropped=%llu\n"
+            "zoom_submitted=%llu\nzoom_completed=%llu\nzoom_failed=%llu\nzoom_stale=%llu\n",
+            (unsigned long long)zs.session,zs.vc_map_focus,zs.source_visible,zs.owner,
+            zs.positive_direction,zs.pending,zs.in_flight,
+            (unsigned long long)zs.accepted,(unsigned long long)zs.rejected,
+            (unsigned long long)zs.dropped,(unsigned long long)zs.sent,
+            (unsigned long long)zs.completed,(unsigned long long)zs.failed,
+            (unsigned long long)zs.stale);
+        if(zn<0 || (size_t)zn>=sizeof(b)-(size_t)n)return;
+        n+=zn;
+    }
     pthread_mutex_lock(&g2_status_lock);
     snprintf(tmp,sizeof(tmp),"%s.new.%ld",g2_status_path,(long)getpid());
     fd=open(tmp,O_WRONLY|O_CREAT|O_TRUNC,0644);
