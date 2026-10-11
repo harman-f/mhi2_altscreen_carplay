@@ -1,5 +1,6 @@
 #!/bin/ksh
-# Two independent receive-only loggers, one shared QNX CLOCK_MONOTONIC domain.
+# Keypanel receives only; DSI sends exclusively OEM VersionInfo and >OK< handshake.
+# Both loggers timestamp received chunks in the same QNX CLOCK_MONOTONIC domain.
 set -u
 ROOT=$(pwd) || exit 2
 case "$ROOT" in /net/mmx/fs/sda0/*|/net/mmx.mibhigh.net/fs/sda0/*) ;; *) echo 'CAPTURE=FAIL not_in_sd_directory'; exit 2 ;; esac
