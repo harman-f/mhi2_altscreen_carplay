@@ -9,7 +9,7 @@ This is a static research result. No firmware was executed, and no live unit, fl
 
 ## Executive findings
 
-- The 106,760-byte raw ARM startup payload is the `/memory/startup` region in the exact MU1440 QNX first-stage kernel image. The extracted bytes match the R7 ASINFO memory interval exactly and are identical in Stage-1 package variants 50 and 70.
+- The 106,760-byte QNX startup region is the `/memory/startup` span in the exact MU1440 first-stage image. It begins with a 256-byte `startup_header`; it is not uniformly executable code. The header-declared entry point and segment arithmetic validate against the R7 ASINFO bounds in both Stage-1 variants 50 and 70.
 - Static markers place early PLL/clock and QNX timer/qtime setup plausibly in this startup. Instruction-level disassembly and register/XREF tracing have not yet established the source of `PLLX0=900 MHz` or the register path behind `qtime=450 MHz` / interrupt 27.
 - The inspected full update archive has no standalone BCT-named member. The byte-identical Quickboot files are unvalidated selector candidates, not established BCTs. The inspected Unit filesystem export has no raw NOR/mNAND boot-storage image.
 - No SDRAM profile table or mapping from physical `RAM_CODE=2` to an `SDRAM[n]` entry was recovered. In particular, this audit does **not** infer `SDRAM[2]`.
@@ -43,15 +43,29 @@ The independent Unit source is a filesystem export, not a raw boot-storage dump.
 
 The existing successful extraction run records the toolkit commit and decoder/module hashes in its manifest. The 6,841,260-byte decoded Stage-1 kernels and 6,734,492-byte inner ImageFS outputs were reused and copied to the private handoff. For each variant, kernel bytes `[0x1A110, end)` are byte-identical to its corresponding ImageFS. The common prefix `[0, 0x1A110)` is 106,768 bytes and is identical between variants.
 
-The startup payload is kernel bytes `[0x8, 0x1A110)`:
+The QNX startup region is kernel bytes `[0x8, 0x1A110)`, length 106,760, SHA-256 `9a7d54a69a5672cf13e532b262670b3ab4146d1e4d942b6cd2424a346a223b39`; both package variants contain identical bytes. Header fields were parsed using the QNX 6.5 `startup_header` layout documented by [QNX IPL documentation](https://get.qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_building/load_process.html) and the [QNX 6.5 `mkifs` image-layout reference](https://www.qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_utilities/m/mkifs.html). The file offset below is relative to the decoded Stage-1 kernel; header offsets are relative to the startup-header start at kernel offset `0x8`.
 
-- Length: 106,760 bytes
-- SHA-256: `9a7d54a69a5672cf13e532b262670b3ab4146d1e4d942b6cd2424a346a223b39`
-- Same bytes and hash in variants 50 and 70
-- Address interval recorded by R7: `0x80A00808–0x80A1A90F`
-- Immediately following R7 region: `/memory/imagefs` begins at `0x80A1A910`
+| Header field | Value | Header offset |
+|---|---:|---:|
+| `signature` | `0x00FF7EEB` (little-endian bytes) | `0x00` |
+| `version` | `1` | `0x04` |
+| `flags1 / flags2` | `0x01 / 0x00` (raw values) | `0x06 / 0x07` |
+| `header_size` | `0x100` (256 bytes) | `0x08` |
+| `machine` | `40` (`EM_ARM`) | `0x0A` |
+| `startup_vaddr` | `0x80A06B40` | `0x0C` |
+| `paddr_bias` | `0` | `0x10` |
+| `image_paddr / ram_paddr` | `0x80A00808 / 0x80A00808` | `0x14 / 0x18` |
+| `ram_size / stored_size` | `0x006863A4 / 0x006863A4` | `0x1C / 0x24` |
+| `startup_size` | `0x0001A108` (106,760 bytes) | `0x20` |
+| `imagefs_paddr` | `0` (IPL-populated field in the image) | `0x28` |
+| `imagefs_size` | `0x0066C29C` (6,734,492 bytes) | `0x2C` |
+| `preboot_size` | `8` bytes | `0x30` |
 
-The size, file boundary, and memory boundary agree exactly. The payload is raw ARM startup code rather than an ELF object with symbol metadata. The first eight kernel bytes are a separate preamble and were not included in the payload slice.
+The eight bytes at kernel offset `[0,0x8)` are therefore the QNX boot prefix before the header, not part of the header or the declared startup entry. Header offset zero is kernel file offset `0x8`. Consistency checks pass for both variants: `startup_size + imagefs_size = stored_size`; `stored_size = kernel_file_size - preboot_size`; and the decoded ImageFS starts at kernel offset `0x1A110`, exactly `preboot_size + startup_size`. This is also R7's `/memory/startup` interval `0x80A00808–0x80A1A90F`, immediately followed by `/memory/imagefs` at `0x80A1A910`.
+
+With `paddr_bias=0`, the header maps its declared `startup_vaddr` to startup-region-relative offset `0x80A06B40 - 0x80A00808 = 0x6338`. The corresponding original kernel file offset is `preboot_size + 0x6338 = 0x6340`; it is ARM-aligned and lies after the `0x100)-byte header and before `startup_size). In both variants, a read-only ARM-mode disassembly at that declared VMA begins with `mrs`, `bic`, `orr`, `msr`, and CP15 `mrc` instructions; subsequent instructions establish the initial stack and call a target inside the same startup region. This validates the header-declared executable entry, not every byte in the startup span.
+
+QNX documents the bootable image as boot prefix, startup header, startup code/data, startup trailer, then image header/files. The available fields delimit the full startup region and the ImageFS boundary, but do not by themselves distinguish internal code, literal/data pools, and the startup-checksum trailer. Those internal sub-bounds remain unresolved here. No full-span disassembly is implied.
 
 The variant-70 `/proc/boot/startup.script` is 4,828 bytes, SHA-256 `055fda81956df20d0a9b00e90a5590d9b85cec4c40d5579b68d10f5a74b84e20`; it matches the independent Unit-export copy and R8. This binary-encoded QNX script is distinct from the recovered first-stage startup code. The Unit-export `clock_init` is 12,894 bytes, SHA-256 `14f98073333c0ee6200384ae54f10e883213183ecf55a4c59bb27c0257439cda`, and matches the R10 evidence.
 
@@ -71,7 +85,7 @@ Static ASCII-marker locations in the decoded kernel are consistent with early cl
 | qtime structure/diagnostic vocabulary | `0x1604C` |
 | Timer validation diagnostic | `0x1682C` |
 
-These are string-marker locations, not instruction addresses. They support the conclusion that early clock/PLL and qtime/timer setup plausibly reside in the recovered startup. They do not prove a particular PLL write, frequency, timer source, or execution path. The startup payload has not yet had instruction-level ARM disassembly and XREF tracing.
+These are string-marker locations, not instruction addresses. They support the conclusion that early clock/PLL and qtime/timer setup plausibly reside in the startup region. The entry was decoded only to validate its location and ARM execution; the clock/timer routines have not yet had instruction-level XREF/call-graph analysis. The markers do not prove a particular PLL write, frequency, timer source, or execution path.
 
 R10/R11 remain important boundaries: the later stock `clock_init` path directly invokes SCLK/HCLK/PCLK, while separate backend CCLK/EMC capability is not proof those handlers ran in the stock path. Neither record establishes the startup's exact `PLLX0` origin.
 
