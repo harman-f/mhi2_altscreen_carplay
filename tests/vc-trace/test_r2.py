@@ -33,7 +33,7 @@ try:
 except ValueError: pass
 else: raise AssertionError('missing extension must fail closed')
 
-with tempfile.TemporaryDirectory(prefix='vc-r2-', dir='/mnt/data/') as td:
+with tempfile.TemporaryDirectory(prefix='vc-r2-') as td:
     out=Path(td)
     port_sock=socket.socket()
     port_sock.bind(('127.0.0.1',0))
