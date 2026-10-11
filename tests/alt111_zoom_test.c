@@ -55,8 +55,13 @@ static void test_gating_and_reversal(void)
     assert(z.pending==0);
     assert(alt111_zoom_encoder(&z,81,4,40,2,0,1)==ALT111_ZOOM_OK);
     assert(alt111_zoom_context(&z,81,0,1,1)==ALT111_ZOOM_OK);
-    assert(z.pending==0);
+    assert(z.pending==0 && z.vc_map_focus==0 && z.owner==0);
+    /* Reacquired picture is not renewed focus/owner proof. */
+    assert(alt111_zoom_context(&z,81,z.vc_map_focus,1,z.owner)==ALT111_ZOOM_OK);
+    assert(alt111_zoom_encoder(&z,81,4,40,1,0,1)==ALT111_ZOOM_WAIT);
     assert(alt111_zoom_next(&z,81,500,&c)==ALT111_ZOOM_WAIT);
+    context(&z,81);
+    assert(alt111_zoom_encoder(&z,81,4,40,1,0,1)==ALT111_ZOOM_OK);
 }
 static void test_bounds_session_and_failure(void)
 {
