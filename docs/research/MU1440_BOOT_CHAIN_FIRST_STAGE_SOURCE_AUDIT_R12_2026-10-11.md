@@ -7,6 +7,8 @@
 
 This is a static research result. No firmware was executed, and no live unit, flash, clock, EMC, or PMIC operation was performed. No overclocking was attempted. This audit does not authorize a clock change or vehicle test.
 
+> **Later work (not part of the original R12-only evidence):** Follow the [consolidated CPU/overclocking research map](MU1440_TEGRA_T30_CPU_CLOCK_POWER_TIMEBASE_AUDIT_2026-10-11.md) and [R13 exact startup ARM/XREF analysis](MU1440_FIRST_STAGE_CPU_CLOCK_QTIME_XREF_AUDIT_R13_2026-10-11.md) for direct proof of PLLX register reading, CCLK source selection and **initial** qtime CPU-rate/2 setup. The [separate exact OEM wrapper roundtrip/NOR audit](MU1440_STAGE1_OEM_WRAPPER_ROUNDTRIP_AND_NOR_BOUNDARIES_2026-10-11.md) and [Toolkit guide on `main`](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/blob/main/docs/MU1440_STAGE1_OEM_OFFLINE_ROUNDTRIP.md) cover offline 3-MiB reconstruction. [R14 Issue #41](https://github.com/harman-f/mhi2_altscreen_carplay/issues/41) tracks outstanding original backup and voltage-source collection. The original R12 conclusion that **no validated BCT was found** remains unchanged.
+
 ## Executive findings
 
 - The 106,760-byte QNX startup region is the `/memory/startup` span in the exact MU1440 first-stage image. It begins with a 256-byte `startup_header`; it is not uniformly executable code. The header-declared entry point and segment arithmetic validate against the R7 ASINFO bounds in both Stage-1 variants 50 and 70.
