@@ -114,6 +114,13 @@ int alt111_zoom_complete(struct alt111_zoom *z, uint64_t session,
         /* A reverse detent arriving during flight changes the desired target:
          * subtract the completed direction from the NEW pending target. */
         z->pending -= z->flight_sign;
+        if (z->pending > ALT111_ZOOM_BACKLOG) {
+            z->dropped += (uint64_t)(z->pending - ALT111_ZOOM_BACKLOG);
+            z->pending = ALT111_ZOOM_BACKLOG;
+        } else if (z->pending < -ALT111_ZOOM_BACKLOG) {
+            z->dropped += (uint64_t)(-ALT111_ZOOM_BACKLOG - z->pending);
+            z->pending = -ALT111_ZOOM_BACKLOG;
+        }
         ++z->completed;
     } else {
         ++z->failed;
