@@ -46,6 +46,25 @@ int alt111_zoom_polarity(struct alt111_zoom *z, uint64_t session,
 int alt111_zoom_encoder(struct alt111_zoom *z, uint64_t session,
                         int keyboard, int encoder_id, int signed_steps,
                         int extra, int effective_validity);
+/*
+ * Candidate semantic OEM map-scale interception policy, host-only until the
+ * exact MU1440 native zoom side-effect callsite and wheel-origin correlation
+ * are proven. Caller MUST invoke this at that one specific OEM zoom branch,
+ * never on the global DSI dispatcher. Preserve OEM BAP ACK/status and all
+ * other listeners; do not call alt111_zoom_encoder separately for the same
+ * detent. STOCK means execute original native zoom branch.
+ * CARPLAY means a zoom intent was accepted into our retained 111 queue and
+ * caller may skip ONLY the native zoom side effect. Submission is async; it
+ * is not proof the iPhone app visually zoomed.
+ */
+enum alt111_zoom_route {
+    ALT111_ZOOM_ROUTE_STOCK = 0,
+    ALT111_ZOOM_ROUTE_CARPLAY = 1
+};
+enum alt111_zoom_route alt111_zoom_route_map_action(
+    struct alt111_zoom *z, uint64_t session, unsigned semantic_action_verified,
+    int keyboard, int encoder_id, int signed_steps,
+    int extra, int effective_validity);
 int alt111_zoom_next(struct alt111_zoom *z, uint64_t session,
                      uint64_t now_ms, struct alt111_zoom_command *out);
 int alt111_zoom_complete(struct alt111_zoom *z, uint64_t session,
