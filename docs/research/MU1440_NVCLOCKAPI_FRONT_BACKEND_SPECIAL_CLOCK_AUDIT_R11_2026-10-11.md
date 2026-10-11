@@ -5,6 +5,8 @@
 
 Target: MHI2_ER_SKG13_P4526_MU1440, QNX 6.5, Tegra T30. Earlier context: [R10](MU1440_CLOCK_INIT_STATIC_AND_IFSLOADER_AUDIT_R10_2026-10-11.md), [R9](MU1440_QNX_CLOCK_INIT_STAGE2_IFS_AUDIT_R9_2026-10-11.md), [consolidated clock audit](MU1440_TEGRA_T30_CPU_CLOCK_POWER_TIMEBASE_AUDIT_2026-10-11.md).
 
+**Read next:** [consolidated clock/overclock navigation](MU1440_TEGRA_T30_CPU_CLOCK_POWER_TIMEBASE_AUDIT_2026-10-11.md) → [R12 original first-stage source](MU1440_BOOT_CHAIN_FIRST_STAGE_SOURCE_AUDIT_R12_2026-10-11.md) → [R13 first-stage PLLX read and qtime /2 proof](MU1440_FIRST_STAGE_CPU_CLOCK_QTIME_XREF_AUDIT_R13_2026-10-11.md) → [OEM Stage-1 roundtrip, SWDL/NOR boundaries](MU1440_STAGE1_OEM_WRAPPER_ROUNDTRIP_AND_NOR_BOUNDARIES_2026-10-11.md). This R11 audit is **the later running-system clock-API route**; it must not be confused with the earlier ARM QNX startup itself. For outstanding original voltage/backup data see [R14 Issue #41](https://github.com/harman-f/mhi2_altscreen_carplay/issues/41).
+
 ## 1. Matching private binary fingerprints
 
 | Binary | Bytes | SHA-256 |
