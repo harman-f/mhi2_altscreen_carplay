@@ -103,7 +103,7 @@ jobs:
             -DMIBR_SHA256_LIBRARY_ONLY \
             -Isrc/native/altscreen111-gen2/include -Isrc/native/alt111-settings/include \
             tests/alt111_gen2_settings_session_test.c \
-            src/native/altscreen111-gen2/src/alt111_{profile,control,policy,video,resync}.c \
+            src/native/altscreen111-gen2/src/alt111_{profile,control,policy,video,resync,zoom}.c \
             src/native/alt111-settings/settings_{core,posix}.c \
             src/native/sha256sum-compat/sha256sum_compat.c -ldl -pthread \
             -o /tmp/alt111-gen2-settings-session-test
