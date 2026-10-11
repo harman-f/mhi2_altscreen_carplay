@@ -6,6 +6,10 @@
 
 **Exact reference:** `MHI2_ER_SKG13_P4526_MU1440`; QNX Neutrino 6.5.0; NVIDIA Tegra T30 (`nVidia_Tegra2(T30)_Boards armle` BSP identification); four online Cortex-A9 cores; direct CarPlay Type-111 -> H.264 -> MPEG-TS -> MOST150 -> AID10-class Virtual Cockpit. **Status:** exact-target live/read-only + exact-target offline binary analysis + comparison literature + explicitly marked hypotheses. No overclock was attempted.
 
+### R15 follow-up to the original clock/boot/packaging research (2026-10-12)
+
+[Direct native original MMX fs0 /70/ Stage-1 and PT audit](MU1440_MMX_FS0_NATIVE_PT_AND_STAGE1_HEADER_CRC_R15_2026-10-12.md) **supersedes** the earlier historical-only Primary/Recovery geometry and the previously unknown outer header field at 0x7FC: exact original archived BACKUP-SNAPSHOT-06 PT directly establishes KERNEL_PRIMARY (3 MiB), separate KERNEL_RECOVERY (6 MiB), and the whole installed Primary equals the original /70/ SWDL module after only four transport-magic bytes differ. The installed 0x7FC word is directly CRC32(first 0x7FC bytes of ANDROID! header), confirmed on two installed kernels and both original OEM update headers after magic normalization. A separate original Recovery QNX kernel passes format/checksum checks. **This does not** identify the *current* vehicle's live NOR contents, authenticate a changed boot image, validate physical flash erase geometry, prove a recovery fallback, or solve safe live CPU voltage/qtime retiming. See [Toolkit source-detail PR #8](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/pull/8).
+
 ## Navigation and subsequent exact-target findings (R4–R14)
 
 **Start here for the CPU/overclocking research.** Sections below preserve the original R0–R3 live/static evidence as recorded on 2026-10-11. The *later* source-specific studies extend it; a previously open question is not still open if a linked later audit has closed that particular point. Evidence labels remain distinct: stock vehicle-readout, original-binary/static, offline wrapper roundtrip, and NOT validated on a modified boot or live overclock.
