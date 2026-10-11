@@ -1,5 +1,9 @@
 # MHI2 AltScreen CarPlay
 
+> [!NOTE]
+> **MU1440 Final Drive vehicle evidence update (2026-10-11).** The tested original v1 native pair is pinned; the parked observational drive showed a clean owner/native stock hand-back, two ViewAreas and an operator-verified reduced SafeArea. Rich navigation options were sent in GEN2 /info, while \`topAligned\` visibly moved Apple Maps arrival information toward the center. 40 FPS is only TEMP-configured so far, not proven renegotiated or physically displayed; zoom jitter, missing GEN2 status/showUI completion and untested v1.3/v1.4 script add-ons remain open. See [live checkpoint](docs/status/MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md), [exact switch matrix](docs/testing/MU1440_FINAL_DRIVE_SWITCH_MATRIX_2026-10-11.md), [zoom/fps A-B gate](docs/findings/MU1440_ZOOM_CADENCE_OBSERVATION_2026-10-11.md), and [SD artifact provenance](deployment/mu1440-final-drive-v1/PACKAGE_PROVENANCE_2026-10-11.md). This is a research/developer handoff, **not** a consumer release.
+
+
 **Open research and engineering for bringing CarPlay secondary-screen navigation to the Virtual Cockpit on Volkswagen Group MHI2 platforms.**
 
 > [!IMPORTANT]
