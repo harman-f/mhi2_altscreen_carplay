@@ -56,10 +56,11 @@ int main(int argc,char **argv) {
         help(argv[0]);return 2;
     }
     if(!out||!sec||out[0]!='/') {help(argv[0]);return 2;}
-    /* Explicit location guard. Never create or write in /tmp, flash or /dev/shmem. */
+    /* Production: SD only. Host CI uses an explicit compile-time switch. */
+#ifndef MIBR_HOST_TEST
     if(strncmp(out,"/net/mmx/fs/sda0/",17)!=0 &&
-       strncmp(out,"/net/mmx.mibhigh.net/fs/sda0/",29)!=0 &&
-       strncmp(out,"/mnt/data/",10)!=0) {fprintf(stderr,"Output path is not approved SD/host-test location\n");return 2;}
+       strncmp(out,"/net/mmx.mibhigh.net/fs/sda0/",29)!=0) {fprintf(stderr,"Output path is not approved SD location\n");return 2;}
+#endif
     struct stat st;if(stat(out,&st)||!S_ISDIR(st.st_mode)){perror("output directory");return 2;}
     if(snprintf(rawpath,sizeof rawpath,"%s/dsi-client-original.bin",out)>=(int)sizeof rawpath ||
        snprintf(indexpath,sizeof indexpath,"%s/dsi-chunks.tsv",out)>=(int)sizeof indexpath ||
