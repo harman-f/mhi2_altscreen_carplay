@@ -78,7 +78,8 @@ int main(void) {
     /* A fresh source session near rollover must accept signed wraparound.
      * The preceding test left an intentionally unmatched stale Tag56; a real
      * read idle period / reconnect expires that incomplete pair. */
-    alt111_spi_zoom_init(&s);\n    n=mkframe(f,sizeof f,2,0xfffffffbu,40,1,1,0);split(&s,f,n,&o);
+    alt111_spi_zoom_init(&s);
+    n=mkframe(f,sizeof f,2,0xfffffffbu,40,1,1,0);split(&s,f,n,&o);
     n=mkframe(f,sizeof f,4,5u,40,1,1,56);split(&s,f,n,&o);
     assert(o.n==12 && o.direction[11]==1 && s.matches==1);
     puts("alt111_zoom_debugspi host PASS: eleven real timestamp pairs, split MLP, negatives, wrap");
