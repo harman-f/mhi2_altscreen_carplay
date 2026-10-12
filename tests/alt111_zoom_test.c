@@ -133,12 +133,62 @@ static void test_native_zoom_selective_routing(void)
     assert(alt111_zoom_route_map_action(&z,55,1,4,40,1,0,1)==ALT111_ZOOM_ROUTE_STOCK);
 }
 
+
+/* Sanitized chronological evidence from native-41771151 / vc-r2-capture-41648264:
+ * five +1, then six -1 right-wheel detents. Each has one f904/tag56
+ * correlation and DSIBAP(50,45) indication/request/ack trio. Scale-like
+ * values are evidence only, not a proven OEM BAP units/field ABI.
+ *
+ * This exercises the *routing policy* with synthetic semantic_action_verified=1.
+ * It DOES NOT claim an exact MU1440 Java callsite or vehicle suppression.
+ */
+static void test_measured_eleven_scale_route(void)
+{
+    static const int signed_detent[11] =
+        { 1,1,1,1,1,-1,-1,-1,-1,-1,-1 };
+    static const int scale_like[11] =
+        { 4000,3000,2000,1500,1000,1500,2000,3000,4000,5000,7500 };
+    struct alt111_zoom z;
+    struct alt111_zoom_command cmd;
+    uint64_t now = 1000;
+    int i;
+    alt111_zoom_init(&z);
+    alt111_zoom_begin(&z, 91);
+    context(&z, 91);
+    for (i=0; i<11; ++i) {
+        if (i) {
+            if (signed_detent[i]>0) assert(scale_like[i]<scale_like[i-1]);
+            else assert(scale_like[i]>scale_like[i-1]);
+        }
+        /* One authoritative semantic route, not an extra raw encoder enqueue. */
+        assert(alt111_zoom_route_map_action(&z,91,1,4,40,
+                signed_detent[i],0,1)==ALT111_ZOOM_ROUTE_CARPLAY);
+        assert(z.pending==signed_detent[i]);
+        assert(alt111_zoom_next(&z,91,now,&cmd)==ALT111_ZOOM_OK);
+        assert(cmd.direction==(signed_detent[i]>0 ?
+                ALT111_ZOOM_IN:ALT111_ZOOM_OUT));
+        assert(alt111_zoom_complete(&z,91,cmd.request,1,now+1)==ALT111_ZOOM_OK);
+        assert(z.pending==0);
+        now+=150;
+    }
+    assert(z.accepted==11 && z.completed==11 && z.sent==11);
+    /* Same physical detent while the VC menu is active must remain OEM. */
+    assert(alt111_zoom_context(&z,91,0,1,1)==ALT111_ZOOM_OK);
+    assert(alt111_zoom_route_map_action(&z,91,1,4,40,1,0,1)==ALT111_ZOOM_ROUTE_STOCK);
+    assert(z.pending==0);
+    /* Returning to visible native/STOCK never consumes its map zoom. */
+    assert(alt111_zoom_context(&z,91,1,1,0)==ALT111_ZOOM_OK);
+    assert(alt111_zoom_route_map_action(&z,91,1,4,40,-1,0,1)==ALT111_ZOOM_ROUTE_STOCK);
+    assert(z.pending==0);
+}
+
 int main(void)
 {
     test_measured_twelve();
     test_gating_and_reversal();
     test_bounds_session_and_failure();
     test_native_zoom_selective_routing();
+    test_measured_eleven_scale_route();
     puts("alt111_zoom host PASS");
     return 0;
 }
