@@ -8,6 +8,13 @@ artifact is generated outside this repository or shared only in a chat.
 2. **Do not invoke external `printf` on the target.** Its absence is VEHICLE-PROVEN, repeatedly (including R17.1 MMX inventory). A passing Linux `bash -n`, `ksh -n` or mock PATH does NOT prove target command availability: the host shell may have a `printf` builtin. Use simple `echo` for simple constant/variable-prefixed lines; if exact formatting is needed, use a separately target-verified capability or stop.
 3. Do not assume bare stock `sha256sum` or `tee`, `sed`, `tr`, GNU `date` options, GNU tools/flags, `grep 'A\\|B'` alternation, or M.I.B. `apps/sbin` or `config/BASICS` layouts. Only invoke a bundled hash/tee helper with a verified explicit executable path. Scripted `awk` is permitted **when the exact program/host environment was validated**; multi-line interactive copy/paste is not.
 4. **MMX and RCC are independent QNX boards.** An MMX `/dev/nvclock`, sensor getter, mount path, command or observed startup frequency is NOT evidence that the same interface exists on RCC. Keep their scripts, evidence labels and logs separate. Unknown endpoint means inventory first, not guessed `cat`/writes.
+**Further live R17.2 evidence:** `date` failed with exit code 126 on the MMX
+even though the inventory/clock reads completed. Do not require it for target
+timestamps; `wall_time=NA` is an honest result. The two stock `nvtmon` raw
+text getters can omit a final newline, so always frame a section end with
+a deliberate plain `echo` separator and test a no-newline mock. RCC evidence
+must be measured independently.
+
 5. **Every command is a dependency.** Before handing over a target script (including private one-off ZIPs), write its command/option/read-path inventory, check it against the canonical contract, and run the repository host-side static gate on **every** target `.sh`/`.ksh` file:
    `python3 tools/check_mu1440_target_shell.py --self-test --check path/to/each-target-script.ksh`
    The gate is necessary, not sufficient; unavailable commands that it cannot recognize must still be checked explicitly. Include a negative fixture that would reproduce the bug; do not mark the artifact vehicle-tested until real QNX output is captured.
