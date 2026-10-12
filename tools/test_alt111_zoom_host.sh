@@ -8,3 +8,7 @@ trap 'rm -rf "$OUT"' EXIT
   -I"$SRC/include" "$SRC/src/alt111_zoom.c" tests/alt111_zoom_test.c \
   -o "$OUT/alt111_zoom_test"
 "$OUT/alt111_zoom_test"
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$SRC/include" "$SRC/src/alt111_zoom_debugspi.c" tests/alt111_zoom_debugspi_test.c \
+  -o "$OUT/alt111_zoom_debugspi_test"
+"$OUT/alt111_zoom_debugspi_test"
