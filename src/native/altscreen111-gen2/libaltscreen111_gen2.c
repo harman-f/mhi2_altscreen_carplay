@@ -19,6 +19,7 @@
 #include "alt111.h"
 #include "alt111_zoom.h"
 #include "alt111_zoom_adapter.h"
+#include "alt111_zoom_debugspi.h"
 #include "alt111_settings.h"
 #define ALT111_RECOVERY_POSIX 1
 #include "alt111_recovery.h"
@@ -370,6 +371,9 @@ static int g2_last_completion_status;
 static unsigned g2_command_ready;
 static pthread_t g2_control_thread;
 static pthread_t g2_output_thread;
+/* V1 optional, receive-only DebugSPI observation; manual parked-test arm only. */
+static pthread_t g2_zoom_spi_thread;
+static const char *g2_zoom_v1_arm = "/tmp/mibr-alt111-zoom-v1.enabled";
 static int g2_workers_started;
 static const char *g2_status_path = "/tmp/mibr-alt111-gen2.status";
 static const char *g2_reacquire_marker = "/tmp/mibr-alt111-gen2-reacquire";
@@ -3946,6 +3950,119 @@ static void *gen2_control_worker(void *arg)
     return NULL;
 }
 
+
+/*
+ * V1 PARALLEL Zoom proof, intentionally NOT the later exclusive interception.
+ * DebugSPI source 127.0.0.1:15001 is only read; no bytes are sent to it.
+ * One physical right detent is admitted only when correlated with the native
+ * zoom-specific f904/tag56 record (see private real 11-step dual session).
+ * That trace tag is NOT asserted to be an independently decoded Java method.
+ *
+ * IMPORTANT: The marker is a MANUAL parked-test arm, not automatic proof of
+ * visible VC ownership. V1 never alters stock listeners, BAP or scale; the
+ * native map WILL zoom as well. Unknown status means no CarPlay command.
+ */
+static void gen2_zoom_spi_clear(void)
+{
+    pthread_mutex_lock(&g2_core_lock);
+    if(g2_zoom.active)
+        (void)alt111_zoom_context(&g2_zoom,g2_zoom.session,0u,0u,0u);
+    pthread_mutex_unlock(&g2_core_lock);
+}
+static void gen2_zoom_spi_pair(void *opaque,uint32_t source_ms,int signed_detent)
+{
+    int rc=ALT111_ZOOM_WAIT;
+    uint64_t session=0;
+    unsigned ready;
+    (void)opaque;
+    /* Revocation is checked at the delivery point as well as in idle poll. */
+    if(access(g2_zoom_v1_arm,F_OK)!=0)return;
+    pthread_mutex_lock(&g2_core_lock);
+    session=g2_control_session;
+    ready=g2_command_ready && g2_zoom.active && session &&
+        g2_zoom.session==session &&
+        g2_control.active && g2_control.desired &&
+        g2_control.shown_ack && !g2_control.reacquiring &&
+        g2_video.active && g2_video.config_valid && g2_video.consumer_primed;
+    if(ready) {
+        /* Empirical private MU1440 native scale sequence:
+         * right +1 -> scale decreases -> zoom IN. The car/iPhone UX must
+         * still verify semantic AirPlay polarity in the bounded pilot. */
+        (void)alt111_zoom_polarity(&g2_zoom,session,1);
+        /* In V1, correlation with a native zoom action is the temporary
+         * per-detent map-focus predicate, and the explicitly armed test
+         * operator confirms visible DIRECT. Neither is a V2 owner feed. */
+        (void)alt111_zoom_context(&g2_zoom,session,1u,1u,1u);
+        rc=alt111_zoom_encoder(&g2_zoom,session,4,40,
+                               signed_detent,0,1);
+    }
+    pthread_mutex_unlock(&g2_core_lock);
+    if(rc==ALT111_ZOOM_OK)
+        logf_u2("GEN2 ZOOM V1 matched source_ms=%u detent=%d session=%llu mode=PARALLEL_NATIVE_UNCHANGED",
+                (unsigned)source_ms,signed_detent,(unsigned long long)session);
+}
+static void *gen2_zoom_spi_worker(void *arg)
+{
+    struct alt111_spi_zoom *decoder;
+    int fd=-1;
+    unsigned char chunk[8192];
+    (void)arg;
+    decoder=(struct alt111_spi_zoom*)calloc(1,sizeof(*decoder));
+    if(!decoder) {
+        logf_u2("GEN2 ZOOM V1: no decoder memory; inactive");
+        return NULL;
+    }
+    alt111_spi_zoom_init(decoder);
+    for(;;) {
+        fd_set rfds;
+        struct timeval tv;
+        int r;
+        if(access(g2_zoom_v1_arm,F_OK)!=0) {
+            if(fd>=0) {close(fd);fd=-1;}
+            alt111_spi_zoom_init(decoder);
+            gen2_zoom_spi_clear();
+            usleep(250000);
+            continue;
+        }
+        if(fd<0) {
+            struct sockaddr_in addr;
+            fd=socket(AF_INET,SOCK_STREAM,0);
+            if(fd<0){usleep(1000000);continue;}
+            memset(&addr,0,sizeof(addr));
+            addr.sin_family=AF_INET;
+            addr.sin_port=htons(15001u);
+            addr.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+            if(connect(fd,(struct sockaddr*)&addr,sizeof(addr))!=0) {
+                close(fd);fd=-1;usleep(1000000);continue;
+            }
+            alt111_spi_zoom_init(decoder);
+            logf_u2("GEN2 ZOOM V1 receive-only DebugSPI connected (no OEM writes)");
+        }
+        FD_ZERO(&rfds);FD_SET(fd,&rfds);
+        tv.tv_sec=0;tv.tv_usec=250000;
+        r=select(fd+1,&rfds,NULL,NULL,&tv);
+        if(r>0 && FD_ISSET(fd,&rfds)) {
+            ssize_t n=recv(fd,chunk,sizeof(chunk),0);
+            if(n<=0) {
+                close(fd);fd=-1;
+                alt111_spi_zoom_init(decoder);
+                gen2_zoom_spi_clear();
+                usleep(250000);
+            } else {
+                alt111_spi_zoom_feed(decoder,chunk,(size_t)n,
+                                     gen2_zoom_spi_pair,NULL);
+            }
+        } else if(r<0 && errno!=EINTR) {
+            close(fd);fd=-1;
+            alt111_spi_zoom_init(decoder);
+            gen2_zoom_spi_clear();
+            usleep(250000);
+        }
+    }
+    /* Infinite background observer, detached with process lifetime. */
+    return NULL;
+}
+
 static int gen2_start_workers(void)
 {
     if(g2_workers_started)return 0;
@@ -3954,6 +4071,11 @@ static int gen2_start_workers(void)
     if(pthread_create(&g2_output_thread,NULL,gen2_output_worker,NULL)!=0)return -1;
     pthread_detach(g2_output_thread);
     g2_workers_started=1;
+    /* Background worker is inert without the explicit volatile V1 marker.
+     * Failure is nonfatal for all stock/CarPlay video/media paths. */
+    if(pthread_create(&g2_zoom_spi_thread,NULL,gen2_zoom_spi_worker,NULL)==0)
+        pthread_detach(g2_zoom_spi_thread);
+    else logf_u2("GEN2 ZOOM V1 worker unavailable; zoom pilot disabled");
     return 0;
 }
 
