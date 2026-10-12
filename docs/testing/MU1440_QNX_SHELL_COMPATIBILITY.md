@@ -58,6 +58,26 @@ The guarded public developer package carries its own reproducibly built QNX ARMv
 
 Do not make either a vehicle runtime dependency. `sed` is missing on some older firmware trains, so the stable deployment removed its only required use in favor of stock `awk`. Earlier live-monitor work also had to remove `tr`.
 
+### R17.2 direct-MMX live evidence: `date` is not executable (2026-10-12)
+
+The actual R17.2 MMX inventory ran to `# FINISH status=COMPLETED`, but
+the optional timestamp section logged `date: cannot execute - No such file or
+directory` and `# END timestamp exit_code=126`. The TegraDiag recorder
+similarly produced valid numeric samples with `wall_time=NA`. **Do not make
+`date` (even without GNU options) a mandatory MMX diagnostic dependency.**
+Use sample ordinal and QNX syspage/qtime snapshots instead; a matching `RCC`
+command still requires independent RCC-side evidence.
+
+A second exact-target finding: `cat /dev/nvtmon/current` and
+`cat /dev/nvtmon/current_local` return bare numeric text without final newline
+(in this run `033` and `027`). The R17.2 shell collector concatenated
+`# END ...` directly onto those values. A target script must add an explicit
+plain `echo` separator **after** each command before the `# END` delimiter;
+a host parser must include no-trailing-newline device fixtures. The real samples
+remain usable; R17.2 host inventory parser's 2 section-boundary warnings reflect
+output framing, not a failed sensor getter. Never turn an optional section
+failure into an unconditional complete-success claim.
+
 ### GNU `date` behavior
 
 Do not assume GNU formatting/options. Runtime code uses the known RCC date path only as a best-effort
