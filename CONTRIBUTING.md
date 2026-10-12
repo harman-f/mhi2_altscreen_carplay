@@ -57,6 +57,19 @@ Please distinguish these explicitly:
 
 Do not promote a hypothesis to fact merely because multiple implementations appear similar.
 
+## Mandatory QNX target-script gate (MMX and RCC)
+
+Before adding or handing over any on-unit `.sh`/`.ksh` (including an ad-hoc
+private diagnosis ZIP), read [root AGENTS.md](AGENTS.md) and the
+[exact-target QNX compatibility document](docs/testing/MU1440_QNX_SHELL_COMPATIBILITY.md).
+Its vehicle-proven absence of external `printf` is an explicit prohibition; host Linux
+mock/syntax tests cannot establish target command availability. Execute
+`python3 tools/check_mu1440_target_shell.py --self-test --check <each-target-script>`
+on **every** extracted target file before delivery; inventory all commands/options
+and validate unknown RCC and MMX capabilities independently. Keep original error logs;
+do not publish a target-tested claim before a real-unit run. Existing repository CI
+cannot see private ZIPs; this explicit local gate closes that coverage gap.
+
 ## Pull Requests
 
 A PR should explain:
