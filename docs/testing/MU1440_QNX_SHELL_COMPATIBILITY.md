@@ -15,6 +15,10 @@ the exact board must subsequently confirm each unproven command/option and the o
 repository CI previously scanned only `deployment/mu1440` and `runtime`; a private R17.1 diagnostic
 bundle bypassed that scan, despite this file documenting absent external `printf`.
 
+## MMX versus RCC: verified operator routing and Codex direct SSH handoff (2026-10-12)
+
+The operator's already running **SSH login terminates directly on MMX**. Run MMX commands there directly; `on` is unnecessary for MMX and MUST NOT be blindly added around MMX diagnostics. M.I.B. Bash explicitly executes RCC-side programs **from MMX** using `on -f rcc <program> [args]`; see [upstream `esd/scripts/backupplus_rcc.sh`](https://github.com/CaneTLOTW/M.I.B._More-Incredible-Bash/blob/main/esd/scripts/backupplus_rcc.sh) (`on -f rcc /net/mmx/fs/sda0/apps/backupplus -rcc`) and [upstream `config/BASICS`](https://github.com/CaneTLOTW/M.I.B._More-Incredible-Bash/blob/main/config/BASICS) (`on -f rcc /net/rcc/usr/apps/modifyE2P`). First run a tiny read-only `on -f rcc uname -a` probe and independently confirm actual CPU/BSP; validate shell/SD visibility and output redirection before attempting a RCC diagnostic script. The M.I.B. README RCC port **123** and MMX port **23** are **Telnet/UART guidance** and must not be interpreted as SSH ports. A cloud Codex runner cannot be assumed to reach the operator's LAN: if existing authorized direct SSH is unavailable, stop and mark `BLOCKED_NO_LAN_SSH`. Never publish SSH keys/passwords or private host setup in a public issue. [R17.3 live-test task](https://github.com/harman-f/mhi2_altscreen_carplay/issues/43).
+
 ## Operator command rule
 
 For direct SSH copy/paste, use **one logical command per paste**.
