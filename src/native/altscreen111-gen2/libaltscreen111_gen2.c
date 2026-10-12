@@ -4054,6 +4054,10 @@ static void *gen2_zoom_spi_worker(void *arg)
                 alt111_spi_zoom_feed(decoder,chunk,(size_t)n,
                                      gen2_zoom_spi_pair,NULL);
             }
+        } else if(r==0) {
+            /* Source events must pair within 40 ms; one 250-ms idle poll
+             * expires partial pairs instead of leaving a stale Tag56 armed. */
+            decoder->have_wheel=decoder->have_tag=0;
         } else if(r<0 && errno!=EINTR) {
             close(fd);fd=-1;
             alt111_spi_zoom_init(decoder);
