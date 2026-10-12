@@ -12,6 +12,8 @@
 #include <stdarg.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
@@ -4021,7 +4023,7 @@ static void *gen2_zoom_spi_worker(void *arg)
             if(fd>=0) {close(fd);fd=-1;}
             alt111_spi_zoom_init(decoder);
             gen2_zoom_spi_clear();
-            usleep(250000);
+            usleep(1000000);
             continue;
         }
         if(fd<0) {
