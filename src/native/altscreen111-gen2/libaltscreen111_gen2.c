@@ -12,11 +12,16 @@
 #include <stdarg.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 #include "alt111.h"
+#include "alt111_zoom.h"
+#include "alt111_zoom_adapter.h"
+#include "alt111_zoom_debugspi.h"
 #include "alt111_settings.h"
 #define ALT111_RECOVERY_POSIX 1
 #include "alt111_recovery.h"
@@ -351,6 +356,8 @@ static pthread_mutex_t g2_status_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t g2_core_cv = PTHREAD_COND_INITIALIZER;
 static struct alt111_profile g2_profile;
 static struct alt111_control g2_control;
+/* Integrated control-plane zoom policy; no implicit vehicle input hook. */
+static struct alt111_zoom g2_zoom;
 static struct alt111_video g2_video;
 static struct alt111_resync g2_resync;
 static struct alt111_policy g2_policy;
@@ -366,6 +373,9 @@ static int g2_last_completion_status;
 static unsigned g2_command_ready;
 static pthread_t g2_control_thread;
 static pthread_t g2_output_thread;
+/* V1 optional, receive-only DebugSPI observation; manual parked-test arm only. */
+static pthread_t g2_zoom_spi_thread;
+static const char *g2_zoom_v1_arm = "/tmp/mibr-alt111-zoom-v1.enabled";
 static int g2_workers_started;
 static const char *g2_status_path = "/tmp/mibr-alt111-gen2.status";
 static const char *g2_reacquire_marker = "/tmp/mibr-alt111-gen2-reacquire";
@@ -3061,6 +3071,29 @@ static CFMutableDictionaryRef command_update_view(unsigned view)
     p_CFRelease(params); return req;
 }
 
+static CFMutableDictionaryRef command_zoom(unsigned direction)
+{
+    CFMutableDictionaryRef req=NULL,params=NULL;
+    CFStringRef key=NULL;
+    const char *uuid=command_uuid();
+    if(!uuid || (direction!=ALT111_ZOOM_IN && direction!=ALT111_ZOOM_OUT))return NULL;
+    req=dict_new();params=dict_new();
+    if(!req || !params)goto done;
+    set_str(req,"type","changeMapZoomLevel");
+    set_str(params,"uuid",uuid);
+    set_i64(params,"zoomDirection",(int64_t)direction);
+    key=s_cf("params");
+    if(!key)goto done;
+    p_CFDictionarySetValue(req,key,params);
+    p_CFRelease(key);p_CFRelease(params);
+    return req;
+done:
+    if(key)p_CFRelease(key);
+    if(params)p_CFRelease(params);
+    if(req)p_CFRelease(req);
+    return NULL;
+}
+
 static CFMutableDictionaryRef gen2_command_dictionary(const struct alt111_command *cmd)
 {
     if (!cmd || !command_uuid()) return NULL;
@@ -3078,6 +3111,7 @@ static void gen2_publish_status(void)
     char b[8192],tmp[192];
     int fd, n;
     struct alt111_control cs;
+    struct alt111_zoom zs;
     struct alt111_video vs;
     struct alt111_resync rs;
     mibr_mode_state_t ms;
@@ -3098,6 +3132,7 @@ static void gen2_publish_status(void)
     unsigned i,reconnect_pending=0u,presentation_pending=0u,session_pending=0u;
     pthread_mutex_lock(&g2_core_lock);
     cs = g2_control;
+    zs = g2_zoom;
     vs = g2_video;
     rs = g2_resync;
     ms = g2_last_mode_state;
@@ -3202,6 +3237,21 @@ static void gen2_publish_status(void)
         ms.screen,ms.main_audio,ms.speech,ms.speech_detail,ms.phone,ms.turns,settings_status);
     if(n<=0)return;
     if((size_t)n>=sizeof(b))return;
+    {
+        int zn=snprintf(b+n,sizeof(b)-(size_t)n,
+            "\nzoom_session=%llu\nzoom_focus=%u\nzoom_source_visible=%u\nzoom_owner=%u\n"
+            "zoom_positive_is_in=%d\nzoom_pending=%d\nzoom_in_flight=%u\n"
+            "zoom_accepted=%llu\nzoom_rejected=%llu\nzoom_dropped=%llu\n"
+            "zoom_submitted=%llu\nzoom_completed=%llu\nzoom_failed=%llu\nzoom_stale=%llu\n",
+            (unsigned long long)zs.session,zs.vc_map_focus,zs.source_visible,zs.owner,
+            zs.positive_direction,zs.pending,zs.in_flight,
+            (unsigned long long)zs.accepted,(unsigned long long)zs.rejected,
+            (unsigned long long)zs.dropped,(unsigned long long)zs.sent,
+            (unsigned long long)zs.completed,(unsigned long long)zs.failed,
+            (unsigned long long)zs.stale);
+        if(zn<0 || (size_t)zn>=sizeof(b)-(size_t)n)return;
+        n+=zn;
+    }
     pthread_mutex_lock(&g2_status_lock);
     snprintf(tmp,sizeof(tmp),"%s.new.%ld",g2_status_path,(long)getpid());
     fd=open(tmp,O_WRONLY|O_CREAT|O_TRUNC,0644);
@@ -3223,6 +3273,8 @@ static void gen2_set_command_ready(unsigned ready)
 {
     pthread_mutex_lock(&g2_core_lock);
     g2_command_ready = ready ? 1u : 0u;
+    if(!ready && g2_zoom.active)
+        (void)alt111_zoom_context(&g2_zoom,g2_zoom.session,0u,0u,0u);
     pthread_cond_broadcast(&g2_core_cv);
     pthread_mutex_unlock(&g2_core_lock);
     gen2_publish_status();
@@ -3272,8 +3324,11 @@ static int gen2_control_projection_on(AirPlayReceiverSessionRef session)
     g2_control.view_count=view_count;
     if (!g2_control_session) {
         g2_control_session = alt111_control_begin(&g2_control);
+        alt111_zoom_begin(&g2_zoom,g2_control_session);
     } else {
         repeated = 1;
+        /* A repeated negotiation invalidates previous focus and queued detents. */
+        (void)alt111_zoom_context(&g2_zoom,g2_control_session,0u,0u,0u);
     }
     (void)alt111_control_intent(&g2_control,1,initial_view);
     pthread_mutex_lock(&g_settings_lock);
@@ -3299,6 +3354,7 @@ static void gen2_control_release(void)
     int stop_handed_off = 0;
     pthread_mutex_lock(&g2_core_lock);
     s=g2_control_session;
+    alt111_zoom_end(&g2_zoom); /* invalidate outstanding zoom on ANY 111 release */
     alt111_resync_cancel(&g2_resync, ALT111_RESYNC_CANCEL_PROJECTION);
     if(s)(void)alt111_control_intent(&g2_control,0,0);
     pthread_cond_broadcast(&g2_core_cv);
@@ -3653,6 +3709,138 @@ static void gen2_apply_selected_view(void)
     pthread_mutex_unlock(&g2_core_lock);
 }
 
+/*
+ * Native integration seam for a future independently validated MU1440 DSI
+ * adapter. This does NOT hook Java, parse DebugSPI, open any IPC listener or
+ * infer VC focus from source111 negotiation. No caller is installed yet.
+ * The authoritative VC map-focus + DIRECT ownership observation MUST be
+ * established before invoking bind_verified; unknown state is always off.
+ */
+int mibr_alt111_zoom_bind_verified(uint64_t session, unsigned vc_map_focus,
+                                   unsigned direct_owner, int positive_is_in)
+{
+    int rc;
+    unsigned visible;
+    pthread_mutex_lock(&g2_core_lock);
+    if(!g2_zoom.active || !session || session!=g2_control_session){
+        pthread_mutex_unlock(&g2_core_lock);return ALT111_ZOOM_STALE;
+    }
+    visible=g2_command_ready && g2_control.active && g2_control.desired &&
+        g2_control.shown_ack && !g2_control.reacquiring &&
+        g2_video.active && g2_video.config_valid && g2_video.consumer_primed;
+    rc=alt111_zoom_polarity(&g2_zoom,session,positive_is_in);
+    if(rc==ALT111_ZOOM_OK)
+        rc=alt111_zoom_context(&g2_zoom,session,vc_map_focus,visible,direct_owner);
+    pthread_mutex_unlock(&g2_core_lock);
+    return rc;
+}
+int mibr_alt111_zoom_observe_encoder2(uint64_t session, int keyboard,
+                                      int encoder_id, int signed_steps,
+                                      int extra, int effective_validity)
+{
+    int rc;
+    unsigned visible;
+    pthread_mutex_lock(&g2_core_lock);
+    if(!g2_zoom.active || !session || session!=g2_control_session){
+        pthread_mutex_unlock(&g2_core_lock);return ALT111_ZOOM_STALE;
+    }
+    visible=g2_command_ready && g2_control.active && g2_control.desired &&
+        g2_control.shown_ack && !g2_control.reacquiring &&
+        g2_video.active && g2_video.config_valid && g2_video.consumer_primed;
+    (void)alt111_zoom_context(&g2_zoom,session,g2_zoom.vc_map_focus,
+                               visible,g2_zoom.owner);
+    rc=alt111_zoom_encoder(&g2_zoom,session,keyboard,encoder_id,signed_steps,
+                            extra,effective_validity);
+    pthread_mutex_unlock(&g2_core_lock);
+    return rc;
+}
+struct gen2_zoom_context {
+    uint64_t session, request;
+    unsigned direction;
+};
+static void gen2_zoom_completion(OSStatus status, CFDictionaryRef response, void *opaque)
+{
+    struct gen2_zoom_context *ctx=(struct gen2_zoom_context *)opaque;
+    int rc;
+    (void)response;
+    if(!ctx)return;
+    pthread_mutex_lock(&g2_core_lock);
+    rc=alt111_zoom_complete(&g2_zoom,ctx->session,ctx->request,
+                             status==K_NO_ERR,monotonic_ms());
+    pthread_mutex_unlock(&g2_core_lock);
+    logf_u2("GEN2 ZOOM completion session=%llu request=%llu direction=%u os=%d rc=%d (submission acknowledgement, not visible map proof)",
+            (unsigned long long)ctx->session,(unsigned long long)ctx->request,
+            ctx->direction,(int)status,rc);
+    free(ctx);
+}
+static void gen2_zoom_worker_tick(void)
+{
+    struct alt111_zoom_command zcmd;
+    struct gen2_zoom_context *ctx=NULL;
+    struct gen2_settings_scope *scope=NULL,*prior=settings_scope();
+    AirPlayReceiverSessionRef session=NULL;
+    CFMutableDictionaryRef req=NULL;
+    uint64_t generation;
+    int rc,send_rc=-1;
+    unsigned visible;
+
+    pthread_mutex_lock(&g2_core_lock);
+    generation=g2_control_session;
+    visible=g2_command_ready && g2_control.active && g2_control.desired &&
+        g2_control.shown_ack && !g2_control.reacquiring &&
+        g2_control.pending.type==ALT111_CMD_NONE &&
+        g2_video.active && g2_video.config_valid && g2_video.consumer_primed;
+    if(g2_zoom.active){
+        (void)alt111_zoom_context(&g2_zoom,generation,g2_zoom.vc_map_focus,
+                                   visible,g2_zoom.owner);
+    }
+    rc=visible ? alt111_zoom_next(&g2_zoom,generation,monotonic_ms(),&zcmd)
+               : ALT111_ZOOM_WAIT;
+    pthread_mutex_unlock(&g2_core_lock);
+    if(rc!=ALT111_ZOOM_OK)return;
+
+    scope=calloc(1,sizeof(*scope));
+    pthread_mutex_lock(&g_settings_lock);
+    if(scope && g_settings_have_active &&
+       g_settings_active_control_generation==zcmd.session &&
+       g_settings_active_session){
+        scope->settings=g_settings_active;
+        scope->valid=1u;
+        session=(AirPlayReceiverSessionRef)p_CFRetain(g_settings_active_session);
+    }
+    pthread_mutex_unlock(&g_settings_lock);
+    if(scope && scope->valid && session && g_settings_scope_ready &&
+       pthread_setspecific(g_settings_scope_key,scope)==0){
+        req=command_zoom(zcmd.direction);
+        (void)pthread_setspecific(g_settings_scope_key,prior);
+    }
+    free(scope);
+    ctx=(struct gen2_zoom_context *)calloc(1,sizeof(*ctx));
+    if(ctx){
+        ctx->session=zcmd.session;ctx->request=zcmd.request;
+        ctx->direction=zcmd.direction;
+    }
+    if(req && session && ctx && g_sendcmd){
+        send_rc=(int)g_sendcmd(session,req,gen2_zoom_completion,ctx);
+        if(send_rc==K_NO_ERR)ctx=NULL; /* asynchronous completion owns context */
+    }
+    if(req)p_CFRelease(req);
+    if(session)p_CFRelease(session);
+    if(ctx){
+        free(ctx);
+        pthread_mutex_lock(&g2_core_lock);
+        (void)alt111_zoom_complete(&g2_zoom,zcmd.session,zcmd.request,0,monotonic_ms());
+        pthread_mutex_unlock(&g2_core_lock);
+    }else if(send_rc!=K_NO_ERR){
+        pthread_mutex_lock(&g2_core_lock);
+        (void)alt111_zoom_complete(&g2_zoom,zcmd.session,zcmd.request,0,monotonic_ms());
+        pthread_mutex_unlock(&g2_core_lock);
+    }
+    logf_u2("GEN2 ZOOM submit session=%llu request=%llu direction=%u rc=%d",
+            (unsigned long long)zcmd.session,(unsigned long long)zcmd.request,
+            zcmd.direction,send_rc);
+}
+
 static void *gen2_control_worker(void *arg)
 {
     uint64_t last_settings_poll=0;
@@ -3696,7 +3884,7 @@ static void *gen2_control_worker(void *arg)
         pthread_mutex_lock(&g2_core_lock);
         nrc=alt111_control_next(&g2_control,monotonic_ms(),&cmd);
         pthread_mutex_unlock(&g2_core_lock);
-        if(nrc!=ALT111_OK){usleep(10000);continue;}
+        if(nrc!=ALT111_OK){gen2_zoom_worker_tick();usleep(10000);continue;}
 
         ctx=(struct gen2_command_context *)calloc(1,sizeof(*ctx));
         scope=calloc(1,sizeof(*scope));previous=settings_scope();
@@ -3764,6 +3952,123 @@ static void *gen2_control_worker(void *arg)
     return NULL;
 }
 
+
+/*
+ * V1 PARALLEL Zoom proof, intentionally NOT the later exclusive interception.
+ * DebugSPI source 127.0.0.1:15001 is only read; no bytes are sent to it.
+ * One physical right detent is admitted only when correlated with the native
+ * zoom-specific f904/tag56 record (see private real 11-step dual session).
+ * That trace tag is NOT asserted to be an independently decoded Java method.
+ *
+ * IMPORTANT: The marker is a MANUAL parked-test arm, not automatic proof of
+ * visible VC ownership. V1 never alters stock listeners, BAP or scale; the
+ * native map WILL zoom as well. Unknown status means no CarPlay command.
+ */
+static void gen2_zoom_spi_clear(void)
+{
+    pthread_mutex_lock(&g2_core_lock);
+    if(g2_zoom.active)
+        (void)alt111_zoom_context(&g2_zoom,g2_zoom.session,0u,0u,0u);
+    pthread_mutex_unlock(&g2_core_lock);
+}
+static void gen2_zoom_spi_pair(void *opaque,uint32_t source_ms,int signed_detent)
+{
+    int rc=ALT111_ZOOM_WAIT;
+    uint64_t session=0;
+    unsigned ready;
+    (void)opaque;
+    /* Revocation is checked at the delivery point as well as in idle poll. */
+    if(access(g2_zoom_v1_arm,F_OK)!=0)return;
+    pthread_mutex_lock(&g2_core_lock);
+    session=g2_control_session;
+    ready=g2_command_ready && g2_zoom.active && session &&
+        g2_zoom.session==session &&
+        g2_control.active && g2_control.desired &&
+        g2_control.shown_ack && !g2_control.reacquiring &&
+        g2_video.active && g2_video.config_valid && g2_video.consumer_primed;
+    if(ready) {
+        /* Empirical private MU1440 native scale sequence:
+         * right +1 -> scale decreases -> zoom IN. The car/iPhone UX must
+         * still verify semantic AirPlay polarity in the bounded pilot. */
+        (void)alt111_zoom_polarity(&g2_zoom,session,1);
+        /* In V1, correlation with a native zoom action is the temporary
+         * per-detent map-focus predicate, and the explicitly armed test
+         * operator confirms visible DIRECT. Neither is a V2 owner feed. */
+        (void)alt111_zoom_context(&g2_zoom,session,1u,1u,1u);
+        rc=alt111_zoom_encoder(&g2_zoom,session,4,40,
+                               signed_detent,0,1);
+    }
+    pthread_mutex_unlock(&g2_core_lock);
+    if(rc==ALT111_ZOOM_OK)
+        logf_u2("GEN2 ZOOM V1 matched source_ms=%u detent=%d session=%llu mode=PARALLEL_NATIVE_UNCHANGED",
+                (unsigned)source_ms,signed_detent,(unsigned long long)session);
+}
+static void *gen2_zoom_spi_worker(void *arg)
+{
+    struct alt111_spi_zoom *decoder;
+    int fd=-1;
+    unsigned char chunk[8192];
+    (void)arg;
+    decoder=(struct alt111_spi_zoom*)calloc(1,sizeof(*decoder));
+    if(!decoder) {
+        logf_u2("GEN2 ZOOM V1: no decoder memory; inactive");
+        return NULL;
+    }
+    alt111_spi_zoom_init(decoder);
+    for(;;) {
+        fd_set rfds;
+        struct timeval tv;
+        int r;
+        if(access(g2_zoom_v1_arm,F_OK)!=0) {
+            if(fd>=0) {close(fd);fd=-1;}
+            alt111_spi_zoom_init(decoder);
+            gen2_zoom_spi_clear();
+            usleep(1000000);
+            continue;
+        }
+        if(fd<0) {
+            struct sockaddr_in addr;
+            fd=socket(AF_INET,SOCK_STREAM,0);
+            if(fd<0){usleep(1000000);continue;}
+            memset(&addr,0,sizeof(addr));
+            addr.sin_family=AF_INET;
+            addr.sin_port=htons(15001u);
+            addr.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+            if(connect(fd,(struct sockaddr*)&addr,sizeof(addr))!=0) {
+                close(fd);fd=-1;usleep(1000000);continue;
+            }
+            alt111_spi_zoom_init(decoder);
+            logf_u2("GEN2 ZOOM V1 receive-only DebugSPI connected (no OEM writes)");
+        }
+        FD_ZERO(&rfds);FD_SET(fd,&rfds);
+        tv.tv_sec=0;tv.tv_usec=250000;
+        r=select(fd+1,&rfds,NULL,NULL,&tv);
+        if(r>0 && FD_ISSET(fd,&rfds)) {
+            ssize_t n=recv(fd,chunk,sizeof(chunk),0);
+            if(n<=0) {
+                close(fd);fd=-1;
+                alt111_spi_zoom_init(decoder);
+                gen2_zoom_spi_clear();
+                usleep(250000);
+            } else {
+                alt111_spi_zoom_feed(decoder,chunk,(size_t)n,
+                                     gen2_zoom_spi_pair,NULL);
+            }
+        } else if(r==0) {
+            /* Source events must pair within 40 ms; one 250-ms idle poll
+             * expires partial pairs instead of leaving a stale Tag56 armed. */
+            decoder->have_wheel=decoder->have_tag=0;
+        } else if(r<0 && errno!=EINTR) {
+            close(fd);fd=-1;
+            alt111_spi_zoom_init(decoder);
+            gen2_zoom_spi_clear();
+            usleep(250000);
+        }
+    }
+    /* Infinite background observer, detached with process lifetime. */
+    return NULL;
+}
+
 static int gen2_start_workers(void)
 {
     if(g2_workers_started)return 0;
@@ -3772,6 +4077,11 @@ static int gen2_start_workers(void)
     if(pthread_create(&g2_output_thread,NULL,gen2_output_worker,NULL)!=0)return -1;
     pthread_detach(g2_output_thread);
     g2_workers_started=1;
+    /* Background worker is inert without the explicit volatile V1 marker.
+     * Failure is nonfatal for all stock/CarPlay video/media paths. */
+    if(pthread_create(&g2_zoom_spi_thread,NULL,gen2_zoom_spi_worker,NULL)==0)
+        pthread_detach(g2_zoom_spi_thread);
+    else logf_u2("GEN2 ZOOM V1 worker unavailable; zoom pilot disabled");
     return 0;
 }
 
@@ -4379,6 +4689,7 @@ static void altscreen111_init(void)
         publish_state("error");
         return;
     }
+    alt111_zoom_init(&g2_zoom);
     if(alt111_control_init(&g2_control,g2_profile.view_count)!=ALT111_OK){
         g_enabled=0;
         logf_u2("gen2 control init failed; disabled fail-closed");

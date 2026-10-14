@@ -7,12 +7,16 @@ on:
       - '.github/workflows/build-altscreen111-gen2.yml'
       - 'src/native/altscreen111-gen2/**'
       - 'tools/build_altscreen111_gen2.sh'
+      - 'tools/test_alt111_zoom_host.sh'
+      - 'tests/alt111_zoom_test.c'
   push:
     branches: [ main ]
     paths:
       - '.github/workflows/build-altscreen111-gen2.yml'
       - 'src/native/altscreen111-gen2/**'
       - 'tools/build_altscreen111_gen2.sh'
+      - 'tools/test_alt111_zoom_host.sh'
+      - 'tests/alt111_zoom_test.c'
 
 permissions:
   contents: read
@@ -28,6 +32,17 @@ env:
   IMAGE: mhi2-qnx65-armv7-public:4.9
 
 jobs:
+  zoom-host:
+    name: Verify gated source111 zoom (host C99)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Measured twelve-tuple, focus/owner/session, cap and reversal regressions
+        run: bash tools/test_alt111_zoom_host.sh
+
   build:
     name: Build GEN2 AltScreen (QNX)
     runs-on: ubuntu-24.04
