@@ -34,6 +34,7 @@ void alt111_resync_cancel(struct alt111_resync *r, unsigned reason)
     r->cancels++;
     r->next_request_ms = 0;
     r->candidate_idr_ordinal = r->bridge_seen_ms = 0;
+    r->bridge_first_blocks=r->bridge_first_sample_us=0;
     r->retry_ms = ALT111_RESYNC_RETRY_MIN_MS;
 }
 int alt111_resync_arm(struct alt111_resync *r, uint64_t now_ms,
@@ -50,6 +51,7 @@ int alt111_resync_arm(struct alt111_resync *r, uint64_t now_ms,
     r->au_at_arm=s->source_aus;r->idr_at_arm=s->source_idrs;
     r->overflow_at_arm=s->soft_recovery_epoch;
     r->candidate_idr_ordinal=r->bridge_seen_ms=0;
+    r->bridge_first_blocks=r->bridge_first_sample_us=0;
     r->last_request_ms=0;r->next_request_ms=now_ms;
     r->completed_ms=0;r->retry_ms=ALT111_RESYNC_RETRY_MIN_MS;
     return ALT111_OK;
@@ -94,6 +96,7 @@ alt111_resync_tick(struct alt111_resync *r, uint64_t now_ms,
         r->overflow_at_arm=s->soft_recovery_epoch;
         r->au_at_arm=s->source_aus;r->idr_at_arm=s->source_idrs;
         r->candidate_idr_ordinal=r->bridge_seen_ms=0;
+        r->bridge_first_blocks=r->bridge_first_sample_us=0;
         r->state=ALT111_RESYNC_NEED_IDR;
         r->next_request_ms=now_ms;
     }
@@ -107,9 +110,16 @@ alt111_resync_tick(struct alt111_resync *r, uint64_t now_ms,
     }
     if(r->state==ALT111_RESYNC_NEED_BRIDGE){
         if(s->bridge_healthy && s->bridge_idr_ordinal>=r->candidate_idr_ordinal){
-            if(!r->bridge_seen_ms)r->bridge_seen_ms=now_ms ? now_ms : 1u;
+            if(!r->bridge_seen_ms){
+                r->bridge_seen_ms=now_ms ? now_ms : 1u;
+                r->bridge_first_blocks=s->bridge_blocks;
+                r->bridge_first_sample_us=s->bridge_sample_us;
+            }
+            /* A frozen writer sample is not evidence of continued health. */
             if(now_ms>=r->bridge_seen_ms &&
-               now_ms-r->bridge_seen_ms>=ALT111_BRIDGE_STABLE_MS){
+               now_ms-r->bridge_seen_ms>=ALT111_BRIDGE_STABLE_MS &&
+               s->bridge_sample_us>r->bridge_first_sample_us &&
+               s->bridge_blocks>r->bridge_first_blocks){
                 r->state=ALT111_RESYNC_SYNCED;
                 ++r->completions;r->completed_ms=now_ms;
                 r->next_request_ms=0;r->retry_ms=ALT111_RESYNC_RETRY_MIN_MS;
@@ -118,6 +128,7 @@ alt111_resync_tick(struct alt111_resync *r, uint64_t now_ms,
             return ALT111_RESYNC_NONE;
         }
         r->bridge_seen_ms=0;
+        r->bridge_first_blocks=r->bridge_first_sample_us=0;
         if(now_ms<r->next_request_ms)return ALT111_RESYNC_NONE;
         /* Writer has not confirmed the same generation+ordinal: retry with
          * a NEW source/consumer candidate; never claim VC presentation. */
