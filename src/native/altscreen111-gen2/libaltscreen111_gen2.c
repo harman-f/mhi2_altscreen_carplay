@@ -3103,6 +3103,28 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         }
         p_CFArrayAppendValue(displays,main);
         p_CFRelease(main);main=NULL;
+        /* Retain every other stock display, in its original order and with
+         * original ownership/capabilities; never silently erase a third one. */
+        {
+            CFIndex idx,count=p_CFArrayGetCount(old);
+            for(idx=1;idx<count;++idx){
+                CFDictionaryRef other=(CFDictionaryRef)p_CFArrayGetValueAtIndex(old,idx);
+                CFStringRef uk=s_cf("uuid");
+                CFTypeRef oid=(other&&uk&&p_CFGetTypeID(other)==p_CFDictionaryGetTypeID())?
+                    p_CFDictionaryGetValue(other,uk):NULL;
+                char other_uuid[96]={0};
+                int clash=oid && p_CFGetTypeID(oid)==p_CFStringGetTypeID() &&
+                    p_CFStringGetCString((CFStringRef)oid,other_uuid,sizeof(other_uuid),CF_UTF8) &&
+                    !strcmp(other_uuid,display.uuid);
+                if(uk)p_CFRelease(uk);
+                if(!other || p_CFGetTypeID(other)!=p_CFDictionaryGetTypeID() || clash){
+                    logf_u2("GEN2 /info stock display[%ld] invalid/UUID collision; stock fallback",(long)idx);
+                    p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+                    return base;
+                }
+                p_CFArrayAppendValue(displays,other);
+            }
+        }
     }
     if(displays&&alt){
         char active_url[384];
@@ -3177,10 +3199,13 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         p_CFDictionarySetValue(info,kdisplays,displays);
         {
             CFStringRef panels=s_cf("displayPanels");
-            if(panels){
-                p_CFDictionarySetValue(info,panels,displays);
-                p_CFRelease(panels);
+            if(!panels){
+                logf_u2("GEN2 /info displayPanels unavailable; return stock");
+                p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+                return base;
             }
+            p_CFDictionarySetValue(info,panels,displays);
+            p_CFRelease(panels);
         }
         if(settings_scope())settings_scope()->descriptor_complete=1u;
         logf_u2("GEN2 /info ready: profile=%s root=altScreen%s type=%u maxFPS=%u features=%u primaryInput=%s geometry=%ux%u physical=%ux%u uuid=%s url=%s",
@@ -3234,6 +3259,16 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
         snprintf(g_settings_advertised_version,sizeof(g_settings_advertised_version),"%s",scope->actual_source_version);
         pthread_mutex_unlock(&g_settings_lock);
         if(previous_advertised)p_CFRelease(previous_advertised);
+    }else{
+        AirPlayReceiverSessionRef retired=NULL;
+        pthread_mutex_lock(&g_settings_lock);
+        if(g_settings_have_advertised && g_settings_advertised_session==session){
+            retired=g_settings_advertised_session;
+            g_settings_advertised_session=NULL;
+            g_settings_have_advertised=0u;
+        }
+        pthread_mutex_unlock(&g_settings_lock);
+        if(retired)p_CFRelease(retired);
     }
     (void)pthread_setspecific(g_settings_scope_key,previous);
     free(scope);
@@ -4681,11 +4716,34 @@ OSStatus AirPlayReceiverSessionPlatformControl(AirPlayReceiverSessionRef session
     return mibr_platform_control(session,flags,command,qualifier,params,outParams);
 }
 
+/* iOS can send control SETUP before its next /info. Use the same real
+ * descriptor builder as /info for a cold preflight; do not infer readiness
+ * merely from request['features'] or a previous session's advert. */
+static int gen2_advert_ready_for(AirPlayReceiverSessionRef s)
+{
+    int ready;
+    pthread_mutex_lock(&g_settings_lock);
+    ready=s && g_settings_valid && g_settings_have_advertised &&
+          g_settings_advertised_session==s &&
+          g_settings_advertised.revision==g_settings_desired.revision;
+    pthread_mutex_unlock(&g_settings_lock);
+    return ready;
+}
+static int gen2_ensure_advert_preflight(AirPlayReceiverSessionRef s)
+{
+    CFDictionaryRef check;
+    OSStatus err=0;
+    uint8_t mac[6]={0};
+    if(gen2_advert_ready_for(s))return 1;
+    check=AirPlayCopyServerInfo(s,NULL,mac,&err);
+    if(check)p_CFRelease(check);
+    return check && err==K_NO_ERR && gen2_advert_ready_for(s);
+}
 static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef request, CFDictionaryRef *outResponse)
 {
     CFDictionaryRef altDesc=NULL;
     CFDictionaryRef stockResp=NULL;
-    int other=0,hasAlt=0;
+    int other=0,hasAlt=0,control_advert_ready=0,alt_ok=0;
     OSStatus e;
     int port=-1;
     uint64_t cid=0;
@@ -4724,9 +4782,13 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
         CFStringRef fk=s_cf("features");
         CFTypeRef proposal=(request && fk) ? p_CFDictionaryGetValue(request,fk) : NULL;
         if(fk)p_CFRelease(fk);
-        if(stockResp && proposal &&
-           !set_reference_enabled_features((CFMutableDictionaryRef)stockResp))
-            logf_u2("GEN2 control SETUP feature merge failed; stock response retained");
+        if(proposal){
+            control_advert_ready=gen2_ensure_advert_preflight(s);
+            if(stockResp && control_advert_ready)
+                control_advert_ready=set_reference_enabled_features((CFMutableDictionaryRef)stockResp);
+            if(!control_advert_ready)
+                logf_u2("GEN2 control SETUP: 111 capability withheld; full advert unavailable");
+        }
     }
 
     hasAlt=g_enabled && contains_stream111(request,&altDesc,&other);
@@ -4741,7 +4803,10 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
             (unsigned long long)cid,other);
     publish_state("setup");
 
-    if(!cid){
+    if(!control_advert_ready && !gen2_advert_ready_for(s)){
+        logf_u2("GEN2 stream111 SETUP withheld: no full same-session display advert");
+        publish_state("setup_advert_unavailable");
+    }else if(!cid){
         logf_u2("stream111 SETUP fail-soft: missing streamConnectionID");
         publish_state("setup_failed");
     }else{
@@ -4749,6 +4814,7 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
         if(port>0 && stockResp){
             if(gen2_control_projection_on(s)){
                 if(append_alt_setup_response((CFMutableDictionaryRef)stockResp,altDesc,port)){
+                    alt_ok=1;
                     logf_u2("GEN2 stream111 SETUP accepted cid=%llu dataPort=%d response=cloned-request+streamID111; UI acquisition armed",
                             (unsigned long long)cid,port);
                 }else{
@@ -4768,6 +4834,16 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
         }
     }
 
+    if(!alt_ok && !other){
+        /* Pure 111 request: stock's unsupported-stream success is not a
+         * successful 111 setup. Never hand iOS a fake-success empty reply. */
+        if(stockResp)p_CFRelease(stockResp);
+        if(outResponse)*outResponse=NULL;
+        logf_u2("GEN2 stream111 SETUP failed: pure 111 request return=-6700; stock 110 unaffected");
+        return -6700;
+    }
+    /* Mixed 110/111: preserve the successful stock streams even if optional
+     * 111 fails. Never fail the established main-screen contract. */
     if(outResponse)*outResponse=stockResp;
     else if(stockResp)p_CFRelease(stockResp);
     return e;
