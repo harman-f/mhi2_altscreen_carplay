@@ -2661,9 +2661,9 @@ static int add_initial_video_stream(CFMutableDictionaryRef display,CFStringRef u
     a=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
     stream=dict_new();key=s_cf("initialVideoStreams");
     if(!a||!stream||!key)goto done;
-    set_i64(stream,"originXPixels",0);
-    set_i64(stream,"originYPixels",0);
-    set_i64(stream,"zIndex",0);
+    if(set_i64(stream,"originXPixels",0) ||
+       set_i64(stream,"originYPixels",0) ||
+       set_i64(stream,"zIndex",0))goto done;
     {
         CFStringRef uk=s_cf("uuid");
         if(!uk)goto done;
@@ -2671,8 +2671,9 @@ static int add_initial_video_stream(CFMutableDictionaryRef display,CFStringRef u
         p_CFRelease(uk);
     }
     p_CFArrayAppendValue(a,stream);
+    if(p_CFArrayGetCount(a)!=1)goto done;
     p_CFDictionarySetValue(display,key,a);
-    ok=1;
+    ok=p_CFDictionaryGetValue(display,key)==a;
 done:
     if(key)p_CFRelease(key);
     if(stream)p_CFRelease(stream);
@@ -3091,7 +3092,8 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
             strlen(real_uuid)==36u && strcmp(real_uuid,display.uuid)!=0;
         if(valid && main && uidkey){
             p_CFDictionarySetValue(main,uidkey,main_uuid);
-            valid=add_initial_video_stream(main,main_uuid);
+            valid=p_CFDictionaryGetValue(main,uidkey)==main_uuid &&
+                  add_initial_video_stream(main,main_uuid);
         }else valid=0;
         if(mk)p_CFRelease(mk);
         if(uidkey)p_CFRelease(uidkey);
@@ -3151,16 +3153,20 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
          * capabilities or cadence. The validated profile and MIBSI parity
          * evidence both identify this secondary display explicitly as type 111.
          */
-        set_i64(alt,"type",(int64_t)g2_profile.type);
-        set_i64(alt,"maxFPS",(int64_t)advertised_fps);
-        set_i64(alt,"features",(int64_t)(compat_profile_classic_single_view()?10u:g2_profile.features));
-        set_i64(alt,"widthPixels",(int64_t)display.width);
-        set_i64(alt,"heightPixels",(int64_t)display.height);
-        set_i64(alt,"widthPhysical",(int64_t)display.width_mm);
-        set_i64(alt,"heightPhysical",(int64_t)display.height_mm);
-        set_str(alt,"uuid",display.uuid);
-        set_str(alt,"uid",display.uuid);
-        set_str(alt,"name","Instrument Cluster");
+        if(set_i64(alt,"type",(int64_t)g2_profile.type) ||
+           set_i64(alt,"maxFPS",(int64_t)advertised_fps) ||
+           set_i64(alt,"features",(int64_t)(compat_profile_classic_single_view()?10u:g2_profile.features)) ||
+           set_i64(alt,"widthPixels",(int64_t)display.width) ||
+           set_i64(alt,"heightPixels",(int64_t)display.height) ||
+           set_i64(alt,"widthPhysical",(int64_t)display.width_mm) ||
+           set_i64(alt,"heightPhysical",(int64_t)display.height_mm) ||
+           set_str(alt,"uuid",display.uuid) ||
+           set_str(alt,"uid",display.uuid) ||
+           set_str(alt,"name","Instrument Cluster")){
+            logf_u2("GEN2 /info incomplete numeric/identity fields; stock fallback");
+            p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+            return base;
+        }
         {
             CFMutableArrayRef props=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
             CFStringRef pk=s_cf("properties"),item=s_cf("Instrument Cluster");
@@ -3199,7 +3205,15 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         }
 
         p_CFArrayAppendValue(displays,alt);
+        if(p_CFArrayGetCount(displays)!=p_CFArrayGetCount(old)+1){
+            p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+            return base;
+        }
         p_CFDictionarySetValue(info,kdisplays,displays);
+        if(p_CFDictionaryGetValue(info,kdisplays)!=displays){
+            p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+            return base;
+        }
         {
             CFStringRef panels=s_cf("displayPanels");
             if(!panels){
@@ -3208,6 +3222,11 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
                 return base;
             }
             p_CFDictionarySetValue(info,panels,displays);
+            if(p_CFDictionaryGetValue(info,panels)!=displays){
+                p_CFRelease(panels);p_CFRelease(alt);p_CFRelease(displays);
+                p_CFRelease(kdisplays);p_CFRelease(info);
+                return base;
+            }
             p_CFRelease(panels);
         }
         if(settings_scope())settings_scope()->descriptor_complete=1u;
