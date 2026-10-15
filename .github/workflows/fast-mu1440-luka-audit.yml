@@ -9,6 +9,9 @@ on:
       - 'src/native/altscreen111-gen2/**'
       - 'tests/alt111_video_queue_recovery_test.c'
       - 'tests/alt111_tcp_nodelay_test.c'
+      - 'tests/alt111_resync_bridge_test.c'
+      - 'src/native/direct-ts-parity/**'
+      - 'tests/direct_ts_parity_recovery_integration.py'
   workflow_dispatch:
 
 permissions:
@@ -41,3 +44,15 @@ jobs:
             -Isrc/native/altscreen111-gen2/include \
             tests/alt111_tcp_nodelay_test.c -o /tmp/alt111_tcp_nodelay_test
           /tmp/alt111_tcp_nodelay_test
+      - name: Exact bridge recovery state machine and status parser
+        run: |
+          cc -std=c99 -Wall -Wextra -Werror -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -Isrc/native/altscreen111-gen2/include tests/alt111_resync_bridge_test.c \
+            src/native/altscreen111-gen2/src/alt111_resync.c -o /tmp/alt111_resync_bridge_test
+          /tmp/alt111_resync_bridge_test
+      - name: Parity writer compile and exact accepted-IDR evidence
+        run: |
+          cc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
+            src/native/direct-ts-parity/direct_ts_parity.c -pthread -o /tmp/direct-ts-parity-host
+          /tmp/direct-ts-parity-host --self-test
+          python3 tests/direct_ts_parity_recovery_integration.py /tmp/direct-ts-parity-host
