@@ -3,7 +3,7 @@ name: Fast MU1440 Luka audit regression
 on:
   push:
     branches:
-      - work/mu1440-luka-audit-implementation-20261015
+      - work/mu1440-luka-audit-complete-20261015
     paths:
       - '.github/workflows/fast-mu1440-luka-audit.yml'
       - 'src/native/altscreen111-gen2/**'
