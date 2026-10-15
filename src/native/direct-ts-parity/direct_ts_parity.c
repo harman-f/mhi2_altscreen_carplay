@@ -112,6 +112,7 @@ struct ts_au {
     size_t packet_count;
     size_t packet_pos;
     uint64_t sequence;
+    uint64_t stream,codec,consumer;
     uint64_t pts90k;
     int idr;
     unsigned slice_class;
@@ -187,6 +188,12 @@ struct bridge_stats {
     uint64_t output_idr_aus_started;
     uint64_t output_non_idr_aus_started;
     uint64_t output_idr_aus_completed;
+    /* Passive evidence: last complete IDR in an accepted 12032-byte write.
+     * Not a claim that the physical VC displayed it. */
+    uint64_t output_last_idr_completed_sequence;
+    uint64_t output_last_idr_completed_stream;
+    uint64_t output_last_idr_completed_codec;
+    uint64_t output_last_idr_completed_consumer;
     uint64_t output_non_idr_aus_completed;
     uint64_t output_slice_p_started;
     uint64_t output_slice_b_started;
@@ -872,12 +879,16 @@ static int queue_push(struct au_queue *q, struct ts_au *au) {
     return 0;
 }
 
+struct bridge_idr_marker {
+    uint64_t sequence,stream,codec,consumer;
+};
 static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
                                 struct clock_state *clock, uint64_t pcr,
-                                unsigned *event) {
+                                unsigned *event, struct bridge_idr_marker *completed_idr) {
     struct ts_au *a;
     (void)pcr;
     unsigned ev=0u;
+    if(completed_idr)memset(completed_idr,0,sizeof(*completed_idr));
     pthread_mutex_lock(&q->lock);
     if (!q->count) { pthread_mutex_unlock(&q->lock); if(event)*event=0u; return 0; }
     a = &q->q[q->head];
@@ -899,7 +910,15 @@ static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
     ++a->packet_pos; --q->packets_queued;
     if (a->packet_pos == a->packet_count) {
         ev|=AU_EVENT_COMPLETED;
-        if(a->idr)ev|=AU_EVENT_IDR;
+        if(a->idr){
+            ev|=AU_EVENT_IDR;
+            if(completed_idr){
+                completed_idr->sequence=a->sequence;
+                completed_idr->stream=a->stream;
+                completed_idr->codec=a->codec;
+                completed_idr->consumer=a->consumer;
+            }
+        }
         ev|=(a->slice_class & 0x0fu) << AU_EVENT_SLICE_SHIFT;
         free(a->packets); memset(a, 0, sizeof(*a));
         q->head = (q->head + 1u) % AU_QUEUE_CAP; --q->count;
@@ -910,7 +929,7 @@ static int queue_take_packet_at(struct au_queue *q, uint8_t p[TS_SIZE],
 }
 
 static int queue_take_packet(struct au_queue *q, uint8_t p[TS_SIZE]) {
-    return queue_take_packet_at(q, p, NULL, 0, NULL);
+    return queue_take_packet_at(q, p, NULL, 0, NULL, NULL);
 }
 
 static int queue_wait_empty(struct au_queue *q, unsigned max_ms) {
@@ -1065,6 +1084,11 @@ static void publish_status(struct bridge_stats *s, struct clock_state *c,
         (unsigned long long)snap.output_non_idr_aus_started,
         (unsigned long long)snap.output_idr_aus_completed,
         (unsigned long long)snap.output_non_idr_aus_completed);
+    fprintf(f,"output_last_idr_completed_sequence=%llu\noutput_last_idr_completed_stream=%llu\noutput_last_idr_completed_codec=%llu\noutput_last_idr_completed_consumer=%llu\n",
+        (unsigned long long)snap.output_last_idr_completed_sequence,
+        (unsigned long long)snap.output_last_idr_completed_stream,
+        (unsigned long long)snap.output_last_idr_completed_codec,
+        (unsigned long long)snap.output_last_idr_completed_consumer);
     fprintf(f,"output_slice_p_started=%llu\noutput_slice_b_started=%llu\noutput_slice_i_started=%llu\noutput_slice_sp_started=%llu\noutput_slice_si_started=%llu\noutput_slice_unknown_started=%llu\n",
         (unsigned long long)snap.output_slice_p_started,
         (unsigned long long)snap.output_slice_b_started,
@@ -1281,14 +1305,16 @@ static void *writer_main(void *arg) {
             uint64_t slice_start[6]={0,0,0,0,0,0},slice_complete[6]={0,0,0,0,0,0};
             uint64_t write_start,write_end,write_us,blocks_now;
             struct writer_timing_probe probe={0};
+            struct bridge_idr_marker block_last_idr={0};
             for(i=0;i<MOST_BLOCK_PACKETS;++i) {
                 uint8_t *p=block+i*TS_SIZE;
                 uint64_t pcr=TRANSPORT_PCR_BASE + (packet_index * TRANSPORT_TICKS_NUM) / TRANSPORT_TICKS_DEN;
                 unsigned ev=0u;
+                struct bridge_idr_marker idr_marker={0};
                 if(packet_index>=w->next_pat_packet){make_pat(p,&w->cc_pat);w->next_pat_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pat_packets,&w->stats->lock,1);}
                 else if(packet_index>=w->next_pmt_packet){make_pmt(p,&w->cc_pmt);w->next_pmt_packet+=PSI_INTERVAL_PACKETS;stats_add_u64(&w->stats->pmt_packets,&w->stats->lock,1);}
                 else if(packet_index>=w->next_pcr_packet){make_pcr_packet(p,pcr);w->next_pcr_packet+=PCR_INTERVAL_PACKETS;stats_add_u64(&w->stats->pcr_packets,&w->stats->lock,1);}
-                else if(queue_take_packet_at(w->queue,p,w->clock,pcr,&ev)){
+                else if(queue_take_packet_at(w->queue,p,w->clock,pcr,&ev,&idr_marker)){
                     {
                         unsigned cls=(ev&AU_EVENT_SLICE_MASK)>>AU_EVENT_SLICE_SHIFT;
                         if(cls>AU_SLICE_SI)cls=AU_SLICE_UNKNOWN;
@@ -1298,6 +1324,7 @@ static void *writer_main(void *arg) {
                             ++slice_start[cls];
                         }
                         if(ev&AU_EVENT_COMPLETED){
+                            if(idr_marker.sequence)block_last_idr=idr_marker;
                             ++block_completes;
                             if(ev&AU_EVENT_IDR)++block_idr_completes;else ++block_non_idr_completes;
                             ++slice_complete[cls];
@@ -1341,6 +1368,12 @@ static void *writer_main(void *arg) {
             w->stats->output_idr_aus_started+=block_idr_starts;
             w->stats->output_non_idr_aus_started+=block_non_idr_starts;
             w->stats->output_idr_aus_completed+=block_idr_completes;
+            if(block_last_idr.sequence){
+                w->stats->output_last_idr_completed_sequence=block_last_idr.sequence;
+                w->stats->output_last_idr_completed_stream=block_last_idr.stream;
+                w->stats->output_last_idr_completed_codec=block_last_idr.codec;
+                w->stats->output_last_idr_completed_consumer=block_last_idr.consumer;
+            }
             w->stats->output_non_idr_aus_completed+=block_non_idr_completes;
             w->stats->output_slice_unknown_started+=slice_start[AU_SLICE_UNKNOWN];
             w->stats->output_slice_p_started+=slice_start[AU_SLICE_P];
@@ -1735,7 +1768,7 @@ int main(int argc,char **argv) {
         pts=assign_pts_presence(&clock,frac,sec,
             flags&M1AU_FLAG_TIME_KNOWN ? !!(flags&M1AU_FLAG_TIME_PRESENT) : -1,&rebased);
         if(packetize_pes(norm,norm_n,pts,idr,discontinuity,&cc_video,&packets,&packet_count)!=0){free(norm);exit_reason="packetization_error";break;}free(norm);discontinuity=0;
-        memset(&au,0,sizeof(au));au.packets=packets;au.packet_count=packet_count;au.sequence=seq;au.pts90k=pts;au.idr=idr;au.slice_class=slice_class;
+        memset(&au,0,sizeof(au));au.packets=packets;au.packet_count=packet_count;au.sequence=seq;au.stream=stream;au.codec=codec;au.consumer=consumer;au.pts90k=pts;au.idr=idr;au.slice_class=slice_class;
         if(queue_push(&queue,&au)!=0){
             free(au.packets);
             if(g_stop_signal){rc=128+g_stop_signal;exit_reason="signal_stop";}
