@@ -16,7 +16,7 @@ Status: **isolated GEN2 source candidate, NOT a vehicle installer or a claim of 
 | V3 TCP_NODELAY | A/B switch only on GEN2 -> local consumer TCP socket, not iPhone/MOST. Default = off. | Inherited `/tmp/mibr-alt111-tcp-nodelay.enabled`, 250 ms poll, readback and log |
 | Renderer HELLO_EX/STATUS | LuKa's renderer is OMX/EGL, ours is M1AU -> TS -> MOST. No blind port to iPhone/VC or speculative presentation feedback. | Deferred |
 | Source timestamps / T1 | Preserve exact source timestamp bytes and ordinal; do not treat remote timestamps as local queue age or alter PTS/PCR/writer pacing. | No changes to 56-byte M1AU schema or downstream clock constants |
-| T3 status overhead | No extra per-MOST-packet or per-AU log writes. Overflow event logging only. | Existing status cadence retained |
+| T3 status overhead | The previous code wrote status only on its sample interval but unnecessarily re-read the interval file on **every** source AU, even when diagnostics were disabled. No per-MOST-packet/per-AU logs are introduced. | Source interval read now disabled unless diagnostics enabled, then cached for up to 1 s; existing status cadence retained |
 | Keyframe cadence / FPS | Keep current tested maxFPS=30 profile (not raising to 40); producer-frame policy default 20 frames, configured settings remain authoritative. At 30 fps, 20 frames are ~0.67 s, **not 0.5 s**. Do not use lack of IDR alone as a 1-Hz watchdog. | No unrelated cadence/decoder experiment |
 | I1 installer hardening | Full public installer/staging/preflight/rollback remains a separate publication milestone. Do not slow the present development iteration by rebuilding frozen R5 or modifying a vehicle. | Not changed |
 
