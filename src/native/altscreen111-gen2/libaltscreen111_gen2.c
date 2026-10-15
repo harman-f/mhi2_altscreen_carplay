@@ -432,6 +432,7 @@ static void gen2_set_command_ready(unsigned ready);
 static void gen2_video_begin_current(void);
 static void gen2_video_end_current(void);
 static void gen2_close_consumer(void);
+static void gen2_keyframe_intent(unsigned reason);
 static void gen2_resync_poll(void);
 static const char *config_layer_name(unsigned layer);
 static void gen2_d2_timing_load(struct gen2_d2_timing *cfg);
@@ -1047,7 +1048,7 @@ static int feature_in_array(CFArrayRef a,const char *name)
     }
     return 0;
 }
-static int set_reference_enabled_features(CFMutableDictionaryRef response)
+static int merge_reference_features(CFMutableDictionaryRef response, const char *feature_key)
 {
     CFStringRef k=NULL,alt=NULL,va=NULL,iap=NULL;
     CFArrayRef old=NULL;
@@ -1056,7 +1057,7 @@ static int set_reference_enabled_features(CFMutableDictionaryRef response)
     struct mibr_viewareas_config cfg;
     if(!response)return 0;
     load_viewareas_config(&cfg);
-    k=s_cf("enabledFeatures");
+    k=s_cf(feature_key);
     if(!k)goto done;
     old=(CFArrayRef)p_CFDictionaryGetValue(response,k);
     if(old && p_CFGetTypeID(old)!=p_CFArrayGetTypeID())goto done;
@@ -1085,6 +1086,10 @@ done:
     if(alt)p_CFRelease(alt);
     if(k)p_CFRelease(k);
     return ok;
+}
+static int set_reference_enabled_features(CFMutableDictionaryRef response)
+{
+    return merge_reference_features(response,"enabledFeatures");
 }
 
 static int source_version_is_valid(const char *s)
@@ -2615,6 +2620,39 @@ done:
     return complete;
 }
 
+/* iOS parses displayPanels.uid and requires a non-empty stream list.
+ * Use the true stock main UUID for 110; the private cluster UUID for 111.
+ * Never synthesize a main identity or overwrite the stock descriptor.
+ */
+static int add_initial_video_stream(CFMutableDictionaryRef display,CFStringRef uuid)
+{
+    CFMutableArrayRef a=NULL;
+    CFMutableDictionaryRef stream=NULL;
+    CFStringRef key=NULL;
+    int ok=0;
+    if(!display || !uuid || p_CFGetTypeID(uuid)!=p_CFStringGetTypeID())return 0;
+    a=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
+    stream=dict_new();key=s_cf("initialVideoStreams");
+    if(!a||!stream||!key)goto done;
+    set_i64(stream,"originXPixels",0);
+    set_i64(stream,"originYPixels",0);
+    set_i64(stream,"zIndex",0);
+    {
+        CFStringRef uk=s_cf("uuid");
+        if(!uk)goto done;
+        p_CFDictionarySetValue(stream,uk,uuid);
+        p_CFRelease(uk);
+    }
+    p_CFArrayAppendValue(a,stream);
+    p_CFDictionarySetValue(display,key,a);
+    ok=1;
+done:
+    if(key)p_CFRelease(key);
+    if(stream)p_CFRelease(stream);
+    if(a)p_CFRelease(a);
+    return ok;
+}
+
 static void log_stream_types(const char *tag, CFDictionaryRef request)
 {
     CFArrayRef a=get_streams(request);
@@ -2945,7 +2983,7 @@ static void log_stock_url_capability(CFDictionaryRef stock_display, const char *
 static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session, CFArrayRef properties, uint8_t *mac, OSStatus *outErr)
 {
     CFDictionaryRef base,stock_display;
-    CFMutableDictionaryRef info=NULL,alt=NULL;
+    CFMutableDictionaryRef info=NULL,alt=NULL,main=NULL;
     CFStringRef kdisplays=NULL;
     CFArrayRef old=NULL;
     CFMutableArrayRef displays=NULL;
@@ -2971,8 +3009,9 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
 
     /* Reference order: compatibility/root capability first, display transformation second. */
     apply_source_version_persona(info);
-    if(!set_reference_enabled_features(info)){
-        logf_u2("GEN2 /info feature merge failed; returning stock info");
+    if(!set_reference_enabled_features(info) ||
+       !merge_reference_features(info,"extendedFeatures")){
+        logf_u2("GEN2 /info capability merge failed; returning stock info");
         p_CFRelease(info);
         return base;
     }
@@ -3005,8 +3044,37 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
                 ie?"<absent>":"",(long long)(ie?0:iv));
         p_CFRelease(ik); p_CFRelease(fk);
     }
-    displays=p_CFArrayCreateMutableCopy(NULL,0,old);
+    displays=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
+    main=dict_clone(stock_display);
     alt=dict_clone(stock_display);
+    /* A1/A2/A4: full two-display advert or the exact unmodified stock /info.
+     * A malformed/missing main UUID must never be replaced by a fake ID. */
+    {
+        CFStringRef mk=s_cf("uuid");
+        CFStringRef main_uuid=mk?(CFStringRef)p_CFDictionaryGetValue(stock_display,mk):NULL;
+        CFStringRef uidkey=s_cf("uid");
+        char real_uuid[96]={0};
+        int valid=main_uuid && p_CFGetTypeID(main_uuid)==p_CFStringGetTypeID() &&
+            p_CFStringGetCString(main_uuid,real_uuid,sizeof(real_uuid),CF_UTF8) &&
+            strlen(real_uuid)==36u && strcmp(real_uuid,display.uuid)!=0;
+        if(valid && main && uidkey){
+            p_CFDictionarySetValue(main,uidkey,main_uuid);
+            valid=add_initial_video_stream(main,main_uuid);
+        }else valid=0;
+        if(mk)p_CFRelease(mk);
+        if(uidkey)p_CFRelease(uidkey);
+        if(!valid || !displays || !alt){
+            logf_u2("GEN2 /info refused partial display advert: valid main uuid=%u main=%u cluster=%u array=%u",
+                    valid?1u:0u,main?1u:0u,alt?1u:0u,displays?1u:0u);
+            if(main)p_CFRelease(main);
+            if(alt)p_CFRelease(alt);
+            if(displays)p_CFRelease(displays);
+            p_CFRelease(kdisplays);p_CFRelease(info);
+            return base;
+        }
+        p_CFArrayAppendValue(displays,main);
+        p_CFRelease(main);main=NULL;
+    }
     if(displays&&alt){
         char active_url[384];
         active_alt_url_copy(active_url,sizeof(active_url));
@@ -3037,6 +3105,18 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         set_i64(alt,"widthPhysical",(int64_t)display.width_mm);
         set_i64(alt,"heightPhysical",(int64_t)display.height_mm);
         set_str(alt,"uuid",display.uuid);
+        set_str(alt,"uid",display.uuid);
+        set_str(alt,"name","Instrument Cluster");
+        {
+            CFStringRef stream_uuid=s_cf(display.uuid);
+            int stream_ok=stream_uuid && add_initial_video_stream(alt,stream_uuid);
+            if(stream_uuid)p_CFRelease(stream_uuid);
+            if(!stream_ok){
+                logf_u2("GEN2 /info incomplete cluster initialVideoStreams; returning stock");
+                p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+                return base;
+            }
+        }
         set_str(alt,"initialURL",active_url);
         /* The strict single-view profile does not advertise altScreenSuggestUIURLs. Keep the M.I.B.
          * extension available outside the strict parity profile. */
@@ -3049,6 +3129,13 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
 
         p_CFArrayAppendValue(displays,alt);
         p_CFDictionarySetValue(info,kdisplays,displays);
+        {
+            CFStringRef panels=s_cf("displayPanels");
+            if(panels){
+                p_CFDictionarySetValue(info,panels,displays);
+                p_CFRelease(panels);
+            }
+        }
         if(settings_scope())settings_scope()->descriptor_complete=1u;
         logf_u2("GEN2 /info ready: profile=%s root=altScreen%s type=%u maxFPS=%u features=%u primaryInput=%s geometry=%ux%u physical=%ux%u uuid=%s url=%s",
                 compat_profile_classic_single_view()?"classic_single_view":"mibr",
