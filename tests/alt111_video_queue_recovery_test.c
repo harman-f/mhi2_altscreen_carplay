@@ -87,10 +87,36 @@ static void unsent_head_overflow(void)
     assert(v.consumer_primed && v.consumer==consumer && !v.recovery_wait_idr);
     alt111_video_destroy(&v);
 }
+static void partial_payload_overflow(void)
+{
+    struct alt111_video v;
+    struct alt111_output_ticket ticket,stale;
+    const uint8_t *bytes=NULL;size_t n=0;
+    uint64_t s=setup(&v),consumer=v.consumer;
+    unsigned i;
+    assert(alt111_video_submit(&v,s,idr,sizeof(idr),1)==ALT111_OK);
+    assert(alt111_video_peek(&v,&bytes,&n,&ticket)==ALT111_OK && n>1);
+    stale=ticket;
+    /* Already sent a payload prefix, even in raw Annex-B mode. */
+    assert(alt111_video_advance(&v,&ticket,1)==ALT111_OK);
+    for(i=1;i<ALT111_QUEUE_CAP;++i)
+        assert(alt111_video_submit(&v,s,pframe,sizeof(pframe),1)==ALT111_OK);
+    assert(alt111_video_submit(&v,s,pframe,sizeof(pframe),1)==ALT111_SOFT_RESYNC);
+    assert(v.count==1 && v.recovery_draining && v.consumer==consumer);
+    assert(alt111_video_peek(&v,&bytes,&n,&ticket)==ALT111_OK && ticket.offset==1);
+    assert(alt111_video_mark_wire_started(&v,&stale)==ALT111_STALE);
+    assert(alt111_video_advance(&v,&ticket,n)==ALT111_OK);
+    assert(v.recovery_request_due && !v.consumer_primed);
+    assert(alt111_video_submit(&v,s,idr,sizeof(idr),1)==ALT111_OK);
+    consume(&v);
+    assert(v.consumer_primed && v.consumer==consumer);
+    alt111_video_destroy(&v);
+}
 int main(void)
 {
     pinned_header_overflow();
     unsent_head_overflow();
+    partial_payload_overflow();
     puts("ALT111_VIDEO_QUEUE_RECOVERY_TEST=PASS");
     return 0;
 }
