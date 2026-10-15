@@ -354,6 +354,10 @@ static const char *g_source_timing_enable_marker = "/tmp/mibr-alt111-source-timi
 static const char *g_source_timing_interval_path = "/tmp/mibr-alt111-source-timing-interval-ms";
 static pthread_mutex_t g_source_timing_lock = PTHREAD_MUTEX_INITIALIZER;
 static mibr_source_timing_t g_source_timing;
+/* Only the diagnostic interval config is cached; source AU counters/timestamps
+ * remain unchanged. Read the interval file <=1x/sec while diagnosis is on. */
+static int64_t g_source_interval_refresh_us;
+static unsigned g_source_interval_cached_ms=1000u;
 static int g_streaming;
 static int g_video_config_seen;
 static uint64_t g_last_heartbeat_ms;
@@ -500,6 +504,8 @@ static void source_timing_reset(void)
 {
     pthread_mutex_lock(&g_source_timing_lock);
     memset(&g_source_timing,0,sizeof(g_source_timing));
+    g_source_interval_refresh_us=0;
+    g_source_interval_cached_ms=1000u;
     pthread_mutex_unlock(&g_source_timing_lock);
     (void)unlink(g_source_timing_status_path);
 }
@@ -610,8 +616,15 @@ static void source_timing_note_frame(const AirPlayScreenHeaderCompat *h, size_t 
     g_source_timing.ts_word1=w1;
     g_source_timing.ts_word2=w2;
 
-    interval_ms=source_timing_interval_ms();
-    if(access(g_source_timing_enable_marker,F_OK)==0 &&
+    if(access(g_source_timing_enable_marker,F_OK)==0){
+        if(!g_source_interval_refresh_us ||
+           now_us-g_source_interval_refresh_us>=1000000LL){
+            g_source_interval_cached_ms=source_timing_interval_ms();
+            g_source_interval_refresh_us=now_us;
+        }
+        interval_ms=g_source_interval_cached_ms;
+    }else interval_ms=0;
+    if(interval_ms &&
        now_us-g_source_timing.window_start_us >= (int64_t)interval_ms*1000LL){
         ++g_source_timing.samples;
         source_timing_write_locked("running",now_us);
