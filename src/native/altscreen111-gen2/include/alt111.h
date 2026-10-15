@@ -20,7 +20,7 @@
 enum alt111_result {
     ALT111_OK = 0, ALT111_WAIT = 1, ALT111_RESTART_CONSUMER = 2,
     ALT111_INVALID = -1, ALT111_STALE = -2, ALT111_BUSY = -3,
-    ALT111_NOMEM = -4
+    ALT111_NOMEM = -4, ALT111_SOFT_RESYNC = 3
 };
 
 struct alt111_rect { uint32_t x, y, width, height; };
@@ -148,13 +148,15 @@ struct alt111_chunk {
     size_t length, offset;
     uint64_t sequence;
     uint64_t source_ordinal;
-    unsigned priming, idr, source_time_present;
+    unsigned priming, idr, source_time_present, wire_started;
     uint8_t source_ts_raw[8];
 };
 struct alt111_video {
     uint64_t session, stream, codec, consumer, sequence, source_ordinal;
     unsigned active, attached, config_valid, config_blocked, nal_length_size;
     unsigned priming_queued, consumer_primed, keyframe_needed;
+    /* Overflow never closes the consumer or invalidates a partially sent AU. */
+    unsigned recovery_wait_idr, recovery_draining, recovery_request_due;
     uint8_t config[ALT111_CODEC_CAP];
     size_t config_length, queued_bytes;
     struct alt111_chunk queue[ALT111_QUEUE_CAP];
@@ -186,6 +188,10 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
  * copy it needs across unlocked I/O. Advance only bytes successfully written. */
 int alt111_video_peek(const struct alt111_video *v, const uint8_t **bytes,
                      size_t *size, struct alt111_output_ticket *ticket);
+/* Pin the head as soon as even an M1AU header byte reaches TCP; dropping
+ * such a head would desynchronize the framed reader. Ticket is generation checked. */
+int alt111_video_mark_wire_started(struct alt111_video *v,
+                                   const struct alt111_output_ticket *ticket);
 int alt111_video_advance(struct alt111_video *v,
                         const struct alt111_output_ticket *ticket, size_t sent);
 
