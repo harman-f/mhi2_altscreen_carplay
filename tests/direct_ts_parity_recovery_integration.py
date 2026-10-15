@@ -141,6 +141,17 @@ def main():
         )
 
         assert "PARITY_SAFE_RECOVERY reason=sequence" in cp.stderr, cp.stderr
+        # Passive evidence must identify the *completed*, writer-accepted
+        # IDR from this precise stream/codec/consumer, not input_last_sequence.
+        status = Path("/tmp/mibr-parity-ts.status").read_text()
+        for field in (
+            "output_last_idr_completed_sequence=6",
+            "output_last_idr_completed_stream=1",
+            "output_last_idr_completed_codec=1",
+            "output_last_idr_completed_consumer=1",
+        ):
+            assert field in status.splitlines(), (field, status)
+
         print("PARITY_RECOVERY_INTEGRATION=PASS")
         print(
             f"blocks={len(data)//BLOCK} video_pes={len(starts)} "
