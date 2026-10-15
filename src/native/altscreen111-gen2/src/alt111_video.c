@@ -79,7 +79,7 @@ static int overflow_resync(struct alt111_video *v, unsigned stale)
     }
     v->recovery_wait_idr = 1;
     v->keyframe_needed = 1;
-    v->recovery_request_due = 1;
+    v->recovery_request_due = 0; /* post-drain only; caller requests initial IDR */
     ++v->soft_recovery_epoch;
     if(stale) ++v->queue_stale_events;
     else ++v->queue_overflow_events;
