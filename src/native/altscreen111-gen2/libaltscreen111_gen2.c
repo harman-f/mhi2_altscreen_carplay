@@ -3018,14 +3018,19 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
 
     kdisplays=s_cf("displays");
     old=(CFArrayRef)p_CFDictionaryGetValue(base,kdisplays);
-    if(!old || p_CFArrayGetCount(old)<=0){
-        logf_u2("IRC-parity /info: root features added but stock displays missing");
-        p_CFRelease(kdisplays);
-        p_CFRelease(base);
-        return info;
+    if(!old || p_CFGetTypeID(old)!=p_CFArrayGetTypeID() || p_CFArrayGetCount(old)<=0){
+        logf_u2("GEN2 /info stock displays missing/invalid; returning exact stock info");
+        if(kdisplays)p_CFRelease(kdisplays);
+        p_CFRelease(info);
+        return base;
     }
 
     stock_display=(CFDictionaryRef)p_CFArrayGetValueAtIndex(old,0);
+    if(!stock_display || p_CFGetTypeID(stock_display)!=p_CFDictionaryGetTypeID()){
+        logf_u2("GEN2 /info stock display[0] is not a dictionary; returning stock");
+        p_CFRelease(kdisplays);p_CFRelease(info);
+        return base;
+    }
     /*
      * iOS 27.2 intersects provider suggestions with receiver-advertised
      * cluster URL capabilities.  Observe the exact stock MU1440 baseline
@@ -3107,6 +3112,23 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         set_str(alt,"uuid",display.uuid);
         set_str(alt,"uid",display.uuid);
         set_str(alt,"name","Instrument Cluster");
+        {
+            CFMutableArrayRef props=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
+            CFStringRef pk=s_cf("properties"),item=s_cf("Instrument Cluster");
+            int props_ok=props && pk && item;
+            if(props_ok){
+                p_CFArrayAppendValue(props,item);
+                p_CFDictionarySetValue(alt,pk,props);
+            }
+            if(item)p_CFRelease(item);
+            if(pk)p_CFRelease(pk);
+            if(props)p_CFRelease(props);
+            if(!props_ok){
+                logf_u2("GEN2 /info incomplete cluster properties; returning stock");
+                p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+                return base;
+            }
+        }
         {
             CFStringRef stream_uuid=s_cf(display.uuid);
             int stream_ok=stream_uuid && add_initial_video_stream(alt,stream_uuid);
@@ -4630,7 +4652,7 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
      * media SETUP response would falsely suggest another negotiation. */
     {
         CFStringRef fk=s_cf("features");
-        CFTypeRef proposal=fk ? p_CFDictionaryGetValue(request,fk) : NULL;
+        CFTypeRef proposal=(request && fk) ? p_CFDictionaryGetValue(request,fk) : NULL;
         if(fk)p_CFRelease(fk);
         if(stockResp && proposal &&
            !set_reference_enabled_features((CFMutableDictionaryRef)stockResp))
