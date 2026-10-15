@@ -22,6 +22,7 @@ void alt111_video_detach(struct alt111_video *v)
     ++v->consumer;
     v->attached = v->priming_queued = v->consumer_primed = 0;
     v->keyframe_needed = 0;
+    v->recovery_wait_idr = v->recovery_draining = v->recovery_request_due = 0;
 }
 
 void alt111_video_destroy(struct alt111_video *v)
@@ -49,6 +50,36 @@ int alt111_video_end(struct alt111_video *v, uint64_t stream)
     v->nal_length_size = 0;
     memset(v->config, 0, sizeof(v->config));
     return ALT111_OK;
+}
+
+/* A bounded overload is NOT a socket failure. Never remove an AU whose TCP
+ * payload or M1AU header has started. Discard only unsent AUs and wait for a
+ * NEW complete IDR with current SPS/PPS before resuming. The receiver still
+ * consumes/decrypts every input AU, keeping AES-CTR aligned.
+ */
+static int overflow_resync(struct alt111_video *v)
+{
+    unsigned keep = v->count &&
+        (v->queue[v->head].wire_started || v->queue[v->head].offset);
+    unsigned i;
+    if (keep) {
+        for (i = 1; i < v->count; ++i) {
+            unsigned idx = (v->head + i) % ALT111_QUEUE_CAP;
+            free(v->queue[idx].bytes);
+            memset(&v->queue[idx], 0, sizeof(v->queue[idx]));
+        }
+        v->count = 1;
+        v->queued_bytes = v->queue[v->head].length;
+        v->recovery_draining = 1;
+    } else {
+        clear_queue(v);
+        v->recovery_draining = 0;
+        v->consumer_primed = v->priming_queued = 0;
+    }
+    v->recovery_wait_idr = 1;
+    v->keyframe_needed = 1;
+    ++v->dropped_aus; /* the triggering AU is lost */
+    return ALT111_SOFT_RESYNC;
 }
 
 static int parameter_set(const uint8_t *p, size_t n, size_t *pos, unsigned type,
@@ -208,15 +239,23 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
     if ((!idr && !dependent) || (idr && dependent)) return invalid_au(v);
     ++v->source_aus; source_ordinal = ++v->source_ordinal; v->source_idrs += idr;
     if (!v->attached) return ALT111_WAIT;
+    if (v->recovery_wait_idr) {
+        /* A pin in progress must first finish completely; an IDR received
+         * before that boundary cannot become the new decoder entry point. */
+        if (v->recovery_draining || !idr) {
+            ++v->dropped_aus;
+            return ALT111_WAIT;
+        }
+        v->recovery_wait_idr = 0;
+        v->consumer_primed = v->priming_queued = 0;
+    }
     if (!v->consumer_primed && !v->priming_queued && !idr) {
         ++v->dropped_aus;
         return ALT111_WAIT;
     }
     prefix = !v->consumer_primed && !v->priming_queued ? v->config_length : 0;
     if (v->count == ALT111_QUEUE_CAP || bytes + prefix > ALT111_QUEUE_BYTES - v->queued_bytes) {
-        ++v->dropped_aus;
-        alt111_video_detach(v);
-        return ALT111_RESTART_CONSUMER;
+        return overflow_resync(v);
     }
     out = (uint8_t *)malloc(prefix + bytes);
     if (!out) { alt111_video_detach(v); ++v->dropped_aus; return ALT111_NOMEM; }
@@ -236,6 +275,7 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
     chunk->sequence = ++v->sequence;
     chunk->source_ordinal = source_ordinal;
     chunk->priming = prefix != 0; chunk->idr = idr;
+    chunk->wire_started = 0;
     chunk->source_time_present = source_ts_raw != NULL;
     if (source_ts_raw) memcpy(chunk->source_ts_raw, source_ts_raw, 8u);
     else memset(chunk->source_ts_raw, 0, sizeof(chunk->source_ts_raw));
@@ -270,6 +310,18 @@ int alt111_video_peek(const struct alt111_video *v, const uint8_t **bytes,
     return ALT111_OK;
 }
 
+int alt111_video_mark_wire_started(struct alt111_video *v,
+                                   const struct alt111_output_ticket *ticket)
+{
+    if (!v || !ticket || !v->active || !v->attached || !v->count ||
+        ticket->stream != v->stream || ticket->codec != v->codec ||
+        ticket->consumer != v->consumer ||
+        ticket->sequence != v->queue[v->head].sequence ||
+        ticket->offset != v->queue[v->head].offset) return ALT111_STALE;
+    v->queue[v->head].wire_started = 1;
+    return ALT111_OK;
+}
+
 int alt111_video_advance(struct alt111_video *v,
                         const struct alt111_output_ticket *ticket, size_t sent)
 {
@@ -290,6 +342,14 @@ int alt111_video_advance(struct alt111_video *v,
         v->queued_bytes -= chunk->length;
         free(chunk->bytes); memset(chunk, 0, sizeof(*chunk));
         v->head = (v->head + 1) % ALT111_QUEUE_CAP; --v->count; ++v->delivered_aus;
+        if (!v->count && v->recovery_draining) {
+            /* The last in-flight AU is now complete on the local wire.
+             * Ask for another source IDR; an earlier requested IDR may have
+             * arrived while this AU was still draining and was discarded. */
+            v->recovery_draining = 0;
+            v->consumer_primed = v->priming_queued = 0;
+            v->recovery_request_due = 1;
+        }
     }
     return ALT111_OK;
 }
