@@ -19,6 +19,7 @@
 #include <time.h>
 #include <unistd.h>
 #include "alt111.h"
+#include "alt111_tcp_nodelay.h"
 #include "alt111_zoom.h"
 #include "alt111_zoom_adapter.h"
 #include "alt111_zoom_debugspi.h"
@@ -260,6 +261,13 @@ static int g_tee_client = -1;
 static uint64_t g_tee_consumer_generation;
 static pthread_t g_tee_thread;
 static int g_tee_started;
+/* V3 diagnostic A/B: no marker = legacy Nagle (TCP_NODELAY=0).
+ * The control worker polls the volatile marker every 250 ms; reconnects
+ * also apply the current value immediately, without rebuilding GEN2.
+ */
+static const char *g_tee_nodelay_marker = "/tmp/mibr-alt111-tcp-nodelay.enabled";
+static int g_tee_nodelay_attempted = -1; /* -1: new/no socket */
+static int g_tee_nodelay_applied = -1;   /* -1: no verified result */
 
 /*
  * Optional local AU framing. Raw Annex-B remains the default transport.
@@ -1921,6 +1929,8 @@ static void tee_drop_client_locked(void)
     if (g_tee_client >= 0) close(g_tee_client);
     g_tee_client = -1;
     g_tee_consumer_generation = 0;
+    g_tee_nodelay_attempted = -1;
+    g_tee_nodelay_applied = -1;
     g_tee_framed = 0;
     g_tee_frame_header_off = 0;
     g_tee_frame_header_sequence = 0;
@@ -1979,6 +1989,35 @@ static void capture_mirror_send(const uint8_t *p, size_t n,
     if (publish) capture_publish_status(drop ? "dropped" : "recording");
 }
 
+/* Poll outside the media hot path. g_lock serializes close/replacement with
+ * setsockopt and GEN2's send. A failed application is logged once per mode
+ * and socket, then may be retried by changing the marker or reconnecting.
+ */
+static void tee_nodelay_poll(void)
+{
+    const int desired = access(g_tee_nodelay_marker, F_OK) == 0 ? 1 : 0;
+    int fd = -1, attempted = 0, saved_errno = 0, applied = -1;
+
+    pthread_mutex_lock(&g_lock);
+    if (g_tee_client >= 0 && g_tee_nodelay_attempted != desired) {
+        fd = g_tee_client;
+        attempted = 1;
+        if (alt111_tcp_nodelay_apply(fd, desired) == 0) {
+            applied = desired;
+        } else {
+            saved_errno = errno;
+        }
+        g_tee_nodelay_attempted = desired;
+        g_tee_nodelay_applied = applied;
+    }
+    pthread_mutex_unlock(&g_lock);
+    if (attempted)
+        logf_u2("GEN2 V3 TCP_NODELAY A/B fd=%d requested=%s verified=%s errno=%d",
+                fd, desired ? "on" : "off",
+                applied < 0 ? "failed" : (applied ? "on" : "off"),
+                saved_errno);
+}
+
 static void *tee_accept_thread(void *arg)
 {
     (void)arg;
@@ -1996,6 +2035,7 @@ static void *tee_accept_thread(void *arg)
         g_tee_frame_header_off = 0;
         g_tee_frame_header_sequence = 0;
         pthread_mutex_unlock(&g_lock);
+        tee_nodelay_poll(); /* apply A/B immediately to the new local socket */
         logf_u2("gen2 renderer connected nonblocking on 127.0.0.1:%d mode=%s; waiting for config+complete IDR",
                 g_tee_port,g_tee_framed?"m1au-v1":"raw-annexb");
         gen2_consumer_attach();
@@ -3855,6 +3895,7 @@ static void *gen2_control_worker(void *arg)
         OSStatus e=-1;
         uint64_t settings_now=monotonic_ms();
         if(!last_settings_poll || settings_now-last_settings_poll>=250u){
+            tee_nodelay_poll(); /* live A/B, no disconnect or media-path I/O */
             (void)settings_refresh();gen2_apply_selected_view();gen2_publish_status();
             last_settings_poll=settings_now;
         }
