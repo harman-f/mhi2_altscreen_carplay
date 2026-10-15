@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include "alt111.h"
 #include "alt111_tcp_nodelay.h"
+#include "alt111_bridge_status.h"
 #include "alt111_zoom.h"
 #include "alt111_zoom_adapter.h"
 #include "alt111_zoom_debugspi.h"
@@ -397,6 +398,7 @@ static const char *g2_diag_keyframe_marker = "/tmp/mibr-alt111-keyframe-only";
 static const char *g2_view_request_path = "/tmp/mibr-alt111-viewarea-request";
 static const char *g2_resync_enable_marker = "/tmp/mibr-alt111-resync.enabled";
 static const char *g2_resync_arm_marker = "/tmp/mibr-alt111-resync-arm";
+static const char *g2_bridge_status_path = "/tmp/mibr-parity-ts.status";
 static const char *g2_d2_config_name = "mibr-carplay111-keyframes.conf";
 static const char *g_source_version_config_name = "mibr-carplay111-sourceversion";
 
@@ -438,6 +440,7 @@ static void gen2_video_end_current(void);
 static void gen2_close_consumer(void);
 static void gen2_keyframe_intent(unsigned reason);
 static void gen2_resync_poll(void);
+static void gen2_resync_snapshot_locked(struct alt111_resync_snapshot *snap);
 static const char *config_layer_name(unsigned layer);
 static void gen2_d2_timing_load(struct gen2_d2_timing *cfg);
 static void source_version_value(char *out, size_t cap,
@@ -1708,8 +1711,9 @@ static int gen2_video_submit_au(const uint8_t *p, size_t n,
     if (consumer_attached) *consumer_attached = 0;
     pthread_mutex_lock(&g2_core_lock);
     before = g2_video.source_aus;
-    rc = g2_video_stream ? alt111_video_submit_timed(&g2_video, g2_video_stream,
-                                                     p, n, 1, source_ts_raw)
+    rc = g2_video_stream ? alt111_video_submit_timed_at(&g2_video, g2_video_stream,
+                                                     p, n, 1, source_ts_raw,
+                                                     (uint64_t)monotonic_us())
                          : ALT111_STALE;
     after_count = g2_video.source_aus;
     /* Reference cadence belongs to the source producer, even when there is
@@ -1720,6 +1724,13 @@ static int gen2_video_submit_au(const uint8_t *p, size_t n,
             (uint64_t)monotonic_us());
         if(reason && g2_control_session)
             (void)alt111_control_keyframe_reason(&g2_control,g2_control_session,reason);
+    }
+    if(rc==ALT111_SOFT_RESYNC && g2_control_session){
+        struct alt111_resync_snapshot snap;
+        gen2_resync_snapshot_locked(&snap);
+        alt111_resync_set_enabled(&g2_resync,1u);
+        (void)alt111_resync_arm(&g2_resync,monotonic_ms(),
+                               ALT111_RESYNC_REASON_OVERFLOW,&snap);
     }
     if (accepted && after_count > before) *accepted = 1;
     if (consumer_attached) *consumer_attached = g2_video.attached ? 1 : 0;
@@ -3453,6 +3464,22 @@ static void gen2_publish_status(void)
     if(n<=0)return;
     if((size_t)n>=sizeof(b))return;
     {
+        int more=snprintf(b+n,sizeof(b)-(size_t)n,
+           "\nqueue_capacity_aus=%u\nqueue_capacity_bytes=%u\nqueue_overflow_events=%llu\nqueue_stale_events=%llu\nsoft_recovery_epoch=%llu\nsource_last_idr_ordinal=%llu\ndelivered_idr_ordinal=%llu\nresync_candidate_idr_ordinal=%llu\nresync_source_recoveries=%llu\nresync_stage=%s\n",
+           (unsigned)ALT111_QUEUE_CAP,(unsigned)ALT111_QUEUE_BYTES,
+           (unsigned long long)vs.queue_overflow_events,
+           (unsigned long long)vs.queue_stale_events,
+           (unsigned long long)vs.soft_recovery_epoch,
+           (unsigned long long)vs.last_source_idr_ordinal,
+           (unsigned long long)vs.delivered_idr_ordinal,
+           (unsigned long long)rs.candidate_idr_ordinal,
+           (unsigned long long)rs.source_recoveries,
+           rs.state==ALT111_RESYNC_NEED_BRIDGE?"BRIDGE_PENDING":
+           rs.state==ALT111_RESYNC_NEED_IDR?"SOURCE_PENDING":"SYNCED");
+        if(more<0 || (size_t)more>=sizeof(b)-(size_t)n)return;
+        n+=more;
+    }
+    {
         int zn=snprintf(b+n,sizeof(b)-(size_t)n,
             "\nzoom_session=%llu\nzoom_focus=%u\nzoom_source_visible=%u\nzoom_owner=%u\n"
             "zoom_positive_is_in=%d\nzoom_pending=%d\nzoom_in_flight=%u\n"
@@ -3674,15 +3701,35 @@ static void gen2_resync_snapshot_locked(struct alt111_resync_snapshot *snap)
     snap->consumer = g2_video.consumer;
     snap->source_aus = g2_video.source_aus;
     snap->source_idrs = g2_video.source_idrs;
+    snap->last_source_idr_ordinal=g2_video.last_source_idr_ordinal;
+    snap->delivered_idr_ordinal=g2_video.delivered_idr_ordinal;
+    snap->soft_recovery_epoch=g2_video.soft_recovery_epoch;
     snap->projection_desired = g2_control.desired;
     snap->config_valid = g2_video.config_valid;
     snap->consumer_primed = g2_video.consumer_primed;
 }
 
+/* Read passive parity status <=2x/sec, outside all media/CORE locks.
+ * File absence, stale samples, mismatched generations or disabled telemetry
+ * leave bridge evidence UNKNOWN, never a fabricated recovery success. */
 static void gen2_resync_poll(void)
 {
     struct alt111_resync_snapshot snap;
     struct gen2_d2_timing d2_timing;
+    static struct alt111_bridge_status bridge_cache;
+    static uint64_t bridge_read_ms;
+    static unsigned bridge_valid;
+    if(!bridge_read_ms || monotonic_ms()<bridge_read_ms ||
+       monotonic_ms()-bridge_read_ms>=500u){
+        char buf[8192];int fd=open(g2_bridge_status_path,O_RDONLY);
+        ssize_t n=-1;
+        bridge_read_ms=monotonic_ms();bridge_valid=0;
+        if(fd>=0){n=read(fd,buf,sizeof(buf)-1u);close(fd);}
+        if(n>0 && n<(ssize_t)sizeof(buf)){
+            buf[n]=0;
+            bridge_valid=alt111_bridge_status_parse(buf,&bridge_cache)==0;
+        }
+    }
     enum alt111_resync_action action;
     uint64_t now = monotonic_ms();
     uint64_t epoch = 0, idr_at_arm = 0, source_idrs = 0;
@@ -3706,8 +3753,15 @@ static void gen2_resync_poll(void)
     before_enabled = g2_resync.enabled;
     before_state = g2_resync.state;
     before_cancel = g2_resync.cancel_reason;
+    if(g2_resync.state!=ALT111_RESYNC_SYNCED &&
+       g2_resync.reason==ALT111_RESYNC_REASON_OVERFLOW)enabled=1u;
     alt111_resync_set_enabled(&g2_resync,enabled);
     gen2_resync_snapshot_locked(&snap);
+    if(bridge_valid && alt111_bridge_status_matches(&bridge_cache,
+        (uint64_t)monotonic_us(),snap.stream,snap.codec,snap.consumer)){
+        snap.bridge_healthy=1u;
+        snap.bridge_idr_ordinal=bridge_cache.sequence;
+    }
 
     if(d2_enabled) {
         if(!g2_d2_was_enabled) {
@@ -3826,10 +3880,13 @@ static void gen2_resync_poll(void)
         if(keyframe_rc!=ALT111_OK)
             logf_u2("GEN2 RESYNC REQUEST not queued through serialized controller rc=%d session=%llu projection=%u",
                     keyframe_rc,(unsigned long long)g2_control_session,snap.projection_desired);
+    }else if(action==ALT111_RESYNC_SOURCE_RECOVERED){
+        logf_u2("GEN2 RESYNC SOURCE_RECOVERED epoch=%llu delivered_idr=%llu bridge_pending=1",
+            (unsigned long long)epoch,(unsigned long long)snap.delivered_idr_ordinal);
     }else if(action==ALT111_RESYNC_COMPLETED){
-        logf_u2("GEN2 RESYNC COMPLETE epoch=%llu completions=%llu idr_at_arm=%llu source_idrs=%llu",
+        logf_u2("GEN2 RESYNC BRIDGE_RECOVERED epoch=%llu completions=%llu idr_ordinal=%llu accepted_block=1 stable_ms=1000 VC_visibility=unverified",
                 (unsigned long long)epoch,(unsigned long long)completions,
-                (unsigned long long)idr_at_arm,(unsigned long long)source_idrs);
+                (unsigned long long)snap.bridge_idr_ordinal);
     }else if(action==ALT111_RESYNC_CANCELLED || (changed && cancels)){
         logf_u2("GEN2 RESYNC CANCEL epoch=%llu cancels=%llu",
                 (unsigned long long)epoch,(unsigned long long)cancels);
