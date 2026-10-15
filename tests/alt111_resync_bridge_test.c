@@ -34,11 +34,14 @@ int main(void)
     s.bridge_idr_ordinal=10;s.bridge_healthy=1;
     assert(alt111_resync_tick(&r,1200,&s)==ALT111_RESYNC_NONE); /* wrong ordinal */
     s.bridge_idr_ordinal=11;s.bridge_healthy=0;
+    s.bridge_blocks=19;s.bridge_sample_us=1000000;
     assert(alt111_resync_tick(&r,1500,&s)==ALT111_RESYNC_NONE); /* not healthy */
     s.bridge_healthy=1;
     assert(alt111_resync_tick(&r,1501,&s)==ALT111_RESYNC_NONE);
     assert(alt111_resync_tick(&r,2500,&s)==ALT111_RESYNC_NONE); /* less than 1s */
-    assert(alt111_resync_tick(&r,2501,&s)==ALT111_RESYNC_COMPLETED);
+    assert(alt111_resync_tick(&r,2501,&s)==ALT111_RESYNC_NONE); /* frozen writer sample */
+    s.bridge_blocks=20;s.bridge_sample_us=2000000;
+    assert(alt111_resync_tick(&r,2502,&s)==ALT111_RESYNC_COMPLETED);
     assert(r.completions==1 && r.source_recoveries==1);
     /* A second overload invalidates any old candidate / stale writer sample. */
     s=ready();alt111_resync_set_enabled(&r,1);
@@ -54,6 +57,7 @@ int main(void)
     assert(alt111_resync_tick(&r,4100,&s)==ALT111_RESYNC_NONE);
     s.bridge_idr_ordinal=12;
     assert(alt111_resync_tick(&r,4101,&s)==ALT111_RESYNC_NONE);
+    s.bridge_blocks=21;s.bridge_sample_us=3000000;
     assert(alt111_resync_tick(&r,5101,&s)==ALT111_RESYNC_COMPLETED);
     puts("ALT111_RESYNC_BRIDGE_TEST=PASS");
     return 0;
