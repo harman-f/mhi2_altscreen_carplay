@@ -1031,30 +1031,60 @@ static int current_advertised_fps(void)
     return g_fps;
 }
 
-static void set_reference_enabled_features(CFMutableDictionaryRef response)
+/* Never mirror the phone's requested "features". Only extend the receiver's
+ * own accepted list. Preserve unknown stock features and avoid duplicates. */
+static int feature_in_array(CFArrayRef a,const char *name)
+{
+    CFIndex i,n;
+    if(!a)return 0;
+    n=p_CFArrayGetCount(a);
+    for(i=0;i<n;++i){
+        CFTypeRef e=p_CFArrayGetValueAtIndex(a,i);
+        char buf[96];
+        if(e && p_CFGetTypeID(e)==p_CFStringGetTypeID() &&
+           p_CFStringGetCString((CFStringRef)e,buf,sizeof(buf),CF_UTF8) &&
+           !strcmp(buf,name))return 1;
+    }
+    return 0;
+}
+static int set_reference_enabled_features(CFMutableDictionaryRef response)
 {
     CFStringRef k=NULL,alt=NULL,va=NULL,iap=NULL;
+    CFArrayRef old=NULL;
     CFMutableArrayRef a=NULL;
-    int classic_single_view=compat_profile_classic_single_view();
+    int ok=0, classic=compat_profile_classic_single_view();
     struct mibr_viewareas_config cfg;
-    if(!response)return;
+    if(!response)return 0;
     load_viewareas_config(&cfg);
-
     k=s_cf("enabledFeatures");
+    if(!k)goto done;
+    old=(CFArrayRef)p_CFDictionaryGetValue(response,k);
+    if(old && p_CFGetTypeID(old)!=p_CFArrayGetTypeID())goto done;
+    a=old ? p_CFArrayCreateMutableCopy(NULL,0,old)
+          : p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
+    if(!a)goto done;
     alt=s_cf("altScreen");
-    va=s_cf("viewAreas");
-    if(classic_single_view)iap=s_cf("iAPChannel");
-    a=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
-    if(a&&iap)p_CFArrayAppendValue(a,iap);
-    if(a&&va&&cfg.enabled)p_CFArrayAppendValue(a,va);
-    if(a&&alt)p_CFArrayAppendValue(a,alt);
-    if(a&&k)p_CFDictionarySetValue(response,k,a);
-
+    if(!alt)goto done;
+    if(!feature_in_array(a,"altScreen"))p_CFArrayAppendValue(a,alt);
+    if(cfg.enabled){
+        va=s_cf("viewAreas");
+        if(!va)goto done;
+        if(!feature_in_array(a,"viewAreas"))p_CFArrayAppendValue(a,va);
+    }
+    if(classic && !feature_in_array(a,"iAPChannel")){
+        iap=s_cf("iAPChannel");
+        if(!iap)goto done;
+        p_CFArrayAppendValue(a,iap);
+    }
+    p_CFDictionarySetValue(response,k,a);
+    ok=1;
+done:
     if(a)p_CFRelease(a);
     if(iap)p_CFRelease(iap);
     if(va)p_CFRelease(va);
     if(alt)p_CFRelease(alt);
     if(k)p_CFRelease(k);
+    return ok;
 }
 
 static int source_version_is_valid(const char *s)
@@ -1462,17 +1492,19 @@ static CFMutableDictionaryRef clone_without_111(CFDictionaryRef request)
 }
 
 /* Clone the exact requested 111 descriptor and preserve unknown peer fields. */
-static void append_alt_setup_response(CFMutableDictionaryRef response,
-                                      CFDictionaryRef requested,
-                                      int data_port)
+static int append_alt_setup_response(CFMutableDictionaryRef response,
+                                     CFDictionaryRef requested,
+                                     int data_port)
 {
     CFStringRef kstreams = NULL, kport = NULL, kstreamid = NULL;
     CFArrayRef old = NULL;
     CFMutableArrayRef a = NULL;
     CFMutableDictionaryRef sd = NULL;
 
-    if(!response || !requested) return;
+    int ok=0;
+    if(!response || !requested || data_port<=0) return 0;
     kstreams = s_cf("streams");
+    if(!kstreams)return 0;
     old = (CFArrayRef)p_CFDictionaryGetValue(response,kstreams);
     a = old ? p_CFArrayCreateMutableCopy(NULL,0,old)
             : p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
@@ -1485,6 +1517,7 @@ static void append_alt_setup_response(CFMutableDictionaryRef response,
         p_CFDictionarySetInt64(sd,kstreamid,K_STREAM_ALT);
         p_CFArrayAppendValue(a,sd);
         p_CFDictionarySetValue(response,kstreams,a);
+        ok=1;
     }
 
     if(sd) p_CFRelease(sd);
@@ -1492,6 +1525,7 @@ static void append_alt_setup_response(CFMutableDictionaryRef response,
     if(kstreamid) p_CFRelease(kstreamid);
     if(kport) p_CFRelease(kport);
     if(kstreams) p_CFRelease(kstreams);
+    return ok;
 }
 
 /*
@@ -1673,7 +1707,12 @@ static int gen2_video_submit_au(const uint8_t *p, size_t n,
     if (consumer_attached) *consumer_attached = g2_video.attached ? 1 : 0;
     pthread_cond_broadcast(&g2_core_cv);
     pthread_mutex_unlock(&g2_core_lock);
-    if (rc == ALT111_RESTART_CONSUMER || rc < 0) {
+    if(rc==ALT111_SOFT_RESYNC){
+        /* Source AES/111 connection and local consumer remain alive. The
+         * control-worker serializes this request with show/stop/view. */
+        logf_u2("GEN2 video queue overflow: soft IDR recovery, consumer retained");
+        gen2_keyframe_intent(ALT111_KF_LATENCY_RECOVERY);
+    }else if (rc == ALT111_RESTART_CONSUMER || rc < 0) {
         logf_u2("gen2 video AU rc=%d body=%zu -> consumer reset", rc, n);
         gen2_close_consumer();
     }
@@ -1825,6 +1864,9 @@ static void *gen2_output_worker(void *arg)
                                   remain,MSG_NOSIGNAL);
                     } while(sent<0 && errno==EINTR);
                     if(sent>0) {
+                        /* Header is already on the wire; the core must not
+                         * discard this AU even while its payload offset is 0. */
+                        (void)alt111_video_mark_wire_started(&g2_video,&ticket);
                         g_tee_frame_header_off+=(size_t)sent;
                         sent=0; /* header bytes never advance the AU payload */
                         if(g_tee_frame_header_off<M1AU_HEADER_BYTES)header_pending=1;
@@ -1887,7 +1929,14 @@ static void *gen2_output_worker(void *arg)
         arc = alt111_video_advance(&g2_video, &ticket, (size_t)sent);
         delivered_after = g2_video.delivered_aus;
         primed_after = g2_video.consumer_primed;
-        pthread_mutex_unlock(&g2_core_lock);
+        /* An earlier requested IDR may have arrived while a pinned AU was
+         * still draining; request a fresh one after that AU completed. */
+        {
+            unsigned post_drain = g2_video.recovery_request_due;
+            g2_video.recovery_request_due=0;
+            pthread_mutex_unlock(&g2_core_lock);
+            if(post_drain) gen2_keyframe_intent(ALT111_KF_LATENCY_RECOVERY);
+        }
 
         if (arc == ALT111_OK && delivered_after > delivered_before) {
             /*
@@ -2922,7 +2971,11 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
 
     /* Reference order: compatibility/root capability first, display transformation second. */
     apply_source_version_persona(info);
-    set_reference_enabled_features(info);
+    if(!set_reference_enabled_features(info)){
+        logf_u2("GEN2 /info feature merge failed; returning stock info");
+        p_CFRelease(info);
+        return base;
+    }
 
     kdisplays=s_cf("displays");
     old=(CFArrayRef)p_CFDictionaryGetValue(base,kdisplays);
@@ -4486,7 +4539,16 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
         return e;
     }
 
-    if(stockResp)set_reference_enabled_features((CFMutableDictionaryRef)stockResp);
+    /* Only a control SETUP carries the phone's feature proposal. Mutating a
+     * media SETUP response would falsely suggest another negotiation. */
+    {
+        CFStringRef fk=s_cf("features");
+        CFTypeRef proposal=fk ? p_CFDictionaryGetValue(request,fk) : NULL;
+        if(fk)p_CFRelease(fk);
+        if(stockResp && proposal &&
+           !set_reference_enabled_features((CFMutableDictionaryRef)stockResp))
+            logf_u2("GEN2 control SETUP feature merge failed; stock response retained");
+    }
 
     hasAlt=g_enabled && contains_stream111(request,&altDesc,&other);
     if(!hasAlt){
@@ -4507,9 +4569,14 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
         port=start_alt_receiver(cid);
         if(port>0 && stockResp){
             if(gen2_control_projection_on(s)){
-                append_alt_setup_response((CFMutableDictionaryRef)stockResp,altDesc,port);
-                logf_u2("GEN2 stream111 SETUP accepted cid=%llu dataPort=%d response=cloned-request+streamID111; UI acquisition armed",
-                        (unsigned long long)cid,port);
+                if(append_alt_setup_response((CFMutableDictionaryRef)stockResp,altDesc,port)){
+                    logf_u2("GEN2 stream111 SETUP accepted cid=%llu dataPort=%d response=cloned-request+streamID111; UI acquisition armed",
+                            (unsigned long long)cid,port);
+                }else{
+                    logf_u2("GEN2 stream111 SETUP descriptor incomplete; preserving stock streams only");
+                    gen2_control_release();
+                    stop_alt_receiver();clear_video_observer();publish_state("setup_descriptor_failed");
+                }
             }else{
                 stop_alt_receiver();clear_video_observer();publish_state("setup_settings_unbound");
             }
