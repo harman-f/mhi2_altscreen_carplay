@@ -1522,24 +1522,29 @@ static int append_alt_setup_response(CFMutableDictionaryRef response,
     CFMutableArrayRef a = NULL;
     CFMutableDictionaryRef sd = NULL;
 
-    int ok=0;
+    int ok=0; CFIndex before=0;OSStatus pe=0,se=0;
     if(!response || !requested || data_port<=0) return 0;
     kstreams = s_cf("streams");
     if(!kstreams)return 0;
     old = (CFArrayRef)p_CFDictionaryGetValue(response,kstreams);
+    if(old && p_CFGetTypeID(old)!=p_CFArrayGetTypeID())goto done;
+    before=old?p_CFArrayGetCount(old):0;
     a = old ? p_CFArrayCreateMutableCopy(NULL,0,old)
             : p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
     sd = dict_clone(requested);
     kport = s_cf("dataPort");
     kstreamid = s_cf("streamID");
-
     if(a && sd && kport && kstreamid) {
         p_CFDictionarySetInt64(sd,kport,data_port);
         p_CFDictionarySetInt64(sd,kstreamid,K_STREAM_ALT);
+        if(p_CFDictionaryGetInt64(sd,kport,&pe)!=data_port || pe ||
+           p_CFDictionaryGetInt64(sd,kstreamid,&se)!=K_STREAM_ALT || se)goto done;
         p_CFArrayAppendValue(a,sd);
+        if(p_CFArrayGetCount(a)!=before+1)goto done;
         p_CFDictionarySetValue(response,kstreams,a);
-        ok=1;
+        ok=p_CFDictionaryGetValue(response,kstreams)==a;
     }
+done:
 
     if(sd) p_CFRelease(sd);
     if(a) p_CFRelease(a);
@@ -4745,7 +4750,7 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
 {
     CFDictionaryRef altDesc=NULL;
     CFDictionaryRef stockResp=NULL;
-    int other=0,hasAlt=0,control_advert_ready=0,alt_ok=0;
+    int other=0,hasAlt=0,control_advert_ready=0,control_attempted=0,alt_ok=0;
     OSStatus e;
     int port=-1;
     uint64_t cid=0;
@@ -4785,6 +4790,7 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
         CFTypeRef proposal=(request && fk) ? p_CFDictionaryGetValue(request,fk) : NULL;
         if(fk)p_CFRelease(fk);
         if(proposal){
+            control_attempted=1;
             control_advert_ready=gen2_ensure_advert_preflight(s);
             if(stockResp && control_advert_ready)
                 control_advert_ready=set_reference_enabled_features((CFMutableDictionaryRef)stockResp);
@@ -4805,7 +4811,8 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
             (unsigned long long)cid,other);
     publish_state("setup");
 
-    if(!control_advert_ready && !gen2_advert_ready_for(s)){
+    if((control_attempted && !control_advert_ready) ||
+       (!control_attempted && !gen2_advert_ready_for(s))){
         logf_u2("GEN2 stream111 SETUP withheld: no full same-session display advert");
         publish_state("setup_advert_unavailable");
     }else if(!cid){
