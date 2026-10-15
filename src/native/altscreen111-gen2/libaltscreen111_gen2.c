@@ -355,10 +355,6 @@ static const char *g_source_timing_enable_marker = "/tmp/mibr-alt111-source-timi
 static const char *g_source_timing_interval_path = "/tmp/mibr-alt111-source-timing-interval-ms";
 static pthread_mutex_t g_source_timing_lock = PTHREAD_MUTEX_INITIALIZER;
 static mibr_source_timing_t g_source_timing;
-/* Only the diagnostic interval config is cached; source AU counters/timestamps
- * remain unchanged. Read the interval file <=1x/sec while diagnosis is on. */
-static int64_t g_source_interval_refresh_us;
-static unsigned g_source_interval_cached_ms=1000u;
 static int g_streaming;
 static int g_video_config_seen;
 static uint64_t g_last_heartbeat_ms;
@@ -507,8 +503,6 @@ static void source_timing_reset(void)
 {
     pthread_mutex_lock(&g_source_timing_lock);
     memset(&g_source_timing,0,sizeof(g_source_timing));
-    g_source_interval_refresh_us=0;
-    g_source_interval_cached_ms=1000u;
     pthread_mutex_unlock(&g_source_timing_lock);
     (void)unlink(g_source_timing_status_path);
 }
@@ -619,15 +613,8 @@ static void source_timing_note_frame(const AirPlayScreenHeaderCompat *h, size_t 
     g_source_timing.ts_word1=w1;
     g_source_timing.ts_word2=w2;
 
-    if(access(g_source_timing_enable_marker,F_OK)==0){
-        if(!g_source_interval_refresh_us ||
-           now_us-g_source_interval_refresh_us>=1000000LL){
-            g_source_interval_cached_ms=source_timing_interval_ms();
-            g_source_interval_refresh_us=now_us;
-        }
-        interval_ms=g_source_interval_cached_ms;
-    }else interval_ms=0;
-    if(interval_ms &&
+    interval_ms=source_timing_interval_ms();
+    if(access(g_source_timing_enable_marker,F_OK)==0 &&
        now_us-g_source_timing.window_start_us >= (int64_t)interval_ms*1000LL){
         ++g_source_timing.samples;
         source_timing_write_locked("running",now_us);
@@ -2449,9 +2436,14 @@ static int start_alt_receiver(uint64_t connection_id)
     return g_alt_port;
 }
 
-static void set_str(CFMutableDictionaryRef d, const char *key, const char *val)
+static int set_str(CFMutableDictionaryRef d, const char *key, const char *val)
 {
-    CFStringRef k=s_cf(key), v=s_cf(val); p_CFDictionarySetValue(d,k,v); p_CFRelease(v); p_CFRelease(k);
+    CFStringRef k=key?s_cf(key):NULL,v=val?s_cf(val):NULL;
+    int ok=0;
+    if(d && k && v){p_CFDictionarySetValue(d,k,v);ok=p_CFDictionaryGetValue(d,k)!=NULL;}
+    if(v)p_CFRelease(v);
+    if(k)p_CFRelease(k);
+    return ok ? 0 : -1;
 }
 
 static void apply_source_version_persona(CFMutableDictionaryRef info)
@@ -2479,9 +2471,15 @@ static void apply_source_version_persona(CFMutableDictionaryRef info)
     }
 }
 
-static void set_i64(CFMutableDictionaryRef d, const char *key, int64_t val)
+static int set_i64(CFMutableDictionaryRef d, const char *key, int64_t val)
 {
-    CFStringRef k=s_cf(key); p_CFDictionarySetInt64(d,k,val); p_CFRelease(k);
+    CFStringRef k=key?s_cf(key):NULL;
+    OSStatus err=-1;int64_t observed=0;
+    if(!d || !k){if(k)p_CFRelease(k);return -1;}
+    p_CFDictionarySetInt64(d,k,val);
+    observed=p_CFDictionaryGetInt64(d,k,&err);
+    p_CFRelease(k);
+    return !err && observed==val ? 0 : -1;
 }
 
 static void set_false(CFMutableDictionaryRef d, const char *key)
