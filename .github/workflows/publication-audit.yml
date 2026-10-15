@@ -29,6 +29,19 @@ jobs:
           grep -Fq 'ADVANCED_RUNTIME_SWITCHES.md' README.md
 
 
+      - name: Every QNX handoff must pass target-shell preflight
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -s AGENTS.md
+          grep -Fq 'MU1440_QNX_SHELL_COMPATIBILITY.md' AGENTS.md
+          test -s docs/testing/MU1440_QNX_SHELL_COMPATIBILITY.md
+          python3 tools/check_mu1440_target_shell.py --self-test --check \
+            runtime/diagnostics/keypanel_trace_discovery.sh
+          # The existing broader deployment/runtime shell-regression step remains
+          # mandatory below. One-off private ZIPs cannot be inspected by GitHub CI:
+          # AGENTS.md requires this same checker on all extracted target scripts.
+
       - name: Deployment smoke audit
         shell: bash
         run: |

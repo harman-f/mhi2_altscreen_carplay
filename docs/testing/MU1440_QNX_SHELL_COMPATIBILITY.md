@@ -3,8 +3,21 @@
 Target: `MHI2_ER_SKG13_P4526_MU1440`  
 Context: direct SSH / MMX QNX shell
 
-This file records exact-target command constraints that matter to this repository's developer
-deployment. It exists because desktop Linux habits are not a safe compatibility model for the unit.
+This is the **canonical mandatory preflight contract for ALL on-unit QNX shell material**, including
+MMX and RCC runtime, developer deployment, ad-hoc read-only diagnosis, keypanel probes, boot/clock
+inventory, one-off shell snippets and **ZIPs prepared outside this repository**. It exists because
+desktop Linux habits are not a safe compatibility model for the unit.
+
+Read together with [root AGENTS.md](../../AGENTS.md) and invoke
+`python3 tools/check_mu1440_target_shell.py --self-test --check <every-target-script>`
+on the HOST **before** a target-side copy/test. The checker does not establish real hardware support:
+the exact board must subsequently confirm each unproven command/option and the output. The
+repository CI previously scanned only `deployment/mu1440` and `runtime`; a private R17.1 diagnostic
+bundle bypassed that scan, despite this file documenting absent external `printf`.
+
+## MMX versus RCC: verified operator routing and Codex direct SSH handoff (2026-10-12)
+
+The operator's already running **SSH login terminates directly on MMX**. Run MMX commands there directly; `on` is unnecessary for MMX and MUST NOT be blindly added around MMX diagnostics. M.I.B. Bash explicitly executes RCC-side programs **from MMX** using `on -f rcc <program> [args]`; see [upstream `esd/scripts/backupplus_rcc.sh`](https://github.com/CaneTLOTW/M.I.B._More-Incredible-Bash/blob/main/esd/scripts/backupplus_rcc.sh) (`on -f rcc /net/mmx/fs/sda0/apps/backupplus -rcc`) and [upstream `config/BASICS`](https://github.com/CaneTLOTW/M.I.B._More-Incredible-Bash/blob/main/config/BASICS) (`on -f rcc /net/rcc/usr/apps/modifyE2P`). First run a tiny read-only `on -f rcc uname -a` probe and independently confirm actual CPU/BSP; validate shell/SD visibility and output redirection before attempting a RCC diagnostic script. The M.I.B. README RCC port **123** and MMX port **23** are **Telnet/UART guidance** and must not be interpreted as SSH ports. A cloud Codex runner cannot be assumed to reach the operator's LAN: if existing authorized direct SSH is unavailable, stop and mark `BLOCKED_NO_LAN_SSH`. Never publish SSH keys/passwords or private host setup in a public issue. [R17.3 live-test task](https://github.com/harman-f/mhi2_altscreen_carplay/issues/43).
 
 ## Operator command rule
 
@@ -19,8 +32,9 @@ and several such exact programs have already been vehicle-tested.
 
 ## Confirmed exact-target limitations
 
-### external `printf`
+### external `printf` — hard target prohibition
 
+**VEHICLE-PROVEN ABSENT on the MMX; never assume a shell built-in will rescue it.**
 Not available in the tested direct runtime PATH.
 
 Observed:
@@ -29,7 +43,13 @@ Observed:
 ./gen2_nav_config.sh[459]: printf: cannot execute - No such file or directory
 ```
 
-Runtime scripts use `echo` for the required simple line writes instead.
+Runtime scripts use `echo` for the required simple line writes instead. The same failure reoccurred in the separately distributed
+R17.1 MMX inventory (2026-10-12): `mibr-mmx-inventory-r17.ksh[16..31]: printf:
+cannot execute - No such file or directory`. Audit showed that **all three** R17.1 target
+scripts (MMX inventory, TegraDiag recorder, RCC baseline) used `printf`. Their Linux
+mock/syntax checks had passed because they did not model this command restriction.
+The R17.2 replacement uses simple `echo` for simple lines and keeps machine-readable
+record delimiters; never reuse the superseded R17/R17.1 target scripts.
 
 ### stock `sha256sum`
 
@@ -41,6 +61,26 @@ The guarded public developer package carries its own reproducibly built QNX ARMv
 ### `sed` / `tr`
 
 Do not make either a vehicle runtime dependency. `sed` is missing on some older firmware trains, so the stable deployment removed its only required use in favor of stock `awk`. Earlier live-monitor work also had to remove `tr`.
+
+### R17.2 direct-MMX live evidence: `date` is not executable (2026-10-12)
+
+The actual R17.2 MMX inventory ran to `# FINISH status=COMPLETED`, but
+the optional timestamp section logged `date: cannot execute - No such file or
+directory` and `# END timestamp exit_code=126`. The TegraDiag recorder
+similarly produced valid numeric samples with `wall_time=NA`. **Do not make
+`date` (even without GNU options) a mandatory MMX diagnostic dependency.**
+Use sample ordinal and QNX syspage/qtime snapshots instead; a matching `RCC`
+command still requires independent RCC-side evidence.
+
+A second exact-target finding: `cat /dev/nvtmon/current` and
+`cat /dev/nvtmon/current_local` return bare numeric text without final newline
+(in this run `033` and `027`). The R17.2 shell collector concatenated
+`# END ...` directly onto those values. A target script must add an explicit
+plain `echo` separator **after** each command before the `# END` delimiter;
+a host parser must include no-trailing-newline device fixtures. The real samples
+remain usable; R17.2 host inventory parser's 2 section-boundary warnings reflect
+output framing, not a failed sensor getter. Never turn an optional section
+failure into an unconditional complete-success claim.
 
 ### GNU `date` behavior
 
@@ -151,3 +191,45 @@ A runtime/deployment shell change should not introduce:
 - an assumption that a readable SD or persistent filesystem is writable.
 
 The public CI checks the first deployment-level regressions automatically.
+
+
+## Contract for every new MMX/RCC diagnostic handoff — hard gate (2026-10-12)
+
+**Why a repeated regression occurred:** the existing publication CI already prohibits
+`printf` in the committed `deployment/mu1440` and `runtime` directories, but our
+standalone source ZIP was built outside those locations. Linux mock tests also used a
+shell with its own `printf` builtin. Passing a syntax check or mock says **HOST-ONLY**,
+never **VEHICLE-PROVEN** command availability.
+
+Before providing any copyable QNX command or downloadable diagnostic ZIP:
+
+1. Declare **MMX or RCC**, exact firmware/board and evidence grade. Do not transfer an MMX
+   command/device path to RCC by inference. On RCC, stock `pidin`, `ls`, `date`, and
+   `uname` still need their own target validation; do not claim proven until observed there.
+2. Inventory **all** executable names, shell builtins, option/format assumptions and
+   `/dev` getter paths used in **every** delivered `.sh`/`.ksh`, not just the entrypoint.
+   Use only exact-board tested endpoints; treat each new dependency as unproven.
+3. For an external handoff ZIP, extract it on the PC and run the project's host checker
+   against all target scripts. Run its negative/self-test; inspect shell source manually
+   for dynamically assembled commands. A host `bash -n` is additional syntax verification,
+   NOT a capability test. When a command cannot be established, remove it or make it an
+   explicit failure/optional result rather than guessing a Linux replacement.
+4. **Forbidden as unbundled assumptions:** external `printf`; `sed`, `tr`; stock
+   `sha256sum` or `tee`; GNU-only `date`, `grep` alternation `A\\|B`, and GNU option
+   extensions. The last four points may be used only with documented exact-board
+   confirmation or with the intended explicitly verified compatible bundled helper.
+   Shell `echo` with uncomplicated single-line text is proven on MMX. Do not rely on
+   `echo -n` or portable backslash-escape interpretation.
+5. Use a **new user-chosen writable diagnostics path**. Scripts emit stdout by default;
+   caller redirects to a new log. Capture stderr/exit codes and preserve partial logs.
+   No implicit remount or write to a production flash/application partition for a
+   read-only collector.
+6. Maintain per-artifact evidence: files/commands scanned, mock negative fixture,
+   syntax result, parser regression result, SHA-256 manifest, exact tested hardware,
+   errors, and outstanding NOT TESTED gates. When a real unit rejects a command,
+   update this canonical record and its guard *before* producing the replacement.
+
+**CI scope:** GitHub scans committed vehicle runtime/deployment code; it cannot
+automatically inspect private archives attached to conversations. For these, the
+host checker is a mandatory explicit packaging step. This distinction must be
+disclosed rather than calling a Linux-only shell simulation “QNX-validated”.
