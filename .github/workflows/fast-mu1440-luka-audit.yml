@@ -1,0 +1,43 @@
+name: Fast MU1440 Luka audit regression
+
+on:
+  push:
+    branches:
+      - work/mu1440-luka-audit-implementation-20261015
+    paths:
+      - '.github/workflows/fast-mu1440-luka-audit.yml'
+      - 'src/native/altscreen111-gen2/**'
+      - 'tests/alt111_video_queue_recovery_test.c'
+      - 'tests/alt111_tcp_nodelay_test.c'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Syntax-check actual GEN2 adapter (no vehicle/QNX dependency)
+        run: |
+          cc -std=gnu99 -Wall -Wextra -DALT111_GEN2_HOST_TEST \
+            -Isrc/native/altscreen111-gen2/include -Isrc/native/alt111-settings/include \
+            -fsyntax-only src/native/altscreen111-gen2/libaltscreen111_gen2.c
+      - name: Queue and incomplete-M1AU recovery (ASan/UBSan)
+        run: |
+          cc -std=c99 -Wall -Wextra -Werror -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -Isrc/native/altscreen111-gen2/include \
+            tests/alt111_video_queue_recovery_test.c \
+            src/native/altscreen111-gen2/src/alt111_video.c \
+            -o /tmp/alt111_video_queue_recovery_test
+          /tmp/alt111_video_queue_recovery_test
+      - name: V3 TCP_NODELAY socket A/B smoke
+        run: |
+          cc -std=c99 -Wall -Wextra -Werror \
+            -Isrc/native/altscreen111-gen2/include \
+            tests/alt111_tcp_nodelay_test.c -o /tmp/alt111_tcp_nodelay_test
+          /tmp/alt111_tcp_nodelay_test
