@@ -3796,6 +3796,8 @@ static void gen2_resync_poll(void)
         (uint64_t)monotonic_us(),snap.stream,snap.codec,snap.consumer)){
         snap.bridge_healthy=1u;
         snap.bridge_idr_ordinal=bridge_cache.sequence;
+        snap.bridge_blocks=bridge_cache.blocks;
+        snap.bridge_sample_us=bridge_cache.snapshot_us;
     }
 
     if(d2_enabled) {
