@@ -10,9 +10,11 @@
 
 #define ALT111_MAX_VIEWS 3
 #define ALT111_CODEC_CAP 4096
-#define ALT111_QUEUE_CAP 16
+#define ALT111_QUEUE_CAP 32
 #define ALT111_AU_LIMIT (2u * 1024u * 1024u)
-#define ALT111_QUEUE_BYTES (4u * 1024u * 1024u)
+#define ALT111_QUEUE_BYTES (8u * 1024u * 1024u)
+/* Monotonic local receive age; source 32.32 is NEVER used as queue age. */
+#define ALT111_BACKLOG_STALE_US 1000000ull
 #define ALT111_COMMAND_TIMEOUT_MS 1500u
 #define ALT111_RETRY_MS 1000u
 #define ALT111_ATTEMPTS 3u
@@ -81,14 +83,16 @@ int alt111_control_complete(struct alt111_control *c, uint64_t session,
 
 enum alt111_resync_state {
     ALT111_RESYNC_SYNCED = 0,
-    ALT111_RESYNC_NEED_IDR = 1
+    ALT111_RESYNC_NEED_IDR = 1,
+    ALT111_RESYNC_NEED_BRIDGE = 2
 };
 
 enum alt111_resync_action {
     ALT111_RESYNC_NONE = 0,
     ALT111_RESYNC_REQUEST_KEYFRAME = 1,
     ALT111_RESYNC_COMPLETED = 2,
-    ALT111_RESYNC_CANCELLED = 3
+    ALT111_RESYNC_CANCELLED = 3,
+    ALT111_RESYNC_SOURCE_RECOVERED = 4
 };
 
 enum alt111_resync_reason {
@@ -97,6 +101,7 @@ enum alt111_resync_reason {
     ALT111_RESYNC_REASON_TURNS = 2,
     ALT111_RESYNC_REASON_SUGGEST_UI = 3,
     ALT111_RESYNC_REASON_WATCHDOG = 4,
+    ALT111_RESYNC_REASON_OVERFLOW = 5,
     ALT111_RESYNC_CANCEL_DISABLED = 100,
     ALT111_RESYNC_CANCEL_PROJECTION = 101,
     ALT111_RESYNC_CANCEL_CONFIG = 102,
@@ -109,6 +114,9 @@ enum alt111_resync_reason {
 struct alt111_resync_snapshot {
     uint64_t stream, codec, consumer;
     uint64_t source_aus, source_idrs;
+    uint64_t last_source_idr_ordinal, delivered_idr_ordinal;
+    uint64_t bridge_idr_ordinal, bridge_blocks, bridge_sample_us, soft_recovery_epoch;
+    unsigned bridge_healthy;
     unsigned projection_desired, config_valid, consumer_primed;
 };
 
@@ -116,7 +124,9 @@ struct alt111_resync {
     unsigned enabled, state, reason, cancel_reason;
     uint64_t epoch;
     uint64_t stream_at_arm, codec_at_arm, consumer_at_arm;
-    uint64_t au_at_arm, idr_at_arm;
+    uint64_t au_at_arm, idr_at_arm, overflow_at_arm;
+    uint64_t candidate_idr_ordinal, bridge_seen_ms, source_recoveries;
+    uint64_t bridge_first_blocks, bridge_first_sample_us;
     uint64_t requests, completions, cancels, retries;
     uint64_t last_request_ms, next_request_ms, completed_ms;
     uint32_t retry_ms;
@@ -149,6 +159,7 @@ struct alt111_chunk {
     uint64_t sequence;
     uint64_t source_ordinal;
     unsigned priming, idr, source_time_present, wire_started;
+    uint64_t arrival_us;
     uint8_t source_ts_raw[8];
 };
 struct alt111_video {
@@ -157,6 +168,8 @@ struct alt111_video {
     unsigned priming_queued, consumer_primed, keyframe_needed;
     /* Overflow never closes the consumer or invalidates a partially sent AU. */
     unsigned recovery_wait_idr, recovery_draining, recovery_request_due;
+    uint64_t last_source_idr_ordinal, delivered_idr_ordinal;
+    uint64_t queue_overflow_events, queue_stale_events, soft_recovery_epoch;
     uint8_t config[ALT111_CODEC_CAP];
     size_t config_length, queued_bytes;
     struct alt111_chunk queue[ALT111_QUEUE_CAP];
@@ -184,6 +197,13 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
                              const uint8_t *avcc, size_t size,
                              unsigned complete_au,
                              const uint8_t source_ts_raw[8]);
+/* The platform supplies CLOCK_MONOTONIC arrival_us. Pass zero in host/legacy
+ * callers to disable age-only recovery; capacity safety still applies. */
+int alt111_video_submit_timed_at(struct alt111_video *v, uint64_t stream,
+                                const uint8_t *avcc, size_t size,
+                                unsigned complete_au,
+                                const uint8_t source_ts_raw[8],
+                                uint64_t arrival_us);
 /* Peek pointer valid only until the next mutating call. The adapter owns any
  * copy it needs across unlocked I/O. Advance only bytes successfully written. */
 int alt111_video_peek(const struct alt111_video *v, const uint8_t **bytes,

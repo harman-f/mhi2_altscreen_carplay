@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include "alt111.h"
 #include "alt111_tcp_nodelay.h"
+#include "alt111_bridge_status.h"
 #include "alt111_zoom.h"
 #include "alt111_zoom_adapter.h"
 #include "alt111_zoom_debugspi.h"
@@ -354,10 +355,6 @@ static const char *g_source_timing_enable_marker = "/tmp/mibr-alt111-source-timi
 static const char *g_source_timing_interval_path = "/tmp/mibr-alt111-source-timing-interval-ms";
 static pthread_mutex_t g_source_timing_lock = PTHREAD_MUTEX_INITIALIZER;
 static mibr_source_timing_t g_source_timing;
-/* Only the diagnostic interval config is cached; source AU counters/timestamps
- * remain unchanged. Read the interval file <=1x/sec while diagnosis is on. */
-static int64_t g_source_interval_refresh_us;
-static unsigned g_source_interval_cached_ms=1000u;
 static int g_streaming;
 static int g_video_config_seen;
 static uint64_t g_last_heartbeat_ms;
@@ -397,6 +394,7 @@ static const char *g2_diag_keyframe_marker = "/tmp/mibr-alt111-keyframe-only";
 static const char *g2_view_request_path = "/tmp/mibr-alt111-viewarea-request";
 static const char *g2_resync_enable_marker = "/tmp/mibr-alt111-resync.enabled";
 static const char *g2_resync_arm_marker = "/tmp/mibr-alt111-resync-arm";
+static const char *g2_bridge_status_path = "/tmp/mibr-parity-ts.status";
 static const char *g2_d2_config_name = "mibr-carplay111-keyframes.conf";
 static const char *g_source_version_config_name = "mibr-carplay111-sourceversion";
 
@@ -438,6 +436,7 @@ static void gen2_video_end_current(void);
 static void gen2_close_consumer(void);
 static void gen2_keyframe_intent(unsigned reason);
 static void gen2_resync_poll(void);
+static void gen2_resync_snapshot_locked(struct alt111_resync_snapshot *snap);
 static const char *config_layer_name(unsigned layer);
 static void gen2_d2_timing_load(struct gen2_d2_timing *cfg);
 static void source_version_value(char *out, size_t cap,
@@ -504,8 +503,6 @@ static void source_timing_reset(void)
 {
     pthread_mutex_lock(&g_source_timing_lock);
     memset(&g_source_timing,0,sizeof(g_source_timing));
-    g_source_interval_refresh_us=0;
-    g_source_interval_cached_ms=1000u;
     pthread_mutex_unlock(&g_source_timing_lock);
     (void)unlink(g_source_timing_status_path);
 }
@@ -616,15 +613,8 @@ static void source_timing_note_frame(const AirPlayScreenHeaderCompat *h, size_t 
     g_source_timing.ts_word1=w1;
     g_source_timing.ts_word2=w2;
 
-    if(access(g_source_timing_enable_marker,F_OK)==0){
-        if(!g_source_interval_refresh_us ||
-           now_us-g_source_interval_refresh_us>=1000000LL){
-            g_source_interval_cached_ms=source_timing_interval_ms();
-            g_source_interval_refresh_us=now_us;
-        }
-        interval_ms=g_source_interval_cached_ms;
-    }else interval_ms=0;
-    if(interval_ms &&
+    interval_ms=source_timing_interval_ms();
+    if(access(g_source_timing_enable_marker,F_OK)==0 &&
        now_us-g_source_timing.window_start_us >= (int64_t)interval_ms*1000LL){
         ++g_source_timing.samples;
         source_timing_write_locked("running",now_us);
@@ -1519,24 +1509,29 @@ static int append_alt_setup_response(CFMutableDictionaryRef response,
     CFMutableArrayRef a = NULL;
     CFMutableDictionaryRef sd = NULL;
 
-    int ok=0;
+    int ok=0; CFIndex before=0;OSStatus pe=0,se=0;
     if(!response || !requested || data_port<=0) return 0;
     kstreams = s_cf("streams");
     if(!kstreams)return 0;
     old = (CFArrayRef)p_CFDictionaryGetValue(response,kstreams);
+    if(old && p_CFGetTypeID(old)!=p_CFArrayGetTypeID())goto done;
+    before=old?p_CFArrayGetCount(old):0;
     a = old ? p_CFArrayCreateMutableCopy(NULL,0,old)
             : p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
     sd = dict_clone(requested);
     kport = s_cf("dataPort");
     kstreamid = s_cf("streamID");
-
     if(a && sd && kport && kstreamid) {
         p_CFDictionarySetInt64(sd,kport,data_port);
         p_CFDictionarySetInt64(sd,kstreamid,K_STREAM_ALT);
+        if(p_CFDictionaryGetInt64(sd,kport,&pe)!=data_port || pe ||
+           p_CFDictionaryGetInt64(sd,kstreamid,&se)!=K_STREAM_ALT || se)goto done;
         p_CFArrayAppendValue(a,sd);
+        if(p_CFArrayGetCount(a)!=before+1)goto done;
         p_CFDictionarySetValue(response,kstreams,a);
-        ok=1;
+        ok=p_CFDictionaryGetValue(response,kstreams)==a;
     }
+done:
 
     if(sd) p_CFRelease(sd);
     if(a) p_CFRelease(a);
@@ -1708,8 +1703,9 @@ static int gen2_video_submit_au(const uint8_t *p, size_t n,
     if (consumer_attached) *consumer_attached = 0;
     pthread_mutex_lock(&g2_core_lock);
     before = g2_video.source_aus;
-    rc = g2_video_stream ? alt111_video_submit_timed(&g2_video, g2_video_stream,
-                                                     p, n, 1, source_ts_raw)
+    rc = g2_video_stream ? alt111_video_submit_timed_at(&g2_video, g2_video_stream,
+                                                     p, n, 1, source_ts_raw,
+                                                     (uint64_t)monotonic_us())
                          : ALT111_STALE;
     after_count = g2_video.source_aus;
     /* Reference cadence belongs to the source producer, even when there is
@@ -1720,6 +1716,13 @@ static int gen2_video_submit_au(const uint8_t *p, size_t n,
             (uint64_t)monotonic_us());
         if(reason && g2_control_session)
             (void)alt111_control_keyframe_reason(&g2_control,g2_control_session,reason);
+    }
+    if(rc==ALT111_SOFT_RESYNC && g2_control_session){
+        struct alt111_resync_snapshot snap;
+        gen2_resync_snapshot_locked(&snap);
+        alt111_resync_set_enabled(&g2_resync,1u);
+        (void)alt111_resync_arm(&g2_resync,monotonic_ms(),
+                               ALT111_RESYNC_REASON_OVERFLOW,&snap);
     }
     if (accepted && after_count > before) *accepted = 1;
     if (consumer_attached) *consumer_attached = g2_video.attached ? 1 : 0;
@@ -2433,9 +2436,14 @@ static int start_alt_receiver(uint64_t connection_id)
     return g_alt_port;
 }
 
-static void set_str(CFMutableDictionaryRef d, const char *key, const char *val)
+static int set_str(CFMutableDictionaryRef d, const char *key, const char *val)
 {
-    CFStringRef k=s_cf(key), v=s_cf(val); p_CFDictionarySetValue(d,k,v); p_CFRelease(v); p_CFRelease(k);
+    CFStringRef k=key?s_cf(key):NULL,v=val?s_cf(val):NULL;
+    int ok=0;
+    if(d && k && v){p_CFDictionarySetValue(d,k,v);ok=p_CFDictionaryGetValue(d,k)!=NULL;}
+    if(v)p_CFRelease(v);
+    if(k)p_CFRelease(k);
+    return ok ? 0 : -1;
 }
 
 static void apply_source_version_persona(CFMutableDictionaryRef info)
@@ -2463,9 +2471,15 @@ static void apply_source_version_persona(CFMutableDictionaryRef info)
     }
 }
 
-static void set_i64(CFMutableDictionaryRef d, const char *key, int64_t val)
+static int set_i64(CFMutableDictionaryRef d, const char *key, int64_t val)
 {
-    CFStringRef k=s_cf(key); p_CFDictionarySetInt64(d,k,val); p_CFRelease(k);
+    CFStringRef k=key?s_cf(key):NULL;
+    OSStatus err=-1;int64_t observed=0;
+    if(!d || !k){if(k)p_CFRelease(k);return -1;}
+    p_CFDictionarySetInt64(d,k,val);
+    observed=p_CFDictionaryGetInt64(d,k,&err);
+    p_CFRelease(k);
+    return !err && observed==val ? 0 : -1;
 }
 
 static void set_false(CFMutableDictionaryRef d, const char *key)
@@ -2647,9 +2661,9 @@ static int add_initial_video_stream(CFMutableDictionaryRef display,CFStringRef u
     a=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
     stream=dict_new();key=s_cf("initialVideoStreams");
     if(!a||!stream||!key)goto done;
-    set_i64(stream,"originXPixels",0);
-    set_i64(stream,"originYPixels",0);
-    set_i64(stream,"zIndex",0);
+    if(set_i64(stream,"originXPixels",0) ||
+       set_i64(stream,"originYPixels",0) ||
+       set_i64(stream,"zIndex",0))goto done;
     {
         CFStringRef uk=s_cf("uuid");
         if(!uk)goto done;
@@ -2657,8 +2671,9 @@ static int add_initial_video_stream(CFMutableDictionaryRef display,CFStringRef u
         p_CFRelease(uk);
     }
     p_CFArrayAppendValue(a,stream);
+    if(p_CFArrayGetCount(a)!=1)goto done;
     p_CFDictionarySetValue(display,key,a);
-    ok=1;
+    ok=p_CFDictionaryGetValue(display,key)==a;
 done:
     if(key)p_CFRelease(key);
     if(stream)p_CFRelease(stream);
@@ -3077,7 +3092,8 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
             strlen(real_uuid)==36u && strcmp(real_uuid,display.uuid)!=0;
         if(valid && main && uidkey){
             p_CFDictionarySetValue(main,uidkey,main_uuid);
-            valid=add_initial_video_stream(main,main_uuid);
+            valid=p_CFDictionaryGetValue(main,uidkey)==main_uuid &&
+                  add_initial_video_stream(main,main_uuid);
         }else valid=0;
         if(mk)p_CFRelease(mk);
         if(uidkey)p_CFRelease(uidkey);
@@ -3092,6 +3108,28 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         }
         p_CFArrayAppendValue(displays,main);
         p_CFRelease(main);main=NULL;
+        /* Retain every other stock display, in its original order and with
+         * original ownership/capabilities; never silently erase a third one. */
+        {
+            CFIndex idx,count=p_CFArrayGetCount(old);
+            for(idx=1;idx<count;++idx){
+                CFDictionaryRef other=(CFDictionaryRef)p_CFArrayGetValueAtIndex(old,idx);
+                CFStringRef uk=s_cf("uuid");
+                CFTypeRef oid=(other&&uk&&p_CFGetTypeID(other)==p_CFDictionaryGetTypeID())?
+                    p_CFDictionaryGetValue(other,uk):NULL;
+                char other_uuid[96]={0};
+                int clash=oid && p_CFGetTypeID(oid)==p_CFStringGetTypeID() &&
+                    p_CFStringGetCString((CFStringRef)oid,other_uuid,sizeof(other_uuid),CF_UTF8) &&
+                    !strcmp(other_uuid,display.uuid);
+                if(uk)p_CFRelease(uk);
+                if(!other || p_CFGetTypeID(other)!=p_CFDictionaryGetTypeID() || clash){
+                    logf_u2("GEN2 /info stock display[%ld] invalid/UUID collision; stock fallback",(long)idx);
+                    p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+                    return base;
+                }
+                p_CFArrayAppendValue(displays,other);
+            }
+        }
     }
     if(displays&&alt){
         char active_url[384];
@@ -3115,16 +3153,20 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
          * capabilities or cadence. The validated profile and MIBSI parity
          * evidence both identify this secondary display explicitly as type 111.
          */
-        set_i64(alt,"type",(int64_t)g2_profile.type);
-        set_i64(alt,"maxFPS",(int64_t)advertised_fps);
-        set_i64(alt,"features",(int64_t)(compat_profile_classic_single_view()?10u:g2_profile.features));
-        set_i64(alt,"widthPixels",(int64_t)display.width);
-        set_i64(alt,"heightPixels",(int64_t)display.height);
-        set_i64(alt,"widthPhysical",(int64_t)display.width_mm);
-        set_i64(alt,"heightPhysical",(int64_t)display.height_mm);
-        set_str(alt,"uuid",display.uuid);
-        set_str(alt,"uid",display.uuid);
-        set_str(alt,"name","Instrument Cluster");
+        if(set_i64(alt,"type",(int64_t)g2_profile.type) ||
+           set_i64(alt,"maxFPS",(int64_t)advertised_fps) ||
+           set_i64(alt,"features",(int64_t)(compat_profile_classic_single_view()?10u:g2_profile.features)) ||
+           set_i64(alt,"widthPixels",(int64_t)display.width) ||
+           set_i64(alt,"heightPixels",(int64_t)display.height) ||
+           set_i64(alt,"widthPhysical",(int64_t)display.width_mm) ||
+           set_i64(alt,"heightPhysical",(int64_t)display.height_mm) ||
+           set_str(alt,"uuid",display.uuid) ||
+           set_str(alt,"uid",display.uuid) ||
+           set_str(alt,"name","Instrument Cluster")){
+            logf_u2("GEN2 /info incomplete numeric/identity fields; stock fallback");
+            p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+            return base;
+        }
         {
             CFMutableArrayRef props=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
             CFStringRef pk=s_cf("properties"),item=s_cf("Instrument Cluster");
@@ -3163,13 +3205,29 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         }
 
         p_CFArrayAppendValue(displays,alt);
+        if(p_CFArrayGetCount(displays)!=p_CFArrayGetCount(old)+1){
+            p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+            return base;
+        }
         p_CFDictionarySetValue(info,kdisplays,displays);
+        if(p_CFDictionaryGetValue(info,kdisplays)!=displays){
+            p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+            return base;
+        }
         {
             CFStringRef panels=s_cf("displayPanels");
-            if(panels){
-                p_CFDictionarySetValue(info,panels,displays);
-                p_CFRelease(panels);
+            if(!panels){
+                logf_u2("GEN2 /info displayPanels unavailable; return stock");
+                p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+                return base;
             }
+            p_CFDictionarySetValue(info,panels,displays);
+            if(p_CFDictionaryGetValue(info,panels)!=displays){
+                p_CFRelease(panels);p_CFRelease(alt);p_CFRelease(displays);
+                p_CFRelease(kdisplays);p_CFRelease(info);
+                return base;
+            }
+            p_CFRelease(panels);
         }
         if(settings_scope())settings_scope()->descriptor_complete=1u;
         logf_u2("GEN2 /info ready: profile=%s root=altScreen%s type=%u maxFPS=%u features=%u primaryInput=%s geometry=%ux%u physical=%ux%u uuid=%s url=%s",
@@ -3223,6 +3281,16 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
         snprintf(g_settings_advertised_version,sizeof(g_settings_advertised_version),"%s",scope->actual_source_version);
         pthread_mutex_unlock(&g_settings_lock);
         if(previous_advertised)p_CFRelease(previous_advertised);
+    }else{
+        AirPlayReceiverSessionRef retired=NULL;
+        pthread_mutex_lock(&g_settings_lock);
+        if(g_settings_have_advertised && g_settings_advertised_session==session){
+            retired=g_settings_advertised_session;
+            g_settings_advertised_session=NULL;
+            g_settings_have_advertised=0u;
+        }
+        pthread_mutex_unlock(&g_settings_lock);
+        if(retired)p_CFRelease(retired);
     }
     (void)pthread_setspecific(g_settings_scope_key,previous);
     free(scope);
@@ -3453,6 +3521,22 @@ static void gen2_publish_status(void)
     if(n<=0)return;
     if((size_t)n>=sizeof(b))return;
     {
+        int more=snprintf(b+n,sizeof(b)-(size_t)n,
+           "\nqueue_capacity_aus=%u\nqueue_capacity_bytes=%u\nqueue_overflow_events=%llu\nqueue_stale_events=%llu\nsoft_recovery_epoch=%llu\nsource_last_idr_ordinal=%llu\ndelivered_idr_ordinal=%llu\nresync_candidate_idr_ordinal=%llu\nresync_source_recoveries=%llu\nresync_stage=%s\n",
+           (unsigned)ALT111_QUEUE_CAP,(unsigned)ALT111_QUEUE_BYTES,
+           (unsigned long long)vs.queue_overflow_events,
+           (unsigned long long)vs.queue_stale_events,
+           (unsigned long long)vs.soft_recovery_epoch,
+           (unsigned long long)vs.last_source_idr_ordinal,
+           (unsigned long long)vs.delivered_idr_ordinal,
+           (unsigned long long)rs.candidate_idr_ordinal,
+           (unsigned long long)rs.source_recoveries,
+           rs.state==ALT111_RESYNC_NEED_BRIDGE?"BRIDGE_PENDING":
+           rs.state==ALT111_RESYNC_NEED_IDR?"SOURCE_PENDING":"SYNCED");
+        if(more<0 || (size_t)more>=sizeof(b)-(size_t)n)return;
+        n+=more;
+    }
+    {
         int zn=snprintf(b+n,sizeof(b)-(size_t)n,
             "\nzoom_session=%llu\nzoom_focus=%u\nzoom_source_visible=%u\nzoom_owner=%u\n"
             "zoom_positive_is_in=%d\nzoom_pending=%d\nzoom_in_flight=%u\n"
@@ -3674,15 +3758,35 @@ static void gen2_resync_snapshot_locked(struct alt111_resync_snapshot *snap)
     snap->consumer = g2_video.consumer;
     snap->source_aus = g2_video.source_aus;
     snap->source_idrs = g2_video.source_idrs;
+    snap->last_source_idr_ordinal=g2_video.last_source_idr_ordinal;
+    snap->delivered_idr_ordinal=g2_video.delivered_idr_ordinal;
+    snap->soft_recovery_epoch=g2_video.soft_recovery_epoch;
     snap->projection_desired = g2_control.desired;
     snap->config_valid = g2_video.config_valid;
     snap->consumer_primed = g2_video.consumer_primed;
 }
 
+/* Read passive parity status <=2x/sec, outside all media/CORE locks.
+ * File absence, stale samples, mismatched generations or disabled telemetry
+ * leave bridge evidence UNKNOWN, never a fabricated recovery success. */
 static void gen2_resync_poll(void)
 {
     struct alt111_resync_snapshot snap;
     struct gen2_d2_timing d2_timing;
+    static struct alt111_bridge_status bridge_cache;
+    static uint64_t bridge_read_ms;
+    static unsigned bridge_valid;
+    if(!bridge_read_ms || monotonic_ms()<bridge_read_ms ||
+       monotonic_ms()-bridge_read_ms>=500u){
+        char buf[8192];int fd=open(g2_bridge_status_path,O_RDONLY);
+        ssize_t n=-1;
+        bridge_read_ms=monotonic_ms();bridge_valid=0;
+        if(fd>=0){n=read(fd,buf,sizeof(buf)-1u);close(fd);}
+        if(n>0 && n<(ssize_t)sizeof(buf)){
+            buf[n]=0;
+            bridge_valid=alt111_bridge_status_parse(buf,&bridge_cache)==0;
+        }
+    }
     enum alt111_resync_action action;
     uint64_t now = monotonic_ms();
     uint64_t epoch = 0, idr_at_arm = 0, source_idrs = 0;
@@ -3706,8 +3810,17 @@ static void gen2_resync_poll(void)
     before_enabled = g2_resync.enabled;
     before_state = g2_resync.state;
     before_cancel = g2_resync.cancel_reason;
+    if(g2_resync.state!=ALT111_RESYNC_SYNCED &&
+       g2_resync.reason==ALT111_RESYNC_REASON_OVERFLOW)enabled=1u;
     alt111_resync_set_enabled(&g2_resync,enabled);
     gen2_resync_snapshot_locked(&snap);
+    if(bridge_valid && alt111_bridge_status_matches(&bridge_cache,
+        (uint64_t)monotonic_us(),snap.stream,snap.codec,snap.consumer)){
+        snap.bridge_healthy=1u;
+        snap.bridge_idr_ordinal=bridge_cache.sequence;
+        snap.bridge_blocks=bridge_cache.blocks;
+        snap.bridge_sample_us=bridge_cache.snapshot_us;
+    }
 
     if(d2_enabled) {
         if(!g2_d2_was_enabled) {
@@ -3826,10 +3939,13 @@ static void gen2_resync_poll(void)
         if(keyframe_rc!=ALT111_OK)
             logf_u2("GEN2 RESYNC REQUEST not queued through serialized controller rc=%d session=%llu projection=%u",
                     keyframe_rc,(unsigned long long)g2_control_session,snap.projection_desired);
+    }else if(action==ALT111_RESYNC_SOURCE_RECOVERED){
+        logf_u2("GEN2 RESYNC SOURCE_RECOVERED epoch=%llu delivered_idr=%llu bridge_pending=1",
+            (unsigned long long)epoch,(unsigned long long)snap.delivered_idr_ordinal);
     }else if(action==ALT111_RESYNC_COMPLETED){
-        logf_u2("GEN2 RESYNC COMPLETE epoch=%llu completions=%llu idr_at_arm=%llu source_idrs=%llu",
+        logf_u2("GEN2 RESYNC BRIDGE_RECOVERED epoch=%llu completions=%llu idr_ordinal=%llu accepted_block=1 stable_ms=1000 VC_visibility=unverified",
                 (unsigned long long)epoch,(unsigned long long)completions,
-                (unsigned long long)idr_at_arm,(unsigned long long)source_idrs);
+                (unsigned long long)snap.bridge_idr_ordinal);
     }else if(action==ALT111_RESYNC_CANCELLED || (changed && cancels)){
         logf_u2("GEN2 RESYNC CANCEL epoch=%llu cancels=%llu",
                 (unsigned long long)epoch,(unsigned long long)cancels);
@@ -4624,11 +4740,34 @@ OSStatus AirPlayReceiverSessionPlatformControl(AirPlayReceiverSessionRef session
     return mibr_platform_control(session,flags,command,qualifier,params,outParams);
 }
 
+/* iOS can send control SETUP before its next /info. Use the same real
+ * descriptor builder as /info for a cold preflight; do not infer readiness
+ * merely from request['features'] or a previous session's advert. */
+static int gen2_advert_ready_for(AirPlayReceiverSessionRef s)
+{
+    int ready;
+    pthread_mutex_lock(&g_settings_lock);
+    ready=s && g_settings_valid && g_settings_have_advertised &&
+          g_settings_advertised_session==s &&
+          g_settings_advertised.revision==g_settings_desired.revision;
+    pthread_mutex_unlock(&g_settings_lock);
+    return ready;
+}
+static int gen2_ensure_advert_preflight(AirPlayReceiverSessionRef s)
+{
+    CFDictionaryRef check;
+    OSStatus err=0;
+    uint8_t mac[6]={0};
+    if(gen2_advert_ready_for(s))return 1;
+    check=AirPlayCopyServerInfo(s,NULL,mac,&err);
+    if(check)p_CFRelease(check);
+    return check && err==K_NO_ERR && gen2_advert_ready_for(s);
+}
 static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef request, CFDictionaryRef *outResponse)
 {
     CFDictionaryRef altDesc=NULL;
     CFDictionaryRef stockResp=NULL;
-    int other=0,hasAlt=0;
+    int other=0,hasAlt=0,control_advert_ready=0,control_attempted=0,alt_ok=0;
     OSStatus e;
     int port=-1;
     uint64_t cid=0;
@@ -4667,9 +4806,14 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
         CFStringRef fk=s_cf("features");
         CFTypeRef proposal=(request && fk) ? p_CFDictionaryGetValue(request,fk) : NULL;
         if(fk)p_CFRelease(fk);
-        if(stockResp && proposal &&
-           !set_reference_enabled_features((CFMutableDictionaryRef)stockResp))
-            logf_u2("GEN2 control SETUP feature merge failed; stock response retained");
+        if(proposal){
+            control_attempted=1;
+            control_advert_ready=gen2_ensure_advert_preflight(s);
+            if(stockResp && control_advert_ready)
+                control_advert_ready=set_reference_enabled_features((CFMutableDictionaryRef)stockResp);
+            if(!control_advert_ready)
+                logf_u2("GEN2 control SETUP: 111 capability withheld; full advert unavailable");
+        }
     }
 
     hasAlt=g_enabled && contains_stream111(request,&altDesc,&other);
@@ -4684,7 +4828,11 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
             (unsigned long long)cid,other);
     publish_state("setup");
 
-    if(!cid){
+    if((control_attempted && !control_advert_ready) ||
+       (!control_attempted && !gen2_advert_ready_for(s))){
+        logf_u2("GEN2 stream111 SETUP withheld: no full same-session display advert");
+        publish_state("setup_advert_unavailable");
+    }else if(!cid){
         logf_u2("stream111 SETUP fail-soft: missing streamConnectionID");
         publish_state("setup_failed");
     }else{
@@ -4692,6 +4840,7 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
         if(port>0 && stockResp){
             if(gen2_control_projection_on(s)){
                 if(append_alt_setup_response((CFMutableDictionaryRef)stockResp,altDesc,port)){
+                    alt_ok=1;
                     logf_u2("GEN2 stream111 SETUP accepted cid=%llu dataPort=%d response=cloned-request+streamID111; UI acquisition armed",
                             (unsigned long long)cid,port);
                 }else{
@@ -4711,6 +4860,16 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
         }
     }
 
+    if(!alt_ok && !other){
+        /* Pure 111 request: stock's unsupported-stream success is not a
+         * successful 111 setup. Never hand iOS a fake-success empty reply. */
+        if(stockResp)p_CFRelease(stockResp);
+        if(outResponse)*outResponse=NULL;
+        logf_u2("GEN2 stream111 SETUP failed: pure 111 request return=-6700; stock 110 unaffected");
+        return -6700;
+    }
+    /* Mixed 110/111: preserve the successful stock streams even if optional
+     * 111 fails. Never fail the established main-screen contract. */
     if(outResponse)*outResponse=stockResp;
     else if(stockResp)p_CFRelease(stockResp);
     return e;

@@ -112,8 +112,30 @@ static void partial_payload_overflow(void)
     assert(v.consumer_primed && v.consumer==consumer);
     alt111_video_destroy(&v);
 }
+static void monotonic_age_backlog(void)
+{
+    struct alt111_video v;
+    uint64_t s=setup(&v),consumer=v.consumer;
+    assert(alt111_video_submit_timed_at(&v,s,idr,sizeof(idr),1,NULL,1000000u)==ALT111_OK);
+    consume(&v);
+    /* One static/delayed AU alone must NEVER be removed for age. */
+    assert(alt111_video_submit_timed_at(&v,s,pframe,sizeof(pframe),1,NULL,1000001u)==ALT111_OK);
+    assert(alt111_video_submit_timed_at(&v,s,pframe,sizeof(pframe),1,NULL,2500002u)==ALT111_OK);
+    assert(v.count==2 && !v.queue_stale_events);
+    /* A new incoming AU with two queued stale AUs triggers loss of only
+     * unsent records; source-time bytes are irrelevant to this decision. */
+    assert(alt111_video_submit_timed_at(&v,s,pframe,sizeof(pframe),1,raw_ts,2500003u)==ALT111_SOFT_RESYNC);
+    assert(v.queue_stale_events==1 && v.queue_overflow_events==0);
+    assert(v.count==0 && v.attached && v.consumer==consumer && v.recovery_wait_idr);
+    assert(alt111_video_submit_timed_at(&v,s,pframe,sizeof(pframe),1,NULL,2500004u)==ALT111_WAIT);
+    assert(alt111_video_submit_timed_at(&v,s,idr,sizeof(idr),1,raw_ts,2500005u)==ALT111_OK);
+    consume(&v);
+    assert(v.consumer_primed && v.consumer==consumer && v.delivered_idr_ordinal==v.source_ordinal);
+    alt111_video_destroy(&v);
+}
 int main(void)
 {
+    monotonic_age_backlog();
     pinned_header_overflow();
     unsent_head_overflow();
     partial_payload_overflow();

@@ -69,8 +69,11 @@ int main(int argc,char **argv) {
             fields=status.read_text().strip().split(' ')
         except FileNotFoundError:
             return None
-        assert len(fields)==8 and fields[0]=='M1GATE1', fields
-        return [int(value) for value in fields[1:]]
+        # The producer truncates then writes the advisory status file.
+        # An empty/partial snapshot is transient, not a gate failure.
+        if len(fields)!=8 or fields[0]!='M1GATE1': return None
+        try: return [int(value) for value in fields[1:]]
+        except ValueError: return None
     def until(predicate, seconds=4):
         end=time.monotonic()+seconds
         while time.monotonic()<end:
@@ -89,8 +92,11 @@ int main(int argc,char **argv) {
             until(lambda s:s[3]>0)  # Real stock writev is still blocked in kernel.
             request.write_text('123456\n')
             until(lambda s:s[0]==123456 and s[6]==1)
+            # Poll for a complete status snapshot rather than sampling during
+            # truncate/write; the drain must still NOT be acknowledged early.
             time.sleep(.1)
-            assert snapshot()[3]>0 and snapshot()[6]==1,'false drain acknowledgement'
+            value=until(lambda s:s[3]>0 and s[6]==1)
+            assert value[6]==1,'false drain acknowledgement'
             end=time.monotonic()+4
             while time.monotonic()<end:
                 try:os.read(reader,65536)

@@ -36,6 +36,7 @@ uint64_t alt111_video_begin(struct alt111_video *v, uint64_t session)
     alt111_video_detach(v);
     ++v->stream; ++v->codec;
     v->source_ordinal = 0;
+    v->last_source_idr_ordinal = v->delivered_idr_ordinal = 0;
     v->session = session; v->active = session != 0;
     v->config_valid = v->config_blocked = v->nal_length_size = 0; v->config_length = 0;
     memset(v->config, 0, sizeof(v->config));
@@ -57,7 +58,7 @@ int alt111_video_end(struct alt111_video *v, uint64_t stream)
  * NEW complete IDR with current SPS/PPS before resuming. The receiver still
  * consumes/decrypts every input AU, keeping AES-CTR aligned.
  */
-static int overflow_resync(struct alt111_video *v)
+static int overflow_resync(struct alt111_video *v, unsigned stale)
 {
     unsigned keep = v->count &&
         (v->queue[v->head].wire_started || v->queue[v->head].offset);
@@ -78,6 +79,10 @@ static int overflow_resync(struct alt111_video *v)
     }
     v->recovery_wait_idr = 1;
     v->keyframe_needed = 1;
+    v->recovery_request_due = 0; /* post-drain only; caller requests initial IDR */
+    ++v->soft_recovery_epoch;
+    if(stale) ++v->queue_stale_events;
+    else ++v->queue_overflow_events;
     ++v->dropped_aus; /* the triggering AU is lost */
     return ALT111_SOFT_RESYNC;
 }
@@ -210,9 +215,9 @@ static int invalid_au(struct alt111_video *v)
     return ALT111_INVALID;
 }
 
-int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
-                             const uint8_t *p, size_t n, unsigned complete_au,
-                             const uint8_t source_ts_raw[8])
+int alt111_video_submit_timed_at(struct alt111_video *v, uint64_t stream,
+                                const uint8_t *p, size_t n, unsigned complete_au,
+                                const uint8_t source_ts_raw[8], uint64_t arrival_us)
 {
     size_t pos = 0, len, bytes = 0, prefix, used;
     unsigned idr = 0, dependent = 0, type, index;
@@ -238,6 +243,7 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
     }
     if ((!idr && !dependent) || (idr && dependent)) return invalid_au(v);
     ++v->source_aus; source_ordinal = ++v->source_ordinal; v->source_idrs += idr;
+    if(idr)v->last_source_idr_ordinal=source_ordinal;
     if (!v->attached) return ALT111_WAIT;
     if (v->recovery_wait_idr) {
         /* A pin in progress must first finish completely; an IDR received
@@ -253,9 +259,16 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
         ++v->dropped_aus;
         return ALT111_WAIT;
     }
+    /* Only an actual queued backlog (>=2) may age out. A single static
+     * picture is never considered stale. Arrival clock is local monotonic,
+     * explicitly independent of the eight source timestamp bytes. */
+    if(arrival_us && v->count>1u && v->queue[v->head].arrival_us &&
+       arrival_us>v->queue[v->head].arrival_us &&
+       arrival_us-v->queue[v->head].arrival_us>ALT111_BACKLOG_STALE_US)
+        return overflow_resync(v,1u);
     prefix = !v->consumer_primed && !v->priming_queued ? v->config_length : 0;
     if (v->count == ALT111_QUEUE_CAP || bytes + prefix > ALT111_QUEUE_BYTES - v->queued_bytes) {
-        return overflow_resync(v);
+        return overflow_resync(v,0u);
     }
     out = (uint8_t *)malloc(prefix + bytes);
     if (!out) { alt111_video_detach(v); ++v->dropped_aus; return ALT111_NOMEM; }
@@ -276,6 +289,7 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
     chunk->source_ordinal = source_ordinal;
     chunk->priming = prefix != 0; chunk->idr = idr;
     chunk->wire_started = 0;
+    chunk->arrival_us = arrival_us;
     chunk->source_time_present = source_ts_raw != NULL;
     if (source_ts_raw) memcpy(chunk->source_ts_raw, source_ts_raw, 8u);
     else memset(chunk->source_ts_raw, 0, sizeof(chunk->source_ts_raw));
@@ -284,10 +298,17 @@ int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
     return ALT111_OK;
 }
 
+int alt111_video_submit_timed(struct alt111_video *v, uint64_t stream,
+                             const uint8_t *p, size_t n, unsigned complete_au,
+                             const uint8_t source_ts_raw[8])
+{
+    return alt111_video_submit_timed_at(v,stream,p,n,complete_au,source_ts_raw,0u);
+}
+
 int alt111_video_submit(struct alt111_video *v, uint64_t stream,
                        const uint8_t *p, size_t n, unsigned complete_au)
 {
-    return alt111_video_submit_timed(v, stream, p, n, complete_au, NULL);
+    return alt111_video_submit_timed_at(v,stream,p,n,complete_au,NULL,0u);
 }
 
 int alt111_video_peek(const struct alt111_video *v, const uint8_t **bytes,
@@ -336,6 +357,7 @@ int alt111_video_advance(struct alt111_video *v,
     chunk->offset += sent;
     /* Byte budget bounds allocated memory, not just unsent data. */
     if (chunk->offset == chunk->length) {
+        if (chunk->idr) v->delivered_idr_ordinal = chunk->source_ordinal;
         if (chunk->priming) {
             v->consumer_primed = 1; v->priming_queued = v->keyframe_needed = 0;
         }
