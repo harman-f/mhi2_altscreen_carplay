@@ -37,7 +37,7 @@ class PublicProtocolTests(unittest.TestCase):
         with self.assertRaises(api.FrameError):
             api.encode_value("\n")
 
-    def test_native_mailbox_host_probe(self):
+    def test_native_mailbox_and_owner_lifecycle_probes(self):
         with tempfile.TemporaryDirectory(prefix="mibr3-public-") as d:
             exe = str(Path(d) / "mailbox-probe")
             subprocess.run(["cc", "-std=c99", "-Wall", "-Wextra", "-Werror", "-O2",
@@ -46,6 +46,13 @@ class PublicProtocolTests(unittest.TestCase):
                            check=True)
             output = subprocess.run([exe], check=True, capture_output=True, text=True)
             self.assertIn("PARITY_MAILBOX_ONE_COMMAND_AT_A_TIME_HOST_PASS", output.stdout)
+            owner = str(Path(d) / "owner-probe")
+            subprocess.run(["cc", "-std=c99", "-Wall", "-Wextra", "-Werror", "-O2",
+                            str(SRC / "mibr_v3_owner_lifecycle.c"),
+                            str(SRC / "mibr_v3_owner_lifecycle_probe.c"), "-o", owner],
+                           check=True)
+            verified = subprocess.run([owner], check=True, capture_output=True, text=True)
+            self.assertIn("PASS", verified.stdout)
 
 
 if __name__ == "__main__":
