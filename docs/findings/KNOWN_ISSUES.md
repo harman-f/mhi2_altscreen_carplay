@@ -1,6 +1,16 @@
 # Known issues and open work
 
-Last updated: **2026-09-26**
+Last updated: **2026-10-21** (original numbered findings retained as historical context).
+
+## October 2026: additional observed issues
+
+- Stream-111 source/session TEARDOWN/EOF and custom writer shutdown on lost native gate proof are distinct observed failure classes; neither alone proves the cause of reported USB/phone disconnects.
+- Two parity supervisor instances were recorded in one installed boot. The owner lock prevented a second writer, but duplicate startup is still a defect.
+- An October HMI field test did not establish effective VC application of five stored navigation presentation values. Stored/TEMP is not an owner-correlated ACTIVE acknowledgment.
+- Long-session logged PTS-minus-PCR lead is not evidence of equivalent physically accumulating display delay. Clean fixture replay supported retaining the original compressed iPhone bitstream.
+- External MU1409/Continental 790 success with an adapted different implementation is compatibility evidence, **not** qualification of this project's runtime on MU1409.
+
+Details: [sanitized October evidence](OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md) and [current integration status](../status/INTEGRATION_STATUS_2026-10-21.md).
 
 This page describes problems that are real enough to matter but not yet stable enough to hide behind
 a "release" label.
