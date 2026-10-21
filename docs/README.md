@@ -14,6 +14,8 @@ The pages here describe the **current public product/source, exact reference-tar
 
 ## System interfaces
 
+- **[Architecture module index and ownership guide](architecture/README.md)** — current authoritative page per subsystem, supporting historical references and release/source boundaries
+
 - [Direct VC video](architecture/DIRECT_VC_VIDEO_PATH.md) · [ScreenAlt control](architecture/SCREENALT_CONTROL_PLANE.md) · [Source/owner runtime](architecture/RUNTIME_CONTRACT.md)
 - [Auto-Direct reference runtime](architecture/AUTO_DIRECT_RUNTIME.md) · [Advanced developer switches](architecture/ADVANCED_RUNTIME_SWITCHES.md)
 - [Navigation and SafeArea](architecture/NAVIGATION_COMPOSITION_AND_SAFEAREA.md) · [View-state overview](research/VC_VIEWAREA_STATE.md)
