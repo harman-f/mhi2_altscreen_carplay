@@ -1,6 +1,6 @@
 # Runtime contract and state files
 
-This is the interface between the current project-owned components.
+This is the **published reference direct-video runtime contract** (ports, markers and source status), not an automatic ABI promise for later privately developed source-time parity, central controller, Java menu or vehicle-data components. Use [architecture index](README.md) and [published source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md) for distinctions.
 
 A contributor can replace one component without rewriting the others if this contract remains stable.
 
