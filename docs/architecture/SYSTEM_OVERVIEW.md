@@ -1,6 +1,6 @@
 # System overview — CarPlay AltScreen to MHI2 Virtual Cockpit
 
-> Status: active engineering documentation, 2026-09-26.
+> **Original system model (2026-09-26):** foundational description of the media/control separation; the exact current component/owner design, HMI and optional vehicle data are defined in [module boundaries](MODULE_BOUNDARIES_AND_PORTABILITY.md) and [the architecture index](README.md). Vehicle-tested results and published-source coverage are separately maintained. This page's historical "trying to reproduce" language is not an assertion that the September PoC is still the current milestone.
 >
 > This document starts at the system level. The control-plane details are expanded in
 > [SCREENALT_CONTROL_PLANE.md](SCREENALT_CONTROL_PLANE.md).
