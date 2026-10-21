@@ -41,6 +41,9 @@ The [current developer release](../../release/CURRENT.md) remains the existing M
 ## Start with these boundaries
 
 - [Module architecture and VW/SEAT portability](../architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md)
+- [Native HMI/controller detail](../architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md)
+- [Optional vehicle-data overview](../architecture/OPTIONAL_VEHICLE_DATA_FEATURE_OVERVIEW.md)
+- [Fault isolation and recovery acceptance](../testing/STREAM111_FAULT_ISOLATION_2026-10-21.md)
 - Detailed vehicle-data protocol publication remains subject to a separate review.
 - [Known issues](../findings/KNOWN_ISSUES.md)
 - [Vehicle and timing findings](../findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md)
