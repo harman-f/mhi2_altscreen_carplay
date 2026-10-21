@@ -26,7 +26,7 @@ The pages here describe the **current public product/source, exact reference-tar
 - [Reference vehicle demonstration](media/mu1440-stream111-poc-2026-09-29/README.md)
 - [Dated Final Drive checkpoint](status/MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md) and [visual cadence limitations](findings/MU1440_ZOOM_CADENCE_OBSERVATION_2026-10-11.md)
 - [Stream-111 fault isolation and recovery acceptance](testing/STREAM111_FAULT_ISOLATION_2026-10-21.md)
-- [Safe vehicle test protocol](testing/VEHICLE_TEST_PROTOCOL.md) · [QNX shell compatibility](testing/MU1440_QNX_SHELL_COMPATIBILITY.md)
+- [Measured physical wheel and head-unit input map; unknown IDs and contribution request](testing/MU1440_MFW_RAW_KEY_MAPPING.md) · [Safe vehicle test protocol](testing/VEHICLE_TEST_PROTOCOL.md) · [QNX shell compatibility](testing/MU1440_QNX_SHELL_COMPATIBILITY.md)
 
 ## Platform and advanced background
 
@@ -35,4 +35,4 @@ The pages here describe the **current public product/source, exact reference-tar
 - [Research background index](research/README.md) · [native wireless prototype status](research/mhi2-native-wireless-2026-10/README.md)
 - [Public technical references](research/PUBLIC_REFERENCES.md)
 
-[Contributor instructions](../CONTRIBUTING.md) · [Privacy and security](../SECURITY.md). Internal audits, working handoffs and experiment tracking are not part of this public documentation index.
+[Official-repository acknowledgements](../ACKNOWLEDGEMENTS.md) · [Third-party license notices](../THIRD_PARTY_NOTICES.md) · [Contributor instructions](../CONTRIBUTING.md) · [Privacy and security](../SECURITY.md). Internal audits, working handoffs and experiment tracking are not part of this public documentation index.
