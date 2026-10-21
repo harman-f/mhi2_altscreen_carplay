@@ -3,7 +3,7 @@
 This directory collects research that is useful to contributors before it becomes a vehicle-approved implementation.
 
 > [!NOTE]
-> Start with the [current October integration status](../status/INTEGRATION_STATUS_2026-10-21.md); the [2026-10-05 research preview](CURRENT_RESEARCH_PREVIEW_2026-10-05.md) is historical. It summarizes the newest
+> Start with the [current October integration status](../status/INTEGRATION_STATUS_2026-10-21.md); the [2026-10-05 research preview](CURRENT_RESEARCH_PREVIEW_2026-10-05.md) is historical. That dated preview summarizes the then-new
 > media/timing, HMI/menu and steering-wheel findings and clearly labels what is vehicle-proven vs static/design-only.
 
 **Newest original MMX evidence (R15):** [Native archived 64-MiB MMX fs0 PT, exact installed /70/ KERNEL_PRIMARY mapping, Recovery and the second outer CRC at 0x7FC](MU1440_MMX_FS0_NATIVE_PT_AND_STAGE1_HEADER_CRC_R15_2026-10-12.md). The uploaded file matches R14 catalog BACKUP-SNAPSHOT-06 (not initially requested Snapshot-10), and its actual native PT directly establishes the G11 Normal 3-MiB Primary/6-MiB Recovery boundaries. Sample-specific original-forensic proof only; current-car identity and modified-image acceptance remain open. [Full Toolkit PR #8](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/pull/8).
