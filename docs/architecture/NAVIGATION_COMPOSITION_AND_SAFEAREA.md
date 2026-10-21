@@ -1,5 +1,7 @@
 # Navigation composition, ViewArea and SafeArea
 
+**Current evidence:** The outer 1010×376 reference video plane is vehicle-demonstrated; subsequent development also investigated two negotiated ViewAreas and nested SafeAreas. This page defines the *mechanisms*, not universal geometry or a completed OEM button-to-UI ACTIVE implementation. See [current integration status](../status/INTEGRATION_STATUS_2026-10-21.md) and [current HMI/control acceptance](NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md).
+
 ## Logical UI surfaces
 
 The current vehicle tests support three distinct CarPlay cluster roles on the same secondary-display
@@ -122,9 +124,7 @@ The intended runtime sequence is therefore:
 7. bind that index to a proven physical VC layout/button state without consuming the OEM button
    behavior.
 
-The current GEN2 implementation contains an `updateViewArea` command scaffold, but currently
-advertises only one ViewArea and does not yet serialize the full adjacency list. Multi-ViewArea
-switching is therefore protocol-understood but not yet vehicle-proven on MU1440.
+**Historical initial implementation (September):** the first public GEN2 variant exposed only one ViewArea and contained an `updateViewArea` command scaffold; its original adjacency list was incomplete. **Later development (October):** two-area negotiation and composition are present in separately tested development candidates and have vehicle observation, but the current public ZIP, physical layout/button mapping and full HMI current-session APPLY/ACTIVE acceptance must be checked **independently**. Do not use this older one-area paragraph to classify all later source or to infer a finished generic in-session layout toggle.
 
 See
 [CarPlay cluster / Ultra research closeout](../research/CARPLAY_CLUSTER_ULTRA_CLOSEOUT_2026-10-03.md)
