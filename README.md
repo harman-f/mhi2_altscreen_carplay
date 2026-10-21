@@ -65,7 +65,7 @@ The public repository already includes project-owned **GEN2 receiver C**, **Dire
 
 **The latest integrated source for newer parity/supervisor, Java HMI, MIBR/3 controller and optional vehicle-data modules is not yet distributed here as a cohesive source or release.** Closing historical experimental PRs did not import them into main. Each new public source package needs dependency, license, build and appropriate vehicle-evidence review.
 
-The existing [hash-pinned MU1440 developer prerelease](release/CURRENT.md) assumes existing SSH, exact-compatible components, backup and tested recovery. It does not contain a finished public menu/zoom/KEY40/vehicle-data installer and is not a universal one-click SD-card solution. [Installation guidance](docs/INSTALLATION.md) · [Build notes](docs/build/DIRECT_TS_REMUX_BUILD.md).
+The existing [hash-pinned MU1440 developer prerelease](release/CURRENT.md) assumes existing SSH, exact-compatible components, backup and tested recovery. It does not contain a finished public menu/zoom/KEY40/vehicle-data installer and is not a universal one-click SD-card solution. [Installation guidance](docs/INSTALLATION.md) · [Build notes](docs/build/DIRECT_TS_REMUX_BUILD.md) · [Advanced runtime reference](docs/architecture/ADVANCED_RUNTIME_SWITCHES.md).
 
 ## Contributing and safety
 
