@@ -1,7 +1,8 @@
 # MU1440 / AID10 developer test — current
 
-This is the **only current vehicle-test release**. Older prereleases are removed automatically after
-this release is published successfully.
+This is the currently pinned **MU1440-specific developer prerelease**, not the newest experimental source line. Documentation-only main-branch updates do not mutate the already published ZIP or retroactively re-qualify its binary hashes. See [current integration status](../docs/status/INTEGRATION_STATUS_2026-10-21.md), [latest known issues](../docs/findings/KNOWN_ISSUES.md) and [dated vehicle test evidence](../docs/status/MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md).
+
+The effective 29 September Most20/D2 update at the end of this file is incorporated into the consolidated statements below; later release-tag decisions require their own verification.
 
 ## Validated reference target
 
@@ -23,6 +24,7 @@ The release ZIP contains every project-supplied file required for the currently 
 - `sha256sum`
 - `tee`
 - `MIBR-NavIgnore.jar`
+- `MIBR-Most20FPS.jar`
 
 No additional project payload needs to be downloaded before testing. The publication audit checks
 that every payload reference in the shipped scripts resolves to a file inside the ZIP and that the
@@ -140,21 +142,20 @@ These remain development/research items rather than hidden prerequisites:
 - SafeArea-capable GEN2 candidate;
 - dynamic ViewArea experiment;
 - DirectVCPolicy experimental Java work;
-- Most20FPS experimental Java work;
-- legacy combined Java patch.
+- unqualified variants of the existing Most20FPS patch;
+- legacy combined Java patch;
+- newer experimental parity/clockdiag/Zoom/HMI/vehicle-data/controller candidate implementations.
 
-The current D2 same-session keyframe policy remains an explicit developer switch while its watchdog
-timing is still being tuned.
+The current public D2 same-session keyframe policy is **persistently enabled by default** as described in the 29 September update below, with its conservative 1-second watchdog and a documented opt-out. It is not evidence of a later recovery candidate's full qualification.
 
-The release tag is recreated on the cleaned current repository commit, so GitHub's automatic
-source-code archives correspond to the same current source/documentation state.
+A documentation merge into `main` must not be described as recreating the frozen developer-release tag. Check the actual GitHub release/tag and ZIP hashes independently whenever making a new release.
 
 This remains a developer prerelease: the media-path payload bytes are vehicle-tested, while the
 integrated standalone installer, logging and foreign-Java recovery flow is undergoing broader
 vehicle validation.
 
 
-## 2026-09-29 reference-default update
+## Historical implementation change incorporated in the above effective release description (2026-09-29)
 
 The MU1440/AID10-class developer package now includes the vehicle-validated standalone Most20 patch
 and enables the conservative D2 keyframe policy persistently by default.
