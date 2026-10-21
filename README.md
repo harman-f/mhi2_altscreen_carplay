@@ -4,7 +4,7 @@
 
 The project has advanced beyond the first moving-map proof of concept. On the exact Škoda MU1440/AID10 reference unit, **Apple Maps, Google Maps and Waze** have appeared as moving auxiliary video. Subsequent development sessions exercised long-running protected direct/parity transport, navigation composition, SafeArea/ViewArea, an OEM-native menu, zoom and an experimental stock/CarPlay route controller. This is a working vehicle-reference engineering project, **not** a universal product or a claim that all the newer features are already in the downloadable public ZIP.
 
-[Feature status](#features-and-status) · [Architecture](#system-architecture) · [Published source coverage](docs/status/PUBLISHED_SOURCE_COVERAGE.md) · [Developer release](release/CURRENT.md) · [Compatibility](docs/testing/COMPATIBILITY_MATRIX.md) · [Measured steering-wheel/head-unit key map](docs/testing/MU1440_MFW_RAW_KEY_MAPPING.md) · [Acknowledgements](ACKNOWLEDGEMENTS.md) · [Documentation](docs/README.md)
+[Feature status](#features-and-status) · [Module architecture](docs/architecture/README.md) · [Published source coverage](docs/status/PUBLISHED_SOURCE_COVERAGE.md) · [Developer release](release/CURRENT.md) · [Compatibility](docs/testing/COMPATIBILITY_MATRIX.md) · [Measured steering-wheel/head-unit key map](docs/testing/MU1440_MFW_RAW_KEY_MAPPING.md) · [Acknowledgements](ACKNOWLEDGEMENTS.md) · [Documentation](docs/README.md)
 
 ## Features and status
 
