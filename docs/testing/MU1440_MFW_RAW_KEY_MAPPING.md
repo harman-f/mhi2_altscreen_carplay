@@ -26,6 +26,22 @@
 | NAV, CAR, RADIO, MEDIA, APP/SmartLink, PHONE, SETUP and any other fitted hardkeys | **Not individually mapped in the published capture** | Unknown; don't derive numbers from a generic VW/QEMU target |
 | Main head-unit rotary control(s): turn +/− / push (where fitted) | **No independently correlated five-int tuple in this public dataset** | Unknown; distinguish rotary and press events |
 
+### Published cross-platform lead — not measured on our MU1440
+
+The open-source [lprot/MIB-Tools `configurationmanagerDecoder.py`](https://github.com/lprot/MIB-Tools/blob/master/configurationmanagerDecoder.py) independently labels keyboard `0x01` as console, `0x04` as steering wheel and `0x0D` as head-unit buttons. Its published key mapping (credited there to [mrfixpl's original public toolbox discussion](https://github.com/olli991/mib-std2-pq-zr-toolbox/issues/7)) gives useful candidate numeric **DSI key names**:
+
+| Public MIB-Tools candidate key | Symbolic action | Public MIB-Tools candidate key | Symbolic action |
+| ---: | --- | ---: | --- |
+| 1 | MEDIA | 3 | PHONE/TEL |
+| 4 | NAV | 6 | CAR |
+| 7 | SETUP/SETTING | 15 | RADIO/BAND/TUNER |
+| 16 | RIGHT KNOB/DDS | 17 | VOL |
+| 78 | MENU | 104 | MAP |
+| 108 | SELECT | 114 | APP/SMARTPHONE |
+| 116 | HOME | | |
+
+**Evidence boundary:** this decoder explicitly discusses MIB STD2 PQ/ZR resource variants and even documents firmware-dependent APP remapping. The symbolic values are neither a directly captured MU1440 `KBD/KEY/KST` record nor a guaranteed physical pin/ID for a differently fitted front panel. Only HOME `13/116` and MENU `13/78` from our table above are independently correlated by our reference-unit capture. The other numbers are excellent candidates for read-only event-by-event verification, *not* a justification for remapping an unknown button or substituting a STD2 configuration file into MHI2. The event IDs such as “NAV pressed” from a higher-level event table are also not raw KEY IDs.
+
 The firmware also contains higher-level hardkey constants such as smartphone/App-Connect ID 114 and mute ID 88. Those are **static API findings, not a measurement** that a particular physical head-unit button has the same `KBD/KEY` tuple. Do not turn symbol existence into a physical assignment.
 
 ## Unresolved steering-wheel controls
