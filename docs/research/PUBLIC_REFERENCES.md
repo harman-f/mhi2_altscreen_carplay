@@ -308,6 +308,10 @@ Useful public comparator for the MU1440 790/791 AltScreen family, including:
 The project treats this as comparative prior art. Exact MU1440 behavior in this repository is still classified
 separately as vehicle-proven, exact-target static, offline/build-proven or design-only.
 
+## Head-unit key mapping and public resource decoder
+
+[lprot/MIB-Tools — configurationmanagerDecoder.py](https://github.com/lprot/MIB-Tools/blob/master/configurationmanagerDecoder.py) lists DSI key names, keyboard-family labels (`0x01` console, `0x04` MFW, `0x0D` head unit) and key-to-action mapping candidates, with attribution to the [original public toolbox discussion](https://github.com/olli991/mib-std2-pq-zr-toolbox/issues/7). The source specifically covers MIB STD2 PQ/ZR resource variants; it is **not** a measured full physical button matrix on Škoda MU1440. See the [current exact-target physical mapping and unresolved HU controls](../testing/MU1440_MFW_RAW_KEY_MAPPING.md).
+
 ## Steering-wheel / hardkey lead
 
 ### y-batsianouski/mib2-voicecontrol-button-patch
