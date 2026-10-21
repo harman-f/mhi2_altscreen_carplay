@@ -1,6 +1,6 @@
 # ScreenAlt control plane — handshake, ownership and presentation refresh
 
-> Status: active research focus, 2026-09-26.
+> **Original September 2026 lifecycle/reference model.** Its control command roles remain useful; references to "our current problem" or the "next vehicle experiment" reflect the original dated session. Use [current integration status](../status/INTEGRATION_STATUS_2026-10-21.md) and [recovery/fault-isolation acceptance](../testing/STREAM111_FAULT_ISOLATION_2026-10-21.md) for newer work, and [architecture index](README.md) for module ownership.
 >
 > This is the detailed continuation point for the current engineering problem.
 
