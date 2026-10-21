@@ -45,6 +45,10 @@ Include as much of the following as possible:
 
 Sanitize logs/screenshots before posting and follow the canonical redaction/privacy rules in [SECURITY.md](SECURITY.md).
 
+## Help with physical input mapping
+
+Our measured [MU1440 wheel and head-unit input map](docs/testing/MU1440_MFW_RAW_KEY_MAPPING.md) separates physical observation from symbolic OEM constants. Compatible-platform contributions for unassigned VIEW/Assist, fitted head-unit hardkeys and rotary inputs are welcome. Record the exact firmware/cluster, the physical control and its stock effect, and only **sanitized** observed `KBD/KEY/KST` or `updateEncoder2` tuples. No VIN, original firmware, private trace/video or unsafe remapping is needed. Missing `HK` text may simply indicate a different OEM input consumer.
+
 ## Evidence levels
 
 Please distinguish these explicitly:
