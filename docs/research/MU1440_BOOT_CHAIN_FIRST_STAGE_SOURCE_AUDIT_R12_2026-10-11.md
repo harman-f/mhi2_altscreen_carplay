@@ -3,9 +3,13 @@
 **Issue:** [harman-f/mhi2_altscreen_carplay#37](https://github.com/harman-f/mhi2_altscreen_carplay/issues/37)  
 **Target:** `MHI2_ER_SKG13_P4526_MU1440`, QNX 6.5 / Tegra30  
 **Scope:** Issue phases 0–4; offline source inventory, extraction, and minimal static classification.  
+**Historical R12 source-scope update:** The result below reflects the available update/Unit-export sources at this checkpoint. Later R15 analysis of a separate original MMX NOR backup identified BCT copies and the native partition map; see [R15](MU1440_MMX_FS0_NATIVE_PT_AND_STAGE1_HEADER_CRC_R15_2026-10-12.md). Neither finding proves the running unit's present flash image.
+
 **Result:** The original QNX first-stage startup payload was identified and extracted from the exact MU1440 update. A Tegra30 BCT and SDRAM profiles were **not found or validated in the available sources**.
 
 This is a static research result. No firmware was executed, and no live unit, flash, clock, EMC, or PMIC operation was performed. No overclocking was attempted. This audit does not authorize a clock change or vehicle test.
+
+> **Later work (not part of the original R12-only evidence):** Follow the [consolidated CPU/overclocking research map](MU1440_TEGRA_T30_CPU_CLOCK_POWER_TIMEBASE_AUDIT_2026-10-11.md) and [R13 exact startup ARM/XREF analysis](MU1440_FIRST_STAGE_CPU_CLOCK_QTIME_XREF_AUDIT_R13_2026-10-11.md) for direct proof of PLLX register reading, CCLK source selection and **initial** qtime CPU-rate/2 setup. The [separate exact OEM wrapper roundtrip/NOR audit](MU1440_STAGE1_OEM_WRAPPER_ROUNDTRIP_AND_NOR_BOUNDARIES_2026-10-11.md) and [Toolkit guide on `main`](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/blob/main/docs/MU1440_STAGE1_OEM_OFFLINE_ROUNDTRIP.md) cover offline 3-MiB reconstruction. [R14 Issue #41](https://github.com/harman-f/mhi2_altscreen_carplay/issues/41) tracks outstanding original backup and voltage-source collection. The original R12 conclusion that **no validated BCT was found** remains unchanged.
 
 ## Executive findings
 
