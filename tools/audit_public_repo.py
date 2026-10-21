@@ -87,6 +87,17 @@ SECRET_PATTERNS = [
     re.compile(rb"https?://[^\s/:]+:[^\s/@]+@"),
 ]
 
+# Public docs and source must not leak a distinct, non-public development identity.
+# Audit the full checked-out current tree; this does NOT sanitize Git history,
+# pull request discussions or hosted external attachments.
+PRIVATE_DEVELOPMENT_REFERENCES = re.compile(
+    rb"(?:CaneTLOTW|M[.]I[.]B[._]Research)", re.IGNORECASE
+)
+TEXT_PUBLICATION_SUFFIXES = {
+    ".md", ".txt", ".csv", ".tsv", ".json", ".yml", ".yaml",
+    ".py", ".sh", ".ksh", ".h", ".c", ".cc", ".cpp", ".java", ".toml",
+}
+
 MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 
 
@@ -161,6 +172,8 @@ def audit_tree(errors: list[str], files: list[Path]) -> None:
             fail(errors, f"unexpected large file ({size} bytes): {rel}")
 
         data = path.read_bytes()
+        if suffix in TEXT_PUBLICATION_SUFFIXES and PRIVATE_DEVELOPMENT_REFERENCES.search(data):
+            fail(errors, f"non-public development account/repository reference: {rel}")
         for pattern in SECRET_PATTERNS:
             if pattern.search(data):
                 fail(errors, f"possible secret/private key pattern in: {rel}")
