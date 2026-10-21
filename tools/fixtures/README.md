@@ -24,6 +24,6 @@ Requires Python3 with numpy and ffmpeg/libx264. Emits `.h264`, `.m1au`, `AUDIT.j
 
 Opt-in replay source, owner, bounded control and rollback remain isolated in [draft PR #24](https://github.com/harman-f/mhi2_altscreen_carplay/pull/24), branch `work/mu1440-fixture-replay-v1`. This ensures the untested iPhone-free native gate takeover is not silently enabled in production/main. Native pair CI #300 built green at SHA `41a472211a1572d0548aaab9f6d6bee4df5cc3e9`; later exact-hash packaging CI [#301](https://github.com/harman-f/mhi2_altscreen_carplay/actions/runs/37852559790) provides both scripts and a binary manifest when completed. Neither CI run is a live in-car AID10 display test.
 
-Research evidence and original live CI295 baseline: [permanent Research main handoff](https://github.com/CaneTLOTW/M.I.B._Research/blob/main/projects/mhi2-altscreen-thirdparty-audit/analysis/MU1440_CARPLAY_LIVE_CI295_AND_FIXTURE_REPLAY_MASTER_2026-10-08.md).
+Research evidence and original live CI295 baseline: a retained offline source comparison.
 
 Preserve this directory, the Research handoff, and the original hashed fixture. New fixture versions can then be generated without reconstructing the protocol, codec or visual test design from old chats.
