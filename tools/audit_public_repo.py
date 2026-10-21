@@ -91,7 +91,7 @@ SECRET_PATTERNS = [
 # Audit the full checked-out current tree; this does NOT sanitize Git history,
 # pull request discussions or hosted external attachments.
 PRIVATE_DEVELOPMENT_REFERENCES = re.compile(
-    b"(?:Cane" + b"TLOTW|M[.]I[.]B[._]Research)", re.IGNORECASE
+    b"(?:Cane" + b"TLOTW|M[.]I[.]B[.][_]Research)", re.IGNORECASE
 )
 TEXT_PUBLICATION_SUFFIXES = {
     ".md", ".txt", ".csv", ".tsv", ".json", ".yml", ".yaml",
@@ -221,6 +221,10 @@ def audit_markdown_links(errors: list[str], files: list[Path]) -> None:
 
 
 def main() -> int:
+    # Regression fixtures are assembled without embedding the disallowed cleartext
+    # identity in this checker source, which is itself scanned as a public text file.
+    assert PRIVATE_DEVELOPMENT_REFERENCES.search(b"Cane" + b"TLOTW")
+    assert PRIVATE_DEVELOPMENT_REFERENCES.search(b"M.I.B." + b"_Research")
     errors: list[str] = []
     files = tracked_files()
 
