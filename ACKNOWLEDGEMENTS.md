@@ -92,6 +92,10 @@ AI-assisted tooling, including ChatGPT, has been used for:
 AI output is not treated as evidence by itself. Claims in this repository are expected to trace back
 to vehicle observations, binary evidence, reproducible builds or clearly identified prior art.
 
+## Input-map contributors welcome
+
+The [public physical key/encoder table](docs/testing/MU1440_MFW_RAW_KEY_MAPPING.md) credits previous public implementation leads separately from our reference-vehicle observations and invites compatible-platform owners to share missing VIEW/Assist and head-unit button mappings. Upstream names here refer only to identified public repositories; this is not a list of private research sources, commercial payload suppliers or implied endorsements.
+
 ## Future contributors
 
 If you provide a useful trace, target hash, patch, reverse-engineering finding or test result, please
