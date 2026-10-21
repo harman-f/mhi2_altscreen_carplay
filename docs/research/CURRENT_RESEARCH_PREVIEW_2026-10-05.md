@@ -1,4 +1,6 @@
-# Current research preview — 2026-10-05
+# Historical research preview — 2026-10-05
+
+> **Archived dated preview.** More recent [integration status](../status/INTEGRATION_STATUS_2026-10-21.md), [HMI/control](../architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md), [vehicle evidence](../findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md), and [R12–R16 research index](README.md) supersede the relevant cross-track status. Historical implementation proposals below do not establish the current installed state.
 
 **Status:** public research preview / mixed evidence levels  
 **Reference target:** `MHI2_ER_SKG13_P4526_MU1440` / AID10-class Virtual Cockpit
