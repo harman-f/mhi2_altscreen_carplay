@@ -1,5 +1,12 @@
 # AGENTS.md — mandatory instructions for contributors and AI agents
 
+## Public repository role (binding)
+
+This is the **curated public source/product repository**, not the development team's coordination or forensic workspace. Publish only independently authored, provenance-checked source with actual dependencies/build checks; current capabilities, accurate support/test evidence, public documentation and external contributor changes. Never place internal audits, research task/handoff reports, private issue or pull request references, raw captures, extracted OEM/phone code, personal provenance, private names/paths or experimental branch diaries here.
+
+Internal implementation experiments, audits, QA logs, reviewer handoffs, prompts and progress tracking stay in private development management. **Do not open a public Issue or Draft PR to relay internal work**, even when the feature eventually ships publicly. Public Issues are for real outside bug/compatibility reports and release-source regressions; public PRs are small independently reviewable release/publication candidates. No stacked public development PRs, source-only file copies without dependent code or undocumented build assumptions. A public code publication requires an exact change set, origin/license and disclosure review, build and appropriate evidence classification, then CI; never equate host/source PASS with a vehicle-ready installer.
+
+
 **Read before proposing, writing, reviewing or packaging ANY on-unit QNX shell command,
 script, diagnostic ZIP, test script or deployment** for the MU1440, even when that
 artifact is generated outside this repository or shared only in a chat.
