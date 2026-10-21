@@ -1,5 +1,8 @@
 # MU1440 HMI menu and ViewHandler architecture
 
+> **October 2026 update:** This document preserves the original static architecture and early WidgetFactory proposal. Current development additionally includes a project-owned HOME tile, OEM-style Settings rows, a separate native MIBR/3 settings/action controller and a source-only scrollbar extension. The latest outcome and individual build/vehicle acceptance gates are in [module boundaries and SEAT/VW portability](MODULE_BOUNDARIES_AND_PORTABILITY.md) and [integration status](../status/INTEGRATION_STATUS_2026-10-21.md). The exact MU1440 widget IDs, skins, CIO routes and classloader details are **not portable binaries**; another firmware/brand requires its own read-only original HMI audit.
+
+
 **Status:** static reverse-engineering / implementation design  
 **Reference target:** `MHI2_ER_SKG13_P4526_MU1440`  
 **Scope:** stock MIB2 High main-menu composition, application-local settings navigation, ViewHandler loading, and the proposed AltScreen settings integration path.
