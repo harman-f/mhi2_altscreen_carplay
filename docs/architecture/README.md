@@ -1,0 +1,20 @@
+# Architecture and module documentation
+
+**One entry point, explicit source/status boundaries.** The current high-level architecture is [module boundaries and portability](MODULE_BOUNDARIES_AND_PORTABILITY.md). The pages below have distinct technical ownership; dated test reports explain *how* a finding was established, not a second definition of the current architecture. Use [published source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md) to distinguish a described interface from a source package already included in public `main`, and [integration status](../status/INTEGRATION_STATUS_2026-10-21.md) for actual proof level.
+
+| Module / question | Authoritative current page | Supporting scope, not an alternative current design |
+| --- | --- | --- |
+| Full system, one media owner and SEAT/VW adaptation | [Module boundaries and portability](MODULE_BOUNDARIES_AND_PORTABILITY.md) | [Original system overview](SYSTEM_OVERVIEW.md) is a September architectural foundation; the later central controller and HMI are governed by the current module page |
+| Type-111 advertisement, URL, lifecycle, show/refresh | [ScreenAlt control plane](SCREENALT_CONTROL_PLANE.md) for protocol roles; [October status](../status/INTEGRATION_STATUS_2026-10-21.md) for current acceptance | September next-test text in the original control-plane page is historical; [fault-isolation guide](../testing/STREAM111_FAULT_ISOLATION_2026-10-21.md) governs current recovery test cases |
+| Compressed media, TS, MOST and exclusive writer | [Direct VC video path](DIRECT_VC_VIDEO_PATH.md) | [Runtime contract](RUNTIME_CONTRACT.md) is for the **published reference binary's** ports/markers, not an asserted contract for unreleased source-time parity |
+| Start/stop, state, fail-closed stock handback | [Auto-Direct reference runtime](AUTO_DIRECT_RUNTIME.md), [runtime contract](RUNTIME_CONTRACT.md) | [Advanced runtime switches](ADVANCED_RUNTIME_SWITCHES.md) covers exactly the publicly released/reference switches; newer native owner implementation is not inferred |
+| ViewArea/SafeArea and navigation presentation | [Navigation composition](NAVIGATION_COMPOSITION_AND_SAFEAREA.md) | [Native HMI/control](NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md) owns menu application/ACTIVE distinction; [NavIgnore](NAVIGNORE.md) owns separate native navigation arbitration |
+| Project HMI menu, Java/native settings and physical input | [Native HMI and single-authority controller](NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md) | [Original MU1440 ViewHandler analysis](MU1440_HMI_MENU_AND_VIEWHANDLER_ARCHITECTURE.md) is a *dated target-specific static source reference*, not the current integration status; [physical input mapping](../testing/MU1440_MFW_RAW_KEY_MAPPING.md) holds measured IDs |
+| Optional vehicle speed, GNSS and status | [Optional vehicle-data overview](OPTIONAL_VEHICLE_DATA_FEATURE_OVERVIEW.md) | Source/release and existing authenticated-session acceptance remain separately gated |
+| Build, target, recovery and release | [Public source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md), [compatibility matrix](../testing/COMPATIBILITY_MATRIX.md), [developer release](../../release/CURRENT.md) | [Installation](../INSTALLATION.md) applies to its exact reference build, not any research candidate |
+
+## Evidence rules
+
+A published C/Java interface or host-tested prototype is **not** an installed feature; UI STORE/TEMP and accepted ACTION are not a physically displayed result; stream-111 state and writer-gate state are independent. A third-party working port is not a compatibility certificate for this project's executable. Original vendor source, extracted graphics, raw private sessions, internal audits and work handoffs are not mirrored here.
+
+The module descriptions intentionally cross-link instead of repeating the full state-machine/installation details. For new public work, edit the owning page and its specific source README, then update [docs index](../README.md) and [public source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md) if a new module is actually published. Retain historical evidence only with its date and superseding reference.
