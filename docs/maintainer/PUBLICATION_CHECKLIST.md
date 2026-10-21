@@ -1,6 +1,6 @@
 # Public publication checklist
 
-Use this checklist immediately before changing repository visibility to public.
+Originally prepared for the initial public launch. **For current changes**, apply this checklist to every proposed PR and release; see the [October 2026 publication/issue policy](ISSUE_AND_PUBLICATION_POLICY.md) and [documentation audit](DOCUMENTATION_AUDIT_2026-10-22.md). History and previously posted issue comments require separate review; a current-tree cleanup does not scrub Git history or externally hosted attachments.
 
 ## GitHub About
 
