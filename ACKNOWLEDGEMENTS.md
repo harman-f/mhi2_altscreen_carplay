@@ -92,6 +92,10 @@ AI-assisted tooling, including ChatGPT, has been used for:
 AI output is not treated as evidence by itself. Claims in this repository are expected to trace back
 to vehicle observations, binary evidence, reproducible builds or clearly identified prior art.
 
+## lprot / MIB-Tools and public key-mapping contributors
+
+Thanks to [lprot/MIB-Tools](https://github.com/lprot/MIB-Tools) and contributors to the original [MIB STD2 head-unit button-mapping discussion](https://github.com/olli991/mib-std2-pq-zr-toolbox/issues/7), including mrfixpl, for publishing a useful configuration-manager decoder and raw key-name cross-check. Its platform/firmware scope is different from our exact MU1440 unit: these numbers are credited as **public comparative prior art**, not represented as our own physical measurements.
+
 ## Input-map contributors welcome
 
 The [public physical key/encoder table](docs/testing/MU1440_MFW_RAW_KEY_MAPPING.md) credits previous public implementation leads separately from our reference-vehicle observations and invites compatible-platform owners to share missing VIEW/Assist and head-unit button mappings. Upstream names here refer only to identified public repositories; this is not a list of private research sources, commercial payload suppliers or implied endorsements.
