@@ -15,6 +15,44 @@ libairplay.so SHA-256:
 
 Different target hashes are stop conditions. The current vehicle proof is additionally limited to the reference **AID10-class 10.x-inch MQB Virtual Cockpit**. Cluster generation/hardware is a separate compatibility gate; a known MU1440-compatible software baseline does not prove a 12.3-inch AID target.
 
+## Existing Type-111 host-firewall prerequisite (TCP 6031)
+
+The MU1440 reference vehicle already has the narrow inbound `carplay0` exception for the
+project's Type-111 receiver. This documents an **existing vehicle-side setup**; it is not a
+request to add another rule or change the active vehicle. The normal CarPlay allowlist does
+not, by itself, prove that a custom secondary stream port is reachable.
+
+The intended effective PF rule for the default `ALTSCREEN111_PORT=6031` is:
+
+```pf
+pass in quick on carplay0 proto tcp from any to any port 6031 allow-opts
+```
+
+- Scope is **inbound TCP on the iPhone's CarPlay interface `carplay0`**, port **6031 only**.
+  Do not disable PF or open 6031 on unrelated WLAN, cellular, debug or external interfaces.
+- Port `6031` is the iPhone-to-head-unit Type-111 video transport. The local H.264 tee at
+  `127.0.0.1:19820` is a separate loopback interface and is **not** an inbound CarPlay
+  firewall exception.
+- The rule must be in the **effective** PF policy after boot, not merely present in a
+  file or a staged configuration. Check the loaded rules read-only with the unit's
+  `pfctl -sr` and verify the 6031 listener separately with `netstat -an`.
+  Neither SETUP success nor a listening socket alone proves inbound connectivity:
+  corroborate with an accepted iPhone connection and advancing VideoConfig/frame counters.
+- For another firmware/vehicle, first identify its actual PF startup/configuration path
+  (including any variant files), preserve the original bytes, inspect existing rules and
+  obtain a deliberate, narrowly scoped change and rollback procedure. Never blindly
+  append duplicate rules or overwrite other tooling's modifications.
+- **Ownership boundary:** the currently published `deployment/mu1440/install.sh` and
+  `uninstall.sh` do not install or remove a PF rule. The existing vehicle-side exception
+  must be audited and backed up/restored separately; do not assume that uninstalling the
+  CarPlay payload removes it.
+
+If Type 111 is advertised in SETUP but no video connection follows, verify the effective
+`carplay0` rule before attributing the failure to the hook, decoder or MOST output.
+The distinct port roles and diagnostic sequence are in
+[STREAM111_PROTOCOL.md](research/STREAM111_PROTOCOL.md#111-mu1440-carplay0-firewall-and-port-ownership)
+and [VEHICLE_TEST_PROTOCOL.md](testing/VEHICLE_TEST_PROTOCOL.md#4-verify-the-type-111-source-separately).
+
 ## Prepare
 
 From a workstation checkout:
