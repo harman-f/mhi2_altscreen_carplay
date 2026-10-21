@@ -1,5 +1,7 @@
 # Exact MU1440 steering-wheel / hardkey API audit
 
+> **Current physical mappings:** [Updated wheel and head-unit key/encoder table](../testing/MU1440_MFW_RAW_KEY_MAPPING.md). This document records the early *static* API comparison; its original future experiments have since gained physical key and five-int wheel evidence. The VIEW/Assist/front-panel gaps remain open, and a symbolic key is never a proven physical assignment.
+
 ## External lead
 
 Reference project:
