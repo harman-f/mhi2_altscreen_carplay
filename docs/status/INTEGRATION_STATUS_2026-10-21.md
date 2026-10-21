@@ -34,6 +34,10 @@ October 20 logs distinguish (a) CarPlay/session TEARDOWN, sometimes reason -6753
 
 The October 20 HMI field result is **not a full functional PASS**: menu changes and TEMP/store observations did not demonstrate that the five selected navigation options actually changed the live CarPlay/VC presentation, even after the tested reconnect/reboot. A verified current-session owner SHOW/APPLY and per-key ACTIVE evidence remain required. A new Java scrollbar/three-view source candidate has build evidence only, not an assumed installed visual PASS.
 
+## Further dated reference-vehicle evidence
+
+The [October 11 Final Drive checkpoint](MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md), [switch matrix](../testing/MU1440_FINAL_DRIVE_SWITCH_MATRIX_2026-10-11.md), [visual zoom/cadence observation](../findings/MU1440_ZOOM_CADENCE_OBSERVATION_2026-10-11.md) and [package provenance](../../deployment/mu1440-final-drive-v1/PACKAGE_PROVENANCE_2026-10-11.md) were transferred as historical documentation only. They do not import the experimental old-stack code or locally staged ZIPs.
+
 ## Current shipping baseline
 
 The [current developer release](../../release/CURRENT.md) remains the existing MU1440-specific experimental checkpoint; no newly described controller, HMI, vehicle-data or parity variant is implicitly part of its ZIP. Use exact component hashes, compatibility checks, backup and rollback. The public research and open draft PRs may be newer than the recommended downloadable binary.
