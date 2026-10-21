@@ -4,7 +4,7 @@
 
 The project has advanced beyond the first moving-map proof of concept. On the exact Škoda MU1440/AID10 reference unit, **Apple Maps, Google Maps and Waze** have appeared as moving auxiliary video. Subsequent development sessions exercised long-running protected direct/parity transport, navigation composition, SafeArea/ViewArea, an OEM-native menu, zoom and an experimental stock/CarPlay route controller. This is a working vehicle-reference engineering project, **not** a universal product or a claim that all the newer features are already in the downloadable public ZIP.
 
-[Feature status](#features-and-status) · [Architecture](#system-architecture) · [Published source coverage](docs/status/PUBLISHED_SOURCE_COVERAGE.md) · [Developer release](release/CURRENT.md) · [Compatibility](docs/testing/COMPATIBILITY_MATRIX.md) · [Documentation](docs/README.md)
+[Feature status](#features-and-status) · [Architecture](#system-architecture) · [Published source coverage](docs/status/PUBLISHED_SOURCE_COVERAGE.md) · [Developer release](release/CURRENT.md) · [Compatibility](docs/testing/COMPATIBILITY_MATRIX.md) · [Measured steering-wheel/head-unit key map](docs/testing/MU1440_MFW_RAW_KEY_MAPPING.md) · [Acknowledgements](ACKNOWLEDGEMENTS.md) · [Documentation](docs/README.md)
 
 ## Features and status
 
@@ -66,6 +66,10 @@ The public repository already includes project-owned **GEN2 receiver C**, **Dire
 **The latest integrated source for newer parity/supervisor, Java HMI, MIBR/3 controller and optional vehicle-data modules is not yet distributed here as a cohesive source or release.** Closing historical experimental PRs did not import them into main. Each new public source package needs dependency, license, build and appropriate vehicle-evidence review.
 
 The existing [hash-pinned MU1440 developer prerelease](release/CURRENT.md) assumes existing SSH, exact-compatible components, backup and tested recovery. It does not contain a finished public menu/zoom/KEY40/vehicle-data installer and is not a universal one-click SD-card solution. [Installation guidance](docs/INSTALLATION.md) · [Build notes](docs/build/DIRECT_TS_REMUX_BUILD.md) · [Advanced runtime reference](docs/architecture/ADVANCED_RUNTIME_SWITCHES.md).
+
+## Open-source acknowledgements
+
+This implementation builds on independently published MIB2/MHI2 research and tools. Special thanks to [Luka](https://github.com/luka-dev), [OneB1t](https://github.com/OneB1t/VcMOSTRenderMqb), [jilleb/MIB Toolbox](https://github.com/jilleb/mib2-toolbox), [omonob](https://github.com/omonob/MHI2-Carplay-Maps) and other credited public project maintainers. See [full acknowledgements](ACKNOWLEDGEMENTS.md), [exact upstream/source and license notices](THIRD_PARTY_NOTICES.md), and [public reference projects](docs/research/PUBLIC_REFERENCES.md). Prior art, separately licensed incorporated material and independently authored project code are distinguished there; attribution is not a claim that the upstream maintainers endorse this project.
 
 ## Contributing and safety
 
