@@ -68,10 +68,10 @@ This directory collects research that is useful to contributors before it become
 - **[Separate comparator: yuedizhibo/MHI2Q-CarPlay-AltScreen (owner: yuedizhibo)](keypanel/MU1440_MHI2Q_ALTSCREEN_ZOOM_PORT_BINARY_PATCH_OPTIONS_2026-10-11.md)** — Audi MHI2Q/AUG22 absolute-magnification/pacing reference, **not** the Omonob MHI2 implementation or a compatible MU1440 binary.
 - [Java / IBM J9 build notes](JAVA_J9_BUILD_NOTES.md)
 
-Current status:
+Historical input/HMI snapshot from 11 October (newer Java model and native source-only components are listed under [public source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md); current UI/store/APPLY/ACTIVE acceptance is in [HMI architecture](../architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md)):
 
 ```text
-menu/ViewHandler architecture        exact-target static + compile-only PoC
+menu/ViewHandler original audit      exact-target static + compile-only PoC
 WidgetFactory injection              offline/build-proven, not vehicle-proven
 steering-wheel ASL APIs              exact-target static
 physical MFW press subset           vehicle-log correlated; VIEW/Assist still open
