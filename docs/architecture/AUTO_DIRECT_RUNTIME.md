@@ -1,6 +1,6 @@
 # Auto-Direct runtime architecture
 
-The current vehicle-tested integration is not just a video binary. It is a small state machine that
+The **published reference** vehicle-tested integration is not just a video binary. Newer experimental supervisor and central-controller development has separate owner/vehicle acceptance; see [architecture index](README.md) and [current status](../status/INTEGRATION_STATUS_2026-10-21.md). It is a small state machine that
 decides when the alternate producer is allowed to own the Virtual Cockpit map-video path.
 
 The exact research scripts are published under `runtime/auto-direct/`.
