@@ -1,5 +1,7 @@
 # Documentation index
 
+**October 2026 starting points:** [current integration status](status/INTEGRATION_STATUS_2026-10-21.md) · [module responsibilities and SEAT/VW HMI portability](architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md) · [sanitized vehicle/timing evidence](findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md) · [public issue/publication policy](maintainer/ISSUE_AND_PUBLICATION_POLICY.md). The older 2026-10-05 research preview is a historical, mixed-evidence snapshot, not an installable current build.
+
 ## New contributor path
 
 1. [System overview](architecture/SYSTEM_OVERVIEW.md)
