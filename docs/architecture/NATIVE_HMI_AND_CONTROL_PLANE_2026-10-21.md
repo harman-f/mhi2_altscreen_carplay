@@ -83,4 +83,4 @@ A SEAT or Volkswagen port should first capture the **original stock menu/cluster
 
 Original OEM screenshot/skin dumps and private full-mode traces are not included. Only independently created diagrams and this publication summary are supplied here.
 
-See [current integration status](../status/INTEGRATION_STATUS_2026-10-21.md), [module boundaries](MODULE_BOUNDARIES_AND_PORTABILITY.md), and [publication policy](../maintainer/ISSUE_AND_PUBLICATION_POLICY.md).
+See [current integration status](../status/INTEGRATION_STATUS_2026-10-21.md), [module boundaries](MODULE_BOUNDARIES_AND_PORTABILITY.md), and [published source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md).
