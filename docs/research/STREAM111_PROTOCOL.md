@@ -212,6 +212,40 @@ The second is project-local IPC between the Type-111 receiver and a local consum
 
 Never expose the local tee beyond loopback without a separate security review.
 
+### 11.1 MU1440 `carplay0` firewall and port ownership
+
+The preferred Type-111 receive port is a **new inbound TCP endpoint** on the USB-CarPlay
+network interface, not a stock-main-screen port. The reference MU1440 vehicle already
+has the required narrow firewall exception (existing vehicle-side configuration):
+
+```pf
+pass in quick on carplay0 proto tcp from any to any port 6031 allow-opts
+```
+
+This permits the iPhone to reach the project's receiver on `carplay0:6031`. It does not
+expose or otherwise affect `127.0.0.1:19820`, which remains local to the head unit,
+and it is not a reason to disable PF or modify other interfaces. `6031` is a preference:
+if SETUP advertises a different actual data port, verify that advertised endpoint and its
+policy instead of assuming the configured default.
+
+**Diagnostic separation (do not collapse these into one "Stream 111 works" status):**
+
+1. Type-111 descriptor accepted in SETUP; record the returned data port and generation.
+2. Receiver bound/listening on the expected interface/address.
+3. The *effective* boot-loaded PF ruleset allows inbound TCP to that port on `carplay0`.
+4. Actual iPhone TCP connection accepted; bytes and VideoConfig/frame counters advance.
+5. Annex-B tee consumer primes on a compatible codec/IDR generation.
+6. The remux/MOST presenter takes and returns ownership independently.
+
+A successful SETUP or `LISTEN` is insufficient evidence for steps 3–6. Read-only
+`pfctl -sr`, `netstat -an` and the receiver's session/connection/frame logs help
+distinguish a blocked transport from a healthy receiver with a downstream failure.
+
+The published MU1440 deployment scripts currently do **not** own PF installation or
+rollback. Inspect/preserve the target's original effective and persistent policy separately
+before porting. This paragraph documents the existing reference rule; it introduces no
+new firewall implementation. See [developer installation](../INSTALLATION.md#existing-type-111-host-firewall-prerequisite-tcp-6031).
+
 ## 12. Consumer priming rule
 
 Current development treats these as separate generations:
