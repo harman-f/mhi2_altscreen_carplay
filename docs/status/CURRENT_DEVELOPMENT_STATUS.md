@@ -1,9 +1,11 @@
-# Current development status
+> **Historical public implementation snapshot (last maintained 2026-10-02).** This file records the original reference-binary checkpoint; statements here such as “no HMI patch deployed” are dated, not the live October status. For current cross-module build/vehicle distinctions see [Integration status (2026-10-21)](INTEGRATION_STATUS_2026-10-21.md), [HMI/control architecture](../architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md), and [dated Final Drive evidence](MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md). The released ZIP has **not** been silently promoted to newer branch artifacts.
+
+# Historical public implementation status — 2026-10-02
 
 > [!IMPORTANT]
 > This page primarily tracks the **vehicle-proven/public implementation line**. Newer design-only work on source-timestamp transport, configurable keyframe policy, ownership A/B, HMI integration and steering-wheel control is summarized separately in the [current research preview](../research/CURRENT_RESEARCH_PREVIEW_2026-10-05.md). Those newer items are not vehicle-approved binaries yet.
 
-Last updated: **2026-10-02**
+Historical snapshot: **2026-10-02**
 
 > The downloadable experimental GEN2 binary is intentionally **not the newest development build**.
 >
