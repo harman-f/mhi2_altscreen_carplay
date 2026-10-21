@@ -62,7 +62,7 @@ This directory collects research that is useful to contributors before it become
 - [MU1440 HMI menu and ViewHandler architecture](../architecture/MU1440_HMI_MENU_AND_VIEWHANDLER_ARCHITECTURE.md)
 - [MU1440 steering-wheel / hardkey API](MU1440_BUTTON_INPUT_API.md)
 - **[MU1440 wheel DSI / decoded vehicle evidence / Omonob Java bytecode / VC zoom video (2026-10-11)](keypanel/MU1440_WHEEL_DSI_AND_OMONOB_2026-10-11.md)** — distinguishes `updateKey2` from `updateEncoder2`, documents the public Omonob KEY38/39-only interception, and defines a passive next-step probe.
-- [Sanitized physical key/encoder evidence matrix](keypanel/MU1440_CAPTURE_SANITIZED_MATRIX.tsv) · [updated raw-key mapping](../testing/MU1440_MFW_RAW_KEY_MAPPING.md).
+- [Canonical current physical wheel/head-unit map and open assignments](../testing/MU1440_MFW_RAW_KEY_MAPPING.md) · [sanitized underlying key/encoder matrix](keypanel/MU1440_CAPTURE_SANITIZED_MATRIX.tsv).
 - **[New actual 12-detent MU1440 five-int mapping](keypanel/MU1440_F902_FIVE_INT_ENCODER_CAPTURE_2026-10-11.md)** — right 4/40 ±1 and left 4/44 ±1; supersedes earlier warnings-only uncertainty; [offline read-only decoder](../../tools/decode_keypanel_f902.py).
 - **[Primary: omonob/MHI2-Carplay-Maps (owner: omonob/QCDWJ) — exact MU1440/790 wheel-input correction and JAR patch options](keypanel/MU1440_OMONOB_MHI2_WHEEL_ENCODER_BINARY_PATCH_OPTIONS_2026-10-11.md)** — the relevant Free790 `CarPlayClusterControls.jar`, `updateEncoder2` gap, real 4/40 ±1 detents, Omonob core zoom worker and safe adapter strategy. Design only; no patch installed.
 - **[Separate comparator: yuedizhibo/MHI2Q-CarPlay-AltScreen (owner: yuedizhibo)](keypanel/MU1440_MHI2Q_ALTSCREEN_ZOOM_PORT_BINARY_PATCH_OPTIONS_2026-10-11.md)** — Audi MHI2Q/AUG22 absolute-magnification/pacing reference, **not** the Omonob MHI2 implementation or a compatible MU1440 binary.
@@ -74,9 +74,9 @@ Current status:
 menu/ViewHandler architecture        exact-target static + compile-only PoC
 WidgetFactory injection              offline/build-proven, not vehicle-proven
 steering-wheel ASL APIs              exact-target static
-physical MFW press subset           vehicle-log mapped / isolated recheck
-rotary five-int baseline           12 direct f902 events / offline-parsed
-actual semantic zoom/focus path     OPEN / targeted map-versus-menu correlation
+physical MFW press subset           vehicle-log correlated; VIEW/Assist still open
+rotary five-int baseline           right 4/40 ±1; left 4/44 ±1 / 12 directly parsed records
+actual semantic zoom/focus path     partly development-observed; current focus/owner integration open
 ```
 
 ## Media / transport / comparator research
