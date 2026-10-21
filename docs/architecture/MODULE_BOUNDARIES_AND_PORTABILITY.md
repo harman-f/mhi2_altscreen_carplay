@@ -1,5 +1,7 @@
 # Module boundaries, HMI and cross-brand portability
 
+[Architecture module index](README.md) identifies the authoritative reference page per subsystem; this page owns the cross-module boundaries and portability model.
+
 **Status: architecture of current public baseline plus later experimental development, 21 October 2026.** This document describes independently developed integration concepts and safe interfaces, not a universal installer. A compatible Škoda/SEAT/VW logo, matching MU number or same-looking menu is never enough to prove binary compatibility.
 
 ## One system, separate responsibilities
