@@ -10,7 +10,7 @@ Last updated: **2026-10-21** (original numbered findings retained as historical 
 - Long-session logged PTS-minus-PCR lead is not evidence of equivalent physically accumulating display delay. Clean fixture replay supported retaining the original compressed iPhone bitstream.
 - External MU1409/Continental 790 success with an adapted different implementation is compatibility evidence, **not** qualification of this project's runtime on MU1409.
 
-Details: [sanitized October evidence](OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md) and [current integration status](../status/INTEGRATION_STATUS_2026-10-21.md).
+Details: [recovery/fault isolation](../testing/STREAM111_FAULT_ISOLATION_2026-10-21.md), [sanitized October evidence](OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md) and [current integration status](../status/INTEGRATION_STATUS_2026-10-21.md).
 
 This page describes problems that are real enough to matter but not yet stable enough to hide behind
 a "release" label.
