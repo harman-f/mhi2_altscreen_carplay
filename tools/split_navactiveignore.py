@@ -20,7 +20,7 @@ def write_jar(path, title, entries):
     manifest = (
         "Manifest-Version: 1.0\r\n"
         f"Implementation-Title: {title}\r\n"
-        "Created-By: M.I.B._Research deterministic split\r\n"
+        "Created-By: MHI2 AltScreen deterministic split\r\n"
         "\r\n"
     ).encode("utf-8")
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as z:
