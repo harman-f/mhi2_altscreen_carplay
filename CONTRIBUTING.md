@@ -24,7 +24,7 @@ This is an experimental reverse-engineering and interoperability project. Contri
 - requests for support on a new Škoda/SEAT/VW MHI2 variant;
 - coordination between testers.
 
-Please do not use Issues as a general support forum.
+Please do not use Issues as a general support forum or as an internal development/status tracker. Internal investigations, work assignments and experimental source are not public issue handoffs. Public source PRs should be standalone, buildable and provenance-cleared.
 
 ## Before opening a vehicle-test Issue
 
