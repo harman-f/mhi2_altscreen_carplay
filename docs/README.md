@@ -8,10 +8,10 @@
 
 1. [System overview](architecture/SYSTEM_OVERVIEW.md)
 2. [Direct VC video path](architecture/DIRECT_VC_VIDEO_PATH.md)
-3. [Current research preview](research/CURRENT_RESEARCH_PREVIEW_2026-10-05.md) — newest media/keyframe, HMI/menu and steering-wheel findings, explicitly labeled by evidence level
+3. [Current October integration status](status/INTEGRATION_STATUS_2026-10-21.md) — latest cross-module evidence and separately qualified build/vehicle milestones
 4. [Research topic index](research/README.md)
 5. [ScreenAlt control plane](architecture/SCREENALT_CONTROL_PLANE.md)
-6. [Current development status](status/CURRENT_DEVELOPMENT_STATUS.md)
+6. [Historical implementation snapshot (2026-10-02)](status/CURRENT_DEVELOPMENT_STATUS.md)
 7. [Known issues](findings/KNOWN_ISSUES.md)
 8. [Roadmap](../ROADMAP.md)
 
