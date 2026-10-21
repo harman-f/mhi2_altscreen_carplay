@@ -117,7 +117,11 @@ Before automatic takeover, check:
 
 - GEN2 hook loaded;
 - stock main CarPlay screen still works;
-- Type-111 listener exists;
+- SETUP returns the actual Type-111 data port (normally TCP 6031);
+- the already configured, effective inbound `carplay0` PF rule allows that port
+  (read-only inspection, e.g. the unit's `pfctl -sr`; check again after reboot);
+- Type-111 listener exists and an **actual iPhone TCP connection** is accepted
+  (a listener or SETUP alone does not establish firewall reachability);
 - source state reaches `streaming`;
 - VideoConfig has been accepted;
 - H.264 AU counters advance;
