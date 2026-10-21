@@ -1,5 +1,7 @@
 # Documentation index
 
+[Full current-tree documentation audit (22 October 2026)](maintainer/DOCUMENTATION_AUDIT_2026-10-22.md). The historic Final Drive evidence is linked from the current integration status; the experimental source and original operator ZIP were not automatically released.
+
 **Detailed new guides:** [Native HMI / control plane](architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md) · [Stream-111 fault isolation](testing/STREAM111_FAULT_ISOLATION_2026-10-21.md) · [optional vehicle-data scope](architecture/OPTIONAL_VEHICLE_DATA_FEATURE_OVERVIEW.md).
 
 **October 2026 starting points:** [current integration status](status/INTEGRATION_STATUS_2026-10-21.md) · [module responsibilities and SEAT/VW HMI portability](architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md) · [sanitized vehicle/timing evidence](findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md) · [public issue/publication policy](maintainer/ISSUE_AND_PUBLICATION_POLICY.md). The older 2026-10-05 research preview is a historical, mixed-evidence snapshot, not an installable current build.
