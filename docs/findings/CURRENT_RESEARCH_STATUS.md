@@ -1,4 +1,6 @@
-# Current research status
+> **Historical research snapshot (2026-10-03).** This page is retained to preserve original evidence labels. Start with [current October integration status](../status/INTEGRATION_STATUS_2026-10-21.md), [new research index](../research/README.md) and [October fault/vehicle observations](OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md). The phrase “newest” below only reflects this snapshot's original date.
+
+# Historical research status — 2026-10-03
 
 > [!NOTE]
 > For the newest cross-track findings after this status snapshot, see the [current research preview](../research/CURRENT_RESEARCH_PREVIEW_2026-10-05.md), especially the source-timestamp/keyframe design, DMDT-vs-writev ownership distinction, HMI WidgetFactory seam and steering-wheel input work.
