@@ -41,7 +41,7 @@ The [current developer release](../../release/CURRENT.md) remains the existing M
 ## Start with these boundaries
 
 - [Module architecture and VW/SEAT portability](../architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md)
-- [Classic vehicle-data interface research](../research/CLASSIC_CARPLAY_VEHICLE_DATA_PUBLIC_INTERFACE.md)
+- Detailed vehicle-data protocol publication remains subject to a separate review.
 - [Known issues](../findings/KNOWN_ISSUES.md)
 - [Vehicle and timing findings](../findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md)
 - [Compatibility matrix](../testing/COMPATIBILITY_MATRIX.md)
