@@ -5,6 +5,8 @@ These are **actual source files**, not an illustration or an installer. They are
 - `api_v3_contract.py`: bounded line framing, percent/UTF-8 encoding, validation, response construction and read-only supplied-snapshot projection. It performs **no** socket, QNX, disk, source-switch, vehicle-data or iAP2 operation.
 - `mibr_v3_parity_mailbox.c/.h`: a bounded, single-request file handoff to an **already qualified existing owner**, with no-replace atomic publication and an uncertainty return that forbids blind retries.
 - `mibr_v3_parity_mailbox_probe.c`: host test of rejects, START/STOP, existing owner request and competing publishers.
+- `mibr_v3_owner_lifecycle.c/.h` and `mibr_v3_route_types.h`: pure, independently compilable, fail-closed STOCK/DIRECT state and current-session/visible-owner decision policy, not a target route driver.
+- `mibr_v3_owner_lifecycle_probe.c`: host regression for same-session owner proof, pending RID, ACK/visibility and reversible handback.
 
 The mailbox is a component interface, **not an authenticated production service**, target installer, car access path, physically attested VC state or permission to start a second parity writer. A successful mailbox handoff means **accepted/pending**, never a proven visible-route change. Do not use its `qualified` flag without independently establishing exact source/session, active owner, AID display evidence and safe rollback.
 
