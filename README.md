@@ -2,6 +2,8 @@
 
 **Open research and engineering for bringing CarPlay secondary-screen navigation to the Virtual Cockpit on Volkswagen Group MHI2 platforms.**
 
+> **October 2026 status:** Read the [current cross-module integration report](docs/status/INTEGRATION_STATUS_2026-10-21.md), [module boundaries / SEAT–VW HMI portability](docs/architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md), [sanitized timing and vehicle findings](docs/findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md), and [issue/publication policy](docs/maintainer/ISSUE_AND_PUBLICATION_POLICY.md). New source-only HMI, controller, parity and vehicle-data work is **not automatically included** in the September public developer release. Vehicle observations, candidate source builds and outstanding integration acceptance are kept separate. Public Issues welcome third-party compatibility reports; maintainer task coordination is not the main public issue workflow.
+
 > [!IMPORTANT]
 > ## ✅ SUCCESS — MU1440 VEHICLE PoC PROVEN
 >
