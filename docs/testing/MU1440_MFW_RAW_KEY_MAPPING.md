@@ -1,264 +1,66 @@
-# MU1440 raw steering-wheel/keypanel mapping
+# Physical steering-wheel and head-unit input map — Škoda MU1440
 
-**Current mapping update (2026-10-11):** A later v1.4 capture directly recovered twelve structured right `(4,40,+/-1,0,1)` and left `(4,44,+/-1,0,1)` wheel records, three per direction. Statements further below that raw numeric tuples are still unknown apply to the earlier v1.3-only evidence. See [actual f902 records](../research/keypanel/MU1440_F902_FIVE_INT_ENCODER_CAPTURE_2026-10-11.md) and [omonob/MHI2-Carplay-Maps (owner: omonob/QCDWJ) input fix study](../research/keypanel/MU1440_OMONOB_MHI2_WHEEL_ENCODER_BINARY_PATCH_OPTIONS_2026-10-11.md).\n\n## Goal
+**Updated 22 October 2026.** These are *observed on the fitted reference vehicle* unless marked otherwise. The manufacturer’s symbolic LEFT/RIGHT names do **not** reliably describe the physical wheel side on this car. Presses (`updateKey2`) and detents (`updateEncoder2`) are separate event families. This page is the current public mapping, superseding the older warnings-only conclusions; the dated raw-record analysis remains [available here](../research/keypanel/MU1440_F902_FIVE_INT_ENCODER_CAPTURE_2026-10-11.md).
 
-Map the physical steering-wheel controls to the **raw** MHI2 keypanel tuples before choosing any
-button for runtime ViewArea/SafeArea switching.
+## Physically correlated controls
 
-Do not infer physical placement from names such as `ROLLER_LEFT` / `ROLLER_RIGHT`. Vehicle
-evidence wins.
-
-## Why the raw layer matters
-
-The exact `MHI2_ER_SKG13_P4526_MU1440` Java stack exposes:
-
-```text
-DSIKeyPanelListener.updateKey2(...)
-  -> raw keyboard ID
-  -> raw key ID
-  -> raw key state
-  -> SystemKeyUtil translation
-  -> ASL KeyListener ID
-```
-
-The high-level ASL API does not contain a named `KEY_VIEW`, and several raw MFW keys are not
-translated into distinct ASL IDs. A high-level listener can therefore lose the identity we need.
-
-The stock keypanel handler path is `AslTargetSystemKeyPanelHandling.processKeyEvent(...)`. In the
-decompiled MHI2 family implementation, it logs the raw tuple **before** forwarding the event through
-`SystemKeyUtil`:
-
-```text
-HK Received: KBD[<kbd>] KEY[<raw-key>] KST[<state>]
-```
-
-The first vehicle mapping attempt should use that existing log path rather than patching an OEM Java
-class merely to discover button IDs. If the exact MU1440 trace sink cannot expose this line live,
-`AslTargetSystemKeyPanelHandling` is the precise fallback observation seam to revisit; even then the
-preferred change is additive/passive logging, not key consumption or remapping.
-
-## Exact MU1440 raw MFW constants
-
-`KBD_MFW = 4`.
-
-| Raw key | Exact DSI name |
-|---:|---|
-| 35 | KEY_MFW_MENU |
-| 36 | KEY_MFW_ARROW_RIGHT |
-| 37 | KEY_MFW_ARROW_LEFT |
-| 38 | KEY_MFW_UP |
-| 39 | KEY_MFW_DOWN |
-| 40 | KEY_MFW_ROLLER_LEFT |
-| 41 | KEY_MFW_CANCEL |
-| 42 | KEY_MFW_VOLUME_UP |
-| 43 | KEY_MFW_VOLUME_DOWN |
-| 44 | KEY_MFW_ROLLER_RIGHT |
-| 45 | KEY_MFW_AUDIOSOURCE |
-| 46 | KEY_MFW_ARROW_A_UP |
-| 47 | KEY_MFW_ARROW_A_DOWN |
-| 48 | KEY_MFW_ARROW_B_UP |
-| 49 | KEY_MFW_ARROW_B_DOWN |
-| 50 | KEY_MFW_PTT_ON |
-| 51 | KEY_MFW_PTT_CANCEL |
-| 52 | KEY_MFW_INFO |
-| 53 | KEY_MFW_HOOK |
-| 54 | KEY_MFW_HANGUP |
-| 55 | KEY_MFW_OFFHOOK |
-| 56 | KEY_MFW_LIGHT |
-| 57 | KEY_MFW_MUTE |
-| 58 | KEY_MFW_JOKER1 |
-| 59 | KEY_MFW_JOKER2 |
-| 60 | KEY_MFW_INIT |
-| 99 | KEY_MFW_SIDEMENULEFT |
-| 100 | KEY_MFW_SIDEMENURIGHT |
-
-Raw states:
-
-| State | Name |
-|---:|---|
-| 0 | KST_RELEASED |
-| 1 | KST_PRESSED |
-| 2 | KST_DOUBLEPRESSED |
-| 3 | KST_LONGPRESSED |
-| 4 | KST_LONGPRESSED2 |
-| 5 | KST_LONGPRESSED3 |
-| 6 | KST_APPROACHED |
-| 7 | KST_ABANDONED |
-| 8 | KST_MOVED |
-
-The three distinct OEM long-press stages are intentionally preserved. For mapping work, hold a
-candidate control long enough to see whether the hardware/firmware emits only `LONGPRESSED` or also
-`LONGPRESSED2` / `LONGPRESSED3`; this may expose additional stock semantics without inventing a
-project-side timer.
-
-## Useful exact ASL translations
-
-The exact MU1440 `SystemKeyUtil` translates, among others:
-
-```text
-47 -> KEY_MFW_ARROW_A_DOWN
-46 -> KEY_MFW_ARROW_A_UP
-50 -> KEY_MFW_PTT_ON
-57 -> KEY_MFW_MUTE
-44 -> KEY_MFW_ROLLER_RIGHT
-45 -> KEY_MFW_AUDIOSOURCE
-42 -> KEY_MFW_VOLUME_UP
-43 -> KEY_MFW_VOLUME_DOWN
-48 -> KEY_MFW_ARROW_B_UP
-49 -> KEY_MFW_ARROW_B_DOWN
-53 -> KEY_MFW_HOOK
-```
-
-Raw 35–41 and 58/59 do not receive their own distinct ASL `KeyListener` IDs in the exact
-translation switch. This is one reason the physical VC VIEW key must be mapped at the raw layer.
-
-## 2026-10-11 vehicle correction — do not use speculative left/right names as physical IDs
-
-The 300-second passive DebugSPI capture was decoded offline: 18,571 MLP frames, 524 inner OEM text messages, 65 `HK Received` events. The physical operator annotations strongly associate **right-wheel PRESS with `KBD=4 KEY=40`** (symbolically `KEY_MFW_ROLLER_LEFT`) and **left-wheel PRESS with `KBD=4 KEY=44`** (symbolically `KEY_MFW_ROLLER_RIGHT`). The symbolic LEFT/RIGHT terms demonstrably must not be treated as physical mounting positions. Reconfirm a single isolated button if side or mode is uncertain.
-
-The physical right roller's *rotation* does not generate an `HK Received` line in this capture: its manually annotated +/- periods instead coincide with five/eight `wrong DDS Encoder` warnings. The separate 21-second vehicle video shows the right roller changing the **OEM instrument-cluster navigation map scale and on-screen scale/OK overlay**. This is an encoder-path issue, not proof that the wheel is invisible to the car. Exact `updateEncoder2(keyboard, encoderId, increment, extra, validity)` numeric tuple is still unknown.
-
-Stock `AslTargetSystemKeyPanelHandling` routes `updateKey2` and `updateEncoder2` separately; its normal-level `HK Received` log is KEY ONLY. Its `processEncoderEvent` accepts IDs 16, 17 or 44 and warns for other IDs. The Omonob Free790 MU1440 patch in `CarPlayClusterControls.jar` intercepts `DSIKeyPanelDispatcher.updateKey2` solely for `KBD4/KEY38/39` -> zoom and leaves `updateEncoder2` to OEM delegates, so it cannot zoom from this observed rotary motion by itself. See [full wheel/DSI/Omonob audit](../research/keypanel/MU1440_WHEEL_DSI_AND_OMONOB_2026-10-11.md) and [sanitized capture matrix](../research/keypanel/MU1440_CAPTURE_SANITIZED_MATRIX.tsv). No raw vehicle files/video are published.
-
-## Physical Octavia 5E Virtual Cockpit controls
-
-The 2019 Octavia 5E owner-manual behavior and matching VC steering-wheel layout give us the
-**physical function layer**, which must remain separate from the raw DSI-ID layer.
-
-| Physical control | OEM function | Raw-ID status on MU1440 |
+| Physical input | Observed signal | Evidence / caution |
 | --- | --- | --- |
-| Left voice button | switch voice control on/off | strong exact-target path: raw `50 KEY_MFW_PTT_ON` -> ASL key 15; confirm tuple on-car |
-| Left volume roller, rotate | volume up/down | no `HK` in annotated session; exact encoder/volume path not captured; 42/43 are OEM key constants, not proof of physical detent mapping |
-| Left volume roller, press | sound/mute on/off | operator-tagged left centre: **observed `KBD4/KEY44`**, despite symbolic `ROLLER_RIGHT`; isolated recheck recommended |
-| Left previous/next controls | previous / next track or station | OEM function confirmed; exact choice among raw arrow A/B keys remains vehicle-trace open |
-| Right assistance button, upper-left | open assistance-systems menu | physical function confirmed; raw key still open |
-| **Right VIEW button, lower-left** | **short: change VC display version; hold: open the pre-selection menu** | **raw key still open; do not infer JOKER1/JOKER2** |
-| Right scroll wheel, rotate | select data / set values / move in menus; VC native map scale visibly changes in video | encoder callback reached stock ASL warning path in tagged periods; exact numeric `updateEncoder2` tuple open; separate from wheel press |
-| Right scroll wheel, press | show/confirm selected item; with map turn+press enables automatic map-scale change | **observed `KBD4/KEY40`**, including `1,3,4,5,0` long press; symbolic name `ROLLER_LEFT` is not physical side |
-| Right menu/back control | display main menu / return to previous level; context can expose telephone menu | operator-tagged right Back: **observed `KBD4/KEY41`** incl. long-press stages; distinguish from separate VIEW control |
+| Right scroll wheel **press** | `updateKey2`: `KBD=4 KEY=40`; short `KST 1→0`, long `1→3→4→5→0` | Correlated OEM `HK Received`; symbolic OEM constant calls 40 “ROLLER_LEFT,” **not** its physical mounting side |
+| Right scroll wheel **up / down** | `updateEncoder2(4,40,+1,0,1)` / `(4,40,-1,0,1)` | Six directly decoded five-int records, three per annotated direction; sign here is physical-test order, **not** proven AirPlay zoom direction |
+| Right Back/menu-return control | `updateKey2`: `4/41`; short `1→0`; long `1→3→4→5→0` | Operator-note/stock-log correlated; don't confuse with separate physical VIEW |
+| Right telephone control | `updateKey2`: `4/53`; `1→0` | Correlated |
+| Left scroll wheel **press** | `updateKey2`: `4/44`; `1→0` | Correlated; symbolic OEM constant calls 44 “ROLLER_RIGHT” |
+| Left scroll wheel **up / down** | `updateEncoder2(4,44,+1,0,1)` / `(4,44,-1,0,1)` | Six directly decoded five-int records, three per annotated direction; no corresponding `HK Received` expected from encoder path |
+| Left upper / lower controls | `updateKey2`: `4/46` / `4/47`; `1→0` | Correlated to manual action sequence, not a claim for every wheel style |
+| Voice/PTT | `updateKey2`: `4/50`; `1→0` | Correlated |
 
-For the VIEW button specifically, the OEM behavior invalidates the earlier idea of using a long hold
-as a project-only SafeArea toggle. **Long VIEW is already occupied by the stock preset-selection
-menu** (Auto / Classic / View 1 / View 2 / View 3). Both short and long VIEW behavior must therefore
-remain untouched.
+**Important:** `KBD4/KEY38` and `KEY39` are OEM symbolic UP/DOWN *key* IDs and a public third-party 790 adapter uses them for semantic actions; neither was emitted as an `HK Received` event during our measured right-wheel detents. Do not invent KEY38/39 messages or globally swallow stock rotary callbacks. `KEY40` as a press and encoder ID 40 as a rotation are different DSI message types.
 
-The preferred project behavior is passive/synchronous:
+## Main head unit / physical button area
 
-```text
-physical VIEW event
-  -> stock VC behavior continues unchanged
-  -> project observes raw tuple and resulting VC layout/state
-  -> project selects ViewArea 0 or 1
-  -> CarPlay relayout follows through updateViewArea
-```
+| Physical input | Measured on this reference unit | Confidence |
+| --- | --- | --- |
+| HOME | `updateKey2`: `KBD=13 KEY=116`, short `1→0`; a ~5.5-second hold also logged only `1→0` | Vehicle log + operator note |
+| MENU | `updateKey2`: `KBD=13 KEY=78`, `1→0` | Vehicle log + operator note |
+| NAV, CAR, RADIO, MEDIA, APP/SmartLink, PHONE, SETUP and any other fitted hardkeys | **Not individually mapped in the published capture** | Unknown; don't derive numbers from a generic VW/QEMU target |
+| Main head-unit rotary control(s): turn +/− / push (where fitted) | **No independently correlated five-int tuple in this public dataset** | Unknown; distinguish rotary and press events |
 
-Only if a later vehicle trace proves a genuinely unused gesture should an additional project-only
-gesture be considered.
+The firmware also contains higher-level hardkey constants such as smartphone/App-Connect ID 114 and mute ID 88. Those are **static API findings, not a measurement** that a particular physical head-unit button has the same `KBD/KEY` tuple. Do not turn symbol existence into a physical assignment.
 
-## Mapping procedure
+## Unresolved steering-wheel controls
 
-Capture one control at a time:
+| Physical control | Known OEM effect | Raw route still required |
+| --- | --- | --- |
+| Right **VIEW** button, short/hold | OEM cluster view selector / stock preset-selection menu | Exact input tuple and whether it reaches the MHI2 KeyPanel DSI, a separate VC-only route, or another consumer are **unknown**. Do not guess KEY58/59 or steal the stock long press |
+| Right assistance button | OEM assistance-systems action | Not visible as `HK` in the earlier sampled DebugSPI text route; **not evidence of no input** |
+| Remaining fitted wheel variants/keys | Varies by equipment and model | No universal Škoda/SEAT/VW key ID claimed |
 
-```text
-A  left roller +1
-B  left roller -1
-C  left roller press (if present)
-D  voice/PTT short
-E  right roller +1
-F  right roller -1
-G  right roller press
-H  VC VIEW short
-I  VC VIEW hold ~2 s
-J  remaining right-side controls
-```
+### DSI event notation and OEM constants
 
-Repeat VIEW short/hold at least twice and record both the raw tuple and the visible OEM result.
+`KBD_MFW=4` on this target. An `HK Received: KBD[k] KEY[n] KST[s]` report is a **key** event. A wheel detent belongs to `updateEncoder2(keyboard,encoderId,signedIncrement,extra,validity)`; the observed five-int vectors above were recovered from separately recorded, typed `f9 02` inner DebugSPI data, not from the `HK` text channel. The observed structured record tag `0x002e` is **not** independently proved to be an OEM service method number.
 
-For the preferred live test use two SSH sessions.
+Known symbolic MFW key constants recovered for this exact firmware, **not physical assignments without a matched capture**:
 
-Session 1:
+| Key ID | OEM symbolic constant | Key ID | OEM symbolic constant |
+| ---: | --- | ---: | --- |
+| 35 | MENU | 36 / 37 | ARROW_RIGHT / ARROW_LEFT |
+| 38 / 39 | UP / DOWN | 40 / 41 | ROLLER_LEFT / CANCEL |
+| 42 / 43 | VOLUME_UP / VOLUME_DOWN | 44 / 45 | ROLLER_RIGHT / AUDIOSOURCE |
+| 46 / 47 | ARROW_A_UP / ARROW_A_DOWN | 48 / 49 | ARROW_B_UP / ARROW_B_DOWN |
+| 50 / 51 | PTT_ON / PTT_CANCEL | 52 / 53 | INFO / HOOK |
+| 54 / 55 | HANGUP / OFFHOOK | 56 / 57 | LIGHT / MUTE |
+| 58 / 59 / 60 | JOKER1 / JOKER2 / INIT | 99 / 100 | SIDEMENULEFT / SIDEMENURIGHT |
 
-```sh
-ksh runtime/diagnostics/keypanel_capture.sh --auto
-```
+KST values: `0` released; `1` pressed; `2` double-pressed; `3/4/5` successive long-press stages; `6` approached; `7` abandoned; `8` moved. Individual gestures need their own actual on-unit proof; a possible key constant is not a confirmed OEM behavior.
 
-Session 2:
+## Can you help complete the mapping?
 
-```sh
-ksh runtime/diagnostics/keypanel_note.sh
-```
+We welcome **sanitized, read-only** observations from compatible Škoda, VW, SEAT and CUPRA owners, especially for **VIEW and Assist, remaining head-unit hardkeys, and front rotary encoders**. Please share exact firmware train/MU, fitted cluster, physical label and short/long/turn direction, `KBD/KEY/KST` *or* complete `updateEncoder2` values if actually observed, and the normal OEM visible response. Indicate whether data is *observed* or merely symbolic/static. Do **not** upload original firmware/JARs, full raw log/capture, vehicle identifiers, VIN, contacts, private nav/media or location-bearing images. A missing DebugSPI `HK` may mean only that the event uses a different bus/consumer. Please preserve all original short/long/menu/volume functions and do not install an unqualified input hook just to contribute.
 
-Enter a label before each action. Both the label and the next stock key events are written into one
-ordered log. If `--auto` cannot use a proven stock reader, run the discovery helper and pipe the
-confirmed reader into `keypanel_capture.sh --stdin`.
+## Sources and caveats
 
-Use the off-unit parser:
-
-```bash
-python3 tools/parse_keypanel_trace.py --gestures keypanel.log
-python3 tools/parse_keypanel_trace.py --summary keypanel.log
-python3 tools/parse_keypanel_trace.py --csv keypanel.log > keypanel.csv
-```
-
-## Target ViewArea UX
-
-The first target is two predeclared pairs:
-
-```text
-ViewArea 0 / SafeArea 0 = MAP_FULL
-ViewArea 1 / SafeArea 1 = GAUGE_REDUCED
-```
-
-Do **not** remap VIEW short or long press. Instead observe the stock event/state and mirror the
-resulting VC layout into `updateViewArea(0|1)`.
-
-If the VIEW button never appears on the MIB keypanel DSI, the project must derive the resulting VC
-layout from another head-unit-visible state rather than intercepting the button itself.
-
-## Safety rule
-
-Do **not** install the external VW voice-button patch just to discover key IDs. Its ASL input model is
-highly relevant and semantically matches the MU1440, but its bootstrap uses an OEM-class
-`-Xbootclasspath/p` shadow. Bootclasspath shadowing remains a separate vehicle-isolation topic.
-
-
-## Read-only trace-path discovery
-
-The stock handler already emits the raw line, but the exact MU1440 trace reader/sink should not be
-guessed from generic QNX or MHI2 knowledge.
-
-Use:
-
-```sh
-./keypanel_trace_discovery.sh
-```
-
-The script is intentionally read-only. It reports:
-
-- the active `/eso/bin/traceserver` process;
-- the traceserver file descriptors;
-- whether known QNX trace readers such as `sloginfo`, `traceprinter` or `tracelogger` actually
-  exist on this firmware;
-- the exact `logging.properties` / `traceConfig.properties` files that are readable on the unit;
-- obvious logger/trace device endpoints.
-
-It does **not** mount anything writable, modify logger settings, signal a process or start a trace
-utility.
-
-Only after that output is known should a stock-reader command be selected. This preserves the
-zero-patch objective and avoids another desktop/QNX capability assumption.
-
-
-## Evidence sources for the physical-function layer
-
-The physical-function descriptions above are intentionally not used as proof of raw key IDs.
-
-- Škoda Octavia 5E 07/2019 owner's manual, digital-instrument-cluster operation:
-  VIEW short changes display version; VIEW hold opens pre-selection; right roller selects/confirms
-  and controls map scale.
-- The same owner's manual, multifunction-steering-wheel operation:
-  voice, volume/mute, next/previous, assistance-menu and display-menu functions.
-- A period Octavia RS245 owner report independently shows the VC-equipped right-side physical layout
-  as assistance button above VIEW, followed by the option scroll wheel and the menu/MID control.
-
-The raw tuple remains authoritative for code.
+- [Sanitized key observation matrix](../research/keypanel/MU1440_CAPTURE_SANITIZED_MATRIX.tsv) (early press capture and later separately recovered encoder result).
+- [Twelve typed five-int detent records](../research/keypanel/MU1440_F902_FIVE_INT_ENCODER_CAPTURE_2026-10-11.md); [project-owned read-only offline decoder](../../tools/decode_keypanel_f902.py).
+- [Earlier DSI/consumer investigation](../research/keypanel/MU1440_WHEEL_DSI_AND_OMONOB_2026-10-11.md); [exact-target hardkey API](../research/MU1440_BUTTON_INPUT_API.md).
+- Public [voice-key input example](https://github.com/y-batsianouski/mib2-voicecontrol-button-patch) and [omonob MHI2 map comparator](https://github.com/omonob/MHI2-Carplay-Maps) are acknowledged prior art, **not** a claim that their physical mappings transfer directly.
