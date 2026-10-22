@@ -137,6 +137,10 @@ Where exact binaries are required for reproduction, prefer documenting:
 - extraction method/toolchain;
 - resulting hash.
 
+## Independence and trademarks
+
+This is an independent community research and software project. It is **not** affiliated with, authorized, sponsored, endorsed, supported or maintained by Volkswagen AG, Volkswagen, Škoda Auto, SEAT, CUPRA, Audi, Harman International or Apple. These names, model identifiers and other trademarks are mentioned only for accurate identification of products, interoperability/compatibility discussion and attribution. All trademarks and logos remain the property of their respective owners. References to an OEM platform do not constitute OEM approval, maintenance or a manufacturer warranty. Original manufacturer software/firmware is not relicensed by the project's GPL license.
+
 ## Volkswagen Group / Harman firmware
 
 OEM/Harman binaries and firmware remain the property of their respective rights holders.
