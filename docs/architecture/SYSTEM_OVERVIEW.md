@@ -7,8 +7,7 @@
 
 ## 1. The problem in one picture
 
-The project is trying to reproduce the complete **CarPlay secondary-display navigation path** on
-Volkswagen Group MHI2 systems and present that video in the MQB Virtual Cockpit.
+The reference MU1440/AID10 setup has demonstrated the **CarPlay secondary-display navigation path** on an MQB Virtual Cockpit. This foundational page explains its media/control roles; the current release, additional OEM menu/control modules and remaining qualifications are documented separately.
 
 The important word is **complete**.
 
@@ -338,7 +337,7 @@ contract, gate behavior, NavIgnore role and stock recovery sequence.
 
 ---
 
-## 8. Why the current problem is not "how do we send video?"
+## 8. Beyond video: independent control and integration acceptance
 
 That question has already been answered.
 
