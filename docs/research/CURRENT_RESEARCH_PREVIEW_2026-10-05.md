@@ -218,7 +218,7 @@ TCP control found in unrelated/older implementations is not treated as the curre
 
 Detailed public write-up:
 
-[MU1440 HMI menu and ViewHandler architecture](../architecture/MU1440_HMI_MENU_AND_VIEWHANDLER_ARCHITECTURE.md)
+[Updated native HMI and single-authority controller architecture](../architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md)
 
 ### Main menu vs local settings
 
