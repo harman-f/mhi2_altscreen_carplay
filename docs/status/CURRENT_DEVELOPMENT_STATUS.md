@@ -48,7 +48,7 @@ The remaining HMI gate is additive loading, not menu discovery:
 No vehicle HMI patch has been deployed yet. The first future HMI test is intentionally UI-only with a
 dummy backend.
 
-See [MU1440 HMI menu and ViewHandler architecture](../architecture/MU1440_HMI_MENU_AND_VIEWHANDLER_ARCHITECTURE.md).
+For the subsequent UI/controller direction see [current native HMI architecture](../architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md). This dated test report is historical.
 
 
 #### HMI integration path update: WidgetFactory seam
