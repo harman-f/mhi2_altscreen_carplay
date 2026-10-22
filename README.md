@@ -71,6 +71,10 @@ The existing [hash-pinned MU1440 developer prerelease](release/CURRENT.md) assum
 
 This implementation builds on independently published MIB2/MHI2 research and tools. Special thanks to [Luka](https://github.com/luka-dev), [OneB1t](https://github.com/OneB1t/VcMOSTRenderMqb), [jilleb/MIB Toolbox](https://github.com/jilleb/mib2-toolbox), [omonob](https://github.com/omonob/MHI2-Carplay-Maps) and other credited public project maintainers. See [full acknowledgements](ACKNOWLEDGEMENTS.md), [exact upstream/source and license notices](THIRD_PARTY_NOTICES.md), and [public reference projects](docs/research/PUBLIC_REFERENCES.md). Prior art, separately licensed incorporated material and independently authored project code are distinguished there; attribution is not a claim that the upstream maintainers endorse this project.
 
+## Independence and trademarks
+
+**Unofficial, independent community project.** This project is not affiliated with, authorized, sponsored, endorsed, supported or maintained by Volkswagen AG, Volkswagen, Škoda Auto, SEAT, CUPRA, Audi, Harman International or Apple. Product, company and trademark names are used solely to identify the original hardware/software, describe compatibility and credit third-party work; all respective marks remain with their owners. The project does not provide official OEM updates, support or warranties. Modifications are experimental; check the exact target, retain backups and an independent recovery path, and do not operate or test modified controls while driving. See [third-party and rights notices](THIRD_PARTY_NOTICES.md), [compatibility](docs/testing/COMPATIBILITY_MATRIX.md) and [safety guidance](SECURITY.md).
+
 ## Contributing and safety
 
 External reproducible bugs, firmware/cluster compatibility reports and independently authored code contributions are welcome; questions can use Discussions. [Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) · [Security/privacy](SECURITY.md) · [Vehicle test protocol](docs/testing/VEHICLE_TEST_PROTOCOL.md).
