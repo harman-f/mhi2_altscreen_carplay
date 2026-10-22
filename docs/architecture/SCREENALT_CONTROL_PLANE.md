@@ -2,7 +2,7 @@
 
 > **Original September 2026 lifecycle/reference model.** Its control command roles remain useful; references to "our current problem" or the "next vehicle experiment" reflect the original dated session. Use [current integration status](../status/INTEGRATION_STATUS_2026-10-21.md) and [recovery/fault-isolation acceptance](../testing/STREAM111_FAULT_ISOLATION_2026-10-21.md) for newer work, and [architecture index](README.md) for module ownership.
 >
-> This is the detailed continuation point for the current engineering problem.
+> This is the detailed protocol and lifecycle reference; the current recovery checklist lives in the linked fault-isolation guide.
 
 ## 1. What "handshake" means here
 
@@ -21,7 +21,7 @@ G. existing stream continues or is refreshed
 H. receiver routes the resulting video to the VC
 ```
 
-Our current problem sits mainly in **C-F**, with **G** as the recovery/synchronization layer.
+In the original September engineering phase, the primary gaps were **C–F**, with **G** as recovery/synchronization. Later vehicle findings identified additional source-session teardown and separate native writer-gate failures.
 
 The media route in H is already proven.
 
@@ -336,7 +336,7 @@ receiver contract is better proven.
 
 ---
 
-## 11. The current failure/unknown space
+## 11. Failure classes (foundational model; see later October evidence)
 
 The interesting handover case is:
 
@@ -435,7 +435,7 @@ deterministic**.
 
 ---
 
-## 13. Current vehicle experiment
+## 13. Historical September vehicle experiment
 
 The next useful test is not "try random CarPlay patches".
 
