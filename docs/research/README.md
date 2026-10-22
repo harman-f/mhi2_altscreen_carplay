@@ -6,7 +6,7 @@ This directory collects research that is useful to contributors before it become
 > Start with the [current October integration status](../status/INTEGRATION_STATUS_2026-10-21.md); the [2026-10-05 research preview](CURRENT_RESEARCH_PREVIEW_2026-10-05.md) is historical. That dated preview summarizes the then-new
 > media/timing, HMI/menu and steering-wheel findings and clearly labels what is vehicle-proven vs static/design-only.
 
-**Newest original MMX evidence (R15):** [Native archived 64-MiB MMX fs0 PT, exact installed /70/ KERNEL_PRIMARY mapping, Recovery and the second outer CRC at 0x7FC](MU1440_MMX_FS0_NATIVE_PT_AND_STAGE1_HEADER_CRC_R15_2026-10-12.md). The uploaded file matches R14 catalog BACKUP-SNAPSHOT-06 (not initially requested Snapshot-10), and its actual native PT directly establishes the G11 Normal 3-MiB Primary/6-MiB Recovery boundaries. Sample-specific original-forensic proof only; current-car identity and modified-image acceptance remain open. [Full Toolkit PR #8](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/pull/8).
+**Dated MMX finding (R15):** [Native archived 64-MiB MMX fs0 PT, exact installed /70/ KERNEL_PRIMARY mapping, Recovery and the second outer CRC at 0x7FC](MU1440_MMX_FS0_NATIVE_PT_AND_STAGE1_HEADER_CRC_R15_2026-10-12.md). The uploaded file matches R14 catalog BACKUP-SNAPSHOT-06 (not initially requested Snapshot-10), and its actual native PT directly establishes the G11 Normal 3-MiB Primary/6-MiB Recovery boundaries. Sample-specific original-forensic proof only; current-car identity and modified-image acceptance remain open. [Full Toolkit PR #8](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/pull/8).
 
 **Separate RCC CPU research (R16):** [Original RCC Jacinto-5 / Cortex-A8 stock clock and ARM/DSP/DDR baseline](MU1440_RCC_JACINTO5_CLOCK_BASELINE_R16_2026-10-12.md) — original RCC IPL/startup has a distinct Jacinto5 clock chain; publicly documented sibling traces show 720/600/400 MHz ARM/DSP/DDR, but this is NOT yet a live clock observation of the current unit. MMX/Tegra getter/voltage interfaces do not carry over. Read-only evidence plan only.
 
@@ -30,7 +30,7 @@ This directory collects research that is useful to contributors before it become
 
 - **[TegraDiag R1: stock-only offline-prepared QNX reader and desktop analysis kit (2026-10-12)](MU1440_TEGRADIAG_R1_OFFLINE_PREP_2026-10-12.md)** — bounded known-getter recorder, 1–3-log CSV/JSON/Markdown comparison, nine parser tests and synthetic examples; private source kit archived and hashed. **Mock/syntax tested only; not yet QNX/vehicle-run, no VDD_CPU measurement or clock control.**
 
-## Current cross-topic preview
+## Historical cross-topic preview
 
 - [Current research preview — 2026-10-05](CURRENT_RESEARCH_PREVIEW_2026-10-05.md)
   - source-timestamp / AU / MPEG-TS design;
@@ -59,7 +59,7 @@ This directory collects research that is useful to contributors before it become
 
 ## HMI / settings / input
 
-- [MU1440 HMI menu and ViewHandler architecture](../architecture/MU1440_HMI_MENU_AND_VIEWHANDLER_ARCHITECTURE.md)
+- [Current native HMI / project-owned menu and controller architecture](../architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md) — public feature/interface description; lengthy superseded OEM ViewHandler research retained outside the product tree
 - [MU1440 steering-wheel / hardkey API](MU1440_BUTTON_INPUT_API.md)
 - **[MU1440 wheel DSI / decoded vehicle evidence / Omonob Java bytecode / VC zoom video (2026-10-11)](keypanel/MU1440_WHEEL_DSI_AND_OMONOB_2026-10-11.md)** — distinguishes `updateKey2` from `updateEncoder2`, documents the public Omonob KEY38/39-only interception, and defines a passive next-step probe.
 - [Canonical current physical wheel/head-unit map and open assignments](../testing/MU1440_MFW_RAW_KEY_MAPPING.md) · [sanitized underlying key/encoder matrix](keypanel/MU1440_CAPTURE_SANITIZED_MATRIX.tsv).
@@ -87,9 +87,7 @@ actual semantic zoom/focus path     partly development-observed; current focus/o
 - [Direct VC video path](../architecture/DIRECT_VC_VIDEO_PATH.md)
 - [Keyframe recovery vehicle finding](../findings/KEYFRAME_RECOVERY_2026-09-27.md)
 
-The newest parity/keyframe/ownership design is summarized in the
-[current research preview](CURRENT_RESEARCH_PREVIEW_2026-10-05.md) and is intentionally marked unvalidated
-until the next vehicle run.
+The October 5 parity/keyframe/ownership model is archived as a dated research preview. For current publicly evidenced behavior and remaining qualifications, use the [integration status](../status/INTEGRATION_STATUS_2026-10-21.md), [module ownership](../architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md), and [October aggregate evidence](../findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md).
 
 ## Firmware / platform portability
 
