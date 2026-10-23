@@ -37,6 +37,7 @@ REQUIRED = [
     "runtime/README.md",
     "src/native/altscreen111-gen2/DEVELOPMENT.md",
     "docs/build/MU1440_R50_SOURCE.md",
+    "docs/build/MU1440_R57_SOURCE.md",
     "docs/build/INSTALLED_GEN2_SOURCE.md",
     "settings/registry.json",
     "src/native/parity-session/parity_session.c",

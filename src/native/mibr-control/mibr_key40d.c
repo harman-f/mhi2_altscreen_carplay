@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -33,6 +34,8 @@
 #define PAUSE_PATH "/tmp/mibr-parity-drive.pause"
 #define OWNER_PID_PATH "/tmp/mibr-parity-session.pid"
 #define OWNER_LOCK_PATH "/tmp/mibr-parity-session.lock"
+#define VIEW_SCRIPT "/mnt/app/root/altscreen-u2/scripts/mibr-view.ksh"
+#define VIEW_WAIT_MS 3000
 #define BUF_CAP 8192u
 #define NEEDLE "HK Received: KBD["
 #define DEBOUNCE_MS 1500LL
@@ -41,19 +44,25 @@ struct key40d_scan {
     char buf[BUF_CAP];
     size_t n;
     struct mibr_key40 key;
+    struct mibr_key40 key44;
 };
 
 typedef void (*key40d_event_fn)(void *context,enum mibr_key40_event event);
+/* r55: called once for every KEY40 press start (KST 1), short or long: the virtual cockpit steps its view then. */
+typedef void (*key40d_step_fn)(void *context);
+/* r57: KEY40 (right roller push) held long = resync of the view counter. */
+typedef void (*key40d_resync_fn)(void *context);
 static void (*g_trace)(int kbd,int key,int kst);
 
 static void key40d_init(struct key40d_scan *s){
     memset(s,0,sizeof(*s));
     mibr_key40_reset(&s->key);
+    mibr_key40_reset(&s->key44);
 }
 
 /* Consumes a chunk of the DebugSPI byte stream. A key line may be split across chunks. */
 static void key40d_feed(struct key40d_scan *s,const char *data,size_t len,
-                        key40d_event_fn fn,void *context){
+                        key40d_event_fn fn,key40d_step_fn step,key40d_resync_fn resync,void *context){
     size_t pos=0,needle=strlen(NEEDLE);
     while(len>0){
         size_t room=BUF_CAP-s->n,take=len<room?len:room,k;
@@ -74,8 +83,13 @@ static void key40d_feed(struct key40d_scan *s,const char *data,size_t len,
             if(sscanf(p,"HK Received: KBD[%d] KEY[%d] KST[%d]",&kbd,&key,&kst)==3){
                 enum mibr_key40_event e;
                 if(g_trace)g_trace(kbd,key,kst);
-                e=mibr_key40_feed(&s->key,kbd,key,kst);
+                if(step&&kbd==4&&key==40&&kst==1)step(context);
+                /* r57: left roller push (KEY44) held long = CarPlay/native route toggle (was KEY40);
+                 * right roller push (KEY40) held long = resync of the view counter. */
+                e=mibr_key40_feed_key(&s->key44,kbd,key,kst,44);
                 if(e==MIBR_KEY40_ROUTE_LONG&&fn)fn(context,e);
+                e=mibr_key40_feed(&s->key,kbd,key,kst);
+                if(e==MIBR_KEY40_ROUTE_LONG&&resync)resync(context);
             }
             pos=(size_t)(p-s->buf)+needle;
         }
@@ -137,6 +151,30 @@ static void toggle(void *context,enum mibr_key40_event event){
     stop_owner();
 }
 
+/* r55: one cockpit view step per KEY40 press start. The helper keeps the position and, when the owner switched
+ * "follow" on, sets the live safe area. It is run to completion (bounded) so quick presses never overlap. */
+static void view_run(const char *verb){
+    pid_t p;int st=0,waited=0;
+    if(access(VIEW_SCRIPT,R_OK)){return;}
+    p=fork();
+    if(p<0){say("VIEW_FORK_FAILED");return;}
+    if(p==0){
+        execl("/bin/ksh","ksh",VIEW_SCRIPT,verb,(char *)NULL);
+        _exit(127);
+    }
+    while(waited<VIEW_WAIT_MS){
+        pid_t w=waitpid(p,&st,WNOHANG);
+        if(w==p)return;
+        if(w<0&&errno!=EINTR)return;
+        usleep(10000);waited+=10;
+    }
+    kill(p,SIGKILL);
+    (void)waitpid(p,&st,0);
+    say("VIEW_STEP_TIMEOUT");
+}
+static void view_step(void *context){(void)context;view_run("step");}
+static void view_resync(void *context){(void)context;say("RESYNC view counter (KEY40 long)");view_run("resync");}
+
 /* r30: passive raw capture of the DebugSPI byte stream for offline key/encoder identification.
  * Record = u32 LE monotonic ms, u16 LE length, payload. Capped so /tmp (RAM) cannot fill up. */
 #define RAW_PATH "/tmp/mibr-debugspi-raw.bin"
@@ -190,7 +228,7 @@ int main(void){
             n=recv(fd,chunk,sizeof(chunk),0);
             if(n<=0)break;
             raw_record(chunk,(size_t)n);
-            key40d_feed(scan,chunk,(size_t)n,toggle,NULL);
+            key40d_feed(scan,chunk,(size_t)n,toggle,view_step,view_resync,NULL);
         }
         close(fd);
         say("DISCONNECTED retry");
@@ -202,10 +240,12 @@ int main(void){
 }
 #else
 /* Host test: stdin is the byte stream, argv[1] the chunk size. Prints one ROUTE_LONG per toggle. */
-static int count;
+static int count,steps,resyncs;
 static void on_event(void *context,enum mibr_key40_event event){
     (void)context;(void)event;count++;printf("ROUTE_LONG %d\n",count);
 }
+static void on_step(void *context){(void)context;steps++;}
+static void on_resync(void *context){(void)context;resyncs++;}
 int main(int argc,char **argv){
     struct key40d_scan *scan=(struct key40d_scan *)calloc(1,sizeof(*scan));
     size_t chunk=argc>1?(size_t)atoi(argv[1]):4096u;
@@ -214,7 +254,9 @@ int main(int argc,char **argv){
     buf=(char *)malloc(chunk);
     if(!buf)return 2;
     key40d_init(scan);
-    while((n=fread(buf,1,chunk,stdin))>0)key40d_feed(scan,buf,n,on_event,NULL);
+    while((n=fread(buf,1,chunk,stdin))>0)key40d_feed(scan,buf,n,on_event,on_step,on_resync,NULL);
+    printf("STEPS %d\n",steps);
+    printf("RESYNCS %d\n",resyncs);
     printf("TOTAL %d\n",count);
     free(buf);free(scan);
     return 0;

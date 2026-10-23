@@ -13,14 +13,14 @@ in `../alt111-settings/` and its policy/header dependencies in
 value validators remain owned by that settings implementation. This module
 does not copy or regenerate a second settings registry.
 
-The R46 service source is identified by its source-file hash in the build
+The R57 service source is identified by its source-file hash in the build
 receipt. Its settings dependency descends from
 `harman-f/mhi2_altscreen_carplay@324b4f249883bb707e0d0a8995b2b6b5fe23be25`;
 this module builds against the current shared registry at
 `settings/registry.json` (SHA-256
 `818cfd7b635742c98e291c3a6eb4a4350bec873715245d2d888fcac360ccd098`).
-The corresponding installed R46 service SHA-256 was
-`993618f9aa213ed9dc02f8deed625d27486af06003681d2c4048f70481ad5e08`.
+The corresponding installed R57 service SHA-256 was
+`97177ddbfe78d49dc0d672c5b70e717a87c0aeebb6ac65ab4e1b7df12e60bb58`.
 The source revision and dependency pin identify the input; a build reproduction
 is a separate result and must be recorded by the build step.
 
@@ -31,10 +31,16 @@ The source includes:
 - route and KEY40 policy adapters that are not attached to a qualified live
   owner in this source snapshot;
 - `mibr_v3_client.c` (`mibrctl-v3`) and `mibr_v3_genkey.c`;
-- `mibr_key40d.c`, the existing KEY40 support daemon source. It contains a
-  long-hold route-toggle mapping. Publishing it preserves the installed source;
-  it does not approve a physical gesture assignment or establish that the
-  input/route path is qualified.
+- `mibr_key40d.c`, the installed support daemon source. KEY40 short press
+  advances the view counter; KEY40 long press resynchronizes to the configured
+  view-after-long-press; KEY44 long press requests the existing route toggle.
+  These source mappings preserve R57 behavior; they do not qualify a physical
+  input port or route action on a vehicle.
+- `runtime/mibr-control/mibr-view.ksh`, the helper for the cockpit-view counter,
+  its configured resync view, and the existing `viewarea.selected` TEMP write.
+  Its defaults are fixed-view mode OFF, Sporttacho present ON, and resync target
+  Voll. The r57 long press advances the OEM view once and the helper records the
+  next view after the selected resync target.
 
 The service exposes `stored`, `materialized`, `apply`, and `active` as separate
 facts. A durable profile readback is not the same as TEMP materialization;
@@ -69,8 +75,8 @@ for the toolchain pin, output interpretation and source/binary hash limits.
 ## Runtime limits
 
 The related scripts are in [`runtime/mibr-control/`](../../../runtime/mibr-control/).
-They preserve the deployed R46 engine helper and boot-start example for source
-review. The boot helper is not a qualified startup integration. In particular,
+They preserve the deployed engine and boot helpers and include the R57 view
+helper for source review. The boot helper is not a qualified startup integration. In particular,
 filesystem behavior, credentials, same-user access, durable write guards,
 boot recovery, live owner binding, and physical route visibility still require
 separate exact-target evidence. No vehicle access was part of this publication.

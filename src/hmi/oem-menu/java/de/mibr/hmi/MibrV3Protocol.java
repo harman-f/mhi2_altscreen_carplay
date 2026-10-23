@@ -99,7 +99,9 @@ public final class MibrV3Protocol {
            // HMI and the "Im Cockpit bestaetigt" text could never appear; the host fakes bypassed this check.
            !op.equals("SHOW_STATUS")&&
            // r46: engine type of the CarPlay Identify (iap2.cfg [vehicle] engine=) via the helper in the broker
-           !op.equals("ENGINE_GET")&&!op.equals("ENGINE_SET"))
+           !op.equals("ENGINE_GET")&&!op.equals("ENGINE_SET")&&
+           // r55: cockpit view follow (position counter and safe area per view) via the helper in the broker
+           !op.equals("VIEW_GET")&&!op.equals("VIEW_SET"))
             throw new IllegalArgumentException("BAD_VERB_OR_ID");
         if(names==null||values==null||names.length!=values.length||names.length>64||
            secret==null||secret.length()!=64)throw new IllegalArgumentException("BAD_FIELDS");
@@ -217,6 +219,17 @@ public final class MibrV3Protocol {
         if(MibrEngineState.index(e)<0||MibrEngineState.index(a)<0||!"0".equals(p)&&!"1".equals(p))return null;
         return new String[]{e,a,p};
     }
+    /** VIEW_GET / VIEW_SET reply: follow, sport, m0, m1, m4, rs, pos must all be well-formed single digits, else null. */
+    public static String[] view(Frame f){
+        if(f==null||!f.ok())return null;
+        String follow=f.get("follow"),sport=f.get("sport"),m0=f.get("m0"),m1=f.get("m1"),m4=f.get("m4"),
+               rs=f.get("rs"),pos=f.get("pos");
+        if(!bit(follow)||!bit(sport)||!area(m0)||!area(m1)||!area(m4)||!view5(rs)||!view5(pos))return null;
+        return new String[]{follow,sport,m0,m1,m4,rs,pos};
+    }
+    private static boolean view5(String s){return s!=null&&s.length()==1&&s.charAt(0)>='0'&&s.charAt(0)<='4';}
+    private static boolean bit(String s){return "0".equals(s)||"1".equals(s);}
+    private static boolean area(String s){return "0".equals(s)||"1".equals(s)||"2".equals(s);}
     public static Commit commit(Frame f,String key,String wanted){
         if(f==null||!f.ok()||!known(key)||wanted==null||
            !"VERIFIED".equals(f.get("stored"))&&!"PENDING_PERSIST".equals(f.get("stored"))&&!"RUNTIME_ONLY".equals(f.get("stored"))||!"UNKNOWN".equals(f.get("active"))||

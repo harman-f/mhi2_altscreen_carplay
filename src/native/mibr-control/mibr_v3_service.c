@@ -273,6 +273,52 @@ static int engine_op(void *context,const char *op,const char *value,char *out,si
     if(pid>0){(void)kill(pid,SIGKILL);(void)waitpid(pid,&status,0);rc=-1;}
     return rc;
 }
+/* r55: cockpit view helper (position counter, safe area per view). Same pattern as the engine helper: fixed script
+ * path, fixed argv (no shell string), key/value already allowlisted by the caller, 12 s bound. */
+static int view_op(void *context,const char *op,const char *key,const char *value,char *out,size_t cap){
+    int fds[2],status=0,rc=-1,w;pid_t pid;size_t n=0;long long t0;
+    const char *script,*shell="/bin/ksh";
+    (void)context;
+    if(!out||cap<16||!op||(strcmp(op,"get")&&strcmp(op,"set")))return -1;
+    if(!strcmp(op,"set")&&(!key||!value))return -1;
+    script="/mnt/app/root/altscreen-u2/scripts/mibr-view.ksh";
+#ifdef ALT111_SETTINGS_TEST
+    if(getenv("MIBR_VIEW_SCRIPT"))script=getenv("MIBR_VIEW_SCRIPT");
+    if(getenv("MIBR_VIEW_SHELL"))shell=getenv("MIBR_VIEW_SHELL");
+#endif
+    out[0]=0;
+    if(pipe(fds))return -1;
+    pid=fork();
+    if(pid<0){(void)close(fds[0]);(void)close(fds[1]);return -1;}
+    if(pid==0){
+        (void)close(fds[0]);
+        if(dup2(fds[1],1)<0)_exit(126);
+        (void)close(fds[1]);
+        if(!strcmp(op,"set"))(void)execl(shell,"ksh",script,"set",key,value,(char *)NULL);
+        else (void)execl(shell,"ksh",script,"get",(char *)NULL);
+        _exit(127);
+    }
+    (void)close(fds[1]);
+    t0=show_now_ms();
+    for(;;){
+        fd_set rs;struct timeval tv;ssize_t k;
+        if(show_now_ms()-t0>12000)break;
+        FD_ZERO(&rs);FD_SET(fds[0],&rs);tv.tv_sec=0;tv.tv_usec=200000;
+        if(select(fds[0]+1,&rs,NULL,NULL,&tv)>0){
+            k=read(fds[0],out+n,cap-1-n);
+            if(k<=0)break;
+            n+=(size_t)k;if(n>=cap-1)break;
+        }
+    }
+    out[n]=0;(void)close(fds[0]);
+    for(w=0;w<20;w++){
+        pid_t got=waitpid(pid,&status,WNOHANG);
+        if(got==pid){rc=(WIFEXITED(status)&&WEXITSTATUS(status)==0)?0:-1;pid=-1;break;}
+        {struct timespec d={0,100000000L};(void)nanosleep(&d,NULL);}
+    }
+    if(pid>0){(void)kill(pid,SIGKILL);(void)waitpid(pid,&status,0);rc=-1;}
+    return rc;
+}
 /* Audit of mutating/failed requests (never the credential: it is stripped before). */
 static unsigned long now_ms(void){
     struct timespec t;
@@ -284,7 +330,7 @@ static void audit(int role,const char *in,const char *out,unsigned long t0){
     int mutating=0;
     if(op){op=strchr(op+1,' ');
         if(op){op++;
-            mutating=!strncmp(op,"SET",3)||!strncmp(op,"ACTION",6)||!strncmp(op,"REQUEST_STATUS",14)||!strncmp(op,"ENGINE_SET",10);}}
+            mutating=!strncmp(op,"SET",3)||!strncmp(op,"ACTION",6)||!strncmp(op,"REQUEST_STATUS",14)||!strncmp(op,"ENGINE_SET",10)||!strncmp(op,"VIEW_SET",8);}}
     if(!mutating&&!strstr(out," ERR "))return;
     for(i=0;i<sizeof(req)-1&&in[i]&&in[i]!='\n';i++){req[i]=in[i];}
     req[i]=0;
@@ -368,7 +414,7 @@ int main(int argc,char **argv){
     reader->carplay_pause=carplay_pause;reader->carplay_paused=carplay_paused_state;
     reader->carplay_context=(void *)paths.temp;
     reader->show_state=show_state;reader->show_context=NULL;
-    reader->engine_op=engine_op;reader->engine_context=NULL;
+    reader->engine_op=engine_op;reader->engine_context=NULL;reader->view_op=view_op;reader->view_context=NULL;
     {
         /* r14 write-behind. Target default: flush 25 s after the last change, at the latest 90 s
          * after the first. 0 = synchronous durable SET. Host tests stay synchronous unless set. */

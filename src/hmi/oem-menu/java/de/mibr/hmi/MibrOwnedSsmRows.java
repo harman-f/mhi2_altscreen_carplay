@@ -112,6 +112,10 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
                 // r47: the engine type is not a registry key: ask the broker (ENGINE_SET) and drop the local wish.
                 String wish=drafts.draft(index);drafts.discardDraft(index);
                 if(wish!=null)v3.engineSet(wish);
+            }else if(index>MibrPopupEditorModel.ENGINE&&MibrPopupEditorModel.isVirtual(index)){
+                // r55: the view rows are broker settings of the helper script, not registry keys.
+                String wish=drafts.draft(index);drafts.discardDraft(index);
+                if(wish!=null)v3.viewSet(MibrViewState.NAMES[index-MibrPopupEditorModel.VIEW_FOLLOW],wish);
             }else v3.commit(index);
         }
     }
@@ -215,6 +219,8 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     private void apply(ListItemModel item,int rank){
         int key=menu.keyForRow(rank),kind=kind(item);
         if(key==MibrPopupEditorModel.ENGINE)drafts.readback(key,MibrEngineState.engine());
+        else if(key>MibrPopupEditorModel.ENGINE&&MibrPopupEditorModel.isVirtual(key))
+            drafts.readback(key,MibrViewState.value(key-MibrPopupEditorModel.VIEW_FOLLOW));
         MibrElementSpec spec=key<0||key>=MibrSettingsCatalog.KEYS.length?null:MibrCanonicalElementMenu.describeVisible(MibrSettingsCatalog.KEYS[key]);
         TextArea text=(TextArea)MibrOemSsmTemplate.target((WidgetModel)item,
             kind==VALUE?MibrOemSsmTemplate.VALUE_LABEL_TARGET_ID:

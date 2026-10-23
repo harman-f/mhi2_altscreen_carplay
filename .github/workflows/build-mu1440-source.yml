@@ -84,7 +84,7 @@ jobs:
           set -euxo pipefail
           bash tools/test_parity_host.sh
 
-      - name: Gate QNX shell compatibility for all 11 new runtime scripts
+      - name: Gate QNX shell compatibility for current runtime scripts
         shell: bash
         run: |
           set -euxo pipefail
@@ -98,6 +98,7 @@ jobs:
             runtime/parity/parity_session.sh \
             runtime/parity/parity_status.sh \
             runtime/mibr-control/mibr-engine.ksh \
+            runtime/mibr-control/mibr-view.ksh \
             runtime/mibr-control/mibr-v3-boot.ksh \
             deployment/mu1440-parity-drive-v1/session-logging.sh
 
@@ -119,6 +120,7 @@ jobs:
         run: |
           set -euxo pipefail
           python3 -B -m unittest discover -s src/hmi/oem-menu/tests -v
+          bash src/hmi/oem-menu/tests/run_view_model_test.sh
           python3 -B src/hmi/oem-menu/generate_catalog.py \
             --registry settings/registry.json \
             --menu src/hmi/oem-menu/menu-definition.json \
@@ -173,12 +175,12 @@ jobs:
           expect_sha "$OUT/direct-ts-parity" 3098cdd4469a4a3b4ee92c583518b3af362e02e41921ed3d80641853ced0827b
           expect_sha "$OUT/libmibr_isotx2_guard.so" cad06d69c698c8940dec9596b96c6b90ec822bdd437c4b0d02a35881ad71fae4
           expect_sha "$OUT/libmibr_isotx2_gate.so" 05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957
-          expect_sha "$OUT/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY" 993618f9aa213ed9dc02f8deed625d27486af06003681d2c4048f70481ad5e08
+          expect_sha "$OUT/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY" 97177ddbfe78d49dc0d672c5b70e717a87c0aeebb6ac65ab4e1b7df12e60bb58
           expect_sha "$OUT/mibr-control/mibrctl-v3-QNX65-ARMv7-NOT-INSTALL-READY" fa4a580337a6a0a1d67e15ee1abc7f809591978cbfdecada5b87259fb8a5f351
           expect_sha "$OUT/mibr-control/mibr-v3-genkey-QNX65-ARMv7-NOT-INSTALL-READY" 328837d6df6daaeec25197d8cb9f7e9070c194e012f86dfc3c75256cb36d5474
-          expect_sha "$OUT/mibr-control/mibr-key40d-QNX65-ARMv7-NOT-INSTALL-READY" 2b9143412b7aa64fd8159056023cec8cb2ad60577a9e97368de61aa6d95c8a61
+          expect_sha "$OUT/mibr-control/mibr-key40d-QNX65-ARMv7-NOT-INSTALL-READY" 3612c686a6de43c7cfbcb4e96645bca83ba9db33f8c03b19e33c0c73efbaf9d2
           test -s "$OUT/parity-session"
-          echo 'R50 parity-session is a source build; it is intentionally not compared with the installed b343743f artifact.'
+          echo 'Canonical owner includes an additional stopped-until-dead safety correction; original R52 a7382451 was reproduced separately.'
           (cd "$OUT" && sha256sum -c SHA256SUMS)
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

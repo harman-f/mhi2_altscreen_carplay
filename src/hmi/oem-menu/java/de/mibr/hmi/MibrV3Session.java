@@ -91,6 +91,7 @@ final class MibrV3Session {
         failure=null;
         changed();
         engineRefresh();
+        viewRefresh();
     }
     /** On SET, publish only one complete matching post-commit original-core revision. */
     private void read(final int version,final String committedKey,final String wanted,
@@ -286,6 +287,34 @@ final class MibrV3Session {
                     String[] e=error!=null?null:MibrV3Protocol.engine(f);
                     if(e==null)MibrEngineState.failed(true);
                     else MibrEngineState.confirmed(e[0],e[1],e[2]);
+                    changed();
+                }});
+            }
+        });
+    }
+    /** r55: read the view follow state once per menu session. */
+    private boolean viewAsked;
+    void viewRefresh(){
+        if(!attached||viewAsked)return;
+        viewAsked=true;
+        viewCall("VIEW_GET",null,null);
+    }
+    /** One row of "Bildbereich folgt Cockpit-Ansicht" changed in a dropdown (name = wire name of the row). */
+    void viewSet(String name,String value){
+        if(!attached||MibrViewState.busy()||MibrViewState.rowOf(name)<0||value==null||value.length()!=1)return;
+        viewCall("VIEW_SET",name,value);
+    }
+    private void viewCall(final String op,String name,String value){
+        final int version=epoch;
+        MibrViewState.busy(true);changed();
+        issue(id(),op,name==null?new String[0]:new String[]{"name","value"},
+              name==null?new String[0]:new String[]{name,value},
+              new MibrV3Client.Listener(){
+            public void onReply(final MibrV3Protocol.Frame f,final String error){
+                relay(version,new Runnable(){public void run(){
+                    String[] v=error!=null?null:MibrV3Protocol.view(f);
+                    if(v==null)MibrViewState.failed(true);
+                    else MibrViewState.confirmed(v);
                     changed();
                 }});
             }

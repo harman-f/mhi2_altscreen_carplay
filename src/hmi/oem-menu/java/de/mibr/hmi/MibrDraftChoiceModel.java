@@ -12,7 +12,7 @@ public final class MibrDraftChoiceModel {
     private String draft;
 
     public MibrDraftChoiceModel(int index) {
-        if (index < 0 || index > MibrPopupEditorModel.ENGINE)
+        if (index < 0 || index >= MibrPopupEditorModel.VIRTUAL_END)
             throw new IllegalArgumentException("index");
         this.index = index;
     }
@@ -27,6 +27,7 @@ public final class MibrDraftChoiceModel {
 
     public String[] options() {
         if (index == MibrPopupEditorModel.ENGINE) return MibrEngineState.VALUES;
+        if (index > MibrPopupEditorModel.ENGINE) return MibrViewState.options(index - MibrPopupEditorModel.VIEW_FOLLOW);
         String kind = MibrSettingsCatalog.UI_KINDS[index];
         String key = MibrSettingsCatalog.KEYS[index];
         if ("STATUS".equals(kind)) return new String[0];
@@ -56,7 +57,7 @@ public final class MibrDraftChoiceModel {
     }
 
     public boolean isChoiceValidationProven() {
-        if (index == MibrPopupEditorModel.ENGINE) return true;
+        if (MibrPopupEditorModel.isVirtual(index)) return true;
         // This flag is only about LOCAL canonical enum membership, never
         // backend availability or actual application of a selected value.
         String kind = MibrSettingsCatalog.UI_KINDS[index];
@@ -65,6 +66,7 @@ public final class MibrDraftChoiceModel {
 
     public String labelFor(String value) {
         if (index == MibrPopupEditorModel.ENGINE) return MibrEngineState.valueLabel(value);
+        if (index > MibrPopupEditorModel.ENGINE) return MibrViewState.valueLabel(index - MibrPopupEditorModel.VIEW_FOLLOW, value);
         if ("user".equals(value) && "TRISTATE".equals(MibrSettingsCatalog.UI_KINDS[index]))
             return MibrI18n.pick("App-Vorgabe", "App default");
         // Display labels only. chooseDraft retains exact canonical URL bytes.

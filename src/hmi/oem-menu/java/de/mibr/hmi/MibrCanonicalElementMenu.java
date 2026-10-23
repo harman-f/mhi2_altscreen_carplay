@@ -72,8 +72,9 @@ public final class MibrCanonicalElementMenu {
             String[] keys=MibrMenuDefinition.GROUP_KEYS[i];
             MibrElementSpec[] rows;
             if(keys.length==0){
-                rows=new MibrElementSpec[]{MibrElementSpec.info("diagnostics.unavailable",
-                                 MibrI18n.pick("Noch keine nachgewiesenen Live-Werte", "No verified live values yet"))};
+                rows=new MibrElementSpec[]{MibrElementSpec.info(id+".unavailable",
+                                 "views".equals(id)?MibrI18n.pick("Zeilen werden im Live-Menue angezeigt", "Rows are shown in the live menu")
+                                 :MibrI18n.pick("Noch keine nachgewiesenen Live-Werte", "No verified live values yet"))};
             }else{
                 rows=new MibrElementSpec[keys.length+(i==parent&&nested>=0?1:0)];
                 for(int j=0;j<keys.length;j++)rows[j]=entry(keys[j]);

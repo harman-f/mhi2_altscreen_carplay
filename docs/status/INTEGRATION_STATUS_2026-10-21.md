@@ -1,6 +1,6 @@
 # MU1440 integration status — 21 October 2026
 
-**Dated acceptance snapshot.** Current published source and reproduction results are recorded in the [23 October R50 source guide](../build/MU1440_R50_SOURCE.md). This page retains the original vehicle/effect limits and does not override the current source inventory.
+**Dated acceptance snapshot.** Current published source and reproduction results are recorded in the [23 October R57 source guide](../build/MU1440_R57_SOURCE.md). This page retains the original vehicle/effect limits and does not override the current source inventory.
 
 This is the current cross-module **research and engineering status**, not a new binary release or a declaration of production readiness. It supersedes older *status summaries* when they disagree; historical test reports retain their original dates and scope.
 

@@ -2,7 +2,7 @@
 
 **Public collaboration guide · 23 October 2026 · Experimental research, not an installer**
 
-The [MU1440 R50 source baseline](../build/MU1440_R50_SOURCE.md) now supplies the real [OEM Java adapter](../../src/hmi/oem-menu/), [native controller](../../src/native/mibr-control/), canonical registry, GEN2 and parity sources with standalone native build/tests. Start a SEAT-specific menu adapter from those implementations; provide your own exact MU1409 firmware/API inputs locally. The MU1440 OEM widget IDs, artwork, Java ABI and input mapping still require target-specific work. This is a partial source publication with documented external dependencies, not a validated MU1409 installer.
+The [MU1440 R57 source baseline](../build/MU1440_R57_SOURCE.md) now supplies the real [OEM Java adapter](../../src/hmi/oem-menu/), [native controller](../../src/native/mibr-control/), canonical registry, GEN2 and parity sources with standalone native build/tests. Start a SEAT-specific menu adapter from those implementations; provide your own exact MU1409 firmware/API inputs locally. The MU1440 OEM widget IDs, artwork, Java ABI and input mapping still require target-specific work. This is a partial source publication with documented external dependencies, not a validated MU1409 installer.
 
 This page describes a proposed joint SEAT/CUPRA port of [mhi2_altscreen_carplay](../../README.md), aimed initially at a contributor's **2020 CUPRA Ateca, `MHI2_ER_SEG11_P4708_1` / MU1409, Continental 790**. Its goal is more than another working moving map: reuse our modular CarPlay video/control architecture, then adapt the **OEM-native HOME/Settings menu** to the SEAT interface. Development can proceed in small, individually agreed steps; no fixed time commitment is expected.
 
@@ -40,6 +40,10 @@ We expect substantial source-level reuse, but cannot promise unchanged Škoda bi
 **No OEM menu is required for WP1.** Start with our existing file-based/manual switches and settings. Confirm that the same media owner handles source/start/stop, reconnect and fallback. Test wired video, then independently demonstrate a visible and reversible **STOCK → DIRECT → STOCK** return with original infotainment behaviour intact. Investigate map cropping/ViewArea only against the actual fitted SEAT cluster, not against an assumed Škoda canvas or panel resolution.
 
 **WP1 acceptance:** a reproducibly built and tested target-specific version of *our* runtime; meaningful diagnostics; wired map output; session stop/recovery; exclusive writer; and an independently checked stock restoration. This is not achieved merely by running the already working third-party package.
+
+**WP1 networking prerequisite:** the target's Type-111 `carplay0` PF ingress is a separate **mandatory installer/test-package gate**, not an optional debugging tweak. See the [persistent firewall/profile contract](../installation/TYPE111_FIREWALL_INSTALLER_CONTRACT.md). Collect actual effective rules, installed profile variants and startup/network reload behaviour read-only first; `pf.conf` containing a permit is not sufficient. The eventual reviewed installer must handle backup, all relevant profiles, postboot verification and owned rollback. The initial contributor bundle is not authorised to automatically patch live PF or reload rules during an SSH/CarPlay session.
+
+**Physical controls are a target-specific evidence gate:** [SEAT/CUPRA key-input discovery — AI-agent handoff](SEAT_CUPRA_KEY_INPUT_CAPTURE_HANDOFF.md) explains our actual Škoda passive DebugSPI/DSI capture method and how to adapt it to P4708_1 without assuming identical keys. First obtain a measured physical key/encoder matrix; only then implement a SEAT input adapter.
 
 ### WP2 — Port the OEM-native HOME / Settings experience to SEAT
 

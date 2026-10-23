@@ -2,7 +2,7 @@
 
 ## Provenance
 
-The installed R46 service source is identified by the source-file SHA-256
+The installed R57 service source is identified by the source-file SHA-256
 below. Its settings implementation descends from
 `harman-f/mhi2_altscreen_carplay@324b4f249883bb707e0d0a8995b2b6b5fe23be25`.
 The public build links the canonical shared implementation in
@@ -13,19 +13,20 @@ This is the three-view registry used by the integrated public source tree; it
 is not the older two-view registry from the upstream snapshot. MIBR/3 does not
 carry a second registry.
 
-The R46-installed `mibr-v3-service` SHA-256 is
-`993618f9aa213ed9dc02f8deed625d27486af06003681d2c4048f70481ad5e08`.
-The QNX cross-build reproduced this hash exactly. The same build also reproduced
-the installed `mibrctl-v3`, `mibr-v3-genkey`, and `mibr-key40d` hashes exactly;
-those three binaries are from earlier source snapshots, not newly introduced by
-R46.
+The R57 reference `mibr-v3-service` SHA-256 is
+`97177ddbfe78d49dc0d672c5b70e717a87c0aeebb6ac65ab4e1b7df12e60bb58`.
+The public source-only QNX cross-build reproduced both R57 hashes exactly.
+`mibrctl-v3` and `mibr-v3-genkey` also reproduced their recorded hashes; the
+R57 changes the service and KEY40 support daemon.
 
 | Component | Source SHA-256 | Installed/rebuilt binary SHA-256 |
 |---|---|---|
-| `mibr_v3_service.c` (R46) | `064fe9c4a854ac48ed1c3039e800262ac60e3261bcb0845db666bfc6b6e53e99` | `993618f9aa213ed9dc02f8deed625d27486af06003681d2c4048f70481ad5e08` |
+| `mibr_v3_service.c` (R57) | `cf642daa6f525b6007a6c6f2ff8aff70e9466d5d4ba4acf3f2cf8b7306161d2a` | `97177ddbfe78d49dc0d672c5b70e717a87c0aeebb6ac65ab4e1b7df12e60bb58` (reproduced) |
 | `mibr_v3_client.c` | `487fa0298ac55b80cf4a53ed9f686a7d7e4b6b3240ad4cccc6c2431e667649ea` | `fa4a580337a6a0a1d67e15ee1abc7f809591978cbfdecada5b87259fb8a5f351` |
 | `mibr_v3_genkey.c` | `a51921f30a3f628b5c27169cc8cc2aa5dc557b89c0f572350d6c1cf3617b6415` | `328837d6df6daaeec25197d8cb9f7e9070c194e012f86dfc3c75256cb36d5474` |
-| `mibr_key40d.c` + `mibr_v3_key40.c` | `85f8e5400b499bda9e3c188dd53e1fcbb483e9f1881c111f9cf48dda450dc16d` + `6cbb8f728e956dfd3feb7fdfcfff65e118cf7887a3a165c3f126dfd2e42a947c` | `2b9143412b7aa64fd8159056023cec8cb2ad60577a9e97368de61aa6d95c8a61` |
+| `mibr_key40d.c` + `mibr_v3_key40.c` (R57) | `878edb0044c48158dfa0463b977e6e90d73b3d8e00508395f362d5c7913c4ee6` + `37e0e539f46908ab08d354e086704540d438bf32650dea4dbb21b978a092d686` | `3612c686a6de43c7cfbcb4e96645bca83ba9db33f8c03b19e33c0c73efbaf9d2` (reproduced) |
+| `mibr_v3_readonly.c` + `.h` (R57) | `7c6ac5a6f5892954e2b5a40dd8554809e1d3d640bd6f12fcd1478f46b53a64d9` + `ed5db3159953179bc610b91c20bf4d365a2cae63d7396dcf4db834e19ef8e2f4` | linked into R57 service above |
+| `mibr-view.ksh` (R57) | `eeb250ee790fa180d901cd68a948da38eea2614733b25b18d99fb5a7ad77e350` | `eeb250ee790fa180d901cd68a948da38eea2614733b25b18d99fb5a7ad77e350` |
 | `mibr-engine.ksh` | `05986352f312bf2dc7b46223ffa2aa666d7127d38e432b15efcaf133d3be2f31` | Same bytes as installed script |
 | `mibr-v3-boot.ksh` | `5334b7689c587a4b805779486efec16c1a1e43227a7497d50d78bf2da321c6ca` | Same bytes as installed script |
 
@@ -61,18 +62,23 @@ reproduction.
 The route gateway and KEY40 input seams are present as project-owned source but
 are not proof of an attached exact-target owner or independent AID-visible
 observer. Route capability must remain off until those providers and their
-recovery behavior are qualified. The existing `mibr_key40d` source includes a
-long-hold route-toggle mapping; this is preserved installed-source evidence,
-not approval of a physical gesture assignment. Physical input port, action,
-and independently visible `ACTIVE` validation remain open. The source
+recovery behavior are qualified. R57 maps KEY40 short press to view-step
+accounting, KEY40 long press to view resynchronization, and KEY44 long press to
+the existing route-toggle request. The view helper applies the configured
+safe-area mapping only when its existing follow option is enabled. These are
+source/binary correspondence facts, not qualification of the physical input
+port, action dispatch, or independently visible `ACTIVE` state. Those checks
+remain open. The source
 publication contains no on-unit test evidence and does not update the
 downloadable reference release.
 
 ## Source-level host tests
 
-The included tests cover KEY40 event parsing/classification and engine helper
-read/write behavior against synthetic configuration. Service-level host
-regressions additionally require a host build linked to the canonical core;
-the repository workflow provides the complete module-level test gate. Test
-results are reported with the exact command and build inputs in the publication
-receipt.
+The R57 source-only validation passed the host build, all 25 module tests, and
+the target-shell static check for `mibr-view.ksh`. Coverage includes KEY40 and
+KEY44 event parsing, the view helper's defaults/persistence/resync rule, and a
+host service VIEW_GET/VIEW_SET round-trip. The QNX cross-build passed and
+reproduced the service and key-daemon hashes in the table above. These results
+do not qualify the physical input path, target filesystem behavior, route
+action, or live `ACTIVE` state. The source-only promotion includes no installer
+or vehicle-test evidence.

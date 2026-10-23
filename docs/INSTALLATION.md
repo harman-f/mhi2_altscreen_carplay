@@ -53,6 +53,10 @@ The distinct port roles and diagnostic sequence are in
 [STREAM111_PROTOCOL.md](research/STREAM111_PROTOCOL.md#111-mu1440-carplay0-firewall-and-port-ownership)
 and [VEHICLE_TEST_PROTOCOL.md](testing/VEHICLE_TEST_PROTOCOL.md#4-verify-the-type-111-source-separately).
 
+### Mandatory PF installer and test-package gate
+
+**Requirement for all future packages:** [persistent Type-111 firewall installer contract](installation/TYPE111_FIREWALL_INSTALLER_CONTRACT.md). The existing developer installer does **not yet** implement automatic PF mutation/restore. Its external firewall prerequisite remains a blocking check; any future automatic patch must discover all actual boot/network-selected profile variants, validate candidates without loading them, preserve exact backups, and prove the **effective** `carplay0` permit again after boot and relevant interface transitions. The SEAT/MU1409 contributor test package starts with a read-only/offline check, not a live hot-reload or blind overwrite.
+
 ## Prepare
 
 From a workstation checkout:

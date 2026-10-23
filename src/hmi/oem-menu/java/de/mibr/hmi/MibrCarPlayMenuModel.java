@@ -4,7 +4,7 @@ package de.mibr.hmi;
 /**
  * r8/r10 flat menu: the main list (CATEGORIES) shows the root settings
  * followed by the Erweitert link; ITEMS is one submenu; DETAIL is one
- * setting. Diagnostics is reached from inside Advanced.
+ * setting. Diagnose is reached from inside Erweitert (r10, owner 2026-10-20).
  * Every list is a single scrolling OEM list, no artificial pages.
  */
 public final class MibrCarPlayMenuModel {
@@ -32,10 +32,19 @@ public final class MibrCarPlayMenuModel {
     /** Extra link row at the end of a submenu, or -1. */
     private static int nestedLink(int group) { return group == NESTED_PARENT && NESTED >= 0 ? NESTED : -1; }
     /** r46: the "Motorart" row (engine type of the CarPlay Identify) sits in Erweitert after the settings. */
-    private static int engineRows(int group) { return group == NESTED_PARENT && NESTED_PARENT >= 0 ? 1 : 0; }
+    private static final int VIEWS = index("views");
+    /** r56: Erweitert has one virtual row (Motorart); the "Ansichten" submenu has the six view rows. */
+    private static int engineRows(int group) {
+        if (group == VIEWS && VIEWS >= 0) return MibrViewState.ROWS;
+        return group == NESTED_PARENT && NESTED_PARENT >= 0 ? 1 : 0;
+    }
+    /** First virtual key of the group's virtual rows. */
+    private static int firstVirtual(int group) {
+        return group == VIEWS && VIEWS >= 0 ? MibrPopupEditorModel.VIEW_FOLLOW : MibrPopupEditorModel.ENGINE;
+    }
     /** True for the engine-type row of the Erweitert list (a tap is handled by the owned rows, not by select()). */
     public boolean isEngineRow(int row) {
-        return screen == ITEMS && engineRows(group) > 0 && row == count(group);
+        return screen == ITEMS && engineRows(group) > 0 && row >= count(group) && row < count(group) + engineRows(group);
     }
 
     public static interface View {
@@ -96,7 +105,7 @@ public final class MibrCarPlayMenuModel {
     /** Mapping for the owned editor; links, diagnostics and hidden descriptors are never keys. */
     public int keyForRow(int row) {
         if (screen == CATEGORIES) return row >= 0 && row < ROOT_KEYS.length ? keyAt(-1, row) : -1;
-        if (isEngineRow(row)) return MibrPopupEditorModel.ENGINE;
+        if (isEngineRow(row)) return firstVirtual(group) + (row - count(group));
         if (screen != ITEMS || row < 0 || row >= count(group)) return -1;
         return keyAt(group, row);
     }
@@ -195,15 +204,21 @@ public final class MibrCarPlayMenuModel {
             int nested = nestedLink(group);
             // An empty submenu still renders one row (status line or notice).
             int engine = engineRows(group);
-            rows = new String[count == 0 ? ("diagnostics".equals(GROUP_IDS[group]) ? DIAG_ROWS : 1) : count + engine + (nested >= 0 ? 1 : 0)];
+            rows = new String[count + engine == 0 ? ("diagnostics".equals(GROUP_IDS[group]) ? DIAG_ROWS : 1) : count + engine + (nested >= 0 ? 1 : 0)];
             for (int j = 0; j < count; j++) rows[j] = rowLabel(keyAt(group, j));
-            if (count > 0 && engine > 0) rows[count] = MibrI18n.pick("Motorart", "Engine type");
+            if (engine > 0) {
+                if (group == VIEWS) {
+                    for (int v = 0; v < MibrViewState.ROWS; v++) rows[count + v] = MibrViewState.rowLabel(v);
+                } else {
+                    rows[count] = MibrI18n.pick("Motorart", "Engine type");
+                }
+            }
             if (nested >= 0) rows[count + engine] = groupNames[nested];
             if (count == 0 && "diagnostics".equals(GROUP_IDS[group])) {
                 String[] live = MibrVdataDiag.read();
                 for (int j = 0; j < rows.length && j < live.length; j++) rows[j] = live[j];
             }
-            if (count == 0) detail = "diagnostics".equals(GROUP_IDS[group])
+            if (count + engine == 0) detail = "diagnostics".equals(GROUP_IDS[group])
                 ? MibrI18n.pick("Fahrzeugdaten zum iPhone: nur Anzeige, nichts wird hier ge\u00e4ndert.", "Vehicle data to iPhone: display only, nothing is changed here.")
                 : MibrI18n.pick("Noch keine freigegebenen Parameter.", "No approved parameters yet.");
         } else if (screen == DETAIL && selected >= 0) {

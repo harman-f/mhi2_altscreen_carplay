@@ -4,9 +4,14 @@ package de.mibr.hmi;
 public final class MibrPopupEditorModel {
     /** r47: virtual row after the 48 registry keys: the engine type of the CarPlay Identify (not a registry setting). */
     public static final int ENGINE = MibrSettingsCatalog.KEYS.length;
-    private final MibrDraftChoiceModel[] drafts = new MibrDraftChoiceModel[ENGINE + 1];
-    private final String[] current = new String[ENGINE + 1];
-    private final boolean[] tempReadback = new boolean[ENGINE + 1];
+    /** r55: virtual rows of "Bildbereich folgt Cockpit-Ansicht" (follow, pos, area at Voll / Wide / Center, sport). */
+    public static final int VIEW_FOLLOW = ENGINE + 1, VIEW_POS = ENGINE + 2, VIEW_RS = ENGINE + 3, VIEW_MAP0 = ENGINE + 4,
+        VIEW_MAP1 = ENGINE + 5, VIEW_MAP4 = ENGINE + 6, VIEW_SPORT = ENGINE + 7, VIRTUAL_END = ENGINE + 8;
+    /** True for the engine row and the view rows: values come from the broker, not from the 48-key registry. */
+    public static boolean isVirtual(int index) { return index >= ENGINE && index < VIRTUAL_END; }
+    private final MibrDraftChoiceModel[] drafts = new MibrDraftChoiceModel[VIRTUAL_END];
+    private final String[] current = new String[VIRTUAL_END];
+    private final boolean[] tempReadback = new boolean[VIRTUAL_END];
     private int opened = -1;
     private int operation;
     private boolean available;
@@ -17,17 +22,17 @@ public final class MibrPopupEditorModel {
     public void setAvailable(boolean value) { available = value; if (!value) cancel(); }
     public boolean available() { return available; }
     public static boolean visible(int index) {
-        if (index == ENGINE) return true;
+        if (isVirtual(index)) return true;
         return index >= 0 && index < MibrSettingsCatalog.KEYS.length &&
             !"hidden".equals(MibrSettingsCatalog.UI_SECTIONS[index]);
     }
     /**
-     * Arrival time, speed limit and compass use stock
+     * r10 (owner 2026-10-20): Ankunftszeit, Tempolimit and Kompass are stock
      * CHECK rows over the canonical yes/no values. The canonical "user"
      * (App-Vorgabe) is not offered, but a read-back "user" is shown unchecked.
      */
     public boolean directToggle(int index) {
-        if(!visible(index) || index == ENGINE)return false;
+        if(!visible(index) || isVirtual(index))return false;
         String key=MibrSettingsCatalog.KEYS[index];
         return "navigation.ETA".equals(key) || "navigation.speedLimit".equals(key) ||
                "navigation.compass".equals(key);
@@ -41,7 +46,7 @@ public final class MibrPopupEditorModel {
      * approved. Everything else is shown but never SET from the HMI.
      */
     public static boolean saveAllowed(int index) {
-        if(!visible(index) || index == ENGINE)return false;
+        if(!visible(index) || isVirtual(index))return false;
         String key=MibrSettingsCatalog.KEYS[index];
         // r14: Ansicht (viewarea.selected) is a live TEMP index and saved like the navigation values.
         // r23: carplay.enabled ("CarPlay im Cockpit") is the runtime pause shared with the KEY40 long press.
@@ -52,10 +57,10 @@ public final class MibrPopupEditorModel {
      * viewarea.selected (r8 "Ansicht" dropdown) is a live index into the two
      * viewareas CarPlay negotiated, not a preference. No qualified
      * requestViewArea/updateViewArea owner exists yet, so the row is shown but
-     * never opens, drafts or SETs (handoff 2026-10-19, section 6).
+     * never opens, drafts or SETs.
      */
     public boolean liveViewGated(int index) {
-        if(!visible(index) || index == ENGINE)return false;
+        if(!visible(index) || isVirtual(index))return false;
         String key=MibrSettingsCatalog.KEYS[index];
         // carplay.enabled (r10 dropdown under Erweitert) needs a qualified
         // session owner as well (native session_control=0).

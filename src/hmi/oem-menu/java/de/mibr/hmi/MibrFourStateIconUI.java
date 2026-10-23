@@ -39,10 +39,12 @@ public final class MibrFourStateIconUI extends CommonImageUI {
         int failures;
         long failedAt;
         long requestedAt;
+        /** r51: when the decoded image arrived; art younger than SETTLE_MS is not drawn (unfinished texture = white/pink tile). */
+        long decodedAt;
         Slot(String path) { this.path = path; }
     }
 
-    /** A failed load/draw is retried at a bounded interval. */
+    /** A failed load/draw is retried at most this often (owner 2026-10-20: white pressed art after a reboot). */
     private static final int MAX_FAILURES = 6;
     private static final long RETRY_MS = 1500L;
     /** r45: after MAX_FAILURES keep trying slowly (a boot-time failure must never blank the art for good). */
@@ -50,6 +52,11 @@ public final class MibrFourStateIconUI extends CommonImageUI {
     /** r45: a request that neither delivers nor fails for this long is cancelled and counted as a failure. */
     private static final long HANG_MS = 4000L;
     private boolean repaintScheduled;
+    /** r51: a freshly decoded image is drawn only after this long; until then the counterpart (normal art) stays. */
+    private static final long SETTLE_MS = 400L;
+    /** r51: failed slots are not retried before this long after start: the menu is still being assembled then. */
+    private static final long STARTUP_QUIET_MS = 20000L;
+    private static final long LOADED_AT = System.currentTimeMillis();
 
     /** A failed or pending slot only gets another chance when something repaints the tile: do it ourselves. */
     private void scheduleRepaint(final long delayMs) {
@@ -57,9 +64,11 @@ public final class MibrFourStateIconUI extends CommonImageUI {
             if (repaintScheduled) return;
             repaintScheduled = true;
         }
+        long quiet = LOADED_AT + STARTUP_QUIET_MS - System.currentTimeMillis();
+        final long sleepMs = delayMs > quiet ? delayMs : quiet;
         Thread t = new Thread(new Runnable() {
             public void run() {
-                try { Thread.sleep(delayMs); } catch (InterruptedException ignored) { }
+                try { Thread.sleep(sleepMs); } catch (InterruptedException ignored) { }
                 synchronized (MibrFourStateIconUI.this) { repaintScheduled = false; }
                 try {
                     WidgetModel widget = getWidget();
@@ -87,7 +96,16 @@ public final class MibrFourStateIconUI extends CommonImageUI {
         Slot slot = ensure(wanted, other);
         Slot fallback = other == null ? null : ensure(other, wanted);
         // Until the wanted art is decoded keep showing its counterpart, never a blank tile.
-        if (!draw(graphics, widget, slot, alpha)) draw(graphics, widget, fallback, alpha);
+        if (!settled(slot) || !draw(graphics, widget, slot, alpha)) draw(graphics, widget, fallback, alpha);
+    }
+
+    /** True when the slot's art has been decoded for SETTLE_MS (or has no image yet: draw() then returns false). */
+    private boolean settled(Slot slot) {
+        if (slot == null || slot.image == null) return true;
+        long age = System.currentTimeMillis() - slot.decodedAt;
+        if (age >= SETTLE_MS) return true;
+        scheduleRepaint(SETTLE_MS - age + 20L);
+        return false;
     }
 
     private boolean draw(Graphics3D graphics, WidgetModel widget, Slot slot, float alpha) {
@@ -123,7 +141,7 @@ public final class MibrFourStateIconUI extends CommonImageUI {
                     return existing;
                 }
                 long wait = existing.failures >= MAX_FAILURES ? SLOW_RETRY_MS : RETRY_MS;
-                if (now - existing.failedAt < wait) return existing;
+                if (now - existing.failedAt < wait || now < LOADED_AT + STARTUP_QUIET_MS) return existing;
                 // Bounded retry of a failed slot, keeping the failure count.
                 failures = existing.failures;
                 release(existing);
@@ -228,6 +246,7 @@ public final class MibrFourStateIconUI extends CommonImageUI {
         releaseDrawable(slot);
         if (slot.image != null) slot.image.dispose();
         slot.image = value;
+        slot.decodedAt = System.currentTimeMillis();
         try {
             WidgetModel widget = getWidget();
             if (widget != null) widget.repaint();

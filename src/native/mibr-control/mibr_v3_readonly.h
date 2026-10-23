@@ -68,6 +68,11 @@ struct mibr_v3_reader {
      * helper ran and reported result=OK. */
     int (*engine_op)(void *,const char *op,const char *value,char *out,size_t cap);
     void *engine_context;
+    /* r55: cockpit view follow (position counter, safe area per view), implemented by the service layer through the
+     * unit helper mibr-view.ksh. op is "get" or "set"; for "set" key/value are already allowlisted by the caller;
+     * out receives key=value lines. Returns 0 when the helper ran and reported result=OK. */
+    int (*view_op)(void *,const char *op,const char *key,const char *value,char *out,size_t cap);
+    void *view_context;
     /* r13 live-first hooks (implemented in the storage layer, never in this library). */
     int (*live_apply)(const struct alt111_settings_paths *,const struct alt111_settings *,unsigned,const char *,uint64_t *);
     int (*live_revert)(const struct alt111_settings_paths *,unsigned,const char *,uint64_t);

@@ -15,6 +15,14 @@
   ],
   "sections": [
     {
+      "id": "views",
+      "label": {
+        "de": "Ansichten",
+        "en": "Views"
+      },
+      "keys": []
+    },
+    {
       "id": "advanced",
       "label": {
         "de": "Erweitert",

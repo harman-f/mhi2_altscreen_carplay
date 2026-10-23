@@ -1,6 +1,6 @@
 # Module boundaries, HMI and cross-brand portability
 
-**Source update, 23 October 2026:** the [published implementation and build guide](../build/MU1440_R50_SOURCE.md) now supply the real R48 menu adapter, R46 central controller, R38 GEN2 and R49/R50 parity stack. The four core runtime components remain separate. The guide owns current source/rebuild coverage; the dated architectural and physical-acceptance limits below are not a complete-release claim.
+**Source update, 23 October 2026:** the [published implementation and build guide](../build/MU1440_R57_SOURCE.md) now supply the real R57 menu adapter, R57 central controller, R38 GEN2 and R49/R52 parity stack. The four core runtime components remain separate. The guide owns current source/rebuild coverage; the dated architectural and physical-acceptance limits below are not a complete-release claim.
 
 [Architecture module index](README.md) identifies the authoritative reference page per subsystem; this page owns the cross-module boundaries and portability model.
 

@@ -170,7 +170,8 @@ jobs:
           grep -Fq 'mount -uw "$DEPLOY_MEDIA_ROOT"' runtime/auto-direct/common.sh
           grep -Fq 'DIRECT_FPS_OVERRIDE_FILE=/mnt/app/root/mibr-direct-output-fps' runtime/auto-direct/common.sh
           grep -Fq 'SOURCE_FPS_OVERRIDE_FILE=/mnt/app/root/mibr-carplay111-fps' runtime/auto-direct/common.sh
-          grep -Fq 'g_fps_override_path = "/mnt/app/root/mibr-carplay111-fps"' src/native/altscreen111-gen2/libaltscreen111_gen2.c
+          grep -Fq '#define MIBR_CFG_PERSIST_ROOT "/mnt/app/root"' src/native/altscreen111-gen2/libaltscreen111_gen2.c
+          grep -Fq 'g_fps_config_name = "mibr-carplay111-fps"' src/native/altscreen111-gen2/libaltscreen111_gen2.c
           grep -Fq 'MIBR_PACE="$DIRECT_PACE" MIBR_PACE_BUFFER="$DIRECT_PACE_BUFFER"' runtime/auto-direct/direct_ts_auto_supervisor.sh
           grep -Fq 'DIRECT_FPS=SET fps=$FPS' runtime/auto-direct/direct_fps.sh
           grep -Fq 'for SPEC in "NavIgnore:MIBR-NavIgnore.jar:$EXPECTED_NAVIGNORE" "Most20:MIBR-Most20FPS.jar:$EXPECTED_MOST20"; do' deployment/mu1440/install.sh

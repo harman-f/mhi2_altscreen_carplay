@@ -14,9 +14,10 @@ SOURCE = ROOT / "settings/registry.json"
 MENU_SOURCE = Path(__file__).with_name("menu-definition.json")
 DEFAULT_OUT_DIR = Path("build/oem-menu-generated")
 
-# r8 flat menu: seven settings directly on the
-# main list, three submenus. navigation.url is hidden from the HMI only; it
-# stays in the 48-key registry and in the native MIBR/3 scope=ui projection.
+# R57 menu: six registry settings directly on the main list, three submenus.
+# The Views submenu has broker-backed virtual rows that are not registry keys.
+# navigation.url is hidden from the HMI only; it stays in the 48-key registry
+# and in the native MIBR/3 scope=ui projection.
 EXPECTED_ROOT = (
     "viewarea.selected", "navigation.surface",
     "navigation.ETA", "navigation.speedLimit", "navigation.compass",
@@ -25,10 +26,11 @@ EXPECTED_ROOT = (
 # CarPlay in the cockpit, frame rate and source version are nested under Advanced.
 # under Erweitert, Diagnose reached from Erweitert, Profil hidden in the HMI.
 EXPECTED_VISIBLE = {
+    "views": set(),
     "advanced": {"carplay.enabled", "maxFPS", "sourceVersion"},
     "diagnostics": set(),
 }
-EXPECTED_GROUPS = ("advanced", "diagnostics")
+EXPECTED_GROUPS = ("views", "advanced", "diagnostics")
 # Exact native MIBR/3 SNAPSHOT scope=ui row order (row_count=11, the native UI projection).
 EXPECTED_NATIVE_UI = (
     "carplay.enabled", "viewarea.selected", "navigation.surface",

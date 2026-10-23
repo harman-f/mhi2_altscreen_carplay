@@ -1,0 +1,8 @@
+281a282,288
+>     if(!ok) {
+>         /* r52: never let the bridge run without proof. SIGTERM stays pending while the process is stopped, so
+>            queue it first and only then continue it: the bridge exits without writing (it checks its stop flag
+>            before every write). */
+>         if(bridge_handle>=0)(void)bound_process_signal(bridge_handle,SIGTERM);
+>         else if(bridge_pid>1)(void)kill(bridge_pid,SIGTERM);
+>     }

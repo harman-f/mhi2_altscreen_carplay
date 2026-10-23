@@ -10,7 +10,7 @@ import java.lang.reflect.Method;
  * lookup, so a page shows a changed language the next time it is built.
  * The service is reached by reflection so this class has no compile-time
  * dependency. Where no HMI service class exists at all, the language is
- * also unreadable and falls back to English (owner requirement 2026-10-19);
+ * also unreadable and falls back to English;
  * host tests that check German texts set {@link #forced}.
  */
 final class MibrI18n {

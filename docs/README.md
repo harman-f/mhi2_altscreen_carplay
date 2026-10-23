@@ -4,7 +4,7 @@ The pages here describe the **current public product/source, exact reference-tar
 
 ## Start here
 
-The [MU1440 R50 source/build baseline](build/MU1440_R50_SOURCE.md) is the current entrypoint for source availability, native reproduction, the real OEM-menu/controller modules, and explicit Java/support-source exclusions. Dated vehicle reports below retain their original acceptance scope.
+The [MU1440 R57 source/build baseline](build/MU1440_R57_SOURCE.md) is the current entrypoint for source availability, native reproduction, the real OEM-menu/controller modules, and explicit Java/support-source exclusions. Dated vehicle reports below retain their original acceptance scope.
 
 1. [Features and goals](../README.md)
 2. [Current integration and evidence status](status/INTEGRATION_STATUS_2026-10-21.md)
@@ -18,6 +18,10 @@ The [MU1440 R50 source/build baseline](build/MU1440_R50_SOURCE.md) is the curren
 
 - [MU1409 / P4708_1 joint AltScreen and native Settings port — public collaboration guide](porting/SEAT_CUPRA_MU1409_COLLABORATION.md). This is a staged development proposal, not a supported installer or a vehicle compatibility claim for our binary.
 - [Local Mac/QNX build and firmware-analysis environment for the SEAT MU1409 contributor](porting/SEAT_CUPRA_MU1409_LOCAL_ENVIRONMENT.md) — host-only prerequisites, reproducibility gates and steps before any vehicle tests.
+
+- [Installer/test-package requirement: persistent Type-111 `carplay0` PF profile handling](installation/TYPE111_FIREWALL_INSTALLER_CONTRACT.md) — read-only check, profile-aware staged patch, postboot effective-rule verification and owned rollback (automatic target patching not yet implemented).
+
+- [SEAT/CUPRA MU1409 key-input capture and AI-agent handoff](porting/SEAT_CUPRA_KEY_INPUT_CAPTURE_HANDOFF.md) — reproduce our two-stage Škoda passive key/encoder analysis on a different firmware; no unverified SEAT key IDs or live remapping.
 
 ## System interfaces
 

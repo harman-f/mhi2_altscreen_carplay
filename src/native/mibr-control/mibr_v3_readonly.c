@@ -347,6 +347,38 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
         }
         response_start(&w,req.rid,"OK");
         field(&w,"engine",engine);field(&w,"announced",announced);field(&w,"pending",pending);
+    }else if(!strcmp(req.op,"VIEW_GET")||!strcmp(req.op,"VIEW_SET")){
+        /* r55: cockpit view follow. Key and value are allowlisted here AND validated by the helper script. */
+        char res[256],follow[4],sport[4],m0[4],m1[4],m4[4],rs[4],pos[4];
+        int set=!strcmp(req.op,"VIEW_SET");
+        if(set){
+            const char *k,*v;
+            if(req.count!=2||strcmp(req.f[0].key,"name")||strcmp(req.f[1].key,"value")){
+                error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+            }
+            k=req.f[0].value;v=req.f[1].value;
+            if(!v[0]||v[1]||
+               !(((!strcmp(k,"follow")||!strcmp(k,"sport"))&&(v[0]=='0'||v[0]=='1'))||
+                 ((!strcmp(k,"m0")||!strcmp(k,"m1")||!strcmp(k,"m4"))&&v[0]>='0'&&v[0]<='2')||
+                 ((!strcmp(k,"pos")||!strcmp(k,"rs"))&&v[0]>='0'&&v[0]<='4'))){
+                error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+            }
+        }else if(req.count){
+            error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+        }
+        if(!r||!r->view_op){error_frame(out,cap,req.rid,"POLICY_BLOCKED");return -1;}
+        res[0]=0;
+        if(r->view_op(r->view_context,set?"set":"get",set?req.f[0].value:NULL,set?req.f[1].value:NULL,res,sizeof(res))){
+            error_frame(out,cap,req.rid,"VIEW_FAILED");return -1;
+        }
+        if(kv_line(res,"follow",follow,sizeof(follow))||kv_line(res,"sport",sport,sizeof(sport))||
+           kv_line(res,"m0",m0,sizeof(m0))||kv_line(res,"m1",m1,sizeof(m1))||kv_line(res,"m4",m4,sizeof(m4))||
+           kv_line(res,"rs",rs,sizeof(rs))||kv_line(res,"pos",pos,sizeof(pos))){
+            error_frame(out,cap,req.rid,"VIEW_FAILED");return -1;
+        }
+        response_start(&w,req.rid,"OK");
+        field(&w,"follow",follow);field(&w,"sport",sport);field(&w,"m0",m0);field(&w,"m1",m1);field(&w,"m4",m4);
+        field(&w,"rs",rs);field(&w,"pos",pos);
     }else if(!strcmp(req.op,"SNAPSHOT")){
         if(req.count>1||(req.count==1&&strcmp(req.f[0].key,"scope"))){
             error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
