@@ -24,6 +24,17 @@ The corresponding installed R57 service SHA-256 was
 The source revision and dependency pin identify the input; a build reproduction
 is a separate result and must be recorded by the build step.
 
+The public `runtime/mibr-control/mibr-engine.ksh` helper also contains a
+review-driven write-safety correction: it remounts `/mnt/system` read-write
+before creating its same-filesystem staging file and requests a read-only
+remount after remount, staging, and replacement failures. It intentionally is
+not byte-identical to the installed R46 helper, whose SHA-256 was
+`05986352f312bf2dc7b46223ffa2aa666d7127d38e432b15efcaf133d3be2f31`. The
+corrected public helper SHA-256 is
+`e4533241733f6e3afea3402fa58e131b065665734e0c053b25442d68ddbfd127`. The
+host mock-mount regression verifies ordering and cleanup only; it makes no
+exact-target filesystem claim.
+
 The source includes:
 
 - `mibr_v3_service.c`, the authenticated, loopback-only MIBR/3 service;
@@ -75,8 +86,10 @@ for the toolchain pin, output interpretation and source/binary hash limits.
 ## Runtime limits
 
 The related scripts are in [`runtime/mibr-control/`](../../../runtime/mibr-control/).
-They preserve the deployed engine and boot helpers and include the R57 view
-helper for source review. The boot helper is not a qualified startup integration. In particular,
+They include the corrected public engine helper described above, the boot
+helper, and the R57 view helper for source review. The engine helper
+intentionally differs from the installed R46 script; the boot helper is not a
+qualified startup integration. In particular,
 filesystem behavior, credentials, same-user access, durable write guards,
 boot recovery, live owner binding, and physical route visibility still require
 separate exact-target evidence. No vehicle access was part of this publication.

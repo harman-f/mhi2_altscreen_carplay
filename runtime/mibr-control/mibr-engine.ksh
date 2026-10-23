@@ -25,7 +25,6 @@ cur(){
     echo "$val"
 }
 valid(){ case "$1" in gas|diesel|electric|cng) return 0 ;; esac; return 1; }
-ro(){ [ "$NOMOUNT" = 1 ] || { sync; mount -ur "$SYS" 2>/dev/null; }; }
 done_out(){
     c=$(cur); b=
     [ -s "$BOOTMARK" ] && read b < "$BOOTMARK"
@@ -35,6 +34,16 @@ done_out(){
     rm -f "$LOCK"
     [ "$1" = OK ] && exit 0
     exit 1
+}
+set_finish(){
+    SET_RESULT=$1
+    rm -f "$NEW" "$NEW.2"
+    # A failed -uw can still leave the mount writable, so always request -ur
+    # after the remount attempt, including staging and replacement failures.
+    if [ "$NOMOUNT" != 1 ]; then
+        sync
+        mount -ur "$SYS" 2>/dev/null || SET_RESULT=RO_RESTORE_FAILED
+    fi
 }
 [ -f "$CFG" ] || { say "engine="; say "announced="; say "pending=0"; say "result=NO_CFG"; exit 1; }
 # /tmp on the unit is a RAM filesystem without mkdir/rmdir: the lock is a pid file created with noclobber.
@@ -57,17 +66,24 @@ case "$1" in
         [ "$c0" = "$2" ] && done_out OK
         n0=0; while IFS= read -r line; do n0=$((n0+1)); done < "$CFG"
         inv=0; n1=0; hit=0
-        : > "$NEW" || done_out NO_TMP
+        if [ "$NOMOUNT" != 1 ]; then mount -uw "$SYS" 2>/dev/null || { set_finish REMOUNT_FAILED; done_out "$SET_RESULT"; }; fi
+        ( : > "$NEW" ) 2>/dev/null || { set_finish NO_TMP; done_out "$SET_RESULT"; }
         while IFS= read -r line; do
             case "$line" in
                 "["*) if [ "$line" = "[vehicle]" ]; then inv=1; else inv=0; fi ;;
                 engine=*) if [ "$inv" -eq 1 ]; then line="engine=$2"; hit=$((hit+1)); fi ;;
             esac
-            echo "$line" >> "$NEW"; n1=$((n1+1))
+            echo "$line" >> "$NEW" || { set_finish NO_TMP; done_out "$SET_RESULT"; }
+            n1=$((n1+1))
         done < "$CFG"
-        if [ "$hit" -ne 1 ] || [ "$n0" -ne "$n1" ]; then rm -f "$NEW"; done_out BAD_LAYOUT; fi
-        if [ "$NOMOUNT" != 1 ]; then mount -uw "$SYS" 2>/dev/null || { rm -f "$NEW"; done_out REMOUNT_FAILED; }; fi
-        if cp "$NEW" "$NEW.2" 2>/dev/null && chmod 755 "$NEW.2" 2>/dev/null && mv "$NEW.2" "$CFG" 2>/dev/null; then rm -f "$NEW"; ro; else rm -f "$NEW" "$NEW.2"; ro; done_out WRITE_FAILED; fi
+        if [ "$hit" -ne 1 ] || [ "$n0" -ne "$n1" ]; then set_finish BAD_LAYOUT; done_out "$SET_RESULT"; fi
+        if cp "$NEW" "$NEW.2" 2>/dev/null && chmod 755 "$NEW.2" 2>/dev/null && mv "$NEW.2" "$CFG" 2>/dev/null; then
+            set_finish OK
+            [ "$SET_RESULT" = OK ] || done_out "$SET_RESULT"
+        else
+            set_finish WRITE_FAILED
+            done_out "$SET_RESULT"
+        fi
         [ "$(cur)" = "$2" ] || done_out VERIFY_FAILED
         done_out OK ;;
     *) done_out USAGE ;;

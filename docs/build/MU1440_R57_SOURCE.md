@@ -77,6 +77,8 @@ Original R50 unconditionally sent CONT after a failed gate-grace wait. R52 queue
 
 The corrected QNX owner built at `/src` has SHA-256 `87b7ece6be005b9ad821a2c899c5a503cbeea7b27504300337676a5590d26b36`.
 
+The public engine-type helper also has a bounded filesystem fix: remount writable before creating its same-directory staging file, then restore read-only after success or failure. Its corrected script SHA-256 is `e4533241733f6e3afea3402fa58e131b065665734e0c053b25442d68ddbfd127`; it intentionally differs from the reference vehicle helper. Eight Linux host tests and the target-shell static gate cover this correction; no new vehicle test is claimed.
+
 ## Remaining source and reproduction limits
 
 - The OEM menu needs an independently obtained, exact MU1440 `lsd.jar`, IBM J9 SDK and local OEM source views for guarded preparation. No OEM JAR, JXE, original class body or generated OEM implementation is included. Class-file major 46 is enforced by the build. Exact R57 JAR reproduction remains open.
