@@ -106,6 +106,16 @@ static void final(sha256_ctx *c, uint8_t out[32]) {
     }
 }
 
+void mibr_sha256_bytes(const void *data, size_t size, char hex[65]) {
+    sha256_ctx c;
+    uint8_t digest[32];
+    unsigned i;
+    init(&c); update(&c, data, size); final(&c, digest);
+    for (i=0;i<32;++i) sprintf(hex+i*2,"%02x",digest[i]);
+    hex[64]=0;
+}
+
+#ifndef MIBR_SHA256_LIBRARY_ONLY
 static int hash_file(const char *path, char hex[65]) {
     FILE *f=fopen(path,"rb");
     uint8_t buf[4096], digest[32];
@@ -150,3 +160,4 @@ int main(int argc, char **argv) {
     }
     return rc;
 }
+#endif

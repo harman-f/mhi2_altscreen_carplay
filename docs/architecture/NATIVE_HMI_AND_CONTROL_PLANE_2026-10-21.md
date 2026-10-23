@@ -1,5 +1,7 @@
 # Native HMI and single-authority control plane — October 2026
 
+**Source update, 23 October 2026:** the real [R48 OEM adapter](../../src/hmi/oem-menu/) and [R46 native controller](../../src/native/mibr-control/) are now supplied with generators, build scripts and host regressions. See [current source/build scope](../build/MU1440_R50_SOURCE.md) for external OEM/J9 inputs and exclusions. The acceptance model below still separates persistence from live effect.
+
 This is a **project-authored design and test-status guide**, not an installation guide or a promise that every control is active. Its reference platform is the exact Škoda `MHI2_ER_SKG13_P4526_MU1440` with the fitted AID10-class cluster. A SEAT/VW port can reuse the approach, but not the exact Java, widget IDs, DSI mappings or media-owner bindings.
 
 ## Why a dedicated OEM-style menu

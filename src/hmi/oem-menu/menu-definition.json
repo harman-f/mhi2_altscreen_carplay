@@ -1,0 +1,245 @@
+{
+  "schema": 3,
+  "target": "MU1440_SSM_5458",
+  "title": {
+    "de": "CarPlay-Einstellungen",
+    "en": "CarPlay settings"
+  },
+  "root": [
+    "viewarea.selected",
+    "navigation.surface",
+    "navigation.ETA",
+    "navigation.speedLimit",
+    "navigation.compass",
+    "navigation.maneuver"
+  ],
+  "sections": [
+    {
+      "id": "advanced",
+      "label": {
+        "de": "Erweitert",
+        "en": "Advanced"
+      },
+      "keys": [
+        "carplay.enabled",
+        "maxFPS",
+        "sourceVersion"
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "label": {
+        "de": "Diagnose",
+        "en": "Diagnostics"
+      },
+      "keys": []
+    }
+  ],
+  "native_ui_keys": [
+    "carplay.enabled",
+    "viewarea.selected",
+    "navigation.surface",
+    "navigation.ETA",
+    "navigation.speedLimit",
+    "navigation.compass",
+    "navigation.maneuver",
+    "navigation.url",
+    "preset.id",
+    "maxFPS",
+    "sourceVersion"
+  ],
+  "labels": {
+    "carplay.enabled": {
+      "de": "CarPlay im Cockpit",
+      "en": "CarPlay in cockpit"
+    },
+    "viewarea.selected": {
+      "de": "Ansicht",
+      "en": "View"
+    },
+    "navigation.query": {
+      "de": "Navigation anfragen",
+      "en": "Request navigation"
+    },
+    "navigation.surface": {
+      "de": "Kartenanzeige",
+      "en": "Map display"
+    },
+    "navigation.ETA": {
+      "de": "Ankunftszeit",
+      "en": "Arrival time"
+    },
+    "navigation.speedLimit": {
+      "de": "Tempolimit",
+      "en": "Speed limit"
+    },
+    "navigation.compass": {
+      "de": "Kompass",
+      "en": "Compass"
+    },
+    "navigation.maneuver": {
+      "de": "Abbiegehinweis",
+      "en": "Maneuver hint"
+    },
+    "navigation.url": {
+      "de": "Streaming-URL",
+      "en": "Streaming URL"
+    },
+    "presentation.suggested_urls": {
+      "de": "Angebotene URLs",
+      "en": "Suggested URLs"
+    },
+    "preset.id": {
+      "de": "Profil",
+      "en": "Profile"
+    },
+    "maxFPS": {
+      "de": "Bildrate",
+      "en": "Frame rate"
+    },
+    "sourceVersion": {
+      "de": "Quellversion",
+      "en": "Source version"
+    },
+    "keyframe.mode": {
+      "de": "Keyframe-Modus",
+      "en": "Keyframe mode"
+    },
+    "keyframe.interval_frames": {
+      "de": "Keyframe-Abstand (Bilder)",
+      "en": "Keyframe interval (frames)"
+    },
+    "keyframe.interval_ms": {
+      "de": "Keyframe-Abstand (ms)",
+      "en": "Keyframe interval (ms)"
+    },
+    "keyframe.showui": {
+      "de": "Keyframe-Anzeige",
+      "en": "Keyframe display"
+    },
+    "viewareas.enabled": {
+      "de": "Ansichten aktiviert",
+      "en": "Views enabled"
+    },
+    "viewareas.count": {
+      "de": "Anzahl Ansichten",
+      "en": "Number of views"
+    },
+    "viewareas.initial": {
+      "de": "Startansicht",
+      "en": "Initial view"
+    },
+    "viewareas.transition_ms": {
+      "de": "Ansicht-Wechselzeit",
+      "en": "View transition time"
+    },
+    "viewarea.0.x": {
+      "de": "Ansicht 0: X-Position",
+      "en": "View 0: X position"
+    },
+    "viewarea.0.y": {
+      "de": "Ansicht 0: Y-Position",
+      "en": "View 0: Y position"
+    },
+    "viewarea.0.w": {
+      "de": "Ansicht 0: Breite",
+      "en": "View 0: width"
+    },
+    "viewarea.0.h": {
+      "de": "Ansicht 0: Hoehe",
+      "en": "View 0: height"
+    },
+    "viewarea.0.safe.x": {
+      "de": "Ansicht 0: SafeArea X",
+      "en": "View 0: safe area X"
+    },
+    "viewarea.0.safe.y": {
+      "de": "Ansicht 0: SafeArea Y",
+      "en": "View 0: safe area Y"
+    },
+    "viewarea.0.safe.w": {
+      "de": "Ansicht 0: SafeArea Breite",
+      "en": "View 0: safe area width"
+    },
+    "viewarea.0.safe.h": {
+      "de": "Ansicht 0: SafeArea Hoehe",
+      "en": "View 0: safe area height"
+    },
+    "viewarea.0.adjacent": {
+      "de": "Ansicht 0: Nachbaransicht",
+      "en": "View 0: adjacent view"
+    },
+    "viewarea.1.x": {
+      "de": "Ansicht 1: X-Position",
+      "en": "View 1: X position"
+    },
+    "viewarea.1.y": {
+      "de": "Ansicht 1: Y-Position",
+      "en": "View 1: Y position"
+    },
+    "viewarea.1.w": {
+      "de": "Ansicht 1: Breite",
+      "en": "View 1: width"
+    },
+    "viewarea.1.h": {
+      "de": "Ansicht 1: Hoehe",
+      "en": "View 1: height"
+    },
+    "viewarea.1.safe.x": {
+      "de": "Ansicht 1: SafeArea X",
+      "en": "View 1: safe area X"
+    },
+    "viewarea.1.safe.y": {
+      "de": "Ansicht 1: SafeArea Y",
+      "en": "View 1: safe area Y"
+    },
+    "viewarea.1.safe.w": {
+      "de": "Ansicht 1: SafeArea Breite",
+      "en": "View 1: safe area width"
+    },
+    "viewarea.1.safe.h": {
+      "de": "Ansicht 1: SafeArea Hoehe",
+      "en": "View 1: safe area height"
+    },
+    "viewarea.1.adjacent": {
+      "de": "Ansicht 1: Nachbaransicht",
+      "en": "View 1: adjacent view"
+    },
+    "keyframe.gap_recovery": {
+      "de": "Luecken-Recovery",
+      "en": "Gap recovery"
+    },
+    "keyframe.latency_recovery": {
+      "de": "Latenz-Recovery",
+      "en": "Latency recovery"
+    },
+    "ownership.backend": {
+      "de": "Ownership-Backend",
+      "en": "Ownership backend"
+    },
+    "display.widthPixels": {
+      "de": "Breite (Pixel)",
+      "en": "Width (pixels)"
+    },
+    "display.heightPixels": {
+      "de": "Hoehe (Pixel)",
+      "en": "Height (pixels)"
+    },
+    "display.widthPhysical": {
+      "de": "Physische Breite",
+      "en": "Physical width"
+    },
+    "display.heightPhysical": {
+      "de": "Physische Hoehe",
+      "en": "Physical height"
+    },
+    "display.uuid": {
+      "de": "Display-UUID",
+      "en": "Display UUID"
+    },
+    "legacy.autodirect": {
+      "de": "Legacy Autodirect",
+      "en": "Legacy autodirect"
+    }
+  }
+}

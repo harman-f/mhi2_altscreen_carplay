@@ -6,13 +6,33 @@ on:
     paths:
       - '.github/workflows/build-altscreen111-gen2.yml'
       - 'src/native/altscreen111-gen2/**'
+      - 'src/native/alt111-settings/**'
+      - 'src/native/vehicle-data/**'
+      - 'src/native/sha256sum-compat/**'
+      - 'settings/**'
       - 'tools/build_altscreen111_gen2.sh'
+      - 'tools/build_alt111_settings.sh'
+      - 'tools/generate_alt111_settings.py'
+      - 'tools/test_installed_gen2_host.sh'
+      - 'tests/test_three_views.c'
+      - 'tests/test_vdata.c'
+      - 'tests/test_vstatus.c'
   push:
     branches: [ main ]
     paths:
       - '.github/workflows/build-altscreen111-gen2.yml'
       - 'src/native/altscreen111-gen2/**'
+      - 'src/native/alt111-settings/**'
+      - 'src/native/vehicle-data/**'
+      - 'src/native/sha256sum-compat/**'
+      - 'settings/**'
       - 'tools/build_altscreen111_gen2.sh'
+      - 'tools/build_alt111_settings.sh'
+      - 'tools/generate_alt111_settings.py'
+      - 'tools/test_installed_gen2_host.sh'
+      - 'tests/test_three_views.c'
+      - 'tests/test_vdata.c'
+      - 'tests/test_vstatus.c'
 
 permissions:
   contents: read
@@ -37,6 +57,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Run installed-source host fixtures
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 tools/generate_alt111_settings.py --check
+          bash tools/test_installed_gen2_host.sh
 
       - name: Build pinned QNX 6.5 ARMv7 toolchain image
         shell: bash
@@ -72,7 +99,7 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p build/gen2
-          docker run --rm --platform=linux/amd64             -v "$PWD:/src" -w /src "$IMAGE"             bash -c 'bash ./tools/build_altscreen111_gen2.sh build/gen2/libaltscreen111.so'
+          docker run --rm --platform=linux/amd64             -v "$PWD:/src" -w /src "$IMAGE"             bash -c 'QCC=arm-unknown-nto-qnx6.5.0eabi-gcc bash ./tools/build_altscreen111_gen2.sh build/gen2/libaltscreen111.so'
           sudo chown -R "$(id -u):$(id -g)" build/gen2
 
       - name: Validate developer ELF
@@ -81,9 +108,9 @@ jobs:
           set -euxo pipefail
           BIN=build/gen2/libaltscreen111.so
           file "$BIN" | tee build/gen2/FILE.txt
-          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE"             arm-unknown-nto-qnx6.5.0eabi-readelf -h "$BIN" > build/gen2/ELF_HEADER.txt
-          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE"             arm-unknown-nto-qnx6.5.0eabi-readelf -S "$BIN" > build/gen2/SECTIONS.txt
-          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE"             arm-unknown-nto-qnx6.5.0eabi-readelf -Ws "$BIN" > build/gen2/SYMBOLS.txt
+          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE"             /usr/bin/readelf -h "$BIN" > build/gen2/ELF_HEADER.txt
+          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE"             /usr/bin/readelf -S "$BIN" > build/gen2/SECTIONS.txt
+          docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE"             /usr/bin/readelf -Ws "$BIN" > build/gen2/SYMBOLS.txt
 
           grep -q 'Machine:.*ARM' build/gen2/ELF_HEADER.txt
           grep -q '\.symtab' build/gen2/SECTIONS.txt
@@ -91,11 +118,12 @@ jobs:
           strings "$BIN" | grep -Fq 'GEN2 candidate active'
           strings "$BIN" | grep -Fq 'maps:/car/instrumentcluster'
           strings "$BIN" | grep -Fq 'forceKeyFrame'
-          strings "$BIN" | grep -Fq 'mibr-carplay111-nav-query.enabled'
+          strings "$BIN" | grep -Fq 'mibr-carplay111-nav.conf'
           strings "$BIN" | grep -Fq 'showSpeedLimit=%s&showCompass=%s&showETA=%s&maneuverLayout=%s'
-          strings "$BIN" | grep -Fq 'mibr-carplay111-safearea.conf'
+          strings "$BIN" | grep -Fq 'mibr-carplay111-viewareas.conf'
           strings "$BIN" | grep -Fq 'GEN2 RESYNC ARM'
-          strings "$BIN" | grep -Fq '/mnt/app/root/mibr-alt111-keyframe-policy.enabled'
+          strings "$BIN" | grep -Fq 'mibr-carplay111-keyframes.conf'
+          strings "$BIN" | grep -Fq 'vstatus_poll'
           sha256sum "$BIN" > build/gen2/libaltscreen111.so.sha256
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

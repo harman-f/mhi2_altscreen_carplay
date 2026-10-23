@@ -1,149 +1,52 @@
-# GEN2 development source
+# MU1440 installed GEN2 source
 
-> The source in this directory is intentionally **newer than the promoted experimental binary**.
+This directory now carries the project-authored source overlay for the installed MU1440 R38
+`libaltscreen111.so` checkpoint. The implementation is based on the public source tree at
+`324b4f249883bb707e0d0a8995b2b6b5fe23be25`, with the source additions in this repository's
+`settings/`, `src/native/alt111-settings/`, `src/native/vehicle-data/`, and the three-view changes in
+this directory.
 
-Promoted vehicle-tested checkpoint:
+The installed binary recorded for this source is SHA-256
+`304b5079374a08ed9a763528217476b29ad49e000ba25d0372ed4147cbb9a705`. That is an artifact
+identity from the installed-source map, not a claim that this public integration has reproduced the
+binary or that the current source has passed vehicle qualification. No OEM binary is published here.
 
-```text
-artifacts/mu1440/altscreen111/experimental-gen2-2026-09-25/libaltscreen111.so
-SHA-256:
-f3efa9f09972422307f1b9e37e323539036d935f9cc630a1ed7d8f223a2bbae2
-```
+## Source and build
 
-That older binary remains useful because its behavior and failure mode are well understood.
-
-The source here tracks the current development line so contributors can help with the actual open
-problem rather than rebuilding already-completed work from the older checkpoint.
-
-## What is newer in this source
-
-The current development source includes work in these areas.
-
-### PlatformControl / SessionControl flight recording
-
-The hook records the real CFString command object and bounded/redacted parameter structures around
-the stock handler.
-
-This supports correlation of:
-
-- `suggestUI`
-- `showUI`
-- `stopUI`
-- `forceKeyFrame`
-- `changeModes`
-- `modesChanged`
-- stream descriptors including Type 111
-
-without replacing the stock control-plane implementation.
-
-### suggestUI receiver behavior
-
-Stock MU1440 has no auxiliary-cluster presenter and returns a stock-only "not handled" result for
-`suggestUI`.
-
-When the project-owned private Type-111 control session is active, current development code can
-acknowledge `suggestUI` while keeping the URL list as **candidate metadata**, rather than blindly
-translating every suggestion into `showUI`.
-
-That distinction follows both vehicle observations and public comparator behavior.
-
-### Advertised cluster URL roles
-
-The current source advertises:
-
-```text
-maps:/car/instrumentcluster
-maps:/car/instrumentcluster/map
-maps:/car/instrumentcluster/instructioncard
-```
-
-through `altScreenSuggestUIURLs`.
-
-These are UI roles inside the same secondary-display session, not separate Type-111 streams.
-
-### ViewArea / SafeArea metadata
-
-Current development can advertise ViewArea/SafeArea metadata while deliberately avoiding
-Audi-specific geometry.
-
-The first Škoda baseline uses the complete 1010×376 secondary-display canvas as the conservative
-starting point.
-
-Dynamic in-session ViewArea switching is still research, not a promoted feature.
-
-### Serialized recovery controller
-
-Recovery commands are no longer treated as unrelated one-off diagnostics.
-
-Current source serializes control operations so `forceKeyFrame` demand does not race with an
-in-flight UI transaction.
-
-The resync logic tracks:
-
-- stream generation;
-- codec/config generation;
-- consumer generation;
-- IDR state;
-- request/retry/completion state.
-
-### VideoConfig / consumer generation handling
-
-A newly attached consumer must become valid through a coherent codec/config + IDR boundary.
-
-Current source explicitly resets/re-primes the consumer when codec state requires it rather than
-continuing to feed stale-generation frames.
-
-### Stream 110 / 111 separation
-
-The private Type-111 lifecycle is increasingly kept independent from unrelated stock main-screen 110
-behavior.
-
-This matters during provider/app transitions where the auxiliary stream may remain established while
-other CarPlay state changes.
-
-## Why there is no matching promoted binary yet
-
-The development line is being used to classify several variables at once:
-
-- UI candidate withdrawal/selection;
-- navigation ownership;
-- bitstream restart;
-- config/IDR generation;
-- provider handover.
-
-Promoting every intermediate build would create a misleading pile of binaries.
-
-The repository therefore uses this policy:
-
-```text
-src/      = current development work
-artifacts = selected understandable checkpoints
-```
-
-A newer binary should be promoted only when its behavior is sufficiently characterized on vehicle
-hardware.
-
-## Build
-
-Use:
+The single settings authority is [`settings/registry.json`](../../../settings/registry.json). Its
+generated C/HMI bindings are checked with:
 
 ```sh
-bash tools/build_altscreen111_gen2.sh build/libaltscreen111.so
+python3 tools/generate_alt111_settings.py --check
 ```
 
-or the public GitHub Actions workflow:
+Run the host-only settings and vehicle-data regression fixtures with:
 
-```text
-Build experimental GEN2 AltScreen
+```sh
+bash tools/test_installed_gen2_host.sh
 ```
 
-A CI-produced development binary is not automatically the new promoted vehicle baseline.
+Build the QNX ARMv7 shared library from the repository root, using the pinned QNX 6.5 toolchain
+image described in [`docs/build/INSTALLED_GEN2_SOURCE.md`](../../../docs/build/INSTALLED_GEN2_SOURCE.md):
 
-## Current engineering problem
+```sh
+docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src mibr-qnx65-temp:4.9 \
+  bash -c 'bash ./tools/build_altscreen111_gen2.sh build/gen2/libaltscreen111.so'
+```
 
-See:
+The build recipe links the shared settings core and project vehicle-data adapter into the existing
+GEN2 library. The VehicleStatus and PASCD producers retain their existing off-by-default mode files.
+The host fixtures cover the pure logic only; they do not execute the QNX interposer or establish
+vehicle behavior.
 
-- `docs/status/CURRENT_DEVELOPMENT_STATUS.md`
-- `docs/findings/KNOWN_ISSUES.md`
-- `docs/research/IOS27_SENDER_LIFECYCLE.md`
-- `docs/research/PLATFORMCONTROL_FLIGHT_RECORDER.md`
+## Three-view compatibility note
+
+The installed overlay represents `viewarea.selected` as `0..2`, `viewareas.count` as `1..3`, and
+`viewareas.initial` as `0..2`. The third safe-area geometry is supplied by GEN2 defaults. This
+preserves the installed source behavior. It is a documented discrepancy with the current two-view
+requirements snapshot and must not be read as a newly approved control redesign or as evidence that
+the third view is qualified on every MU1440 unit.
+
+The source tree retains the four runtime boundaries: the Type-111 hook, `parity-session`,
+`direct-ts-parity`, and the DisplayManager arbitration guard remain separate components. This library
+does not take ownership of parity lifecycle or MOST writes.

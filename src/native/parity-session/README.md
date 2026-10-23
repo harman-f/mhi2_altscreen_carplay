@@ -1,0 +1,13 @@
+# R50 parity-session owner
+
+`parity_session.c` is the R50 reference owner implementation. It freezes one settings/backend snapshot, binds the bridge process identity, waits for native gate drain before releasing the child exec barrier, monitors the owner/watchdog, and confirms child termination before stock restoration. Unknown owner or stop state remains quarantined for explicit reconciliation.
+
+R50 adds a four-second, bounded gate-grace attempt for descriptor close/reopen events. The existing writer is paused while the same token is checked or stock ownership is reacquired; failure returns through the existing stop/restore path. The public source includes one safety correction: a failed grace attempt leaves the bridge stopped until bounded termination is confirmed. The installed R50 source unconditionally resumed it before cleanup, leaving an unproven writer interval. A regression using a TERM-resistant child reproduced that error; the corrected owner permits CONT only after proof recovery. This correction has host coverage and a QNX build, but has not been installed or vehicle-qualified.
+
+The original public source is `harman-f/mhi2_altscreen_carplay@324b4f249883bb707e0d0a8995b2b6b5fe23be25`. The original R50 transformation is retained in `tools/source-overlays/r50-owner-grace.patch.py` and `r50-owner-grace.diff`; it expects the CRLF original input. These are provenance utilities, not a second runtime implementation. The canonical implementation is this module.
+
+The pinned QNX reconstruction first reproduced predecessor `c16965ec11caec738141d348253d74cf6a6799000deccfe9b11d50117dc122b2`, then the original installed R50 `b343743f02258bb1c952dabb3722b7645ac43fe881ecfbd027bdc8099db03c7e` using the retained transformation. The canonical corrected owner produces a different hash and must not be described as already installed. The owner embeds the exact bridge SHA-256: build the bridge first and pass its path through `BRIDGE_IDENTITY_PATH` when building a different output layout. Never use an arbitrary fixture or a different bridge binary merely to obtain a successful link.
+
+Run `bash tools/test_parity_host.sh` on a Linux workstation. The lifecycle suite covers token-bound stop, concurrent start rejection, parent/watchdog death, uncertain foreign identity, in-flight gate drain, stale proof, grace recovery, proof loss, partial release and restore failure. The native gate integration test exercises real blocked host `writev` and descriptor aliases.
+
+No installer or vehicle acceptance is supplied by this source publication. See [source build and coverage](../../../docs/build/MU1440_R50_SOURCE.md).

@@ -1,11 +1,13 @@
 # Local build output
-build/
+/build/
 out/
 dist/
 *.o
 *.a
 *.map
 *.log
+__pycache__/
+*.py[cod]
 
 # Temporary transfer/staging data
 .transfer/

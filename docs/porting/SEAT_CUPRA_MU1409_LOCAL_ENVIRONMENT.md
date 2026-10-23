@@ -4,7 +4,7 @@
 
 This is the **practical workstation setup** for the proposed [SEAT/CUPRA collaboration](SEAT_CUPRA_MU1409_COLLABORATION.md). It prepares a local environment to compare an exact `MHI2_ER_SEG11_P4708_1` firmware against the known MU1447/MU1440 references, compile project-authored native/Java modules, and later develop a SEAT-specific OEM HOME/Settings adapter.
 
-**This is an off-car guide.** Finishing it does not mean that an executable is safe to install, that the third-party MU1409 installer accepts our runtime, or that the latest menu/controller sources are already supplied as a coherent public release. Never replace a working omonob installation simply because a cross-build passes.
+**This is an off-car guide.** The [MU1440 source baseline](../build/MU1440_R50_SOURCE.md) supplies the actual menu adapter, controller and native modules for source development. Its OEM inputs and installed support-file gaps are documented individually. Finishing setup does not establish safe installation or MU1409 compatibility. Never replace a working omonob installation simply because a cross-build passes.
 
 ## 1. End state / first milestone
 

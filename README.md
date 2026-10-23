@@ -13,6 +13,8 @@ The project has advanced beyond the first moving-map proof of concept. On the ex
 
 [Feature status](#features-and-status) · [Module architecture](docs/architecture/README.md) · [Published source coverage](docs/status/PUBLISHED_SOURCE_COVERAGE.md) · [Developer release](release/CURRENT.md) · [Compatibility](docs/testing/COMPATIBILITY_MATRIX.md) · [Measured steering-wheel/head-unit key map](docs/testing/MU1440_MFW_RAW_KEY_MAPPING.md) · [Acknowledgements](ACKNOWLEDGEMENTS.md) · [Documentation](docs/README.md)
 
+**Source baseline, 23 October 2026:** the real [MU1440 source stack and build guide](docs/build/MU1440_R50_SOURCE.md) now include R38 GEN2, the shared three-view settings, direct-TS transport, native gates, R46 controller, R48 OEM menu adapter and R49/R50 lifecycle sources. Native reference hashes were reproduced. The public owner adds a regression-tested failed-grace safety correction that is not yet vehicle-qualified. OEM Java/skin inputs and several installed support-file source lineages remain external or unresolved; this is a partial vehicle-matched source publication. The downloadable developer release retains its own older scope.
+
 ## Features and status
 
 ✅ = demonstrated reference-vehicle or existing reference-release milestone; ◐ = advanced development/partial field evidence with integration or release gates; ◻ = still research/planned. The evidence refers to **different pinned test configurations**, not an assertion that one current public download includes every item.
@@ -30,7 +32,7 @@ The project has advanced beyond the first moving-map proof of concept. On the ex
 | ◻ | Vehicle data to CarPlay | Actual speed, ambient temperature, range and warning integration being developed; existing-session phone acceptance not yet proven |
 | ◻ | Further platforms and optional features | SEAT/VW/CUPRA, native wireless, RGI/native maneuvers need independent hardware/software qualification |
 
-**Remaining milestones:** distinguish phone/source TEARDOWN from loss of native writer gate proof; eliminate duplicate supervisor start; finish same-session reconnection/visible VC recovery; qualify HMI STORE → APPLY → ACTIVE; qualify Zoom/KEY40 while preserving OEM behavior; connect optional truthful vehicle data; publish one coherent current source/build/release package. [Current detailed status](docs/status/INTEGRATION_STATUS_2026-10-21.md) · [Known issues](docs/findings/KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md).
+**Remaining milestones:** finish integrated source reconnect and visible VC recovery; qualify HMI STORE → APPLY → ACTIVE; qualify Zoom/KEY40 while preserving OEM behavior; confirm optional truthful vehicle data; resolve the documented Java/support-source gaps and complete vehicle-release acceptance. [Source and build status](docs/build/MU1440_R50_SOURCE.md) · [Dated vehicle status](docs/status/INTEGRATION_STATUS_2026-10-21.md) · [Known issues](docs/findings/KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md).
 
 ## Vehicle demonstration
 

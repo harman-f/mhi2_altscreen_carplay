@@ -2,6 +2,8 @@
 
 **Public collaboration guide · 23 October 2026 · Experimental research, not an installer**
 
+The [MU1440 R50 source baseline](../build/MU1440_R50_SOURCE.md) now supplies the real [OEM Java adapter](../../src/hmi/oem-menu/), [native controller](../../src/native/mibr-control/), canonical registry, GEN2 and parity sources with standalone native build/tests. Start a SEAT-specific menu adapter from those implementations; provide your own exact MU1409 firmware/API inputs locally. The MU1440 OEM widget IDs, artwork, Java ABI and input mapping still require target-specific work. This is a partial source publication with documented external dependencies, not a validated MU1409 installer.
+
 This page describes a proposed joint SEAT/CUPRA port of [mhi2_altscreen_carplay](../../README.md), aimed initially at a contributor's **2020 CUPRA Ateca, `MHI2_ER_SEG11_P4708_1` / MU1409, Continental 790**. Its goal is more than another working moving map: reuse our modular CarPlay video/control architecture, then adapt the **OEM-native HOME/Settings menu** to the SEAT interface. Development can proceed in small, individually agreed steps; no fixed time commitment is expected.
 
 **Start with the actual evidence:** the contributor has already reported a working wired CarPlay moving-map result using an experimental, omonob-derived **MU1409** package, with the same limitations as the original Leon test in [community issue #47](https://github.com/harman-f/mhi2_altscreen_carplay/issues/47). This does *not* mean our own binaries have been tested on his Ateca.

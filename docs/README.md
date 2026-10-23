@@ -4,6 +4,8 @@ The pages here describe the **current public product/source, exact reference-tar
 
 ## Start here
 
+The [MU1440 R50 source/build baseline](build/MU1440_R50_SOURCE.md) is the current entrypoint for source availability, native reproduction, the real OEM-menu/controller modules, and explicit Java/support-source exclusions. Dated vehicle reports below retain their original acceptance scope.
+
 1. [Features and goals](../README.md)
 2. [Current integration and evidence status](status/INTEGRATION_STATUS_2026-10-21.md)
 3. [Exact public source coverage](status/PUBLISHED_SOURCE_COVERAGE.md)

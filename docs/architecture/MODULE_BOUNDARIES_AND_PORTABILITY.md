@@ -1,5 +1,7 @@
 # Module boundaries, HMI and cross-brand portability
 
+**Source update, 23 October 2026:** the [published implementation and build guide](../build/MU1440_R50_SOURCE.md) now supply the real R48 menu adapter, R46 central controller, R38 GEN2 and R49/R50 parity stack. The four core runtime components remain separate. The guide owns current source/rebuild coverage; the dated architectural and physical-acceptance limits below are not a complete-release claim.
+
 [Architecture module index](README.md) identifies the authoritative reference page per subsystem; this page owns the cross-module boundaries and portability model.
 
 **Status: architecture of current public baseline plus later experimental development, 21 October 2026.** This document describes independently developed integration concepts and safe interfaces, not a universal installer. A compatible Škoda/SEAT/VW logo, matching MU number or same-looking menu is never enough to prove binary compatibility.

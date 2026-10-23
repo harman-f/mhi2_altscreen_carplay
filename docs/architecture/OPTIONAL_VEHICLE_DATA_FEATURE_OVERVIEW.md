@@ -1,5 +1,7 @@
 # Optional classic vehicle-data integration — design overview
 
+The project-authored [vehicle-data adapters](../../src/native/vehicle-data/) are included in the [R38 GEN2 source baseline](../build/MU1440_R50_SOURCE.md). Their inclusion and native build do not establish phone acceptance of every optional field; validity and current-session evidence remain required.
+
 **Status (21 October 2026):** independent feature research and host-built candidates, NOT a currently installed or end-to-end vehicle-validated part of the public developer release.
 
 ## Scope

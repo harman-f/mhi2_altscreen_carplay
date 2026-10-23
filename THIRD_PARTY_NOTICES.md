@@ -4,6 +4,12 @@ This project is independent research. The repository's GPL-3.0-or-later license 
 
 ## Attribution policy
 
+### MU1440 source-only modules
+
+The R38 GEN2/vehicle-data adapters, canonical settings core, source-time parity worker, R49 supervisor, R50 owner and its publication safety correction, R46 MIBR/3 controller, and R48 OEM-menu adapter are independently authored project source under GPL-3.0-or-later. Original public reference source is identified by commit `324b4f249883bb707e0d0a8995b2b6b5fe23be25` where applicable. The four flat-color scroll images have [separate first-party provenance](src/hmi/oem-menu/assets/scroll/README.md).
+
+IBM J9, original firmware/JAR APIs, locally prepared OEM class bodies, and OEM tile/skin artwork are external inputs and retain their owners' rights. They are not redistributed or relicensed here. The Java build's target-derived output remains local. This source publication includes neither proprietary DirectVCPolicy source bodies nor an inferred replacement for unresolved installed BootProbe lineage. See [source scope and exclusions](docs/build/MU1440_R50_SOURCE.md).
+
 We try to distinguish three cases.
 
 ### 1. Open-source upstream work

@@ -36,6 +36,15 @@ REQUIRED = [
     "docs/research/JAVA_J9_BUILD_NOTES.md",
     "runtime/README.md",
     "src/native/altscreen111-gen2/DEVELOPMENT.md",
+    "docs/build/MU1440_R50_SOURCE.md",
+    "docs/build/INSTALLED_GEN2_SOURCE.md",
+    "settings/registry.json",
+    "src/native/parity-session/parity_session.c",
+    "src/native/direct-ts-parity/direct_ts_parity.c",
+    "src/native/mibr-control/mibr_v3_service.c",
+    "src/hmi/oem-menu/java/de/mibr/hmi/MibrControlClient.java",
+    "runtime/parity/parity_drive_supervisor.sh",
+    "tools/build_mu1440_source.sh",
 ]
 
 HASHED_ARTIFACTS = [
@@ -77,6 +86,19 @@ FORBIDDEN_PATH_PARTS = {
 # binary image/video files remain forbidden everywhere else in the repository.
 PUBLIC_MEDIA_ROOT = Path("docs/media/mu1440-stream111-poc-2026-09-29")
 PUBLIC_MEDIA_SUFFIXES = {".jpg", ".jpeg", ".mp4"}
+
+# Reviewed first-party flat-color artwork. No general OEM skin/image exception.
+OWNED_ARTWORK = {
+    "src/hmi/oem-menu/assets/scroll/mibr_scroll_thumb.png": "3f883283a5af35a789ce76c3f414a3b030250bbf5a3d8b76421120d80e39cbee",
+    "src/hmi/oem-menu/assets/scroll/mibr_scroll_thumb_v2.png": "6d34382b9744264121871e8b092f1ab025619ee028b1f5ca30ffc030fe62f8f4",
+    "src/hmi/oem-menu/assets/scroll/mibr_scroll_track.png": "f33c96eada17e1573a81032c5301dc9e0c9e5320ad37be3bc2dd97386f6b27d4",
+    "src/hmi/oem-menu/assets/scroll/mibr_scroll_track_v2.png": "8b2f0d77dd89432e3faa043d0b0e1566d939366d42a6d3b2f8964645cd13f93b",
+}
+
+
+def reviewed_artwork(rel: Path, data: bytes) -> bool:
+    expected = OWNED_ARTWORK.get(rel.as_posix())
+    return bool(expected and hashlib.sha256(data).hexdigest() == expected)
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
 
@@ -155,13 +177,14 @@ def audit_tree(errors: list[str], files: list[Path]) -> None:
             fail(errors, f"temporary/private staging path committed: {rel}")
 
         suffix = path.suffix.lower()
+        data = path.read_bytes()
         is_curated_public_media = (
             rel.is_relative_to(PUBLIC_MEDIA_ROOT)
             and suffix in PUBLIC_MEDIA_SUFFIXES
         )
 
         if any(low.endswith(blocked) for blocked in FORBIDDEN_SUFFIXES):
-            if not is_curated_public_media:
+            if not is_curated_public_media and not reviewed_artwork(rel, data):
                 fail(errors, f"forbidden publication artifact type: {rel}")
 
         if "dyld_shared_cache" in low:
@@ -171,7 +194,6 @@ def audit_tree(errors: list[str], files: list[Path]) -> None:
         if size > MAX_FILE_SIZE:
             fail(errors, f"unexpected large file ({size} bytes): {rel}")
 
-        data = path.read_bytes()
         if suffix in TEXT_PUBLICATION_SUFFIXES and PRIVATE_DEVELOPMENT_REFERENCES.search(data):
             fail(errors, f"non-public development account/repository reference: {rel}")
         for pattern in SECRET_PATTERNS:
@@ -226,6 +248,16 @@ def main() -> int:
     assert PRIVATE_DEVELOPMENT_REFERENCES.search(b"Cane" + b"TLOTW")
     assert PRIVATE_DEVELOPMENT_REFERENCES.search(b"M.I.B." + b"_Research")
     errors: list[str] = []
+    for rel in OWNED_ARTWORK:
+        asset = ROOT / rel
+        if not asset.is_file():
+            fail(errors, f"missing reviewed owned artwork: {rel}")
+            continue
+        data = asset.read_bytes()
+        if not reviewed_artwork(Path(rel), data):
+            fail(errors, f"reviewed owned artwork changed: {rel}")
+        assert not reviewed_artwork(Path(rel), data + b"tampered")
+        assert not reviewed_artwork(Path("unreviewed.png"), data)
     files = tracked_files()
 
     audit_required(errors)

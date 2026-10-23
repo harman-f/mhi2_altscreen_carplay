@@ -1,0 +1,187 @@
+name: Build MU1440 source stack
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/build-mu1440-source.yml'
+      - '.github/workflows/build-altscreen111-gen2.yml'
+      - 'settings/**'
+      - 'src/native/**'
+      - 'src/hmi/oem-menu/**'
+      - 'tests/**'
+      - 'tools/build_*.sh'
+      - 'tools/check_mu1440_target_shell.py'
+      - 'tools/generate_alt111_settings.py'
+      - 'tools/test_*.sh'
+      - 'tools/source-overlays/**'
+      - 'runtime/parity/**'
+      - 'runtime/mibr-control/**'
+      - 'deployment/mu1440-parity-drive-v1/**'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/build-mu1440-source.yml'
+      - '.github/workflows/build-altscreen111-gen2.yml'
+      - 'settings/**'
+      - 'src/native/**'
+      - 'src/hmi/oem-menu/**'
+      - 'tests/**'
+      - 'tools/build_*.sh'
+      - 'tools/check_mu1440_target_shell.py'
+      - 'tools/generate_alt111_settings.py'
+      - 'tools/test_*.sh'
+      - 'tools/source-overlays/**'
+      - 'runtime/parity/**'
+      - 'runtime/mibr-control/**'
+      - 'deployment/mu1440-parity-drive-v1/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-mu1440-source-build
+  cancel-in-progress: true
+
+env:
+  TOOLCHAIN_REPO: https://github.com/luka-dev/qnx65-armv7-toolchain.git
+  TOOLCHAIN_COMMIT: 56a66557245af14077678cd28a83ce3a337d9e2d
+  TOOLCHAIN_DOCKERFILE_SHA256: 9a867a7ae70f2c0222a241b80232856526ccec0db2cfe013f8991ca31c74bcb1
+  IMAGE: mhi2-qnx65-armv7-public:4.9
+
+jobs:
+  host:
+    name: Host tests and source checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install host test dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg default-jdk-headless
+          gcc --version
+          python3 --version
+          javac -version
+          ffmpeg -version | head -n 2
+
+      - name: Validate canonical registry and installed GEN2 host fixtures
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 tools/generate_alt111_settings.py --check
+          bash tools/test_installed_gen2_host.sh
+          bash tools/test_gen2_components_host.sh
+
+      - name: Run direct parity and native gate host regressions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          bash tools/test_parity_host.sh
+
+      - name: Gate QNX shell compatibility for all 11 new runtime scripts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -B tools/check_mu1440_target_shell.py --self-test --check \
+            runtime/parity/master-script-basenames.sh \
+            runtime/parity/parity_drive_disable.sh \
+            runtime/parity/parity_drive_enable.sh \
+            runtime/parity/parity_drive_status.sh \
+            runtime/parity/parity_drive_supervisor.sh \
+            runtime/parity/parity_profile.sh \
+            runtime/parity/parity_session.sh \
+            runtime/parity/parity_status.sh \
+            runtime/mibr-control/mibr-engine.ksh \
+            runtime/mibr-control/mibr-v3-boot.ksh \
+            deployment/mu1440-parity-drive-v1/session-logging.sh
+
+      - name: Build and test MIBR/3 host controller
+        shell: bash
+        run: |
+          set -euxo pipefail
+          export PATH=/usr/bin:/bin:$PATH
+          export CC=/usr/bin/gcc
+          export PYTHONDONTWRITEBYTECODE=1
+          export PYTHONPATH="$PWD/tests/mibr-control${PYTHONPATH:+:$PYTHONPATH}"
+          export MIBR_CONTROL_OUT="$PWD/build/host/mibr-control"
+          bash tools/build_mibr_control.sh host
+          MIBR_V3_NATIVE_HOST_BIN="$MIBR_CONTROL_OUT/mibr-v3-service-host" \
+            python3 -B -m unittest discover -s tests/mibr-control -p 'test_*.py' -v
+
+      - name: Validate OEM menu catalog and source adapters
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -B -m unittest discover -s src/hmi/oem-menu/tests -v
+          python3 -B src/hmi/oem-menu/generate_catalog.py \
+            --registry settings/registry.json \
+            --menu src/hmi/oem-menu/menu-definition.json \
+            --out-dir build/oem-menu-generated
+          python3 -B src/hmi/oem-menu/generate_catalog.py --check \
+            --registry settings/registry.json \
+            --menu src/hmi/oem-menu/menu-definition.json \
+            --out-dir build/oem-menu-generated
+
+  qnx:
+    name: QNX 6.5 ARMv7 source build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build pinned QNX 6.5 toolchain image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          bash tools/build_qnx65_image.sh \
+            "$RUNNER_TEMP/mu1440-qnx-toolchain-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" "$IMAGE"
+
+      - name: Build all MU1440 source outputs in one QNX container
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p build/mu1440-source
+          docker run --rm --platform=linux/amd64 \
+            -v "$PWD:/src" -w /src "$IMAGE" \
+            bash -c 'QNX_CC=arm-unknown-nto-qnx6.5.0eabi-gcc bash tools/build_mu1440_source.sh build/mu1440-source'
+          sudo chown -R "$(id -u):$(id -g)" build/mu1440-source
+
+      - name: Verify expected installed source identities
+        shell: bash
+        run: |
+          set -euxo pipefail
+          expect_sha() {
+            local file=$1 expected=$2 actual
+            actual=$(sha256sum "$file" | awk '{print $1}')
+            if [[ "$actual" != "$expected" ]]; then
+              echo "SHA-256 mismatch for $file: expected $expected, got $actual" >&2
+              exit 1
+            fi
+            echo "$file SHA256=$actual"
+          }
+          OUT=build/mu1440-source
+          expect_sha "$OUT/libaltscreen111.so" 304b5079374a08ed9a763528217476b29ad49e000ba25d0372ed4147cbb9a705
+          expect_sha "$OUT/alt111-settings" b0d61578452a93b966f268e2bd400029bb1b6fa249dfd18e8895f851ca89073c
+          expect_sha "$OUT/direct-ts-parity" 3098cdd4469a4a3b4ee92c583518b3af362e02e41921ed3d80641853ced0827b
+          expect_sha "$OUT/libmibr_isotx2_guard.so" cad06d69c698c8940dec9596b96c6b90ec822bdd437c4b0d02a35881ad71fae4
+          expect_sha "$OUT/libmibr_isotx2_gate.so" 05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957
+          expect_sha "$OUT/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY" 993618f9aa213ed9dc02f8deed625d27486af06003681d2c4048f70481ad5e08
+          expect_sha "$OUT/mibr-control/mibrctl-v3-QNX65-ARMv7-NOT-INSTALL-READY" fa4a580337a6a0a1d67e15ee1abc7f809591978cbfdecada5b87259fb8a5f351
+          expect_sha "$OUT/mibr-control/mibr-v3-genkey-QNX65-ARMv7-NOT-INSTALL-READY" 328837d6df6daaeec25197d8cb9f7e9070c194e012f86dfc3c75256cb36d5474
+          expect_sha "$OUT/mibr-control/mibr-key40d-QNX65-ARMv7-NOT-INSTALL-READY" 2b9143412b7aa64fd8159056023cec8cb2ad60577a9e97368de61aa6d95c8a61
+          test -s "$OUT/parity-session"
+          echo 'R50 parity-session is a source build; it is intentionally not compared with the installed b343743f artifact.'
+          (cd "$OUT" && sha256sum -c SHA256SUMS)
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mu1440-source-qnx-build
+          path: build/mu1440-source/**
