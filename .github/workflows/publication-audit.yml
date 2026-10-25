@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
   pull_request:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
+
+concurrency:
+  group: publication-audit-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

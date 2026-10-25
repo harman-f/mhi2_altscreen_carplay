@@ -1,0 +1,85 @@
+name: Source package v1
+
+on:
+  pull_request:
+    branches: [ develop ]
+  push:
+    branches: [ develop ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-package-v1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-package:
+    name: PR source gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR merge commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Test source package builder
+        shell: bash
+        run: python3 -B -m unittest discover -s tests -p 'test_package_source_v1.py' -v
+
+      - name: Check every MU1440 target shell script
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$GITHUB_SHA" <<'PY' > "$RUNNER_TEMP/mu1440-target-shells.list"
+          import sys
+          from pathlib import Path
+          from tools.package_source_v1 import collect_source
+
+          target_roots = (
+              "deployment/mu1440/",
+              "deployment/mu1440-parity-drive-v1/",
+              "runtime/auto-direct/",
+              "runtime/deployment/",
+              "runtime/diagnostics/",
+              "runtime/isotx2-gate/",
+              "runtime/mibr-control/",
+              "runtime/navigation/",
+              "runtime/parity/",
+          )
+          _, source_files = collect_source(Path.cwd(), sys.argv[1])
+          for path in sorted(source_files):
+              if path.startswith(target_roots) and path.endswith((".sh", ".ksh")):
+                  print(path)
+          PY
+          mapfile -t target_scripts < "$RUNNER_TEMP/mu1440-target-shells.list"
+          if ((${#target_scripts[@]} == 0)); then
+            echo 'No MU1440 target shell scripts found.' >&2
+            exit 1
+          fi
+          python3 -B tools/check_mu1440_target_shell.py --self-test --check "${target_scripts[@]}"
+
+      - name: Package source snapshot and provenance
+        shell: bash
+        env:
+          SOURCE_PACKAGE_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          SOURCE_PACKAGE_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          python3 -B tools/package_source_v1.py \
+            --repo "$GITHUB_WORKSPACE" \
+            --ref "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/source-package-v1/source.tar.gz"
+
+      - name: Upload source package and detached provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: source-package-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/source-package-v1/source.tar.gz
+            ${{ runner.temp }}/source-package-v1/source.tar.gz.provenance.json
+            ${{ runner.temp }}/source-package-v1/source.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 3
