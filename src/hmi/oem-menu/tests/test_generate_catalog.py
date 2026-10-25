@@ -16,7 +16,7 @@ class CatalogGenerationTest(unittest.TestCase):
         self.assertEqual(len({entry["key"] for entry in settings}), 48)
         self.assertEqual(tuple(menu["native_ui_keys"]), generate_catalog.EXPECTED_NATIVE_UI)
         self.assertEqual(tuple(section["id"] for section in menu["sections"]),
-                         ("views", "advanced", "diagnostics"))
+                         ("views", "advanced", "diagnostics", "version"))
         self.assertEqual(menu["sections"][0]["keys"], [])
         self.assertIn('"Ansichten"', generate_catalog.render_menu(menu))
         catalog = generate_catalog.render_catalog(settings, menu)

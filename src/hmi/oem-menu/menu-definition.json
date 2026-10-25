@@ -41,6 +41,14 @@
         "en": "Diagnostics"
       },
       "keys": []
+    },
+    {
+      "id": "version",
+      "label": {
+        "de": "Version",
+        "en": "Version"
+      },
+      "keys": []
     }
   ],
   "native_ui_keys": [

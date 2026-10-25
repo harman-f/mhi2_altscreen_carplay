@@ -1,0 +1,67 @@
+name: Version identity and HMI host gate
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/version-identity.yml'
+      - 'config-identity*.json'
+      - 'target-profiles/**'
+      - 'tools/mibr_build_identity.py'
+      - 'tests/test_mibr_build_identity.py'
+      - 'src/hmi/oem-menu/**'
+
+permissions:
+  contents: read
+
+jobs:
+  version-and-menu:
+    name: Version identity and menu host tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test metadata schema and OEM-independent HMI navigation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s tests -p 'test_mibr_build_identity.py' -v
+          python3 -B -m unittest discover -s src/hmi/oem-menu/tests -v
+          bash src/hmi/oem-menu/tests/run_view_model_test.sh
+      - name: Generate repeatable Skoda and generic identity sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          python3 -B tools/mibr_build_identity.py \
+            --product-version 1.3.3-rc.1 --source-commit "$SOURCE_SHA" \
+            --target target-profiles/skoda-mu1440-p4526-aid10.json \
+            --config-index config-identity.json --component mibr-v3-service \
+            --out "$RUNNER_TEMP/identity-a"
+          python3 -B tools/mibr_build_identity.py \
+            --product-version 1.3.3-rc.1 --source-commit "$SOURCE_SHA" \
+            --target target-profiles/skoda-mu1440-p4526-aid10.json \
+            --config-index config-identity.json --component mibr-v3-service \
+            --out "$RUNNER_TEMP/identity-b"
+          diff -r "$RUNNER_TEMP/identity-a" "$RUNNER_TEMP/identity-b"
+          python3 -B tools/mibr_build_identity.py \
+            --product-version 1.3.3-rc.1 --source-commit "$SOURCE_SHA" \
+            --target target-profiles/generic.json \
+            --config-index config-identity-generic.json \
+            --out "$RUNNER_TEMP/identity-generic"
+          gcc -std=gnu99 -Wall -Wextra -Werror -c \
+            "$RUNNER_TEMP/identity-a/mibr_build_identity.c" \
+            -o "$RUNNER_TEMP/mibr_build_identity.o"
+          readelf -p .mibr.ident "$RUNNER_TEMP/mibr_build_identity.o" |
+            grep -F 'MIBR_BUILD_INFO:product=MIBR-CarPlay'
+          python3 -B - "$RUNNER_TEMP/identity-a/build-identity.json" "$RUNNER_TEMP/identity-generic/build-identity.json" <<'PY'
+          import json, sys
+          skoda, generic = [json.load(open(f,encoding="utf-8")) for f in sys.argv[1:]]
+          assert skoda["target_brand"] == "SKODA"
+          assert generic["target_brand"] == "GENERIC"
+          assert generic["target_qualification"] == "unqualified"
+          assert skoda["package_id"] is None and skoda["binary_set_id"] is None
+          assert len(skoda["configurations"]) == 2
+          assert len(generic["configurations"]) == 1
+          PY

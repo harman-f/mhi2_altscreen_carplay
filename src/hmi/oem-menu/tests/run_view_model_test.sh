@@ -23,6 +23,7 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/java/de/mibr/hmi/MibrPopupEditorModel.java" \
   "$MODULE/java/de/mibr/hmi/MibrVdataDiag.java" \
   "$MODULE/java/de/mibr/hmi/MibrCarPlayMenuModel.java" \
+  "$MODULE/java/de/mibr/hmi/MibrVersionInfo.java" \
   "$MODULE/java/de/mibr/hmi/MibrV3Protocol.java" \
   "$MODULE/java/de/mibr/hmi/MibrV3Client.java" \
   "$MODULE/java/de/mibr/hmi/MibrV3Session.java" \
@@ -32,6 +33,7 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/tests/MibrViewStateTest.java" \
   "$MODULE/tests/MibrCanonicalElementMenuTest.java" \
   "$MODULE/tests/MibrCarPlayMenuModelTest.java" \
+  "$MODULE/tests/MibrVersionInfoTest.java" \
   "$MODULE/tests/MibrV3BindingTest.java" \
   "$MODULE/tests/MibrV3BusyTest.java" \
   "$MODULE/tests/MibrV3QueueTest.java" \
@@ -39,6 +41,7 @@ python3 "$MODULE/generate_catalog.py" \
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrViewStateTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrCanonicalElementMenuTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrCarPlayMenuModelTest
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrVersionInfoTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3BindingTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3BusyTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3QueueTest

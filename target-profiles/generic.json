@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "id": "generic",
+  "brand": "GENERIC",
+  "qualification": "unqualified",
+  "firmware_train": null,
+  "mu_version": null,
+  "cluster_family": null
+}

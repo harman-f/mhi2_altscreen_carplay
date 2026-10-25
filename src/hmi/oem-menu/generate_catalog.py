@@ -29,8 +29,9 @@ EXPECTED_VISIBLE = {
     "views": set(),
     "advanced": {"carplay.enabled", "maxFPS", "sourceVersion"},
     "diagnostics": set(),
+    "version": set(),
 }
-EXPECTED_GROUPS = ("views", "advanced", "diagnostics")
+EXPECTED_GROUPS = ("views", "advanced", "diagnostics", "version")
 # Exact native MIBR/3 SNAPSHOT scope=ui row order (row_count=11, the native UI projection).
 EXPECTED_NATIVE_UI = (
     "carplay.enabled", "viewarea.selected", "navigation.surface",
