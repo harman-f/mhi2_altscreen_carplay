@@ -286,6 +286,13 @@ def _scan_command_tokens(script_text: str) -> list[int]:
             command_name = command_token.lstrip("(").rsplit("/", 1)[-1]
             if command_name in BLOCKED_COMMANDS and not _is_allowed_bundled_helper(command_token, command_name):
                 blocked_lines.append(line_number)
+            nested_wrapper = _command_wrapper_kind(command_name)
+            if nested_wrapper:
+                wrapper = nested_wrapper
+                wrapper_skip_argument = False
+                wrapper_lookup = False
+                command_expected = False
+                continue
             wrapper = None
             command_expected = False
             continue
@@ -385,6 +392,17 @@ def _split_punctuation_token(token: str) -> list[str] | None:
         parts.append(operator)
         offset += len(operator)
     return parts
+
+
+def _command_wrapper_kind(command_name: str) -> str | None:
+    """Return scanner state for a shell wrapper used as another wrapper's command."""
+    if command_name == "command":
+        return "command"
+    if command_name == "env":
+        return "env"
+    if command_name in {"exec", "builtin"}:
+        return "exec"
+    return None
 
 
 def _leading_redirection_end(tokens: list[tuple[str, int]], index: int) -> int | None:
@@ -617,6 +635,17 @@ def self_test() -> None:
         assert scan(script), "env -u wrapper hid a blocked command"
         script.write_text("env -S 'sha256sum input.bin'\n", encoding="utf-8")
         assert scan(script), "env -S split-string wrapper hid a blocked command"
+        for source, description in (
+            ("command env -i printf x\n", "command/env wrapper chain hid printf"),
+            ("exec env tee log.txt\n", "exec/env wrapper chain hid tee"),
+            ("env command -p printf x\n", "env/command wrapper chain hid printf"),
+            ("command exec printf x\n", "command/exec wrapper chain hid printf"),
+        ):
+            script.write_text(source, encoding="utf-8")
+            assert scan(script), description
+        for source in ("command env -i echo okay\n", "exec env echo okay\n"):
+            script.write_text(source, encoding="utf-8")
+            assert not scan(script), "a benign nested-wrapper command was rejected"
         script.write_text("command; sha256sum input.bin\nenv; tee log.txt\n", encoding="utf-8")
         assert scan(script), "empty command wrappers hid a following blocked command"
         script.write_text("echo 'example $(printf x)'\n# $(printf x)\n", encoding="utf-8")

@@ -159,6 +159,17 @@ class SourcePackageV1Tests(unittest.TestCase):
                 self.assertIn(1, _blocked_command_lines(script))
         self.assertEqual(_blocked_command_lines("echo okay > /dev/null\n"), [])
 
+        for script in (
+            "command env -i printf x\n",
+            "exec env tee log\n",
+            "env command -p printf x\n",
+            "command exec printf x\n",
+        ):
+            with self.subTest(script=script):
+                self.assertIn(1, _blocked_command_lines(script))
+        self.assertEqual(_blocked_command_lines("command env -i echo okay\n"), [])
+        self.assertEqual(_blocked_command_lines("exec env echo okay\n"), [])
+
         self.assertEqual(_blocked_command_lines("echo first\necho second\n"), [])
         self.assertEqual(
             _blocked_command_lines('echo "literal | && || tee printf"\necho done\n'), []
