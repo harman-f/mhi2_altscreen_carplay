@@ -20,6 +20,7 @@ import tempfile
 BLOCKED_COMMANDS = {"printf", "sed", "tr", "sha256sum", "tee"}
 GREP_BRE_ALTERNATION = re.compile(r"\\\|")
 COMMAND_SEPARATORS = {";", ";;", ";&", ";;&", "&&", "||", "|", "&", "(", ")", "\n"}
+REDIRECTION_OPERATORS = {"<", ">", "<<", "<<-", "<<<", ">>", ">|", "<>", "<&", ">&", "&>"}
 CONTROL_WORDS = {"then", "do", "else", "elif", "if", "while", "until"}
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 LINE_CONTINUATION_MARKER = "\x01"
@@ -177,7 +178,7 @@ def _active_substitutions(text: str) -> list[tuple[int, int, str]]:
 
 def _scan_command_tokens(script_text: str) -> list[int]:
     script_text = _terminate_unquoted_newlines(script_text)
-    lexer = shlex.shlex(script_text, posix=True, punctuation_chars="\n;&|()")
+    lexer = shlex.shlex(script_text, posix=True, punctuation_chars="\n;&|()<>")
     lexer.whitespace_split = True
     lexer.commenters = "#"
     try:
@@ -200,8 +201,15 @@ def _scan_command_tokens(script_text: str) -> list[int]:
     case_states: list[str] = []
     loop_state: str | None = None
     blocked_lines: list[int] = []
-    for token, line_number in tokens:
+    skip_until = 0
+    for token_index, (token, line_number) in enumerate(tokens):
+        if token_index < skip_until:
+            continue
         if wrapper:
+            redirection_end = _leading_redirection_end(tokens, token_index)
+            if redirection_end is not None and not wrapper_skip_argument:
+                skip_until = redirection_end
+                continue
             if token in COMMAND_SEPARATORS:
                 if wrapper_skip_argument:
                     blocked_lines.append(line_number)
@@ -316,6 +324,10 @@ def _scan_command_tokens(script_text: str) -> list[int]:
                 case_states.pop()
                 command_expected = False
             continue
+        redirection_end = _leading_redirection_end(tokens, token_index)
+        if redirection_end is not None:
+            skip_until = redirection_end
+            continue
         if token == "case":
             case_states.append("header")
             command_expected = False
@@ -339,6 +351,20 @@ def _scan_command_tokens(script_text: str) -> list[int]:
         command_expected = False
 
     return sorted(set(blocked_lines))
+
+
+def _leading_redirection_end(tokens: list[tuple[str, int]], index: int) -> int | None:
+    """Return the first token after a command-leading redirection and its operand."""
+    operator_index = index
+    if (tokens[index][0].isdigit() and index + 1 < len(tokens)
+            and tokens[index + 1][0] in REDIRECTION_OPERATORS):
+        operator_index += 1
+    if tokens[operator_index][0] not in REDIRECTION_OPERATORS:
+        return None
+    operand_index = operator_index + 1
+    if operand_index < len(tokens) and tokens[operand_index][0] not in COMMAND_SEPARATORS:
+        return operand_index + 1
+    return operand_index
 
 
 def _terminate_unquoted_newlines(script_text: str) -> str:
@@ -511,6 +537,12 @@ def self_test() -> None:
         assert not scan(script), "quoted multiline operator/command text was mistaken for syntax"
         script.write_text("echo data \\\ntee log.txt\n", encoding="utf-8")
         assert not scan(script), "a continued echo argument was mistaken for a tee command"
+        script.write_text("2>/dev/null printf x\n", encoding="utf-8")
+        assert scan(script), "a leading file-descriptor redirection hid forbidden printf"
+        script.write_text("> /dev/null tee log.txt\n", encoding="utf-8")
+        assert scan(script), "a leading output redirection hid forbidden tee"
+        script.write_text("echo okay > /dev/null\n", encoding="utf-8")
+        assert not scan(script), "a normal command redirection was mistaken for a command"
         script.write_text("sha256sum input.bin\n", encoding="utf-8")
         assert scan(script), "unbundled sha256sum command was not rejected"
         script.write_text("case x in x) sha256sum input.bin;; esac\n", encoding="utf-8")

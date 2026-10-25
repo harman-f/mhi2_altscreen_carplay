@@ -150,6 +150,14 @@ class SourcePackageV1Tests(unittest.TestCase):
         for script in escaped_cases:
             with self.subTest(script=script):
                 self.assertIn(2, _blocked_command_lines(script))
+        for script in (
+            "2>/dev/null printf x\n",
+            "> /dev/null tee log\n",
+            "command 2>/dev/null printf x\n",
+        ):
+            with self.subTest(script=script):
+                self.assertIn(1, _blocked_command_lines(script))
+        self.assertEqual(_blocked_command_lines("echo okay > /dev/null\n"), [])
 
         self.assertEqual(_blocked_command_lines("echo first\necho second\n"), [])
         self.assertEqual(
