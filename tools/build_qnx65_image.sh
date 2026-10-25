@@ -36,7 +36,7 @@ replacement = (
     "RUN sed -i 's#http://deb.debian.org/debian-security#"
     "http://snapshot.debian.org/archive/debian-security/20260903T220410Z#g' "
     "/etc/apt/sources.list && \\\n"
-    "    echo 'Acquire::Check-Valid-Until \"false\";' "
+    "    echo 'Acquire::Check-Valid-Until \"false\"; Acquire::Retries \"5\";' "
     "> /etc/apt/apt.conf.d/99snapshot && \\\n"
     "    dpkg --add-architecture i386 && apt-get update && \\\n"
 )

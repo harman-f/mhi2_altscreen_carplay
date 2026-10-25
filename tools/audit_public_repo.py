@@ -96,9 +96,26 @@ OWNED_ARTWORK = {
     "src/hmi/oem-menu/assets/scroll/mibr_scroll_track_v2.png": "8b2f0d77dd89432e3faa043d0b0e1566d939366d42a6d3b2f8964645cd13f93b",
 }
 
+# Owner-approved public infographic assets. On 2026-10-25 the owner confirmed
+# that the source photographs were taken by the owner, ChatGPT created these
+# derivative illustrations, and these exact files may be used publicly. Keep
+# each exception bound to its exact path and SHA-256; this grants no general
+# WebP/image-format exemption and no permission for OEM artwork.
+OWNER_APPROVED_INFOGRAPHICS = {
+    "docs/testing/assets/MU1440_COLUMBUS_MIB25_LEFT_DISPLAY_CONTROLS.webp":
+        "b523b4ebe13ae223e4c46c2f9850d91082f2c68806ff1e652b264019b914c5dc",
+    "docs/testing/assets/MU1440_OCTAVIA_III_2016_STEERING_WHEEL_CONTROL_MAP.webp":
+        "83fb2817b09b4336acd304fe9b0795b88a385f8588870d942c9204690e949d89",
+}
+
 
 def reviewed_artwork(rel: Path, data: bytes) -> bool:
     expected = OWNED_ARTWORK.get(rel.as_posix())
+    return bool(expected and hashlib.sha256(data).hexdigest() == expected)
+
+
+def reviewed_owner_approved_infographic(rel: Path, data: bytes) -> bool:
+    expected = OWNER_APPROVED_INFOGRAPHICS.get(rel.as_posix())
     return bool(expected and hashlib.sha256(data).hexdigest() == expected)
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -185,7 +202,11 @@ def audit_tree(errors: list[str], files: list[Path]) -> None:
         )
 
         if any(low.endswith(blocked) for blocked in FORBIDDEN_SUFFIXES):
-            if not is_curated_public_media and not reviewed_artwork(rel, data):
+            if (
+                not is_curated_public_media
+                and not reviewed_artwork(rel, data)
+                and not reviewed_owner_approved_infographic(rel, data)
+            ):
                 fail(errors, f"forbidden publication artifact type: {rel}")
 
         if "dyld_shared_cache" in low:
@@ -259,6 +280,17 @@ def main() -> int:
             fail(errors, f"reviewed owned artwork changed: {rel}")
         assert not reviewed_artwork(Path(rel), data + b"tampered")
         assert not reviewed_artwork(Path("unreviewed.png"), data)
+    for rel, expected in OWNER_APPROVED_INFOGRAPHICS.items():
+        asset = ROOT / rel
+        if not asset.is_file():
+            fail(errors, f"missing owner-approved public infographic: {rel}")
+            continue
+        data = asset.read_bytes()
+        if hashlib.sha256(data).hexdigest() != expected:
+            fail(errors, f"owner-approved public infographic changed: {rel}")
+        assert reviewed_owner_approved_infographic(Path(rel), data)
+        assert not reviewed_owner_approved_infographic(Path(rel), data + b"tampered")
+        assert not reviewed_owner_approved_infographic(Path("unreviewed.webp"), data)
     files = tracked_files()
 
     audit_required(errors)

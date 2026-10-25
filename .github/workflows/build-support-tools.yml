@@ -11,7 +11,7 @@ on:
       - 'src/native/tee-compat/**'
       - 'tools/build_support_tools.sh'
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths:
       - '.github/workflows/build-support-tools.yml'
       - 'src/native/isotx2-gate/**'
@@ -21,11 +21,7 @@ on:
       - 'tools/build_support_tools.sh'
 
 permissions:
-  contents: write
-
-concurrency:
-  group: public-support-tools
-  cancel-in-progress: true
+  contents: read
 
 env:
   TOOLCHAIN_REPO: https://github.com/luka-dev/qnx65-armv7-toolchain.git
@@ -38,12 +34,15 @@ jobs:
     name: Build support tools (QNX)
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    concurrency:
+      group: public-support-tools-build-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Host-test gate semantics
         shell: bash
@@ -226,13 +225,39 @@ jobs:
           name: mu1440-support-tools-unstripped
           path: build/support-tools/
           if-no-files-found: error
+          retention-days: 3
+  publish:
+    name: Publish build-confirmed gate artifact
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: public-support-tools-publish-main
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main for artifact publication
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+          fetch-depth: 0
 
+      - name: Download built support tools
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mu1440-support-tools-unstripped
+          path: build/support-tools
 
       - name: Publish build-confirmed gate artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash
         run: |
           set -euxo pipefail
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          # Never rebase an artifact from an older build onto a later main head.
+          test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
           DEST=artifacts/mu1440/isotx2-gate/build-confirmed-current
           mkdir -p "$DEST"
           cp build/support-tools/libmibr_isotx2_gate.so "$DEST/libmibr_isotx2_gate.so"
@@ -306,6 +331,4 @@ jobs:
             exit 0
           fi
           git commit -m "artifacts: publish build-confirmed isoTX2 gate"
-          git fetch origin main
-          git rebase origin/main
           git push origin HEAD:main

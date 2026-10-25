@@ -19,7 +19,7 @@ on:
       - 'runtime/mibr-control/**'
       - 'deployment/mu1440-parity-drive-v1/**'
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths:
       - '.github/workflows/build-mu1440-source.yml'
       - '.github/workflows/build-altscreen111-gen2.yml'
@@ -40,7 +40,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: public-mu1440-source-build
+  group: public-mu1440-source-build-${{ github.ref }}
   cancel-in-progress: true
 
 env:
