@@ -27,6 +27,15 @@ The last three milestones are development results, **not** included as finished 
 | **Portability** | Exact firmware/J9, OEM widget IDs, DSI source and fitted display routing verified separately for each SEAT/VW/CUPRA/Škoda target |
 | **Distribution** | Build reproducibility, independent test evidence, exact installer preflight and rollback, manifest and separate vehicle acceptance |
 
+## Planned v1.4 optional features (acceptance-gated)
+
+| Candidate | Gate before enabling in a vehicle build |
+| --- | --- |
+| **Parked-only GPS demo location for private CarPlay screenshots** ([design](docs/architecture/CARPLAY_GPS_PRIVACY_DEMO_V1_4.md), [#76](https://github.com/harman-f/mhi2_altscreen_carplay/issues/76)) | Prove exact iAP2 NMEA sender and complete position-bearing sentence coverage; qualify independent parking/brake and fresh speed proof; pass deterministic host transformation, live parked iPhone/map adoption and unmodified stock recovery tests. Explicit opt-in, short TTL, OFF by default. If the phone does not honor accessory GNSS, retain disabled/shadow mode and use privacy-safe static/demo imagery instead. |
+| **Version/target identity, HMI Version page and reproducible distribution** | Integrate reviewable source and target provenance/host tests first; any release claim requires exact binaries, authorized OEM inputs and separate installer qualification. |
+
+These are **v1.4 feature targets, not evidence of a qualified implementation or a promise that all optional toggles will be released**. The historic 1.3.2 kit and normal vehicle navigation are not modified.
+
 ## Additional research directions
 
 Native wireless CarPlay, RGI/native maneuver guidance, additional firmware/cluster families and decoder quality/performance are independent optional research goals. They do not block the current wired reference milestone. Existing alternate implementations are prior art and require separate compatibility and origin checks; they are not silently imported into this release.
