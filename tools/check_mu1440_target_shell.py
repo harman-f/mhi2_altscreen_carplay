@@ -454,6 +454,15 @@ def _scan_command_tokens(script_text: str) -> list[int]:
                     command_expected = False
                     continue
                 command_token = token
+            elif wrapper == "time":
+                if token == "-p":
+                    continue
+                if token.startswith("-"):
+                    blocked_lines.append(line_number)
+                    wrapper = None
+                    command_expected = False
+                    continue
+                command_token = token
             else:
                 if token in {"-c", "-l", "--"}:
                     continue
@@ -538,8 +547,13 @@ def _scan_command_tokens(script_text: str) -> list[int]:
             continue
         if token == "!":
             continue
-        if token in {"command", "env", "exec", "builtin"}:
-            wrapper = "command" if token == "command" else "env" if token == "env" else "exec"
+        if token in {"command", "env", "exec", "builtin", "time"}:
+            wrapper = (
+                "command" if token == "command" else
+                "env" if token == "env" else
+                "time" if token == "time" else
+                "exec"
+            )
             command_expected = False
             continue
         command_name = token.lstrip("(").rsplit("/", 1)[-1]
@@ -588,6 +602,8 @@ def _command_wrapper_kind(command_name: str) -> str | None:
         return "env"
     if command_name in {"exec", "builtin"}:
         return "exec"
+    if command_name == "time":
+        return "time"
     return None
 
 
@@ -840,10 +856,12 @@ def self_test() -> None:
             ("exec env tee log.txt\n", "exec/env wrapper chain hid tee"),
             ("env command -p printf x\n", "env/command wrapper chain hid printf"),
             ("command exec printf x\n", "command/exec wrapper chain hid printf"),
+            ("time printf x\n", "time reserved word hid printf"),
+            ("time -p tee log.txt\n", "time -p reserved word hid tee"),
         ):
             script.write_text(source, encoding="utf-8")
             assert scan(script), description
-        for source in ("command env -i echo okay\n", "exec env echo okay\n"):
+        for source in ("command env -i echo okay\n", "exec env echo okay\n", "time echo okay\n"):
             script.write_text(source, encoding="utf-8")
             assert not scan(script), "a benign nested-wrapper command was rejected"
         script.write_text("command; sha256sum input.bin\nenv; tee log.txt\n", encoding="utf-8")

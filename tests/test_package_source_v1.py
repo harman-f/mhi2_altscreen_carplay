@@ -164,11 +164,15 @@ class SourcePackageV1Tests(unittest.TestCase):
             "exec env tee log\n",
             "env command -p printf x\n",
             "command exec printf x\n",
+            "time printf x\n",
+            "time -p tee log\n",
+            "command time -p printf x\n",
         ):
             with self.subTest(script=script):
                 self.assertIn(1, _blocked_command_lines(script))
         self.assertEqual(_blocked_command_lines("command env -i echo okay\n"), [])
         self.assertEqual(_blocked_command_lines("exec env echo okay\n"), [])
+        self.assertEqual(_blocked_command_lines("time echo okay\n"), [])
 
         self.assertEqual(_blocked_command_lines("echo first\necho second\n"), [])
         self.assertEqual(
