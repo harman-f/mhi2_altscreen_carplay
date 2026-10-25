@@ -1,76 +1,124 @@
-# Type-111 firewall persistence — installer and contributor-test contract
+# Type-111 firewall: additive installer step and rollback contract
 
-**Status: required design and acceptance gate; target-side automatic patch/restore is NOT implemented by the current public developer installer.** Applies to the MU1440 reference and to proposed SEAT/CUPRA MU1409 adaptations after their exact firmware-specific preflight. Read alongside [developer installation](../INSTALLATION.md), [vehicle test protocol](../testing/VEHICLE_TEST_PROTOCOL.md) and [QNX shell compatibility](../testing/MU1440_QNX_SHELL_COMPATIBILITY.md).
+**Status: design contract; not yet implemented in the public installer.**
+Target for the initial qualification: exact Skoda MU1440/P4526. The firewall
+is one normal install substep, like a change to an OEM JSON or launcher file;
+it is **not** a separate major research/rollout project.
 
-## Why this is an installer responsibility
+## Expected outcome
 
-The CarPlay auxiliary stream is advertised on a **target-confirmed** TCP port (default `ALTSCREEN111_PORT=6031`). The iPhone reaches a listener on the head unit's CarPlay-facing interface `carplay0`. A correct SETUP response, open socket, edited file or successful temporary `pfctl` reload alone does **not** establish persistent reachability.
+Ensure the currently configured/advertised CarPlay Type-111 TCP port (typically
+**6031**) is permitted inbound on the **carplay0** interface in every existing
+PF profile that the target firmware can load. A file's hash need not match
+stock or a known reference to be safely updated. Preserve SSH port 22 and
+any other third-party rules.
 
-A head unit may load a different PF source as its network state changes. Known MHI2 profile candidates in other implementations include `pf.conf`, `pf.ecm0.conf`, `pf.mlan0.conf`, and `pf.ppp0.conf` (commonly under the actual target's `/etc`); an LTE/ECM activation can replace the initially loaded rules. **Do not assume all four exist, use a fixed `/mnt/system` mapping, or are used on every train. Discover and record the exact startup/reload selection and mounted source/target mapping on the particular unit.** The MU1440 reference's original startup has a `pfctl -ef /etc/pf.conf` step, but later reloads/other target trains are separate evidence.
+Two *reference*, not mandatory replacement, states exist:
 
-The intended narrow effective permit for the default port may look like:
+- **OEM_STOCK:** bytes from independently verified exact target firmware
+  (variants 50/70 may be compared as reference).
+- **MIBR_TARGET:** the four saved files from the 2026-10-25 owner-unit
+  snapshot, which represent the owner's *desired working policy*, not an
+  exact-format requirement for every other firmware or installation.
 
-```pf
-pass in quick on carplay0 proto tcp from any to any port 6031 allow-opts
-```
+Known MIBR_TARGET SHA-256 from K5:
 
-A compatible existing `carplay0` allowlist covering the target TCP port is equally acceptable. Verify actual order relative to preceding `block quick` or other effective PF policy. **Do not disable PF, add a generic `pass all`, expose external WLAN/cellular/SSH/debug interfaces, or open the local loopback H.264 tee (`127.0.0.1:19820`) as a CarPlay ingress port.** Retain all non-project PF policy and any existing third-party modifications.
-
-## Required implementation interface
-
-The future installer and each target-specific test package must provide explicit, separately gated firewall functionality:
-
-| Action | Minimum semantics |
+| Profile | SHA-256 |
 | --- | --- |
-| `firewall --check` | **Read-only** inventory: running PF state/rules (e.g. verified `pfctl -sr`), actual active profile and its loader if observable, all existing/referenced profile candidates, file hashes, matching rule/order, configured + advertised Type-111 port, actual listening socket, and existing changes/backup ownership. No remount, active reload, write or service restart. Distinguish missing tools/permissions from missing permit. |
-| `firewall --plan` | Construct an **offline proposal** for every profile that can become active, preserving each original's bytes/line endings and unrelated rules. Explicitly list every would-change file, original/proposed hashes, syntax-validation capability, dependency and recovery route. Fail closed if the relevant profile set is unresolved, different mounted paths/loader are ambiguous, or another project's changes cannot be preserved. |
-| `firewall --apply` | Separate explicit owner approval, exact target/firmware and hash-qualified preimages, recoverable backup of **all** affected profile variants, temporary same-filesystem staging, syntax validation for **every** candidate, then a guarded all-or-none profile-file transaction. No non-transactional first-file-success result. Do not force a live PF reload while SSH/CarPlay relies on the connection; use a reviewed controlled-reload/reboot plan specific to the unit. |
-| `firewall --verify` | After normal boot **and** the relevant network profile transitions, read the **effective** loaded PF policy, loaded profile/loader evidence when available, correct listener and actual accepted phone connection/advancing Type-111 counters. If a profile switch removes the permit, result is FAIL even when `pf.conf` still contains the desired text. |
-| `firewall --restore` | Separate hash-qualified, project-owned rollback; restore only the exact preimages when current contents match our known installed state, otherwise stop with a conflict and preserve third-party changes. Verify restored profile contents, PF syntax and normal stock networking after the approved reboot/reload. Uninstall must not delete an existing/foreign permit as though we owned it. |
+| pf.conf | 029079e992dd12a6e3c242b90b6bb6293f3e9d93d5ef87481c8c2f0d196aa031 |
+| pf.ecm0.conf | e1f2125bdf3a31516890293ef31e78de098b82b88a6d6b7a47b70486ede99cb2 |
+| pf.mlan0.conf | c6b01dcb72a7a33f0fbf95c6bc6710483676e12fdb8b63167f78da77a50a12ba |
+| pf.ppp0.conf | 9df94378fe607ac1fad241d2d0eac913eeafe5e4c567833ffed95f66ae82e7ab |
 
-The command names are **proposed public API**, not claims that these commands exist in the current deployment scripts or contributor bundle. A target test package may initially implement only host-only `--check`/`--plan` on explicit copied snapshots; in that case `--apply`, `--verify` and `--restore` must report `NOT_IMPLEMENTED`, never a false PASS.
+The exact mounted source and loaded /etc profile are target-specific.
+Do not invent missing profiles: enumerate relevant existing pf*.conf files
+and inspect startup/reload logic as part of ordinary installer preflight.
 
-### Transaction/syntax constraints
+## Minimal algorithm (integrated into the ordinary installer)
 
-- A patch must be idempotent. Detect an already compatible `carplay0` TCP permit (including a port range), otherwise make only the smallest scoped delta in its actual existing rule/allowlist. Never append duplicate conflicting permits blindly or assume where an effective `block quick` appears.
-- Verify the locally installed target `pfctl` command path and supported options. The QNX 6.5 manual documents `-n` with `-f` for parsing without loading; only use `pfctl -nf <candidate>` after verifying the actual target binary's capabilities, syntax and command availability. Never silently replace this with a live `pfctl -f` in preflight.
-- Check *every* candidate first, preserve permission/ownership and exact original bytes for recovery, and handle read-only/missing variant profiles deterministically. A missing/unrelated profile is not automatically safe to fabricate. If all-or-none rollback cannot be guaranteed on that filesystem, block the automatic install.
-- Reconcile the existing omonob/M.I.B./other AltScreen installation and PF modifications: detect owners/preimages, do not stack blind overwrites. The original operating-system PF loader must remain in charge; a project runtime/startup hook must not race it by loading an incompatible transient ruleset.
-- A source-publishable patcher needs host unit tests for single-port and range allowlists, different whitespace/line endings, all discovered profiles, duplicate/idempotence, block-rule ordering, syntax error, mid-transaction failure, foreign edit/rollback conflict, and fake postboot profile replacement. Test **no write/no reload** on `--check`.
-- Apply the mandatory [target-shell compatibility gate](../testing/MU1440_QNX_SHELL_COMPATIBILITY.md) to every proposed target-side `.sh`/`.ksh`, then qualify every used binary, mount and flag against the fitted SEAT/MU1409 unit independently. Host mocks alone do not establish vehicle compatibility.
+1. **CHECK (read-only):** inspect actual existing profiles, their hashes,
+   the effective TCP allowlist on carplay0, and the configured Type-111 port.
+   If the port is already allowed by a direct member or range and rule order
+   is correct, report ALREADY_ALLOWED and perform **no write**. A textual
+   occurrence of 6031 in an unrelated rule is not proof of access.
+2. **PREPARE:** for every existing relevant profile missing the permit, alter
+   **only** its existing carplay0 inbound TCP allowlist. Example: change one
+   member 6030 to 6030:6031, or add 6031 to the same brace list. Preserve
+   every other port, rule, comment, SSH exception, LF/CRLF, mode and owner.
+   An existing 6030:6032 or 6030:6033 already includes 6031: skip it.
+3. **BACK UP:** create a byte-exact backup of the **actual existing file**,
+   whatever its SHA-256. Record preimage and proposed SHA-256, ownership,
+   path and transaction ID. Build the new file in same-filesystem staging.
+   Recheck that the live preimage still has the expected hash before rename.
+4. **VALIDATE + APPLY:** independently check each candidate's only-intended
+   delta and syntax (use target-confirmed pfctl -nf when supported). Write
+   only changed files with guarded replacement, verify read-back and record
+   them in the **normal installer recovery journal**, not a standalone
+   firewall subsystem. Restore the preimages on failure if still owned.
+   A normal installer --apply authorizes this known-safe additive step;
+   no extra --apply-firewall switch should be required.
+5. **VERIFY:** distinguish (a) stored rule, (b) effective loaded pfctl rules,
+   (c) listener, (d) iPhone connection, and (e) Type-111 frames. Staging
+   success proves only (a). A later supervised, separately authorized
+   postboot/network-profile test is required for (b)-(e).
+6. **ROLL BACK/UNINSTALL:** restore a saved original only if the current file
+   still matches *this installer's* recorded postimage, or safely remove its
+   uniquely identified unchanged rule. If later external edits exist, preserve
+   them and report a conflict instead of wiping the file.
 
-### Honest result states and install blocking
+Never flush or reload PF in an unattended install, disable PF, kill SSH/inetd,
+reset network interfaces, reboot, open broad inbound access or expose
+127.0.0.1:19820 outside loopback.
 
-Proposed machine-readable status labels:
+### Unrecognized layout
 
-```text
-PF_PROFILE_UNRESOLVED
-PF_ALREADY_ALLOWED
-PF_PLAN_READY
-PF_SYNTAX_FAILED
-PF_APPLY_DEFERRED
-PF_PERSISTED_UNVERIFIED
-PF_EFFECTIVE_CONFIRMED
-PF_ROLLBACK_CONFLICT
-PF_NOT_IMPLEMENTED
-```
+An unknown full-file SHA-256 is not a blocker if the structural
+carplay0 TCP allowlist is recognized and can be edited safely. Only if the
+policy cannot be located, an earlier block overrides the permit, syntax
+cannot be validated, or the profile loader/mount path is uncertain, leave
+that profile unchanged and report FIREWALL_REVIEW_REQUIRED. Continue
+independent installer steps where safe; do **not** claim that Type-111
+network access is ready. Optionally propose an explicit owner-approved,
+exact-target full-file replacement as fallback with byte-exact backup;
+this is **not** the default and cannot be silently applied across brands.
 
-**Preflight is blocking:** do not label video-install success or instruct replacement of a working third-party port while the persistent and postboot effective ingress requirement is unresolved. A temporary, explicitly marked experiment may proceed only under separate owner-approved recovery controls. Port 6031 is the project reference default; read the actual configured/advertised port instead of assuming all future targets use it.
+### Existing SSH installation precedent
 
-## Contribution/test-package handoff
+Source: https://github.com/Mr-MIBonk/M.I.B._More-Incredible-Bash/blob/main/mod/sshd/scripts/sshd_install.sh
 
-For a SEAT/CUPRA P4708_1/MU1409 contributor:
+The published More Incredible Bash SSH installer changes PF files as an
+ordinary installation step: creates .bu backups for pf*.conf when absent,
+then **copies .bu over the currently installed file on every execution**;
+it inserts port 22 rules for interfaces present in the file and calls
+pfctl -F all -f on pf.mlan0.conf, then restarts inetd.
 
-1. First take a **read-only snapshot** of the PF rules and *all actual* startup/reload profile candidates, preserving hashes and any observed loader/active-profile change; redact private unit data before sharing.
-2. Perform host-only analysis/patch preview and report what still needs exact-target validation. The current first-stage bundle is **not** an approved in-car auto-patcher.
-3. Before first installed video tests, independently review an exact-target, reversible persistent profile transaction and its no-disconnect operational sequence. Recheck after boot and after LTE/WLAN/PPP changes relevant to this fitted firmware.
-4. Separate transport state: `listener bound` ≠ `PF permits incoming iPhone TCP` ≠ `socket accepts phone` ≠ `Type-111 source frames advance` ≠ `DIRECT cockpit output`. Test and report each independently.
-5. After uninstall/rollback, verify PF preimages and the original stock networking; do not restore a stale shared PF file over subsequent legitimate edits.
+**Do not copy its reset/reload behavior.** Reinstalling SSH with that
+historical script can remove an existing 6031 allowance if the old .bu
+snapshot predates it. This is why our step patches the *currently found*
+rules, is idempotent, preserves SSH ports, and rechecks after third-party
+changes. This is a source-code observation, not proof that the same
+script actually ran on the owner's vehicle.
 
-## Public references
+A similar in-place allowlist expansion is described in:
+https://github.com/maxim-smirnov/mhi2-carplay-cluster/blob/main/docs/build-and-deploy/DEPLOY_AND_RELEASE.md
+This is precedent, not a verified reusable binary or installer.
 
-- [QNX Neutrino 6.5 PF utility manual](https://qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_utilities/p/pfctl.html) for option semantics; unit availability remains train-specific.
-- [MHI2 CarPlay cluster PF profile handling](https://github.com/maxim-smirnov/mhi2-carplay-cluster/blob/main/docs/build-and-deploy/DEPLOY_AND_RELEASE.md) for documented multi-profile design (independent third-party implementation, not a validated patch for this project).
-- [MHI2Q AltScreen profile-switch issue](https://github.com/yuedizhibo/MHI2Q-CarPlay-AltScreen/blob/main/README_EN.md) for an independent LTE profile-reload failure description; do not transplant another platform's binaries or automatic fallback blindly.
+## API and acceptance
 
-**Evidence policy:** publishing this contract updates installer requirements; it does not certify a newly implemented on-target PF patcher or show that the colleague has already installed anything.
+Use the existing installer's ordinary check/plan/apply/status/uninstall and
+backup mechanisms. An optional firewall subcommand may expose the same
+read-only evidence, but must not create a second configuration database or
+installer state machine.
+
+Host tests cover: stock 6030, existing 6031, 6030:6031 and 6030:6032
+ranges; spaces and LF/CRLF; an unrelated SSH port-22 addition and other
+foreign rules; multiple PF profiles and interface switches; an earlier
+block quick; unchanged second install; stale preimage/hash; invalid syntax;
+failure mid-install; exact restoration and conflicting third-party edits.
+Explicitly simulate SSH-then-MIBR and MIBR-then-SSH-reinstall (the latter
+must detect and repair a missing 6031 permission on the next install/check).
+
+The original Type-111 stream may only be called firewall-ready after
+the effective PF policy was independently verified. This does not
+turn PF into a separate release pipeline or require exact whole-file
+stock/MIBR_TARGET equality on other units.
