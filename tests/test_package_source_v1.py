@@ -179,6 +179,24 @@ class SourcePackageV1Tests(unittest.TestCase):
         )
         self.assertEqual(_blocked_command_lines("echo data \\\ntee log\n"), [])
 
+    def test_target_shell_gate_isolates_here_document_parser_state(self) -> None:
+        cases = (
+            ("cat <<'EOF'\nfor details see README\nEOF\nprintf x\n", 4),
+            ("cat <<-EOF\n\tfor details see README\n\tEOF\ntee log.txt\n", 4),
+            (
+                "cat <<ONE <<'TWO'\nfor first body\nONE\nif second body\nTWO\nprintf x\n",
+                6,
+            ),
+        )
+        for script, expected_line in cases:
+            with self.subTest(script=script):
+                self.assertEqual(_blocked_command_lines(script), [expected_line])
+
+        self.assertEqual(
+            _blocked_command_lines("cat <<'EOF'\nprintf body text\nEOF\necho okay\n"), [2]
+        )
+        self.assertEqual(_blocked_command_lines("cat <<< 'for details'\necho okay\n"), [])
+
     def test_path_type_and_private_path_exclusions(self) -> None:
         manifest, files = collect_source(self.repo)
         self.assertIn("src/native/altscreen111-gen2/example.c", files)

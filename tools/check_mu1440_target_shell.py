@@ -179,7 +179,191 @@ def _active_substitutions(text: str) -> list[tuple[int, int, str]]:
     return found
 
 
+def _read_heredoc_delimiter(script_text: str, start: int) -> tuple[str, int, bool] | None:
+    """Read a here-document delimiter word, removing quote syntax like the shell."""
+    index = start
+    while index < len(script_text) and script_text[index] in " \t":
+        index += 1
+    if index >= len(script_text) or script_text[index] in "\r\n#;|&()<>":
+        return None
+
+    delimiter: list[str] = []
+    quote: str | None = None
+    dynamic = False
+    while index < len(script_text):
+        char = script_text[index]
+        if quote == "'":
+            if char == "'":
+                quote = None
+            else:
+                delimiter.append(char)
+            index += 1
+            continue
+        if char == "\\" and quote != "'":
+            if index + 1 >= len(script_text):
+                return None
+            next_char = script_text[index + 1]
+            if quote == '"' and next_char not in '$`"\\\n':
+                delimiter.extend((char, next_char))
+            else:
+                delimiter.append(next_char)
+            index += 2
+            continue
+        if quote == '"':
+            if char == '"':
+                quote = None
+            else:
+                delimiter.append(char)
+                dynamic = dynamic or char in "$`"
+            index += 1
+            continue
+        if char in "'\"":
+            quote = char
+            index += 1
+            continue
+        if char.isspace() or char in ";|&()<>" or (char == "#" and not delimiter):
+            break
+        delimiter.append(char)
+        dynamic = dynamic or char in "$`"
+        index += 1
+
+    if quote is not None or not delimiter:
+        return None
+    return "".join(delimiter), index, dynamic
+
+
+def _mask_heredoc_bodies(script_text: str) -> tuple[str, list[tuple[int, str]], list[int]]:
+    """Isolate here-document bodies so their syntax cannot affect surrounding commands.
+
+    Bodies are scanned in their own parser state to preserve the existing blocked
+    command coverage, but parser state never flows from a literal body into the
+    command after its delimiter. Dynamic delimiters are rejected conservatively
+    because their terminator cannot be identified statically.
+    """
+    output = list(script_text)
+    bodies: list[tuple[int, str]] = []
+    ambiguous_lines: list[int] = []
+    pending: list[tuple[str, bool, int]] = []
+    quote: str | None = None
+    in_comment = False
+    escaped = False
+    index = 0
+
+    while index < len(script_text):
+        char = script_text[index]
+        if in_comment:
+            if char == "\n":
+                in_comment = False
+            else:
+                index += 1
+                continue
+        if escaped:
+            escaped = False
+            if char == "\n":
+                index += 1
+                continue
+            index += 1
+            continue
+        if quote == "'":
+            if char == "'":
+                quote = None
+            index += 1
+            continue
+        if char == "\\" and quote != "'":
+            escaped = True
+            index += 1
+            continue
+        if quote == '"':
+            if char == '"':
+                quote = None
+            index += 1
+            continue
+        if char == "#" and (index == 0 or script_text[index - 1].isspace() or script_text[index - 1] in ";|&"):
+            in_comment = True
+            index += 1
+            continue
+        if char in "'\"":
+            quote = char
+            index += 1
+            continue
+        if (
+            char == "<"
+            and script_text.startswith("<<", index)
+            and not script_text.startswith("<<<", index)
+            and (index == 0 or script_text[index - 1] != "<")
+        ):
+            operator_end = index + 2
+            strip_tabs = operator_end < len(script_text) and script_text[operator_end] == "-"
+            if strip_tabs:
+                operator_end += 1
+            delimiter_info = _read_heredoc_delimiter(script_text, operator_end)
+            if delimiter_info is None:
+                ambiguous_lines.append(script_text.count("\n", 0, index) + 1)
+                return script_text, bodies, ambiguous_lines
+            delimiter, after_delimiter, dynamic = delimiter_info
+            if dynamic:
+                ambiguous_lines.append(script_text.count("\n", 0, index) + 1)
+                return script_text, bodies, ambiguous_lines
+            pending.append((delimiter, strip_tabs, script_text.count("\n", 0, index) + 1))
+            index = after_delimiter
+            continue
+        if char == "\n" and pending:
+            body_start = index + 1
+            position = body_start
+            for delimiter, strip_tabs, opener_line in pending:
+                terminator_found = False
+                while position <= len(script_text):
+                    line_end = script_text.find("\n", position)
+                    if line_end < 0:
+                        line_end = len(script_text)
+                    candidate = script_text[position:line_end]
+                    if candidate.endswith("\r"):
+                        candidate = candidate[:-1]
+                    if (candidate.lstrip("\t") if strip_tabs else candidate) == delimiter:
+                        if position > body_start:
+                            bodies.append((script_text.count("\n", 0, body_start) + 1, script_text[body_start:position]))
+                        for mask_index in range(position if position == body_start else body_start, line_end):
+                            if script_text[mask_index] != "\n":
+                                output[mask_index] = " "
+                        if line_end < len(script_text):
+                            position = line_end + 1
+                        else:
+                            position = line_end
+                        body_start = position
+                        terminator_found = True
+                        break
+                    if line_end == len(script_text):
+                        break
+                    position = line_end + 1
+                if not terminator_found:
+                    if body_start < len(script_text):
+                        bodies.append((script_text.count("\n", 0, body_start) + 1, script_text[body_start:]))
+                    for mask_index in range(body_start, len(script_text)):
+                        if script_text[mask_index] != "\n":
+                            output[mask_index] = " "
+                    ambiguous_lines.append(opener_line)
+                    pending.clear()
+                    index = len(script_text)
+                    break
+            else:
+                pending.clear()
+                index = position
+                quote = None
+                in_comment = False
+                escaped = False
+                continue
+            continue
+        index += 1
+
+    if pending:
+        ambiguous_lines.extend(opener_line for _, _, opener_line in pending)
+    return "".join(output), bodies, sorted(set(ambiguous_lines))
+
+
 def _scan_command_tokens(script_text: str) -> list[int]:
+    script_text, heredoc_bodies, ambiguous_heredoc_lines = _mask_heredoc_bodies(script_text)
+    if ambiguous_heredoc_lines:
+        return ambiguous_heredoc_lines
     script_text = _terminate_unquoted_newlines(script_text)
     lexer = shlex.shlex(script_text, posix=True, punctuation_chars="\n;&|()<>")
     lexer.whitespace_split = True
@@ -364,6 +548,8 @@ def _scan_command_tokens(script_text: str) -> list[int]:
                 blocked_lines.append(line_number)
         command_expected = False
 
+    for body_start_line, body in heredoc_bodies:
+        blocked_lines.extend(body_start_line + line - 1 for line in _scan_command_tokens(body))
     return sorted(set(blocked_lines))
 
 
@@ -595,6 +781,20 @@ def self_test() -> None:
         assert scan(script), "a leading output redirection hid forbidden tee"
         script.write_text("echo okay > /dev/null\n", encoding="utf-8")
         assert not scan(script), "a normal command redirection was mistaken for a command"
+        for source, description in (
+            ("cat <<'EOF'\nfor details see README\nEOF\nprintf x\n", "command after a quoted here-document"),
+            ("cat <<-EOF\n\tfor details see README\n\tEOF\ntee log.txt\n", "command after a tab-stripped here-document"),
+            (
+                "cat <<ONE <<'TWO'\nfor first body\nONE\nif second body\nTWO\nprintf x\n",
+                "command after multiple here-documents",
+            ),
+        ):
+            script.write_text(source, encoding="utf-8")
+            assert scan(script), f"{description} was hidden by here-document parser state"
+        script.write_text("cat <<'EOF'\nprintf body text\nEOF\necho okay\n", encoding="utf-8")
+        assert scan(script), "a forbidden command in a separately scanned here-document was ignored"
+        script.write_text("cat <<< 'for details'\necho okay\n", encoding="utf-8")
+        assert not scan(script), "a here-string was mistaken for a here-document"
         for source, description in (
             ("(echo ok)\nprintf x\n", "forbidden command after newline-terminated subshell"),
             ("(echo ok); printf x\n", "forbidden command after semicolon-terminated subshell"),
