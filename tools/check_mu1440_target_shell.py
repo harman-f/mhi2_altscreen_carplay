@@ -21,6 +21,9 @@ BLOCKED_COMMANDS = {"printf", "sed", "tr", "sha256sum", "tee"}
 GREP_BRE_ALTERNATION = re.compile(r"\\\|")
 COMMAND_SEPARATORS = {";", ";;", ";&", ";;&", "&&", "||", "|", "&", "(", ")", "\n"}
 REDIRECTION_OPERATORS = {"<", ">", "<<", "<<-", "<<<", ">>", ">|", "<>", "<&", ">&", "&>"}
+SHELL_PUNCTUATION_OPERATORS = tuple(
+    sorted(COMMAND_SEPARATORS | REDIRECTION_OPERATORS, key=lambda operator: (-len(operator), operator))
+)
 CONTROL_WORDS = {"then", "do", "else", "elif", "if", "while", "until"}
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 LINE_CONTINUATION_MARKER = "\x01"
@@ -189,7 +192,11 @@ def _scan_command_tokens(script_text: str) -> list[int]:
             # only those newlines, leaving quoted multiline strings and ordinary
             # newline separators intact.
             token = token.replace("\n" + LINE_CONTINUATION_MARKER, "")
-            tokens.append((token, lexer.lineno))
+            line_number = lexer.lineno
+            punctuation_parts = _split_punctuation_token(token)
+            if punctuation_parts is None:
+                return [line_number]
+            tokens.extend((part, line_number) for part in punctuation_parts)
     except ValueError:
         # Keep malformed shell lines visible to the gate; they need a manual fix.
         return [lexer.lineno]
@@ -351,6 +358,33 @@ def _scan_command_tokens(script_text: str) -> list[int]:
         command_expected = False
 
     return sorted(set(blocked_lines))
+
+
+def _split_punctuation_token(token: str) -> list[str] | None:
+    """Split shlex punctuation runs into shell operators, longest operator first.
+
+    `shlex` groups adjacent punctuation characters into one token. Shell syntax
+    can place separate operators next to each other, such as the `)` and `;` in
+    `(...);`, so leaving the run intact can hide the next command from the
+    command-position scanner.
+    """
+    if not token or any(char not in "\n;&|()<>" for char in token):
+        return [token]
+
+    parts: list[str] = []
+    offset = 0
+    while offset < len(token):
+        operator = next(
+            (candidate for candidate in SHELL_PUNCTUATION_OPERATORS if token.startswith(candidate, offset)),
+            None,
+        )
+        if operator is None:
+            # All punctuation characters emitted by this lexer are represented
+            # above. Unexpected punctuation makes the line ambiguous, so fail closed.
+            return None
+        parts.append(operator)
+        offset += len(operator)
+    return parts
 
 
 def _leading_redirection_end(tokens: list[tuple[str, int]], index: int) -> int | None:
@@ -543,6 +577,22 @@ def self_test() -> None:
         assert scan(script), "a leading output redirection hid forbidden tee"
         script.write_text("echo okay > /dev/null\n", encoding="utf-8")
         assert not scan(script), "a normal command redirection was mistaken for a command"
+        for source, description in (
+            ("(echo ok)\nprintf x\n", "forbidden command after newline-terminated subshell"),
+            ("(echo ok); printf x\n", "forbidden command after semicolon-terminated subshell"),
+            ("(echo ok)&&printf x\n", "forbidden command after adjacent AND operator"),
+            ("(echo ok)|tee log.txt\n", "forbidden command after adjacent pipeline operator"),
+            ("(echo ok) >/dev/null; printf x\n", "forbidden command after subshell redirection"),
+            ("case x in x) (echo ok); printf x;; esac\n", "forbidden command after subshell in case arm"),
+        ):
+            script.write_text(source, encoding="utf-8")
+            assert scan(script), f"{description} was hidden by adjacent shell punctuation"
+        for source, description in (
+            ("(echo ok)\necho done\n", "ordinary command after newline-terminated subshell"),
+            ("(echo ok); echo done\n", "ordinary command after semicolon-terminated subshell"),
+        ):
+            script.write_text(source, encoding="utf-8")
+            assert not scan(script), f"{description} was unexpectedly rejected"
         script.write_text("sha256sum input.bin\n", encoding="utf-8")
         assert scan(script), "unbundled sha256sum command was not rejected"
         script.write_text("case x in x) sha256sum input.bin;; esac\n", encoding="utf-8")
