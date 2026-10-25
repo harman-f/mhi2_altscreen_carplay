@@ -70,3 +70,45 @@ Codex should return:
 - Separate approval decision required before deployment or merging into active acceptance branch.
 
 The present patch is **source-only, not yet demonstrated on vehicle**.
+
+## 6. Codex Luna execution order and actual CI receipts (checked 2026-10-25)
+
+**Primary Codex entrypoint: [Draft PR #67](https://github.com/harman-f/mhi2_altscreen_carplay/pull/67).** Start by checking out `work/suggestui-root-advertisement-review-20261025` at verified review baseline commit `369a8ba3eb1d4f41335a961149f97f0d64d37838` or newer commits on that same branch. The code was ALREADY committed by ChatGPT; Codex must independently review it, implement justified corrections on this isolated review branch, run reproducible tests, and post a verdict to the PR. **Do not treat this as a task to reimplement from scratch.**
+
+### Actual GitHub Actions results for baseline 369a8ba3 (not speculation)
+
+| Workflow/job | Receipt | Precise interpretation |
+| --- | --- | --- |
+| Publication integrity audit, run `40174377318` | **PASS** | The public handoff no longer contains a forbidden private research-repo hyperlink. Keep this public/private boundary. |
+| Build experimental GEN2 AltScreen, run `40174377304`, job `121111837790` | **PASS** | Standalone QNX build has succeeded. This is *build-only*, not a car/iPhone test. |
+| Build MU1440 source stack, run `40174377305`, host tests job `121111841577` | **PASS** | Host/controller/source checks passed. The newly added `test_suggestui_root_contract.py` was not individually certified by this receipt; explicitly run it. |
+| Build MU1440 source stack, run `40174377305`, QNX job `121111841775` | **FAIL at 'Verify expected installed source identities'** | The **actual QNX source build itself PASSED** (`MU1440_SOURCE_QNX_BUILD=PASS`), but the subsequent `expect_sha` for the deliberately modified `libaltscreen111.so` compares against the old frozen released-library SHA. This is an integrity gate failure, *not* a compiler failure. |
+
+Relevant hard facts from QNX job `121111841775`:
+- expected pinned `libaltscreen111.so` SHA-256: `304b5079374a08ed9a763528217476b29ad49e000ba25d0372ed4147cbb9a705`;
+- candidate build SHA-256: `1eb0dd067cbf6ca0e90b47dfe387fecfab63b3fbc4e24ef3eddd4c2dcfd77cb3`;
+- `ALT111_SETTINGS_SCHEMA=PASS`, `QNX_BUILD=PASS`, `MU1440_SOURCE_QNX_BUILD=PASS` occurred before pinned-hash failure;
+- there is a separate existing compiler warning `'main' is usually a function [-Wmain]` on the local dictionary identifier, not related to the URL-advertisement patch.
+- The candidate ELF is NOT INSTALL READY by virtue of building; no deployment was executed.
+
+**Required CI action for Codex:** Keep the exact legacy production SHA pin as the default / acceptance-baseline authority. Implement a *scoped, explicit, reviewable candidate-branch integrity contract* (for example a source-controlled expected hash for THIS branch/build output plus production pin for released builds, or a gated diff-and-allowlist receipt) which verifies that only the approved library content changed and retains integrity checks for every unaffected component. Do NOT simply replace the globally frozen expected SHA with this experimental one, disable hash checking, or call this a pass. Re-run the full workflow and report any residual failures. First inspect how existing workflows name production vs experimental builds and choose the smallest coherent solution. Even if this remains an intentional documented red check in draft stage, report it explicitly rather than bypassing it.
+
+### Codex review priority list
+
+1. **Compare exact current vehicle-acceptance source/release**, which may live in a newer unpublished branch. Do not overwrite the owner's new Scaling menu, steering mappings, viewarea or recovery work merely because this draft began from public `main`. If latest source is inaccessible, mark integration BLOCKED, complete source review and preserve draft isolation.
+2. **Prove wire contract**: iOS CarKit reading `EndpointInfo.altScreenSuggestUIURLs` from the root vs GEN2 root writer; determine whether full `AirPlayCopyServerInfo` output is what CarKit consumes. Compare canonical URL equality, display typing, initial URL and iOS version assumptions.
+3. **Audit ownership/error handling** in `add_alt_suggest_ui_urls`, `gen2_serverinfo_scoped`, CF retain/release, fail-closed stock fallback and strict classic profile; verify a failed root insertion doesn't create a partial/mutated stock dictionary.
+4. **Audit config source**: `mibr-carplay111-ui-urls.conf`, `read_layered_value`, `config_line_value` and the maximum field/storage size. The local 2048-byte scratch buffer alone does not prove all paths accept a long multi-URL list. Check malformed entries, escaping, exact-match URLs, duplicate roles and max-eight cap; do not silently invent a new schema.
+5. **Run focused source test explicitly**:
+   ```sh
+   python3 -m unittest discover -s src/native/altscreen111-gen2/tests -p 'test_suggestui_root_contract.py' -v
+   ```
+   Add a compiled/native CF-like dictionary unit fixture that demonstrates root-only vs nested-only key behavior, strict profile and readback error path. Label source-string tests honestly; do not use them as substitute for an Apple/iPhone transaction.
+6. **Preserve behavior**: `suggestUI` inbound `LIVI_NOOP`, no automatic `showUI`, no stateful suggestion-choice cache, no HMI toggle, no additional setting, no reconnect triggered by inspection. Existing debug log redaction and no exposure of private route URLs remain mandatory.
+7. **Close with evidence**: Code commit(s) only to the draft branch, CI links/results, source-level review verdict, separate QNX and vehicle acceptance statuses, a short URL-roles case matrix with `idle→route active→withdrawal`, and a no-deployment note. No merge or release without owner decision.
+
+### Required Codex Luna output / completion criteria
+
+Post a review summary on draft PR #67 and update this handoff if test results affect assumptions. Verdict must be exactly one of **PASS_SOURCE_ONLY**, **CHANGES_REQUESTED**, **BLOCKED_BY_CURRENT_ACCEPTANCE_SOURCE**; attach exact commit SHA, tests with observed outputs, unresolved cases, and release-safety confirmation. A PASS_SOURCE_ONLY never means the iPhone emitted a non-empty `suggestUI` or that the car is qualified.
+
+**Explicitly excluded:** Installing, merging, releasing, automatically switching to incoming Suggestions, creating a `navigation.followSuggestions` settings key or UI, or modifying the currently scheduled acceptance image.
