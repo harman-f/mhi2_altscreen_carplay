@@ -9,7 +9,7 @@ public final class MibrCanonicalElementMenuTest {
         for(int k=0;k<p.size();k++){
             MibrElementSpec s=p.row(k);
             if(s.kind==MibrElementSpec.LINK){ok(t.open(k),"link opens");visit(t);ok(t.back(),"back");continue;}
-            if(s.kind==MibrElementSpec.INFO){ok("diagnostics".equals(p.id)||"views".equals(p.id),"info only in Diagnose and Ansichten");diagnostic++;continue;}
+            if(s.kind==MibrElementSpec.INFO){ok("diagnostics".equals(p.id)||"views".equals(p.id)||"version".equals(p.id),"info only in Diagnose and Ansichten");diagnostic++;continue;}
             ok(!"hidden".equals(MibrSettingsCatalog.UI_SECTIONS[index(s.id)]),"visible "+s.id);
             ok(!"navigation.url".equals(s.id)&&!"preset.id".equals(s.id),"hidden in HMI "+s.id);
             ok(s.kind==MibrElementSpec.CHOICE,"choice "+s.id);
@@ -37,9 +37,9 @@ public final class MibrCanonicalElementMenuTest {
         ok(root.row(6).kind==MibrElementSpec.LINK&&"Ansichten".equals(root.row(6).label),"Ansichten link");
         ok(root.row(7).kind==MibrElementSpec.LINK&&"Erweitert".equals(root.row(7).label),"Erweitert link");
         visit(t);
-        ok(settings==9&&diagnostic==2,"9 settings + 2 info rows (Ansichten, Diagnose), got "+settings+"/"+diagnostic);
+        ok(settings==9&&diagnostic==3,"9 settings + 3 info rows, got "+settings+"/"+diagnostic);
         MibrElementEngine e=MibrCanonicalElementMenu.createEngine();
-        ok(e.count()==14,"engine count "+e.count()); // 6 root + Ansichten + info + Erweitert + 3 + Diagnose link + info
+        ok(e.count()==16,"engine count "+e.count()); // 6 root + Ansichten + info + Erweitert + 3 + Diagnose link + info
         e.detach();t.detach();
         System.out.println("MIBR_CANONICAL_TYPED_TREE_PASS keys=48 visible=9 hidden=39 root=8 nested=diagnostics");
     }

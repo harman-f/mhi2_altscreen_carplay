@@ -61,24 +61,27 @@ public final class MibrCanonicalElementMenu {
     public static MibrElementTree createTree(){
         int groups=MibrMenuDefinition.GROUP_IDS.length;
         int direct=MibrMenuDefinition.ROOT_KEYS.length;
-        int nested=group("diagnostics"),parent=group("advanced");
-        MibrElementSpec[] rootLinks=new MibrElementSpec[direct+groups-(nested>=0?1:0)];
+        int nested=group("diagnostics"),version=group("version"),parent=group("advanced");
+        int nestedCount=(nested>=0?1:0)+(version>=0?1:0);
+        MibrElementSpec[] rootLinks=new MibrElementSpec[direct+groups-nestedCount];
         for(int k=0;k<direct;k++)rootLinks[k]=entry(MibrMenuDefinition.ROOT_KEYS[k]);
         MibrElementTree.Page[] pages=new MibrElementTree.Page[groups+1];
         int n=direct;
         for(int i=0;i<groups;i++){
             String id=MibrMenuDefinition.GROUP_IDS[i];
-            if(i!=nested)rootLinks[n++]=link(i);
+            if(i!=nested && i!=version)rootLinks[n++]=link(i);
             String[] keys=MibrMenuDefinition.GROUP_KEYS[i];
             MibrElementSpec[] rows;
             if(keys.length==0){
                 rows=new MibrElementSpec[]{MibrElementSpec.info(id+".unavailable",
                                  "views".equals(id)?MibrI18n.pick("Zeilen werden im Live-Menue angezeigt", "Rows are shown in the live menu")
+                                 :"version".equals(id)?MibrI18n.pick("Version: nur lesbare Metadaten", "Version: read-only metadata")
                                  :MibrI18n.pick("Noch keine nachgewiesenen Live-Werte", "No verified live values yet"))};
             }else{
-                rows=new MibrElementSpec[keys.length+(i==parent&&nested>=0?1:0)];
+                rows=new MibrElementSpec[keys.length+(i==parent?nestedCount:0)];
                 for(int j=0;j<keys.length;j++)rows[j]=entry(keys[j]);
                 if(i==parent&&nested>=0)rows[keys.length]=link(nested);
+                if(i==parent&&version>=0)rows[keys.length+(nested>=0?1:0)]=link(version);
             }
             pages[i+1]=new MibrElementTree.Page(id,MibrMenuDefinition.groupNames()[i],rows);
         }

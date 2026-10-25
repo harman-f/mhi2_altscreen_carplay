@@ -43,6 +43,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
 
     private static final int PLAIN=0,VALUE=1,CHECK=2;
     private static final int DIAGNOSTICS_GROUP=group("diagnostics");
+    private static final int VERSION_GROUP=group("version");
     private static int group(String id){
         for(int i=0;i<MibrMenuDefinition.GROUP_IDS.length;i++)
             if(id.equals(MibrMenuDefinition.GROUP_IDS[i]))return i;
@@ -282,7 +283,8 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
                 if(!attached || version!=epoch)return;
                 try{
                     int key=menu.keyForRow(rank);
-                    if(menu.screen()==MibrCarPlayMenuModel.ITEMS && menu.group()==DIAGNOSTICS_GROUP)return;
+                    if(menu.screen()==MibrCarPlayMenuModel.ITEMS &&
+                      (menu.group()==DIAGNOSTICS_GROUP||menu.group()==VERSION_GROUP))return;
                     if(key>=0 && drafts.directToggle(key)){
                         if(drafts.toggle(key)){
                             if(v3!=null)v3.commit(key);

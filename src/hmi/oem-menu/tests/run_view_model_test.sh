@@ -23,6 +23,7 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/java/de/mibr/hmi/MibrPopupEditorModel.java" \
   "$MODULE/java/de/mibr/hmi/MibrVdataDiag.java" \
   "$MODULE/java/de/mibr/hmi/MibrCarPlayMenuModel.java" \
+  "$MODULE/java/de/mibr/hmi/MibrVersionInfo.java" \
   "$MODULE/java/de/mibr/hmi/MibrV3Protocol.java" \
   "$MODULE/java/de/mibr/hmi/MibrV3Client.java" \
   "$MODULE/java/de/mibr/hmi/MibrV3Session.java" \

@@ -13,6 +13,9 @@ on:
       - 'tools/build_*.sh'
       - 'tools/check_mu1440_target_shell.py'
       - 'tools/generate_alt111_settings.py'
+      - 'tools/mibr_build_identity.py'
+      - 'target-profiles/**'
+      - 'config-identity.json'
       - 'tools/test_*.sh'
       - 'tools/source-overlays/**'
       - 'runtime/parity/**'
@@ -30,6 +33,9 @@ on:
       - 'tools/build_*.sh'
       - 'tools/check_mu1440_target_shell.py'
       - 'tools/generate_alt111_settings.py'
+      - 'tools/mibr_build_identity.py'
+      - 'target-profiles/**'
+      - 'config-identity.json'
       - 'tools/test_*.sh'
       - 'tools/source-overlays/**'
       - 'runtime/parity/**'
@@ -119,6 +125,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          python3 -B -m unittest discover -s tests -p 'test_mibr_build_identity.py' -v
           python3 -B -m unittest discover -s src/hmi/oem-menu/tests -v
           bash src/hmi/oem-menu/tests/run_view_model_test.sh
           python3 -B src/hmi/oem-menu/generate_catalog.py \

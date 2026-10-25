@@ -96,8 +96,8 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         check(view.screen == MibrCarPlayMenuModel.CATEGORIES, "Ansichten back to the main list");
         menu.select(7);
         check(view.screen == MibrCarPlayMenuModel.ITEMS && "Erweitert".equals(view.title), "Erweitert");
-        String[] advanced = {"CarPlay im Cockpit", "Bildrate", "Quellversion", "Motorart", "Diagnose"};
-        check(view.rows.length == 5, "Erweitert: 3 settings + engine type + Diagnose link");
+        String[] advanced = {"CarPlay im Cockpit", "Bildrate", "Quellversion", "Motorart", "Diagnose", "Version"};
+        check(view.rows.length == 6, "Erweitert: 3 settings + engine type + two read-only subpages");
         for (int i = 0; i < advanced.length; i++) check(advanced[i].equals(view.rows[i]), "Erweitert row " + i);
         check(menu.isEngineRow(3) && !menu.isEngineRow(2) && !menu.isEngineRow(4), "only row 3 is the engine row");
         check(menu.keyForRow(3) == MibrPopupEditorModel.ENGINE && menu.groupForRow(3) == -1, "engine row is a value row (virtual key), never a link");
@@ -127,12 +127,21 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         for (int row = 0; row < 3; row++)
             count += visitSetting(menu, view, visited, row, MibrCarPlayMenuModel.ITEMS);
         check(menu.keyForRow(4) == -1 && menu.groupForRow(4) == 2, "Diagnose link");
+        check(menu.keyForRow(5) == -1 && menu.groupForRow(5) == 3, "Version link");
         menu.select(4);
         check(view.screen == MibrCarPlayMenuModel.ITEMS && "Diagnose".equals(view.title) && view.rows.length == 7,
               "Diagnose seven vehicle-data rows");
         check(view.rows[3].indexOf("Identify") >= 0 && view.rows[4].indexOf("iPhone") >= 0, "diagnostics rows come from status files only");
         menu.back();
         check(view.screen == MibrCarPlayMenuModel.ITEMS && "Erweitert".equals(view.title), "Diagnose back to Erweitert");
+        menu.select(5);
+        check(view.screen == MibrCarPlayMenuModel.ITEMS && "Version".equals(view.title), "Version own page");
+        check(view.rows.length>=1 && view.rows[0].indexOf("Versionsdaten")>=0,"absent metadata never invents version");
+        check(menu.keyForRow(0)==-1 && menu.groupForRow(0)==-1,"version is read-only");
+        menu.select(0);
+        check(view.screen==MibrCarPlayMenuModel.ITEMS && "Version".equals(view.title),"version info rows non-clickable");
+        menu.back();
+        check(view.screen==MibrCarPlayMenuModel.ITEMS && "Erweitert".equals(view.title),"version back to Advanced");
         menu.back();
         check(view.screen == MibrCarPlayMenuModel.CATEGORIES, "Erweitert back to main list");
         check(count == 9, "exactly nine user-facing settings reachable");

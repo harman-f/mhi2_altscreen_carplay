@@ -13,6 +13,7 @@ public final class MibrCarPlayMenuModel {
     private static final String[] ROOT_KEYS = MibrMenuDefinition.ROOT_KEYS;
     /** Submenu reached from inside another submenu instead of the main list. */
     private static final int NESTED = index("diagnostics");
+    private static final int VERSION = index("version");
     private static final int DIAG_ROWS = 7;
     private static final int NESTED_PARENT = index("advanced");
     private static int index(String id) {
@@ -22,15 +23,24 @@ public final class MibrCarPlayMenuModel {
     /** Main-list submenu links (every group except the nested one). */
     private static int[] links() {
         int n = 0;
-        for (int g = 0; g < GROUP_IDS.length; g++) if (g != NESTED) n++;
+        for (int g = 0; g < GROUP_IDS.length; g++) if (g != NESTED && g != VERSION) n++;
         int[] out = new int[n];
         n = 0;
-        for (int g = 0; g < GROUP_IDS.length; g++) if (g != NESTED) out[n++] = g;
+        for (int g = 0; g < GROUP_IDS.length; g++) if (g != NESTED && g != VERSION) out[n++] = g;
         return out;
     }
     private static final int[] LINKS = links();
-    /** Extra link row at the end of a submenu, or -1. */
-    private static int nestedLink(int group) { return group == NESTED_PARENT && NESTED >= 0 ? NESTED : -1; }
+    /** Two read-only subpages under Advanced, never settings keys. */
+    private static int nestedCount(int group) {
+        return group==NESTED_PARENT?(NESTED>=0?1:0)+(VERSION>=0?1:0):0;
+    }
+    private static int nestedLink(int group,int ordinal){
+        if(group!=NESTED_PARENT||ordinal<0||ordinal>=nestedCount(group))return -1;
+        return ordinal==0&&NESTED>=0?NESTED:VERSION;
+    }
+    private static int nestedAtRow(int group,int row){
+        return nestedLink(group,row-count(group)-engineRows(group));
+    }
     /** r46: the "Motorart" row (engine type of the CarPlay Identify) sits in Erweitert after the settings. */
     private static final int VIEWS = index("views");
     /** r56: Erweitert has one virtual row (Motorart); the "Ansichten" submenu has the six view rows. */
@@ -98,7 +108,7 @@ public final class MibrCarPlayMenuModel {
     public static int rootRows() { return ROOT_KEYS.length + LINKS.length; }
     /** Submenu index of a main-list row, or -1 when the row is a setting. */
     public int groupForRow(int row) {
-        if (screen == ITEMS && row == count(group) + engineRows(group) && nestedLink(group) >= 0) return nestedLink(group);
+        if (screen == ITEMS && group == NESTED_PARENT) return nestedAtRow(group,row);
         if (screen != CATEGORIES || row < ROOT_KEYS.length || row >= rootRows()) return -1;
         return LINKS[row - ROOT_KEYS.length];
     }
@@ -133,8 +143,8 @@ public final class MibrCarPlayMenuModel {
             return;
         }
         if (screen != ITEMS) return;
-        if (row == count(group) + engineRows(group) && nestedLink(group) >= 0) {
-            group = nestedLink(group);
+        if (group == NESTED_PARENT && nestedAtRow(group,row) >= 0) {
+            group = nestedAtRow(group,row);
             selected = -1;
             render();
             return;
@@ -149,7 +159,7 @@ public final class MibrCarPlayMenuModel {
         if (screen == DETAIL) {
             screen = group < 0 ? CATEGORIES : ITEMS;
             selected = -1;
-        } else if (screen == ITEMS && group == NESTED) {
+        } else if (screen == ITEMS && (group == NESTED || group == VERSION)) {
             group = NESTED_PARENT;
         } else if (screen == ITEMS) {
             screen = CATEGORIES;
@@ -201,10 +211,12 @@ public final class MibrCarPlayMenuModel {
         } else if (screen == ITEMS) {
             title = groupNames[group];
             int count = count(group);
-            int nested = nestedLink(group);
-            // An empty submenu still renders one row (status line or notice).
+            int nested = nestedCount(group);
             int engine = engineRows(group);
-            rows = new String[count + engine == 0 ? ("diagnostics".equals(GROUP_IDS[group]) ? DIAG_ROWS : 1) : count + engine + (nested >= 0 ? 1 : 0)];
+            int total = count + engine + nested;
+            rows = new String[total==0?
+                ("diagnostics".equals(GROUP_IDS[group])?DIAG_ROWS:
+                 "version".equals(GROUP_IDS[group])?MibrVersionInfo.rows().length:1):total];
             for (int j = 0; j < count; j++) rows[j] = rowLabel(keyAt(group, j));
             if (engine > 0) {
                 if (group == VIEWS) {
@@ -213,12 +225,16 @@ public final class MibrCarPlayMenuModel {
                     rows[count] = MibrI18n.pick("Motorart", "Engine type");
                 }
             }
-            if (nested >= 0) rows[count + engine] = groupNames[nested];
-            if (count == 0 && "diagnostics".equals(GROUP_IDS[group])) {
-                String[] live = MibrVdataDiag.read();
-                for (int j = 0; j < rows.length && j < live.length; j++) rows[j] = live[j];
+            for(int i=0;i<nested;i++)rows[count+engine+i]=groupNames[nestedLink(group,i)];
+            if(count==0 && "diagnostics".equals(GROUP_IDS[group])){
+                String[] live=MibrVdataDiag.read();
+                for(int j=0;j<rows.length && j<live.length;j++)rows[j]=live[j];
             }
-            if (count + engine == 0) detail = "diagnostics".equals(GROUP_IDS[group])
+            if(count==0 && "version".equals(GROUP_IDS[group])){
+                String[] identity=MibrVersionInfo.rows();
+                for(int j=0;j<rows.length && j<identity.length;j++)rows[j]=identity[j];
+            }
+            if (total == 0) detail = "diagnostics".equals(GROUP_IDS[group])
                 ? MibrI18n.pick("Fahrzeugdaten zum iPhone: nur Anzeige, nichts wird hier ge\u00e4ndert.", "Vehicle data to iPhone: display only, nothing is changed here.")
                 : MibrI18n.pick("Noch keine freigegebenen Parameter.", "No approved parameters yet.");
         } else if (screen == DETAIL && selected >= 0) {
