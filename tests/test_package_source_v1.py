@@ -17,7 +17,6 @@ from tools.package_source_v1 import (
     PACKAGE_KIND,
     PackageError,
     _is_excluded,
-    _git,
     build_package,
     collect_source,
     parse_allowlist,
@@ -111,8 +110,7 @@ class SourcePackageV1Tests(unittest.TestCase):
 
     def test_curated_test_scope_excludes_unshipped_experimental_dependencies(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        self.assertTrue((repo_root / "tests/test_public_mibr3.py").is_file())
-        packaged_paths = set(parse_allowlist(_git(repo_root, "show", f"HEAD:{ALLOWLIST_PATH}")))
+        packaged_paths = set(parse_allowlist((repo_root / ALLOWLIST_PATH).read_bytes()))
 
         self.assertIn("tests/test_package_source_v1.py", packaged_paths)
         self.assertNotIn("tests/test_public_mibr3.py", packaged_paths)
@@ -143,6 +141,15 @@ class SourcePackageV1Tests(unittest.TestCase):
         self.assertTrue(commented.splitlines()[0].rstrip().endswith("|"))
         self.assertNotIn("|;\ntee", commented)
         self.assertIn(2, _blocked_command_lines("echo data | # pipeline continues\ntee log\n"))
+        escaped_cases = (
+            "echo data | \\\ntee log\n",
+            "true && \\\nprintf x\n",
+            "false || \\\ntee log\n",
+            "true && pri\\\nntf x\n",
+        )
+        for script in escaped_cases:
+            with self.subTest(script=script):
+                self.assertIn(2, _blocked_command_lines(script))
 
         self.assertEqual(_blocked_command_lines("echo first\necho second\n"), [])
         self.assertEqual(

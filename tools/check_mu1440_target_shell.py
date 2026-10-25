@@ -22,6 +22,7 @@ GREP_BRE_ALTERNATION = re.compile(r"\\\|")
 COMMAND_SEPARATORS = {";", ";;", ";&", ";;&", "&&", "||", "|", "&", "(", ")", "\n"}
 CONTROL_WORDS = {"then", "do", "else", "elif", "if", "while", "until"}
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+LINE_CONTINUATION_MARKER = "\x01"
 
 
 def _is_allowed_bundled_helper(token: str, command_name: str) -> bool:
@@ -180,7 +181,14 @@ def _scan_command_tokens(script_text: str) -> list[int]:
     lexer.whitespace_split = True
     lexer.commenters = "#"
     try:
-        tokens = [(token, lexer.lineno) for token in lexer]
+        tokens = []
+        for token in lexer:
+            # shlex keeps an escaped physical newline inside the word, which can
+            # hide an executable at a command position. The marker identifies
+            # only those newlines, leaving quoted multiline strings and ordinary
+            # newline separators intact.
+            token = token.replace("\n" + LINE_CONTINUATION_MARKER, "")
+            tokens.append((token, lexer.lineno))
     except ValueError:
         # Keep malformed shell lines visible to the gate; they need a manual fix.
         return [lexer.lineno]
@@ -360,6 +368,8 @@ def _terminate_unquoted_newlines(script_text: str) -> str:
             continue
         if escaped:
             output.append(char)
+            if char == "\n":
+                output.append(LINE_CONTINUATION_MARKER)
             escaped = False
             if char != "\n":
                 pending_operator = None
@@ -468,6 +478,10 @@ def self_test() -> None:
             ("true &&\nprintf x\n", "multiline AND-list printf"),
             ("false ||\ntee log.txt\n", "multiline OR-list tee"),
             ("echo data | # comment\ntee log.txt\n", "commented multiline pipeline tee"),
+            ("echo data | \\\ntee log.txt\n", "escaped multiline pipeline tee"),
+            ("true && \\\nprintf x\n", "escaped multiline AND-list printf"),
+            ("false || \\\ntee log.txt\n", "escaped multiline OR-list tee"),
+            ("true && pri\\\nntf x\n", "split command-name printf"),
         ):
             script.write_text(source, encoding="utf-8")
             problems = scan(script)
