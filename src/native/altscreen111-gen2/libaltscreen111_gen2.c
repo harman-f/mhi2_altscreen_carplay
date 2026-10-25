@@ -3108,7 +3108,19 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
      * cluster URL capabilities.  Observe the exact stock MU1440 baseline
      * before mutating the clone; do not synthesize capability arrays here.
      */
-    log_stock_url_capability(base,"altScreenSuggestUIURLs");
+    /* The root EndpointInfo is what iOS reads. Log only shape/count here;
+     * advertising URLs may contain user context and must not be copied into
+     * a new root log verbatim. */
+    {
+        CFStringRef key=s_cf("altScreenSuggestUIURLs");
+        CFTypeRef value=key?(CFTypeRef)p_CFDictionaryGetValue(base,key):NULL;
+        if(!value)logf_u2("GEN2 stock ROOT altScreenSuggestUIURLs=<absent>");
+        else if(p_CFGetTypeID(value)==p_CFArrayGetTypeID())
+            logf_u2("GEN2 stock ROOT altScreenSuggestUIURLs=array count=%ld",
+                    (long)p_CFArrayGetCount((CFArrayRef)value));
+        else logf_u2("GEN2 stock ROOT altScreenSuggestUIURLs=invalid-type");
+        if(key)p_CFRelease(key);
+    }
     log_stock_url_capability(stock_display,"altScreenSuggestUIURLs");
     log_stock_url_capability(stock_display,"altScreenURLs");
     log_stock_url_capability(stock_display,"uiContextURLs");
