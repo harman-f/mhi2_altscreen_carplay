@@ -3,7 +3,7 @@
 **State: SOURCE-ONLY DRAFT; unmerged, not on Unit, not in upcoming acceptance image.**
 
 - Code branch: `work/suggestui-root-advertisement-review-20261025` based on `main` (not the owner's unpushed newer acceptance branch).
-- Research authority: [CaneTLOTW/M.I.B._Research#129](https://github.com/CaneTLOTW/M.I.B._Research/issues/129), especially comments [root-scope evidence](https://github.com/CaneTLOTW/M.I.B._Research/issues/129#issuecomment-6391479710) and [owner's no-menu/no-auto policy](https://github.com/CaneTLOTW/M.I.B._Research/issues/129#issuecomment-6394796194).
+- Internal owner research handoff: issue #129 (private; intentionally not linked or copied into this public source repository). Owner decision: no new menu/toggle or automatic acceptance until non-empty suggestions have been passively verified.
 - **Owner's latest request** is to implement the discovered wire fix **in source code** and have Codex Luna review it. This supersedes the earlier research-only restriction **for an isolated code branch only**; it does **not** authorize merging into the current acceptance candidate, uploading binaries to the HU, or implementing automatic UI selection.
 
 ## 1. Exact source-backed bug
