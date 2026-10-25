@@ -10,6 +10,7 @@ import unittest
 
 
 SOURCE = Path(__file__).resolve().parents[1] / "libaltscreen111_gen2.c"
+SETTINGS_HEADER = Path(__file__).resolve().parents[2] / "alt111-settings/include/alt111_settings.h"
 
 
 def section(source: str, start: str, end: str) -> str:
@@ -71,10 +72,17 @@ class SuggestUIRootContract(unittest.TestCase):
         ix = self.server.index("if(!compat_profile_exact_reference() && !add_alt_suggest_ui_urls(info))")
         self.assertIn("return base;", self.server[ix:ix + 350])
 
-    def test_list_not_truncated_at_previous_192_byte_buffer(self):
-        self.assertIn("char blob[2048],url[2048];", self.writer)
+    def test_url_buffer_matches_validated_setting_storage_limit(self):
+        settings_header = SETTINGS_HEADER.read_text(encoding="utf-8")
+        self.assertRegex(settings_header, r"#define ALT111_SETTING_VALUE_CAP 192u")
+        self.assertIn("char blob[2048],url[192];", self.writer)
         self.assertIn('config_line_value(blob,"urls",url,sizeof(url))', self.writer)
         self.assertIn('read_layered_value(g_ui_urls_config_name', self.writer)
+
+    def test_string_allocation_failure_fails_closed_before_root_write(self):
+        self.assertIn("if(!item)goto done;", self.writer)
+        self.assertEqual(self.writer.count("if(!item)goto done;"), 2)
+        self.assertLess(self.writer.index("if(!item)goto done;"), self.writer.index("p_CFDictionarySetValue(info,key,urls);"))
 
     def test_root_logging_is_shape_only(self):
         self.assertIn("GEN2 stock ROOT altScreenSuggestUIURLs=array count=", self.server)

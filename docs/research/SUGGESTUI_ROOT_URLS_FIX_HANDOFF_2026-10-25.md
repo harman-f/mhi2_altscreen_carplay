@@ -24,7 +24,7 @@ Source: `src/native/altscreen111-gen2/libaltscreen111_gen2.c`.
 1. The existing `add_alt_suggest_ui_urls` function now takes the **root** CFMutableDictionary (`info`) and writes the same existing `CFArray<CFString>` there using exactly the key `altScreenSuggestUIURLs`. It checks readback, logs root count/source, and makes failed construction return stock `/info`. The original URL roles and settings precedence remain unchanged.
 2. It is called only **after** the synthetic secondary display has been appended and `info["displays"]` has been written, and only when `!compat_profile_exact_reference()`. Classic single-view/strict parity keeps its existing no-advertisement contract.
 3. A potentially inherited/misplaced `altScreenSuggestUIURLs` on **synthetic display `alt` only** is removed in the MIBR profile. The stock/Main display and existing `initialURL`, `altScreenURLs`, video streams, UUIDs, ViewAreas, codec pixels and parity data plane are not deliberately altered.
-4. Prior `url[192]` parsing scratch was raised to `url[2048]` to avoid silently clipping a configured `urls=...|...|...` list before conversion (still bounded by the underlying `blob[2048]` render and existing max 8 URLs).
+4. `presentation.suggested_urls` uses the existing settings schema and remains bounded by `ALT111_SETTING_VALUE_CAP=192` bytes including the NUL terminator (191 printable bytes). The group renderer validates the URL list before this code reads it; it permits at most eight supported URLs. The writer keeps a matching `url[192]` scratch buffer. No storage or schema limit was raised, and `|` remains the unescaped list separator.
 5. Original root capability logger checks only **existence, CFType and array count**; it does not newly print raw root URL values. The legacy nested stock-display diagnostics are otherwise untouched.
 6. The existing `mibr_platform_control` `suggestUI` path remains exactly **LIVI_NOOP**: stock may return `-6714`, our private Type111 reply may return success, optional D2 scheduling continues. **No storing inbound candidate URLs, no `showUI`, no followSuggestions switch, no new registry key, no HMI changes.**
 
@@ -98,7 +98,7 @@ Relevant hard facts from QNX job `121111841775`:
 1. **Compare exact current vehicle-acceptance source/release**, which may live in a newer unpublished branch. Do not overwrite the owner's new Scaling menu, steering mappings, viewarea or recovery work merely because this draft began from public `main`. If latest source is inaccessible, mark integration BLOCKED, complete source review and preserve draft isolation.
 2. **Prove wire contract**: iOS CarKit reading `EndpointInfo.altScreenSuggestUIURLs` from the root vs GEN2 root writer; determine whether full `AirPlayCopyServerInfo` output is what CarKit consumes. Compare canonical URL equality, display typing, initial URL and iOS version assumptions.
 3. **Audit ownership/error handling** in `add_alt_suggest_ui_urls`, `gen2_serverinfo_scoped`, CF retain/release, fail-closed stock fallback and strict classic profile; verify a failed root insertion doesn't create a partial/mutated stock dictionary.
-4. **Audit config source**: `mibr-carplay111-ui-urls.conf`, `read_layered_value`, `config_line_value` and the maximum field/storage size. The local 2048-byte scratch buffer alone does not prove all paths accept a long multi-URL list. Check malformed entries, escaping, exact-match URLs, duplicate roles and max-eight cap; do not silently invent a new schema.
+4. **Audit config source**: `mibr-carplay111-ui-urls.conf`, `read_layered_value`, `config_line_value` and the maximum field/storage size. The setting storage is capped at 192 bytes including NUL (191 printable bytes), and the renderer accepts up to eight supported URLs. Keep malformed-entry, separator and role handling within that existing schema; do not silently invent a new one.
 5. **Run focused source test explicitly**:
    ```sh
    python3 -m unittest discover -s src/native/altscreen111-gen2/tests -p 'test_suggestui_root_contract.py' -v
@@ -112,3 +112,36 @@ Relevant hard facts from QNX job `121111841775`:
 Post a review summary on draft PR #67 and update this handoff if test results affect assumptions. Verdict must be exactly one of **PASS_SOURCE_ONLY**, **CHANGES_REQUESTED**, **BLOCKED_BY_CURRENT_ACCEPTANCE_SOURCE**; attach exact commit SHA, tests with observed outputs, unresolved cases, and release-safety confirmation. A PASS_SOURCE_ONLY never means the iPhone emitted a non-empty `suggestUI` or that the car is qualified.
 
 **Explicitly excluded:** Installing, merging, releasing, automatically switching to incoming Suggestions, creating a `navigation.followSuggestions` settings key or UI, or modifying the currently scheduled acceptance image.
+
+## 7. Local review and build receipt (2026-10-25; GitHub Actions not rerun)
+
+The review branch received a narrow correction after inspecting the actual settings storage contract:
+
+- The iOS source comments now name the pinned iOS 26.1 analysis consistently.
+- `add_alt_suggest_ui_urls` fails closed if any configured/default CFString allocation fails. No partial URL list is written; a failed root insertion/readback returns the original stock `/info` through the existing caller path.
+- The writer now checks `CFArrayGetCount` after each append. A missing or partial append fails before the root dictionary is changed; the compiled CF-like fixture covers this simulated failure.
+- The URL scratch buffer is `192` bytes, matching the validated `ALT111_SETTING_VALUE_CAP` including NUL. The earlier claim that the setting could exceed that cap was incorrect; no schema or persistence change is needed.
+
+R57 remains the current owner-confirmed acceptance line. Its source inventory identifies GEN2 as the R38 overlay and records the same installed library identity, `304b5079374a08ed9a763528217476b29ad49e000ba25d0372ed4147cbb9a705`; this patch is based on that native source line. The separate R58 scaling candidate is still pending acceptance and was not integrated or modified. A source-controlled, exact-branch override applies only to `libaltscreen111.so` on `work/suggestui-root-advertisement-review-20261025`; all eight other build identities keep their original pins, and unlisted refs select the production baseline.
+
+Observed local results using `mibr-qnx65-temp:4.9` (Docker image ID `sha256:46f795c04e3d0a1058d621901b7d6cf9fb64411dc65a7db29ae3d86f61560c0c`; documented toolchain source `luka-dev/qnx65-armv7-toolchain@56a66557245af14077678cd28a83ce3a337d9e2d`, Dockerfile SHA-256 `9a867a7ae70f2c0222a241b80232856526ccec0db2cfe013f8991ca31c74bcb1`) and a disposable `mibr-hostnative:latest` container:
+
+- Full MU1440 QNX source build: `MU1440_SOURCE_QNX_BUILD=PASS`.
+- Exact review-branch identity check: `SOURCE_IDENTITIES=PASS count=9`; candidate `libaltscreen111.so` SHA-256 is `f6064f1eb4deabf280a502ce2742c3b366e44edec60966c6e400fbbcd4e8860e`. Each of the other eight artifacts matched its unchanged production pin.
+- Production profile check: expected rejection of this candidate on `main`, with exactly one mismatch (`libaltscreen111.so`); the frozen production SHA remains unchanged.
+- Static suggestUI source-contract tests: 11/11 PASS.
+- Compiled CF-like writer fixture: PASS for root placement, complete defaults, allocation and append failure, dictionary readback failure and no mutation on failed construction. Strict classic-profile suppression is covered by the source-contract test.
+- Hash-selection tests: 6/6 PASS for production baseline, exact candidate ref, unlisted refs, protected unaffected artifacts and invalid/missing policy inputs.
+- The full local host workflow passed: GEN2 and parity component suites; QNX shell gate; MIBR/3 host build and 29 tests; OEM menu 6 tests, Java view-model tests and generated-catalog check. After correcting the fixture setup for the simulated append failure, the compiled CF fixture was rerun standalone and passed.
+
+Source-level lifecycle matrix (no iPhone transaction observed):
+
+| Phase | Source behavior | Evidence boundary |
+| --- | --- | --- |
+| Idle | Root `/info` advertises the configured URL roles or the existing defaults; no `showUI` is issued. | Compiled CF-like fixture and source contract. |
+| Route active | Incoming `suggestUI` remains `LIVI_NOOP`; the implementation adds no selection cache or automatic route switch. | Source inspection only. |
+| Withdrawal | This change adds no withdrawal state, reconnect or route restoration action. The iOS withdrawal sequence remains unverified. | No iPhone/Unit test. |
+
+Review verdict: **PASS_SOURCE_ONLY**. The result does not qualify R57/R58 on a Unit or establish that an iPhone emits a non-empty `suggestUI` transaction.
+
+GitHub Actions were not triggered because the account run quota was exhausted. No Unit/phone test, deployment, acceptance-image update, merge or release was performed. The candidate library hash above is a local build identity, not an install-ready or vehicle-qualified artifact.

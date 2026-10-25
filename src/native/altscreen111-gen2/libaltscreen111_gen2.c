@@ -2555,7 +2555,7 @@ static void remove_key(CFMutableDictionaryRef d, const char *name)
 }
 
 /*
- * iOS 27.2 builds navigator cluster UI candidates and intersects them with the
+ * iOS 26.1 builds navigator cluster UI candidates and intersects them with the
  * receiver-advertised altScreenSuggestUIURLs list. Stock MU1440 has no such
  * key because it has no auxiliary cluster display. Apple reads this capability
  * from the ROOT EndpointInfo dictionary, NOT from displays[n]. It describes
@@ -2568,7 +2568,7 @@ static int add_alt_suggest_ui_urls(CFMutableDictionaryRef info)
 {
     CFMutableArrayRef urls=NULL;
     CFStringRef key=NULL,item=NULL;
-    char blob[2048],url[2048];
+    char blob[2048],url[192];
     unsigned layer=0u;
     int i,count=0,ok=0;
     if(!info)return 0;
@@ -2582,7 +2582,9 @@ static int add_alt_suggest_ui_urls(CFMutableDictionaryRef info)
             for(i=0;i<8 && p && *p;++i){
                 char *end=strchr(p,'|');if(end)*end=0;
                 item=s_cf(p);
-                if(item){p_CFArrayAppendValue(urls,item);p_CFRelease(item);item=NULL;++count;}
+                if(!item)goto done;
+                p_CFArrayAppendValue(urls,item);p_CFRelease(item);item=NULL;++count;
+                if(!p_CFArrayGetCount || p_CFArrayGetCount(urls)!=count)goto done;
                 p=end ? end+1 : NULL;
             }
         }
@@ -2594,10 +2596,11 @@ static int add_alt_suggest_ui_urls(CFMutableDictionaryRef info)
         };
         for(i=0;i<3;++i){
             item=s_cf(defaults[i]);
-            if(!item)continue;
+            if(!item)goto done;
             p_CFArrayAppendValue(urls,item);
             p_CFRelease(item); item=NULL;
             ++count;
+            if(!p_CFArrayGetCount || p_CFArrayGetCount(urls)!=count)goto done;
         }
         layer=0u;
     }
@@ -3104,7 +3107,7 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         return base;
     }
     /*
-     * iOS 27.2 intersects provider suggestions with receiver-advertised
+     * iOS 26.1 intersects provider suggestions with receiver-advertised
      * cluster URL capabilities.  Observe the exact stock MU1440 baseline
      * before mutating the clone; do not synthesize capability arrays here.
      */
