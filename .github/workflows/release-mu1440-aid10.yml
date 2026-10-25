@@ -245,20 +245,6 @@ jobs:
             --notes-file "$NOTES" \
             --prerelease
 
-          # Keep exactly one visible release. Remove older developer releases and tags
-          # only after the new current release has been created successfully.
-          gh release list --limit 100 --json tagName --jq '.[].tagName' | while IFS= read -r OLD; do
-            [ -n "$OLD" ] || continue
-            [ "$OLD" = "$TAG" ] && continue
-            gh release delete "$OLD" --yes --cleanup-tag
-          done
-
-          # A manually deleted release may have left its tag behind. Remove historical
-          # developer-release tags as well, preserving only the stable current tag.
-          git ls-remote --tags --refs origin 'refs/tags/mu1440-aid10-dev-*' |
-            awk '{sub("refs/tags/","",$2); print $2}' |
-            while IFS= read -r OLD; do
-              [ -n "$OLD" ] || continue
-              [ "$OLD" = "$TAG" ] && continue
-              git push origin ":refs/tags/$OLD"
-            done
+          # Historical releases/tags are immutable evidence. Never sweep or delete
+          # unrelated tags here. This legacy dev-current alias is intentionally
+          # distinct from future immutable, versioned product releases.
