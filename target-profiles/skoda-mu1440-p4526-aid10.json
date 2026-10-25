@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "id": "skoda-mu1440-p4526-aid10",
+  "brand": "SKODA",
+  "qualification": "source-reference",
+  "firmware_train": "MHI2_ER_SKG13_P4526",
+  "mu_version": "MU1440",
+  "cluster_family": "AID10"
+}

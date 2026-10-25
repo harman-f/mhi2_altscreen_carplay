@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "configurations": [
+    {
+      "path": "settings/registry.json",
+      "schema_version": 2,
+      "brand": "GENERIC"
+    },
+    {
+      "path": "src/hmi/oem-menu/menu-definition.json",
+      "schema_version": 3,
+      "brand": "SKODA"
+    }
+  ]
+}
