@@ -238,7 +238,6 @@ tests/mibr-control/test_service_host.py
 tests/parity_session_lifecycle.py
 tests/parity_session_logging.py
 tests/test_package_source_v1.py
-tests/test_public_mibr3.py
 tests/test_three_views.c
 tests/test_vdata.c
 tests/test_vstatus.c

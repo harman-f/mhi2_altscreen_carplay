@@ -339,17 +339,31 @@ def _terminate_unquoted_newlines(script_text: str) -> str:
     quote: str | None = None
     in_comment = False
     escaped = False
+    pending_operator: str | None = None
+    previous_operator: str | None = None
+
+    def terminate_line() -> None:
+        if pending_operator in {"|", "||", "&&"}:
+            output.append("\n")
+        else:
+            output.extend((";", "\n"))
+
     for index, char in enumerate(script_text):
         if in_comment:
             if char == "\n":
-                output.extend((";", "\n"))
+                terminate_line()
                 in_comment = False
+                pending_operator = None
+                previous_operator = None
             else:
                 output.append(" ")
             continue
         if escaped:
             output.append(char)
             escaped = False
+            if char != "\n":
+                pending_operator = None
+                previous_operator = None
             continue
         if char == "\\" and quote != "'":
             output.append(char)
@@ -359,11 +373,15 @@ def _terminate_unquoted_newlines(script_text: str) -> str:
             output.append(char)
             if char == "'":
                 quote = None
+                pending_operator = None
+                previous_operator = None
             continue
         if quote == '"':
             output.append(char)
             if char == '"':
                 quote = None
+                pending_operator = None
+                previous_operator = None
             continue
         if char == "#" and (index == 0 or script_text[index - 1].isspace() or script_text[index - 1] in ";|&"):
             output.append(" ")
@@ -372,11 +390,28 @@ def _terminate_unquoted_newlines(script_text: str) -> str:
         if char in {"'", '"'}:
             quote = char
             output.append(char)
+            pending_operator = None
+            previous_operator = None
             continue
         if char == "\n":
-            output.extend((";", "\n"))
+            terminate_line()
+            pending_operator = None
+            previous_operator = None
             continue
         output.append(char)
+        if char in " \t\r":
+            previous_operator = None
+            continue
+        if char == "|":
+            pending_operator = "||" if previous_operator == "|" else "|"
+            previous_operator = "|"
+            continue
+        if char == "&":
+            pending_operator = "&&" if previous_operator == "&" else None
+            previous_operator = "&"
+            continue
+        pending_operator = None
+        previous_operator = None
     return "".join(output)
 
 
@@ -428,6 +463,40 @@ def self_test() -> None:
         assert not scan(script), "quoted diagnostic text was mistaken for a command"
         script.write_text("command -v sha256sum >/dev/null 2>&1\n", encoding="utf-8")
         assert not scan(script), "command availability probe was mistaken for execution"
+        for source, description in (
+            ("echo data |\ntee log.txt\n", "multiline pipeline tee"),
+            ("true &&\nprintf x\n", "multiline AND-list printf"),
+            ("false ||\ntee log.txt\n", "multiline OR-list tee"),
+            ("echo data | # comment\ntee log.txt\n", "commented multiline pipeline tee"),
+        ):
+            script.write_text(source, encoding="utf-8")
+            problems = scan(script)
+            assert any(":2:" in problem for problem in problems), (
+                f"{description} was not rejected on the continued command line"
+            )
+        for source, continuation, description in (
+            ("echo data |\ntee log.txt\n", "|\ntee", "pipeline"),
+            ("true &&\nprintf x\n", "&&\nprintf", "AND-list"),
+            ("false ||\ntee log.txt\n", "||\ntee", "OR-list"),
+        ):
+            normalized = _terminate_unquoted_newlines(source)
+            assert continuation in normalized, f"{description} continuation was split with a semicolon"
+            assert continuation.replace("\n", ";\n") not in normalized, (
+                f"{description} continuation contains a statement separator"
+            )
+        commented = _terminate_unquoted_newlines("echo data | # comment\ntee log.txt\n")
+        assert commented.splitlines()[0].rstrip().endswith("|"), (
+            "commented pipeline continuation was split with a semicolon"
+        )
+        assert "|;\ntee" not in commented, "commented pipeline continuation contains a separator"
+        script.write_text("echo first\necho second\n", encoding="utf-8")
+        assert not scan(script), "ordinary statement newlines were mistaken for continuation"
+        script.write_text('echo "literal | && || tee printf"\necho done\n', encoding="utf-8")
+        assert not scan(script), "quoted operator/command text was mistaken for shell syntax"
+        script.write_text('echo "literal | && || tee\nprintf"\necho done\n', encoding="utf-8")
+        assert not scan(script), "quoted multiline operator/command text was mistaken for syntax"
+        script.write_text("echo data \\\ntee log.txt\n", encoding="utf-8")
+        assert not scan(script), "a continued echo argument was mistaken for a tee command"
         script.write_text("sha256sum input.bin\n", encoding="utf-8")
         assert scan(script), "unbundled sha256sum command was not rejected"
         script.write_text("case x in x) sha256sum input.bin;; esac\n", encoding="utf-8")

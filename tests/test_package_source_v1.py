@@ -12,14 +12,17 @@ import unittest
 from unittest.mock import patch
 
 from tools.package_source_v1 import (
+    ALLOWLIST_PATH,
     MANIFEST_NAME,
     PACKAGE_KIND,
     PackageError,
     _is_excluded,
+    _git,
     build_package,
     collect_source,
     parse_allowlist,
 )
+from tools.check_mu1440_target_shell import _blocked_command_lines, _terminate_unquoted_newlines
 
 
 class SourcePackageV1Tests(unittest.TestCase):
@@ -105,6 +108,50 @@ class SourcePackageV1Tests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(first[0].read_bytes()).hexdigest(), detached["archive"]["sha256"])
         checks = first[2].read_text(encoding="ascii").splitlines()
         self.assertIn(detached["archive"]["sha256"], checks[0])
+
+    def test_curated_test_scope_excludes_unshipped_experimental_dependencies(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        self.assertTrue((repo_root / "tests/test_public_mibr3.py").is_file())
+        packaged_paths = set(parse_allowlist(_git(repo_root, "show", f"HEAD:{ALLOWLIST_PATH}")))
+
+        self.assertIn("tests/test_package_source_v1.py", packaged_paths)
+        self.assertNotIn("tests/test_public_mibr3.py", packaged_paths)
+        self.assertNotIn("src/experimental/mibr3/api_v3_contract.py", packaged_paths)
+        self.assertNotIn("src/experimental/mibr3/mibr_v3_parity_mailbox.c", packaged_paths)
+        self.assertNotIn("src/experimental/mibr3/mibr_v3_parity_mailbox_probe.c", packaged_paths)
+        self.assertNotIn("src/experimental/mibr3/mibr_v3_owner_lifecycle.c", packaged_paths)
+        self.assertNotIn("src/experimental/mibr3/mibr_v3_owner_lifecycle_probe.c", packaged_paths)
+
+    def test_experimental_test_cannot_be_reintroduced_through_the_allowlist(self) -> None:
+        with self.assertRaisesRegex(PackageError, "outside the curated product closure"):
+            parse_allowlist(
+                ("tools/source-package-v1.paths\ntests/test_public_mibr3.py\n").encode("utf-8")
+            )
+
+    def test_target_shell_gate_detects_forbidden_commands_after_multiline_operators(self) -> None:
+        cases = (
+            ("echo data |\ntee log\n", "echo data |\ntee log;\n", "tee"),
+            ("true &&\nprintf x\n", "true &&\nprintf x;\n", "printf"),
+            ("false ||\ntee log\n", "false ||\ntee log;\n", "tee"),
+        )
+        for script, expected_normalized, command in cases:
+            with self.subTest(script=script):
+                self.assertEqual(_terminate_unquoted_newlines(script), expected_normalized)
+                self.assertIn(2, _blocked_command_lines(script), command)
+
+        commented = _terminate_unquoted_newlines("echo data | # pipeline continues\ntee log\n")
+        self.assertTrue(commented.splitlines()[0].rstrip().endswith("|"))
+        self.assertNotIn("|;\ntee", commented)
+        self.assertIn(2, _blocked_command_lines("echo data | # pipeline continues\ntee log\n"))
+
+        self.assertEqual(_blocked_command_lines("echo first\necho second\n"), [])
+        self.assertEqual(
+            _blocked_command_lines('echo "literal | && || tee printf"\necho done\n'), []
+        )
+        self.assertEqual(
+            _blocked_command_lines('echo "literal | && || tee\nprintf"\necho done\n'), []
+        )
+        self.assertEqual(_blocked_command_lines("echo data \\\ntee log\n"), [])
 
     def test_path_type_and_private_path_exclusions(self) -> None:
         manifest, files = collect_source(self.repo)

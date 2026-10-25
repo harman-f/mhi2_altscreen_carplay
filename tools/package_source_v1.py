@@ -77,7 +77,7 @@ ALLOWED_ROOT_FILES = {
 }
 ALLOWED_TOP_TEST_RE = re.compile(
     r"tests/(?:alt111_[A-Za-z0-9_.-]+|direct_ts_parity_[A-Za-z0-9_.-]+|"
-    r"parity_session_(?:lifecycle|logging)\.py|test_three_views\.c|test_public_mibr3\.py|"
+    r"parity_session_(?:lifecycle|logging)\.py|test_three_views\.c|"
     r"test_vdata\.c|test_vstatus\.c)"
 )
 EXCLUDED_COMPONENTS = {"artifacts", "release", ".research"}
