@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "configurations": [
+    {
+      "path": "settings/registry.json",
+      "schema_version": 2,
+      "brand": "GENERIC"
+    }
+  ]
+}

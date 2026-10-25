@@ -111,7 +111,15 @@ def properties(identity):
             "target_profile_sha256": identity["target_profile_sha256"],
             "config_count": str(len(identity["configurations"])),
             "identity_stage": identity["stage"]}
-    return "".join(k + "=" + keys[k] + "\n" for k in sorted(keys))
+    lines = [k + "=" + keys[k] + "\n" for k in sorted(keys)]
+    for index, entry in enumerate(identity["configurations"]):
+        # Path and digest stay in JSON; HMI uses a short, read-only display record.
+        prefix = "config." + str(index) + "."
+        lines.extend((prefix + "name=" + Path(entry["path"]).name + "\n",
+                      prefix + "schema=" + str(entry["schema_version"]) + "\n",
+                      prefix + "brand=" + entry["brand"] + "\n",
+                      prefix + "sha256=" + entry["sha256"] + "\n"))
+    return "".join(lines)
 
 
 def elf_note(identity, component):

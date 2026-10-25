@@ -30,6 +30,12 @@ class BuildIdentityTests(unittest.TestCase):
     def test_generic_is_not_vehicle_qualified(self):
         with self.assertRaisesRegex(ValueError, "CONFIG_BRAND_MISMATCH"):
             self.make("target-profiles/generic.json")
+        generic = make_identity(ROOT,"1.3.3",SHA,ROOT/"target-profiles/generic.json",
+                                ROOT/"config-identity-generic.json")
+        self.assertEqual(generic["target_brand"],"GENERIC")
+        self.assertEqual(generic["target_qualification"],"unqualified")
+        self.assertEqual(len(generic["configurations"]),1)
+        self.assertEqual(generic["configurations"][0]["brand"],"GENERIC")
         validate_profile({"schema":1,"id":"generic","brand":"GENERIC","qualification":"unqualified",
                           "firmware_train":None,"mu_version":None,"cluster_family":None})
         with self.assertRaisesRegex(ValueError, "GENERIC_CANNOT_ASSERT_TARGET"):
@@ -80,6 +86,9 @@ class BuildIdentityTests(unittest.TestCase):
         txt = properties(self.make())
         self.assertIn("target_brand=SKODA\n",txt)
         self.assertIn("identity_stage=SOURCE_ONLY\n",txt)
+        self.assertIn("config.0.brand=GENERIC\n",txt)
+        self.assertIn("config.1.brand=SKODA\n",txt)
+        self.assertIn("config.0.schema=3\n",txt)
         self.assertNotIn("package_id=",txt)
         txt.encode("ascii")
         self.assertEqual(len(txt.splitlines()),len(set(txt.splitlines())))

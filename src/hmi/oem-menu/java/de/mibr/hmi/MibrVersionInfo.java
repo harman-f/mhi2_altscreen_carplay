@@ -36,19 +36,33 @@ public final class MibrVersionInfo {
         if(!"1".equals(p.getProperty("identity_schema"))||
            !"MIBR-CarPlay".equals(p.getProperty("product")))
             return new String[]{MibrI18n.pick("Versionsdaten ungueltig","Invalid version metadata")};
+        return rowsFor(p);
+    }
+    /** Pure formatter for Java host tests and fail-closed read-only presentation. */
+    static String[] rowsFor(Properties p){
+        if(!"1".equals(p.getProperty("identity_schema"))||
+           !"MIBR-CarPlay".equals(p.getProperty("product")))
+            return new String[]{MibrI18n.pick("Versionsdaten ungueltig","Invalid version metadata")};
         String git=safe(p,"source_commit");
         if(git.length()==40||git.length()==64)git=git.substring(0,12);
         String state=safe(p,"identity_stage");
         String status="INSTALLED_VERIFIED".equals(state)
             ? MibrI18n.pick("Installationsbeleg vorhanden (Laufzeit ungeprueft)","Installation receipt present (runtime unverified)")
             : MibrI18n.pick("Nur Build-Metadaten, keine Installation bestaetigt","Build metadata only, installation unconfirmed");
-        return new String[]{
-            MibrI18n.pick("Version: ","Version: ")+safe(p,"product_version"),
-            MibrI18n.pick("Marke: ","Brand: ")+brand(safe(p,"target_brand")),
-            "Target: "+safe(p,"target_profile_id"),
-            "Source: "+git,
-            MibrI18n.pick("Konfigurationen: ","Configurations: ")+safe(p,"config_count"),
-            status
-        };
+        int count=0;
+        try{count=Integer.parseInt(safe(p,"config_count"));}catch(NumberFormatException ignored){}
+        if(count<0||count>12)count=0;
+        String[] rows=new String[5+count];
+        rows[0]=MibrI18n.pick("Version: ","Version: ")+safe(p,"product_version");
+        rows[1]=MibrI18n.pick("Marke: ","Brand: ")+brand(safe(p,"target_brand"));
+        rows[2]="Target: "+safe(p,"target_profile_id");
+        rows[3]="Source: "+git;
+        for(int i=0;i<count;i++){
+            String prefix="config."+i+".";
+            rows[4+i]=safe(p,prefix+"name")+" v"+safe(p,prefix+"schema")+
+                      " ["+brand(safe(p,prefix+"brand"))+"]";
+        }
+        rows[4+count]=status;
+        return rows;
     }
 }
