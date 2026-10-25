@@ -28,7 +28,6 @@ def _is_allowed_bundled_helper(token: str, command_name: str) -> bool:
     bundled_paths = {
         "tee": {
             "$BASE/bin/tee", "${BASE}/bin/tee", "$PAYLOAD/tee", "${PAYLOAD}/tee",
-            "/mnt/app/root/altscreen-u2/bin/tee",
         },
         "sha256sum": {
             "$BASE/bin/sha256sum", "${BASE}/bin/sha256sum",
