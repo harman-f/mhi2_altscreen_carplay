@@ -1,34 +1,36 @@
-"""Guard against destructive cleanup of historical MU1440 releases.
-
-The legacy 'dev-current' alias has its own historical behavior. This gate
-covers all *unrelated* release/tag identities, which must never be deleted
-as a side effect of updating that alias.
-"""
+"""Regression gate: retired developer publisher cannot mutate tags/releases."""
+from pathlib import Path
 import re
 import unittest
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/release-mu1440-aid10.yml"
+POLICY = ROOT / "docs/build/RELEASE_HISTORY_POLICY.md"
+HISTORY = ROOT / "release/CURRENT.md"
 
 
 class ReleaseHistorySafety(unittest.TestCase):
-    def test_legacy_release_has_no_global_cleanup(self):
-        text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn('TAG: mu1440-aid10-dev-current', text)
-        self.assertIn('gh release create "$TAG"', text)
-        self.assertNotIn('gh release list', text)
-        self.assertNotIn('gh release delete "$OLD"', text)
-        self.assertNotIn('git ls-remote --tags', text)
-        self.assertNotIn('git push origin ":refs/tags/$OLD"', text)
-        self.assertNotRegex(text, r'gh\s+release\s+delete\s+\$\{?OLD')
-        self.assertNotRegex(text, r'gh\s+release\s+delete\s+--.*\$\{?OLD')
+    def test_retired_workflow_has_no_write_capability(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("contents: read", workflow)
+        self.assertIn("Legacy developer publisher retired", workflow)
+        self.assertNotIn("contents: write", workflow)
+        self.assertNotRegex(workflow, r"(?m)^\s*push\s*:")
+        self.assertNotRegex(workflow, r"(?im)\bgh\s+release\s+(?:create|delete|edit|upload)\b")
+        self.assertNotRegex(workflow, r"(?im)\bgit\s+push\b")
+        self.assertNotRegex(workflow, r"(?im)\bgh\s+api\b")
+        self.assertNotIn("actions/upload-release-asset", workflow.lower())
+        self.assertNotIn("softprops/action-gh-release", workflow.lower())
 
-    def test_legacy_release_requires_publication_checks(self):
-        text = WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn('Final release audit', text)
-        self.assertIn('Assemble self-contained SD-root package', text)
-        self.assertIn('sha256sum "$ZIP_NAME"', text)
+    def test_history_and_immutable_policy_are_distinct(self):
+        policy = POLICY.read_text(encoding="utf-8")
+        history = HISTORY.read_text(encoding="utf-8")
+        self.assertIn("retired", policy.lower())
+        self.assertIn("immutable", policy.lower())
+        self.assertIn("withdrawn", history.lower())
+        self.assertIn("mu1440-aid10-dev-current", history)
+        self.assertIn("not an installable public 1.3.2", history.lower())
 
 
 if __name__ == "__main__":
