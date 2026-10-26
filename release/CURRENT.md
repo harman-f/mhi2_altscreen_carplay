@@ -1,8 +1,20 @@
-# MU1440 / AID10 developer test — current
+# Historical MU1440 / AID10 developer-test reference (withdrawn)
 
-This is the currently pinned **MU1440-specific developer prerelease**, not the newest experimental source line. Documentation-only main-branch updates do not mutate the already published ZIP or retroactively re-qualify its binary hashes. See [current integration status](../docs/status/INTEGRATION_STATUS_2026-10-21.md), [latest known issues](../docs/findings/KNOWN_ISSUES.md) and [dated vehicle test evidence](../docs/status/MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md).
+**This is not an installable public 1.3.2 release.** The previous
+`mu1440-aid10-dev-current` GitHub Release and both of its assets were
+**withdrawn on 2026-10-26**. The historical alias tag was retained at
+commit `48534532b504c89b5198c93e90b6b2eb83a65ad6` for traceability.
+The legacy publishing workflow is retired and cannot recreate a download.
 
-The effective 29 September Most20/D2 update at the end of this file is incorporated into the consolidated statements below; later release-tag decisions require their own verification.
+The content below describes **the withdrawn historical seven-payload
+developer test** and its original MU1440/AID10 scope. It is preserved as
+technical evidence, not a currently downloadable kit or an instruction to
+install it. Newer public source is source-only; a complete versioned product
+release, accepted installer and target qualification remain separate work.
+
+See [current integration status](../docs/status/INTEGRATION_STATUS_2026-10-21.md),
+[known issues](../docs/findings/KNOWN_ISSUES.md) and
+[dated vehicle evidence](../docs/status/MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md).
 
 ## Validated reference target
 

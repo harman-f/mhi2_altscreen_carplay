@@ -11,7 +11,7 @@ The [MU1440 R57 source/build baseline](build/MU1440_R57_SOURCE.md) is the curren
 3. [Exact public source coverage](status/PUBLISHED_SOURCE_COVERAGE.md)
 4. [System architecture and SEAT/VW portability](architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md)
 5. [OEM-native HMI and controller](architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md)
-6. [Reference developer release](../release/CURRENT.md), [installation](INSTALLATION.md) and [compatibility matrix](testing/COMPATIBILITY_MATRIX.md)
+6. [Withdrawn historical developer reference](../release/CURRENT.md), [installation](INSTALLATION.md) and [compatibility matrix](testing/COMPATIBILITY_MATRIX.md)
 7. [Current roadmap](../ROADMAP.md) and [known issues](findings/KNOWN_ISSUES.md)
 
 ## SEAT/CUPRA contributor port

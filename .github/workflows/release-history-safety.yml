@@ -1,0 +1,25 @@
+name: Release history safety
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release-history-safety.yml'
+      - '.github/workflows/release-mu1440-aid10.yml'
+      - 'docs/build/RELEASE_HISTORY_POLICY.md'
+      - 'tests/test_release_history_safety.py'
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Preserve historical releases
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Regression gate
+        shell: bash
+        run: python3 -B -m unittest discover -s tests -p 'test_release_history_safety.py' -v
