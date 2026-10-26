@@ -29,6 +29,6 @@ R57 source-only stack, or qualify a Unit or vehicle.
 6. Release publication is a separate, approval-gated action after installer
    rollback, target compatibility, rights and stated acceptance have passed.
 
-The [product delivery plan](PRODUCT_DELIVERY_PIPELINE.md) will be the
-public integration reference when that documentation reaches `develop`.
-Until then, source and build CI outputs are **not** the versioned product.
+The source-to-product integration plan is under separate review and is not
+part of the current `develop` base. Source and build CI outputs are **not**
+versioned product releases.
