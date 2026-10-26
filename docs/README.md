@@ -2,6 +2,9 @@
 
 The pages here describe the **current public product/source, exact reference-target evidence and implementation interfaces**. Old dated experiments are retained only where they still explain a verified finding or an important limitation; they are not competing “current” plans.
 
+
+**Source-to-release work:** [Product delivery pipeline (2026-10-26)](build/PRODUCT_DELIVERY_PIPELINE.md) distinguishes current source CI, the historical developer installer, pending product packaging, immutable releases and physical qualification. The previously published `dev-current` GitHub Release has been withdrawn; its alias tag remains.
+
 ## Start here
 
 The [MU1440 R57 source/build baseline](build/MU1440_R57_SOURCE.md) is the current entrypoint for source availability, native reproduction, the real OEM-menu/controller modules, and explicit Java/support-source exclusions. Dated vehicle reports below retain their original acceptance scope.
