@@ -2,6 +2,11 @@
 
 The pages here describe the **current public product/source, exact reference-target evidence and implementation interfaces**. Old dated experiments are retained only where they still explain a verified finding or an important limitation; they are not competing “current” plans.
 
+## AltScreen Cluster Atlas
+
+- **[Open the standalone AltScreen Cluster Atlas](index.html)** — interactive cross-project matrix for MHI2, MHI2Q and MST2, supported cluster hardware, navigation/telephony/audio capabilities, repository lineage and dated evidence. It is a static, self-contained HTML file; basic filtering and sorting work without JavaScript.
+- **GitHub Pages:** after enabling Pages from `main` → `/docs`, this page is served at `https://harman-f.github.io/mhi2_altscreen_carplay/`. The repository file remains usable without Pages.
+
 ## Start here
 
 The [MU1440 R57 source/build baseline](build/MU1440_R57_SOURCE.md) is the current entrypoint for source availability, native reproduction, the real OEM-menu/controller modules, and explicit Java/support-source exclusions. Dated vehicle reports below retain their original acceptance scope.
