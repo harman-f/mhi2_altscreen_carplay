@@ -277,16 +277,17 @@ public final class MibrNativeDropdownEditor {
                 MibrOemSsmTemplate.OPTION_TEXT_TARGET_ID,TextArea.class);
             rowHeight=stock.option.get_height(); // Stock option geometry, not text-derived
             String[] values=model.options(key);
-            // Frame padding comes from the stock popup: the option list sits
-            // inside the DropDown frame at its own offset, so a fixed padding
-            // let the last options paint below the frame.
-            int chrome=originalPopupHeight-originalOptionsHeight;
+            // A closed popup can be shorter than its hidden option list. Match
+            // native frame sizing from LayoutAttribs, not those two heights.
+            de.vw.mib.properties.values.LayoutAttribs insets=stock.popup.get_layoutAttribs();
+            int chrome=MibrDropdownFrame.chrome(insets==null?0:insets.getInsetTop(),
+                insets==null?0:insets.getInsetBottom());
             int available=stock.view.get_height()-24-chrome;
             if(sample.get_font()==null || sample.get_width()<=0 || rowHeight<=0 ||
                values.length==0 || chrome<0 || available<rowHeight || stock.popup.get_width()<=0 ||
                stock.popup.get_width()>stock.view.get_width())
                 throw new IllegalStateException("MIBR_SSM_OPTION_VIEW_BOUNDS");
-            int visibleRows=Math.min(values.length,Math.max(1,available/rowHeight));
+            int visibleRows=MibrDropdownFrame.rows(stock.view.get_height(),rowHeight,values.length,chrome);
             int height=visibleRows*rowHeight+chrome;
             stock.popup.set_height(height);
             stock.popup.set_y(Math.max(12,Math.min(originalPopupY,stock.view.get_height()-height-12)));

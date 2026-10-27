@@ -51,6 +51,14 @@ Prefer:
 
 ## Provenance
 
+The six contributor-supplied photographs in
+[`docs/media/seat-mu1409-2026-10-25`](media/seat-mu1409-2026-10-25/README.md)
+are an explicit, photographer-authorized exception for this vehicle report.
+They retain the visible navigation content requested by the contributor;
+identifying JPEG metadata was removed without changing decoded pixels.
+The publication checker pins these exact files by hash. This exception does
+not authorize additional navigation screenshots or relaxing the general policy.
+
 Public provenance should identify:
 
 - public source path;

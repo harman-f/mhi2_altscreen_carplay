@@ -14,6 +14,14 @@ The Java menu depends on a matching MIBR/3 broker implementation for `VIEW_GET` 
 
 ## Source scope
 
+The dropdown frame calculation uses runtime `LayoutAttribs` vertical insets.
+A collapsed popup height is not a frame-padding measurement: a 6-pixel closed
+popup can retain a 471-pixel hidden option list. The independent geometry
+regression is included in `tests/run_view_model_test.sh`. A target-adapted
+version was exercised on SEAT MU1409; see the
+[observations and remaining limitations](../../../docs/testing/SEAT_CUPRA_MU1409_VEHICLE_OBSERVATIONS.md).
+This does not qualify the complete MU1440 adapter on SEAT.
+
 `java/de/mibr/hmi/` contains the Java adapter, owned page lifecycle, native Ssm row/dropdown bindings, project UI state models, MIBR/3 client, and the diagnostics/vehicle-data adapters. `java/mib/mu1440/vehiclespeed/` contains the project-owned speed decoding and DSI adapter used by that menu.
 
 The module does not include OEM JAR/JXE files, OEM class files, decompiled OEM implementation sources, generated OEM class bodies, menu artwork, or an install package. Two local source files from the exact target are needed only as inputs to the build-time adapter patcher. The patcher checks each expected anchor exactly once, writes patched copies to the local build directory, and fails on drift or repeated patching. Keep those inputs and generated outputs outside public Git.

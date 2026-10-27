@@ -13,6 +13,8 @@ python3 "$MODULE/generate_catalog.py" \
   --menu "$MODULE/menu-definition.json" \
   --out-dir "$OUT/generated"
 "$JAVAC" -encoding UTF-8 -d "$OUT/classes" \
+  "$MODULE/java/de/mibr/hmi/MibrDropdownFrame.java" \
+  "$MODULE/tests/MibrDropdownFrameTest.java" \
   "$MODULE/java/de/mibr/hmi/MibrI18n.java" \
   "$MODULE/java/de/mibr/hmi/MibrEngineState.java" \
   "$MODULE/java/de/mibr/hmi/MibrElementSpec.java" \
@@ -43,3 +45,5 @@ python3 "$MODULE/generate_catalog.py" \
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3BusyTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3QueueTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3ShowTest
+
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrDropdownFrameTest

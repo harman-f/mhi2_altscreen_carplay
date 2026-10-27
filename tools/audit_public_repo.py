@@ -97,6 +97,14 @@ OWNED_ARTWORK = {
 }
 
 
+# Contributor-authorized vehicle photos; exact bytes only, no general media exception.
+REVIEWED_SEAT_PHOTOS = {'docs/media/seat-mu1409-2026-10-25/hardware-and-controls.jpg': 'ffd9f405d1c260212864e1ce03ffa6b0ed8826723d9c0d031023cf76e1762143', 'docs/media/seat-mu1409-2026-10-25/round-dials-cards-obscured.jpg': '4296fd7bf1cba60c521ee952fa38fcec270f23e6edbecdadd352b9d5b8d751c5', 'docs/media/seat-mu1409-2026-10-25/oem-single-dial-layout.jpg': '15e4a8b82d5b63cf5ac94554ab3bba8b7e03f79ac540dafae56bd0a96d0a3a61', 'docs/media/seat-mu1409-2026-10-25/edge-gauges-cards-clipped.jpg': '41bec956593792e41d2831687a6aa9af8c188ad9bd1227d1b4ebfcdf213653e6', 'docs/media/seat-mu1409-2026-10-25/wide-cards-visible.jpg': 'a13b5655b8e8480d9a339285e6583854d9c25acac1ca145d4d3088f3ea470d2f', 'docs/media/seat-mu1409-2026-10-25/center-map-only.jpg': 'caa872da937b545929412669aa6acbe2a30d1bb837602aaf824b390019bd913a'}
+
+def reviewed_seat_photo(rel: Path, data: bytes) -> bool:
+    expected = REVIEWED_SEAT_PHOTOS.get(rel.as_posix())
+    return expected is not None and hashlib.sha256(data).hexdigest() == expected
+
+
 def reviewed_artwork(rel: Path, data: bytes) -> bool:
     expected = OWNED_ARTWORK.get(rel.as_posix())
     return bool(expected and hashlib.sha256(data).hexdigest() == expected)
@@ -185,7 +193,7 @@ def audit_tree(errors: list[str], files: list[Path]) -> None:
         )
 
         if any(low.endswith(blocked) for blocked in FORBIDDEN_SUFFIXES):
-            if not is_curated_public_media and not reviewed_artwork(rel, data):
+            if not is_curated_public_media and not reviewed_artwork(rel, data) and not reviewed_seat_photo(rel, data):
                 fail(errors, f"forbidden publication artifact type: {rel}")
 
         if "dyld_shared_cache" in low:
@@ -259,6 +267,13 @@ def main() -> int:
             fail(errors, f"reviewed owned artwork changed: {rel}")
         assert not reviewed_artwork(Path(rel), data + b"tampered")
         assert not reviewed_artwork(Path("unreviewed.png"), data)
+    for rel in REVIEWED_SEAT_PHOTOS:
+        asset = ROOT / rel
+        if not asset.is_file() or not reviewed_seat_photo(Path(rel), asset.read_bytes()):
+            fail(errors, f"missing or changed reviewed SEAT vehicle photo: {rel}")
+        else:
+            assert not reviewed_seat_photo(Path(rel), asset.read_bytes() + b"tampered")
+            assert not reviewed_seat_photo(Path("unreviewed.jpg"), asset.read_bytes())
     files = tracked_files()
 
     audit_required(errors)
