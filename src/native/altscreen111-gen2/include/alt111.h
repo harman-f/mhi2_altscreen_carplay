@@ -39,6 +39,8 @@ struct alt111_profile {
 /* This constructs a test/next profile, not a Run143 fallback dictionary. */
 void alt111_profile_mu1440(struct alt111_profile *p, unsigned hid_ready);
 int alt111_profile_validate(const struct alt111_profile *p);
+/* Explicit MU1409 calibration only; never a global default. */
+int alt111_profile_seat_mu1409_views(struct alt111_profile *p);
 const char *alt111_initial_url(void);
 
 enum alt111_command_type {

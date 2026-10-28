@@ -53,3 +53,28 @@ int alt111_profile_validate(const struct alt111_profile *p)
             !contains(&p->views[i].area, &p->views[i].safe)) return ALT111_INVALID;
     return ALT111_OK;
 }
+
+/* Contributor-observed MU1409 calibration. Preserve transport/identity fields.
+ * Reduced views are candidates: ETA/direction visibility remains unresolved.
+ */
+int alt111_profile_seat_mu1409_views(struct alt111_profile *p)
+{
+    struct alt111_profile candidate;
+    static const uint32_t safe_x[3]={151u,264u,377u};
+    static const uint32_t safe_w[3]={708u,482u,256u};
+    unsigned i;
+    if (!p || p->type!=111u || p->width!=1010u || p->height!=376u)
+        return ALT111_INVALID;
+    candidate=*p;
+    candidate.view_count=3u;candidate.initial_view=0u;
+    candidate.draw_outside_safe=0u;candidate.transition_control=0u;
+    for(i=0;i<3u;++i){
+        candidate.views[i].area.x=candidate.views[i].area.y=0u;
+        candidate.views[i].area.width=1010u;candidate.views[i].area.height=376u;
+        candidate.views[i].safe.x=safe_x[i];candidate.views[i].safe.y=56u;
+        candidate.views[i].safe.width=safe_w[i];candidate.views[i].safe.height=244u;
+    }
+    if(alt111_profile_validate(&candidate)!=ALT111_OK)return ALT111_INVALID;
+    *p=candidate;
+    return ALT111_OK;
+}

@@ -1,0 +1,19 @@
+name: SEAT MU1409 view calibration
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Host regression
+        shell: bash
+        run: |
+          set -euxo pipefail
+          out="$(mktemp -d)"
+          cc -std=c99 -Wall -Wextra -Werror -Isrc/native/altscreen111-gen2/include tests/alt111_seat_mu1409_views_test.c src/native/altscreen111-gen2/src/alt111_profile.c -o "$out/views"
+          "$out/views"
