@@ -307,6 +307,8 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         Throwable failure=null;
         boolean cleanupFailed=false;
         try{editor.detach();}catch(Throwable t){failure=t;}
+        try{if(stock.indicator!=null){stock.indicator.detach();stock.indicator=null;}}
+        catch(Throwable t){cleanupFailed=true;if(failure==null)failure=t;}
         try{clearMasters();}catch(Throwable t){cleanupFailed=true;if(failure==null)failure=t;}
         try{stock.mainList.setListItemTransfer(originalTransfer);}catch(Throwable t){cleanupFailed=true;if(failure==null)failure=t;}
         try{MibrHomeList.replaceOwnedSsmItems(stock.mainList,stock.view,original);}catch(Throwable t){cleanupFailed=true;if(failure==null)failure=t;}

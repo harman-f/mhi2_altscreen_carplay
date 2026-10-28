@@ -31,17 +31,26 @@ final class MibrScrollIndicator implements AdjustmentListener {
     private static final int RIGHT_MARGIN = 66;
     private static final int MIN_THUMB = 36;
 
+    private static String thumbPath() {
+        try {
+            if ("seat_red".equals(System.getProperty("mibr.hmi.scrollbar.theme")))
+                return MibrIconState.ROOT + "mibr_scroll_thumb_seat_red.png";
+        } catch (SecurityException ignored) { }
+        return THUMB;
+    }
+
     private final WidgetList list;
     private final ContainerModel parent;
     private final MibrOwnedStaticImage track;
     private final MibrOwnedStaticImage thumb;
     private int logged;
+    private boolean detached;
 
     private MibrScrollIndicator(WidgetList list, ContainerModel parent, ViewModel view) {
         this.list = list;
         this.parent = parent;
         track = create(TRACK, "MibrScrollTrack", -8811, view);
-        thumb = create(THUMB, "MibrScrollThumb", -8812, view);
+        thumb = create(thumbPath(), "MibrScrollThumb", -8812, view);
     }
 
     private static MibrOwnedStaticImage create(String path, String name, int id, ViewModel view) {
@@ -58,13 +67,19 @@ final class MibrScrollIndicator implements AdjustmentListener {
 
     /** Attaches track and thumb next to the list; returns null when the page layout is unexpected. */
     static MibrScrollIndicator attach(WidgetList list, ViewModel view) {
+        MibrScrollIndicator created=null;
         try {
             WidgetModel parent = list.getParent();
             if (!(parent instanceof ContainerModel) || !(list instanceof Adjustable)) {
                 MibrOemSsmTemplate.diag("MIBR_SCROLL_INDICATOR_NO_PARENT");
                 return null;
             }
+            WidgetModel[] present=((ContainerModel)parent).getChildren();
+            for(int i=0;present!=null && i<present.length;i++)
+                if(present[i]!=null && (present[i].get_targetId()==-8811 || present[i].get_targetId()==-8812))
+                    throw new IllegalStateException("SCROLL_INDICATOR_ALREADY_ATTACHED");
             MibrScrollIndicator indicator = new MibrScrollIndicator(list, (ContainerModel)parent, view);
+            created=indicator;
             WidgetModel[] old = ((ContainerModel)parent).getChildren();
             int n = old == null ? 0 : old.length;
             WidgetModel[] next = new WidgetModel[n + 2];
@@ -83,6 +98,7 @@ final class MibrScrollIndicator implements AdjustmentListener {
             indicator.update();
             return indicator;
         } catch (Throwable failure) {
+            if(created!=null)try{created.detach();}catch(Throwable cleanup){MibrOemSsmTemplate.diag("SCROLL_CLEANUP_FAILED "+cleanup);}
             MibrOemSsmTemplate.diag("MIBR_SCROLL_INDICATOR_FAILED " + failure);
             return null;
         }
@@ -94,6 +110,7 @@ final class MibrScrollIndicator implements AdjustmentListener {
 
     /** Recomputes the thumb from the list Adjustable; hidden while everything fits. */
     void update() {
+        if(detached)return;
         try {
             Adjustable adjustable = (Adjustable)list;
             int min = adjustable.getMinimum();
@@ -140,9 +157,17 @@ final class MibrScrollIndicator implements AdjustmentListener {
     }
 
     void detach() {
-        try {
-            ((Adjustable)list).removeAdjustmentListener(this);
-        } catch (Throwable ignored) {
-        }
+        if(detached)return;
+        detached=true;
+        ((Adjustable)list).removeAdjustmentListener(this);
+        WidgetModel[] old=parent.getChildren();int count=0;
+        for(int i=0;old!=null && i<old.length;i++)if(old[i]!=track && old[i]!=thumb)count++;
+        WidgetModel[] next=new WidgetModel[count];count=0;
+        for(int i=0;old!=null && i<old.length;i++)if(old[i]!=track && old[i]!=thumb)next[count++]=old[i];
+        parent.setChildren(next);
+        if(track.is_activated())track.deActivate();
+        if(thumb.is_activated())thumb.deActivate();
+        track.deInit();thumb.deInit();
+        MibrOemSsmTemplate.diag("MIBR_SCROLL_INDICATOR_DETACHED");
     }
 }
