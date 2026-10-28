@@ -1,0 +1,23 @@
+name: SEAT correlated wheel zoom
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Host regression
+        shell: bash
+        run: |
+          set -euxo pipefail
+          out="$(mktemp -d)"
+          cc -std=c99 -Wall -Wextra -Werror -Isrc/native/altscreen111-gen2/include tests/seat_zoom_epoch_test.c -o "$out/epoch"
+          "$out/epoch"
+          cc -std=c99 -Wall -Wextra -Werror -pthread -Isrc/native/altscreen111-gen2/include tests/seat_zoom_auto_context_test.c src/native/altscreen111-gen2/src/alt111_zoom.c -o "$out/context"
+          "$out/context"
+          cc -std=c99 -Wall -Wextra -Werror -Isrc/native/altscreen111-gen2/include tests/alt111_zoom_debugspi_test.c src/native/altscreen111-gen2/src/alt111_zoom_debugspi.c -o "$out/parser"
+          "$out/parser"

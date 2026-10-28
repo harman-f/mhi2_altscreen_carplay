@@ -4084,6 +4084,8 @@ static void gen2_apply_selected_view(void)
  * The authoritative VC map-focus + DIRECT ownership observation MUST be
  * established before invoking bind_verified; unknown state is always off.
  */
+#include "seat_zoom_auto.inc"
+
 int mibr_alt111_zoom_bind_verified(uint64_t session, unsigned vc_map_focus,
                                    unsigned direct_owner, int positive_is_in)
 {
@@ -4153,6 +4155,8 @@ static void gen2_zoom_worker_tick(void)
     unsigned visible;
 
     pthread_mutex_lock(&g2_core_lock);
+    if(gen2_seat_zoom_auto_enabled() && access(g2_zoom_v1_arm,F_OK)!=0)
+        (void)gen2_seat_zoom_refresh_locked();
     generation=g2_control_session;
     visible=g2_command_ready && g2_control.active && g2_control.desired &&
         g2_control.shown_ack && !g2_control.reacquiring &&
@@ -4347,7 +4351,7 @@ static void gen2_zoom_spi_pair(void *opaque,uint32_t source_ms,int signed_detent
     unsigned ready;
     (void)opaque;
     /* Revocation is checked at the delivery point as well as in idle poll. */
-    if(access(g2_zoom_v1_arm,F_OK)!=0)return;
+    if(!gen2_zoom_spi_requested())return;
     pthread_mutex_lock(&g2_core_lock);
     session=g2_control_session;
     ready=g2_command_ready && g2_zoom.active && session &&
@@ -4355,6 +4359,9 @@ static void gen2_zoom_spi_pair(void *opaque,uint32_t source_ms,int signed_detent
         g2_control.active && g2_control.desired &&
         g2_control.shown_ack && !g2_control.reacquiring &&
         g2_video.active && g2_video.config_valid && g2_video.consumer_primed;
+    if(gen2_seat_zoom_auto_enabled() && access(g2_zoom_v1_arm,F_OK)!=0)
+        ready=ready && gen2_seat_zoom_refresh_locked() &&
+            seat_zoom_epoch_fresh(&g_seat_zoom_epoch,source_ms,(uint32_t)monotonic_ms());
     if(ready) {
         /* Empirical private MU1440 native scale sequence:
          * right +1 -> scale decreases -> zoom IN. The car/iPhone UX must
@@ -4388,7 +4395,7 @@ static void *gen2_zoom_spi_worker(void *arg)
         fd_set rfds;
         struct timeval tv;
         int r;
-        if(access(g2_zoom_v1_arm,F_OK)!=0) {
+        if(!gen2_zoom_spi_requested()) {
             if(fd>=0) {close(fd);fd=-1;}
             alt111_spi_zoom_init(decoder);
             gen2_zoom_spi_clear();
