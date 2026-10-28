@@ -20,6 +20,8 @@ This page describes a proposed joint SEAT/CUPRA port of [mhi2_altscreen_carplay]
 
 The previously analysed **MU1447** stock firmware is a useful comparator: it shares a complete `libairplay.so` byte profile with the Škoda MU1440 reference, and the existing corpus shows considerable Java/native reuse. The MU1409 contributor separately reported **26,240** common Java class paths versus MU1447, of which **26,202** were byte-identical and **38** differed. Those are reported comparison results; they are not a substitute for hashing and analysing the exact installed `P4708_1` firmware. Its reported `lsd.jxe` size is also not a reliable identity check on its own.
 
+See also [MU1409 auxiliary scaling and bounded queue recovery](../testing/SEAT_CUPRA_MU1409_SCALING_AND_RECOVERY.md) for the 25 October target observation, opt-in zoom percentage and remaining acceptance limits.
+
 ## The intended result: two work packages
 
 ### WP1 — Qualify our video and control stack on this exact SEAT firmware

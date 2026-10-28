@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 static const uint8_t avcc[]={
     1,0x42,0,31,0xff,0xe1,0,4,0x67,0x42,0,31,1,0,2,0x68,0xce
@@ -133,8 +134,35 @@ static void monotonic_age_backlog(void)
     assert(v.consumer_primed && v.consumer==consumer && v.delivered_idr_ordinal==v.source_ordinal);
     alt111_video_destroy(&v);
 }
+static void byte_budget_overflow(void)
+{
+    struct alt111_video v;
+    uint64_t stream=setup(&v),consumer=v.consumer;
+    const size_t payload=1024u*1024u, size=payload+4u;
+    uint8_t *au=(uint8_t *)malloc(size);
+    unsigned accepted=0;
+    int rc;
+    assert(au);
+    memset(au,0x88,size);
+    au[0]=0;au[1]=0x10;au[2]=0;au[3]=0;au[4]=0x41;
+    assert(alt111_video_submit(&v,stream,idr,sizeof(idr),1)==ALT111_OK);
+    consume(&v);
+    do {
+        rc=alt111_video_submit(&v,stream,au,size,1);
+        if(rc==ALT111_OK)++accepted;
+    } while(rc==ALT111_OK && accepted<ALT111_QUEUE_CAP);
+    assert(rc==ALT111_SOFT_RESYNC && accepted<ALT111_QUEUE_CAP);
+    assert(v.attached && v.consumer==consumer && !v.count &&
+           !v.queued_bytes && v.recovery_wait_idr);
+    assert(alt111_video_submit(&v,stream,pframe,sizeof(pframe),1)==ALT111_WAIT);
+    assert(alt111_video_submit(&v,stream,idr,sizeof(idr),1)==ALT111_OK);
+    consume(&v);
+    assert(v.consumer_primed && v.consumer==consumer);
+    free(au);alt111_video_destroy(&v);
+}
 int main(void)
 {
+    byte_budget_overflow();
     monotonic_age_backlog();
     pinned_header_overflow();
     unsent_head_overflow();

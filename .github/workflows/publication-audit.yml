@@ -35,6 +35,21 @@ jobs:
           set -euxo pipefail
           python3 -B tests/test_public_mibr3.py
 
+      - name: Auxiliary zoom metadata and video queue recovery regressions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          build_dir="$(mktemp -d)"
+          cc -std=c99 -Wall -Wextra -Werror \
+            tests/alt111_aux_zoom_factor_test.c -o "$build_dir/aux-zoom-test"
+          "$build_dir/aux-zoom-test"
+          cc -std=c99 -Wall -Wextra -Werror \
+            -Isrc/native/altscreen111-gen2/include \
+            tests/alt111_video_queue_recovery_test.c \
+            src/native/altscreen111-gen2/src/alt111_video.c \
+            -o "$build_dir/video-queue-test"
+          "$build_dir/video-queue-test"
+
       - name: Public Java HMI protocol/model host compilation
         shell: bash
         run: |

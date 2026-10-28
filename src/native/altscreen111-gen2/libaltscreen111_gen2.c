@@ -3045,6 +3045,8 @@ static void log_stock_url_capability(CFDictionaryRef stock_display, const char *
     }
 }
 
+#include "aux_zoom_factor.inc"
+
 static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session, CFArrayRef properties, uint8_t *mac, OSStatus *outErr)
 {
     CFDictionaryRef base,stock_display;
@@ -3199,7 +3201,8 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
            set_i64(alt,"heightPhysical",(int64_t)display.height_mm) ||
            set_str(alt,"uuid",display.uuid) ||
            set_str(alt,"uid",display.uuid) ||
-           set_str(alt,"name","Instrument Cluster")){
+           set_str(alt,"name","Instrument Cluster") ||
+           apply_aux_zoom_factor(alt)){
             logf_u2("GEN2 /info incomplete numeric/identity fields; stock fallback");
             p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
             return base;
