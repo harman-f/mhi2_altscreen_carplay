@@ -2555,25 +2555,26 @@ static void remove_key(CFMutableDictionaryRef d, const char *name)
 }
 
 /*
- * iOS 27.2 builds navigator cluster UI candidates and intersects them with the
- * receiver-advertised altScreenSuggestUIURLs list.  Stock MU1440 has no such
- * key because it has no auxiliary cluster display.  Our synthetic type-111
- * display must therefore advertise the roles it intentionally supports.
+ * iOS 26.1 builds navigator cluster UI candidates and intersects them with the
+ * receiver-advertised altScreenSuggestUIURLs list. Stock MU1440 has no such
+ * key because it has no auxiliary cluster display. Apple reads this capability
+ * from the ROOT EndpointInfo dictionary, NOT from displays[n]. It describes
+ * the selectable URL roles for the whole receiver/session.
  *
  * This is capability metadata only: it does not issue showUI/stopUI, rebuild
  * Stream111, change codec state, or synthesize a provider suggestion.
  */
-static void add_alt_suggest_ui_urls(CFMutableDictionaryRef alt)
+static int add_alt_suggest_ui_urls(CFMutableDictionaryRef info)
 {
     CFMutableArrayRef urls=NULL;
     CFStringRef key=NULL,item=NULL;
     char blob[2048],url[192];
     unsigned layer=0u;
-    int i,count=0;
-    if(!alt)return;
+    int i,count=0,ok=0;
+    if(!info)return 0;
 
     urls=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
-    if(!urls)return;
+    if(!urls)return 0;
 
     if(read_layered_value(g_ui_urls_config_name,blob,sizeof(blob),&layer)==0){
         if(config_line_value(blob,"urls",url,sizeof(url))==0){
@@ -2581,7 +2582,9 @@ static void add_alt_suggest_ui_urls(CFMutableDictionaryRef alt)
             for(i=0;i<8 && p && *p;++i){
                 char *end=strchr(p,'|');if(end)*end=0;
                 item=s_cf(p);
-                if(item){p_CFArrayAppendValue(urls,item);p_CFRelease(item);item=NULL;++count;}
+                if(!item)goto done;
+                p_CFArrayAppendValue(urls,item);p_CFRelease(item);item=NULL;++count;
+                if(!p_CFArrayGetCount || p_CFArrayGetCount(urls)!=count)goto done;
                 p=end ? end+1 : NULL;
             }
         }
@@ -2593,24 +2596,31 @@ static void add_alt_suggest_ui_urls(CFMutableDictionaryRef alt)
         };
         for(i=0;i<3;++i){
             item=s_cf(defaults[i]);
-            if(!item)continue;
+            if(!item)goto done;
             p_CFArrayAppendValue(urls,item);
             p_CFRelease(item); item=NULL;
             ++count;
+            if(!p_CFArrayGetCount || p_CFArrayGetCount(urls)!=count)goto done;
         }
         layer=0u;
     }
 
     key=s_cf("altScreenSuggestUIURLs");
-    if(!key)goto done;
-    p_CFDictionarySetValue(alt,key,urls);
-    logf_u2("GEN2 advertised altScreenSuggestUIURLs count=%d source=%s",
+    if(!key || count<=0)goto done;
+    p_CFDictionarySetValue(info,key,urls);
+    if(p_CFDictionaryGetValue(info,key)!=urls){
+        logf_u2("GEN2 /info root altScreenSuggestUIURLs failed readback");
+        goto done;
+    }
+    ok=1;
+    logf_u2("GEN2 /info root altScreenSuggestUIURLs count=%d source=%s",
             count,config_layer_name(layer));
 
 done:
     if(item)p_CFRelease(item);
     if(key)p_CFRelease(key);
     if(urls)p_CFRelease(urls);
+    return ok;
 }
 
 /*
@@ -3097,10 +3107,23 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         return base;
     }
     /*
-     * iOS 27.2 intersects provider suggestions with receiver-advertised
+     * iOS 26.1 intersects provider suggestions with receiver-advertised
      * cluster URL capabilities.  Observe the exact stock MU1440 baseline
      * before mutating the clone; do not synthesize capability arrays here.
      */
+    /* The root EndpointInfo is what iOS reads. Log only shape/count here;
+     * advertising URLs may contain user context and must not be copied into
+     * a new root log verbatim. */
+    {
+        CFStringRef key=s_cf("altScreenSuggestUIURLs");
+        CFTypeRef value=key?(CFTypeRef)p_CFDictionaryGetValue(base,key):NULL;
+        if(!value)logf_u2("GEN2 stock ROOT altScreenSuggestUIURLs=<absent>");
+        else if(p_CFGetTypeID(value)==p_CFArrayGetTypeID())
+            logf_u2("GEN2 stock ROOT altScreenSuggestUIURLs=array count=%ld",
+                    (long)p_CFArrayGetCount((CFArrayRef)value));
+        else logf_u2("GEN2 stock ROOT altScreenSuggestUIURLs=invalid-type");
+        if(key)p_CFRelease(key);
+    }
     log_stock_url_capability(stock_display,"altScreenSuggestUIURLs");
     log_stock_url_capability(stock_display,"altScreenURLs");
     log_stock_url_capability(stock_display,"uiContextURLs");
@@ -3232,9 +3255,10 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
             }
         }
         set_str(alt,"initialURL",active_url);
-        /* The strict single-view profile does not advertise altScreenSuggestUIURLs. Keep the M.I.B.
-         * extension available outside the strict parity profile. */
-        if(!compat_profile_exact_reference())add_alt_suggest_ui_urls(alt);
+        /* The URL allowance is an EndpointInfo ROOT capability, not a
+         * display-scoped key. Drop any stray inheritance on the synthetic
+         * display only; strict classic parity keeps its original structure. */
+        if(!compat_profile_exact_reference())remove_key(alt,"altScreenSuggestUIURLs");
         if(views.enabled && !add_reference_viewarea(alt)){
             logf_u2("GEN2 /info incomplete ViewArea descriptor; returning stock info");
             p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
@@ -3248,6 +3272,14 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         }
         p_CFDictionarySetValue(info,kdisplays,displays);
         if(p_CFDictionaryGetValue(info,kdisplays)!=displays){
+            p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+            return base;
+        }
+        /* CarKit/CARSessionConfiguration consumes this from root EndpointInfo.
+         * Keep classic mode untouched and fail closed to stock on error.
+         * This does NOT accept, store or execute an incoming suggestion. */
+        if(!compat_profile_exact_reference() && !add_alt_suggest_ui_urls(info)){
+            logf_u2("GEN2 /info root altScreenSuggestUIURLs unavailable; stock fallback");
             p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
             return base;
         }
