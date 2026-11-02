@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "contract": "docs/architecture/REPOSITORY_LAYOUT.md",
+  "lifecycle": "migration-in-progress",
+  "notes": "Development source ownership only; distribution and target acceptance are governed independently. Existing source paths remain authoritative until tested moves.",
+  "modules": {
+    "carplay": {
+      "status": "indexed",
+      "distribution": "common/carplay",
+      "depends_on": [],
+      "source": [
+        "src/native/altscreen111-gen2",
+        "src/native/alt111-settings",
+        "src/native/direct-ts-parity",
+        "src/native/direct-ts-remux",
+        "src/native/most-ts-writer",
+        "src/native/isotx2-gate",
+        "src/native/parity-session",
+        "src/native/sha256sum-compat",
+        "src/native/tee-compat",
+        "src/native/vehicle-data"
+      ],
+      "runtime": [
+        "runtime/auto-direct",
+        "runtime/parity",
+        "runtime/isotx2-gate"
+      ],
+      "build_scripts": [
+        "tools/build_alt111_settings.sh",
+        "tools/build_altscreen111_gen2.sh",
+        "tools/build_direct_ts_parity.sh",
+        "tools/build_direct_ts_remux.sh",
+        "tools/build_native_isotx2_guard.sh"
+      ],
+      "outputs": [
+        "libaltscreen111.so",
+        "alt111-settings",
+        "direct-ts-parity",
+        "direct-ts-remux",
+        "parity-session",
+        "libmibr_isotx2_guard.so",
+        "libmibr_isotx2_gate.so"
+      ],
+      "build_coverage": "partial",
+      "evidence": "docs/build/MU1440_R57_SOURCE.md"
+    },
+    "broker": {
+      "status": "indexed",
+      "distribution": "common/broker",
+      "depends_on": [
+        "carplay"
+      ],
+      "source": [
+        "src/native/mibr-control",
+        "src/native/keypanel",
+        "src/native/display-scaling",
+        "settings/registry.json"
+      ],
+      "runtime": [
+        "runtime/mibr-control"
+      ],
+      "build_scripts": [
+        "tools/build_mibr_control.sh",
+        "tools/build_keypanel_native.sh"
+      ],
+      "outputs": [
+        "mibr-v3-service",
+        "mibr-v3-genkey",
+        "mibr-key40d"
+      ],
+      "build_coverage": "partial",
+      "evidence": "docs/build/MU1440_R57_SOURCE.md"
+    },
+    "menu": {
+      "status": "indexed",
+      "distribution": "common/menu",
+      "depends_on": [
+        "broker"
+      ],
+      "source": [
+        "src/hmi/oem-menu"
+      ],
+      "runtime": [],
+      "build_scripts": [],
+      "outputs": [],
+      "build_coverage": "external-abi-inputs-required",
+      "evidence": "docs/build/MU1440_MENU_RGI_SOURCE.md",
+      "support_tools": [
+        "tools/menu-editor"
+      ]
+    },
+    "navigation": {
+      "status": "partially-migrated",
+      "distribution": "common/navigation",
+      "depends_on": [
+        "carplay",
+        "broker"
+      ],
+      "source": [
+        "modules/navigation/source"
+      ],
+      "runtime": [
+        "runtime/navigation"
+      ],
+      "build_scripts": [
+        "modules/navigation/source/build.sh"
+      ],
+      "outputs": [],
+      "build_coverage": "target-specific-incomplete",
+      "evidence": "docs/build/MU1440_MENU_RGI_SOURCE.md"
+    }
+  },
+  "profiles": [
+    "skoda-mu1440-p4526",
+    "seat-mu1409-p4708",
+    "seat-mu1447-p4709"
+  ],
+  "profile_status": "documentation-only: this is not a set of qualified installable profiles",
+  "shared_orchestration": [
+    "tools/build_mu1440_source.sh",
+    "tools/validate_modular_package.py"
+  ],
+  "artifact_policy": "Each produced binary needs exact source revision, toolchain/ABI, build recipe, SHA-256, target profile(s) and evidence classification. No implied build coverage."
+}
