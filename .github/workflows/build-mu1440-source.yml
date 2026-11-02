@@ -44,7 +44,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: public-mu1440-source-build
+  group: public-mu1440-source-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
