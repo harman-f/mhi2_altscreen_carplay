@@ -13,7 +13,7 @@
         "src/native/alt111-settings",
         "src/native/direct-ts-parity",
         "src/native/direct-ts-remux",
-        "src/native/most-ts-writer",
+        "modules/carplay/source/most-ts-writer",
         "src/native/isotx2-gate",
         "src/native/parity-session",
         "src/native/sha256sum-compat",
