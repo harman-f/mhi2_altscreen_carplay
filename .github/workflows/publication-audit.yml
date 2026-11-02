@@ -28,6 +28,13 @@ jobs:
           test -s docs/architecture/ADVANCED_RUNTIME_SWITCHES.md
           grep -Fq 'ADVANCED_RUNTIME_SWITCHES.md' README.md
 
+      - name: Modular distribution contract regression gate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -s docs/build/PACKAGE_LAYOUT.md
+          python3 tools/validate_modular_package.py --self-test
+
 
       - name: Public standalone MIBR/3 source checks
         shell: bash
