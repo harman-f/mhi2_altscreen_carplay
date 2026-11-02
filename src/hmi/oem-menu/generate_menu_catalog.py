@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""menu-editor/function-catalog.json -> MibrMenuCatalog.java and the standard menu file."""
+"""tools/menu-editor/function-catalog.json -> MibrMenuCatalog.java and the standard menu file."""
 import json
 import pathlib
 import zlib
 
 HERE = pathlib.Path(__file__).resolve().parent
-CATALOG = HERE / "menu-editor" / "function-catalog.json"
+EDITOR = HERE.parents[2] / "tools" / "menu-editor"
+CATALOG = EDITOR / "function-catalog.json"
 JAVA = HERE / "java" / "de" / "mibr" / "hmi" / "MibrMenuCatalog.java"
-STANDARD = HERE / "menu-editor" / "standard-menu.txt"
+STANDARD = EDITOR / "standard-menu.txt"
 
 
 def java_string(value):
@@ -56,7 +57,7 @@ def main():
         raise SystemExit("catalog entry with unknown parent")
     standard = standard_file(catalog)
     STANDARD.write_bytes(standard.encode("utf-8"))
-    java = ["/* Generated from menu-editor/function-catalog.json. */\n", "package de.mibr.hmi;\n",
+    java = ["/* Generated from tools/menu-editor/function-catalog.json. */\n", "package de.mibr.hmi;\n",
             "final class MibrMenuCatalog {\n", " private MibrMenuCatalog(){}\n",
             " static final int CATALOG=%d;\n" % catalog["catalog"],
             array("IDS", [f["id"] for f in functions]),

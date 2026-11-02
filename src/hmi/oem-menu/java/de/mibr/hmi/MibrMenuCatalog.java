@@ -1,4 +1,4 @@
-/* Generated from menu-editor/function-catalog.json. */
+/* Generated from tools/menu-editor/function-catalog.json. */
 package de.mibr.hmi;
 final class MibrMenuCatalog {
  private MibrMenuCatalog(){}

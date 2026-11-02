@@ -185,129 +185,226 @@
 #define MAN_TYPE_SHARP_LEFT_TURN            47
 #define MAN_TYPE_SHARP_RIGHT_TURN           48
 #define MAN_TYPE_SLIGHT_LEFT_TURN           49
-#define …16043 tokens truncated…utton(112352865));option.set_height(60);
-  WidgetList opts=new WidgetList();opts.setChildren(new WidgetModel[]{option});opts.set_height(120);DropDown popup=new DropDown();popup.set_width(600);popup.set_height(180);InactiveArea inactive=new InactiveArea();opener().set_dropDownRef(popup);
-  DropDownButton open=(DropDownButton)value.getChildren()[2];open.set_dropDownRef(popup);open.set_inactiveAreaRef(inactive);open.set_width(500);
-  view.setChildren(new WidgetModel[]{main,value,popup});
-  activeStock=new MibrOemSsmTemplate.Binding(view,plain,value,checkRow,open,popup,main,title,back,opts,option);return activeStock;
- }
- static void popupCallbacks(){
-  MibrOemSsmTemplate.Binding s=stock();ListItemTransfer original=new ListItemTransfer(){public boolean transferData(ListItemModel i,int a,int b){return false;}};s.options.setListItemTransfer(original);
-  MibrPopupEditorModel model=new MibrPopupEditorModel();final int[] changed={0};MibrNativeDropdownEditor.StockBinding binding=new MibrNativeDropdownEditor.StockBinding(s,model,new MibrNativeDropdownEditor.Sink(){public void changed(){changed[0]++;}public void committed(int i){}});
-  check(!model.directToggle(1) && !model.liveViewGated(1) && model.open(1),"r14 view dropdown (Voll/Wide) opens as a popup");model.cancel();
-  binding.prepare(s.opener,3);check(model.opened()==3,"surface choice popup prepared");check(s.option.get_height()==60 && s.popup.get_height()==240 && s.options.get_height()==180,"OEM option height is fixed; three rows fit inside the stock frame padding");
-  check(s.option.getChildren().length==2 && s.option.getChildren()[1].get_targetId()==112352865,"fixture option children");check(MibrOemSsmTemplate.target(s.option,112352865,Button.class)!=null,"fixture nested option button");s.option.setAbsoluteIndex(1);check(binding.transferData(s.option,0,0),"row transfer");check(s.option.get_height()==60 && s.option.getChildren()[1].get_height()==60,"native option and Button geometry unchanged");DefaultDropDownButtonController ctl=(DefaultDropDownButtonController)s.opener.getController();
-  int old=model.operationToken();ctl.emitHmi("dropDownClosed");check(model.opened()==3,"close is deferred");
-  s.option.getController().emitList("buttonReleased",0);check("map".equals(model.draft(3)),"surface choice committed after earlier native close callback");
-  drain();check(model.opened()==-1 && s.popup.get_height()==180 && s.options.get_height()==120,"old close callback harmless and OEM popup height restored");
-  binding.prepare(s.opener,3);ctl.emitHmi("dropDownClosed");binding.prepare(s.opener,7);int newer=model.operationToken();check(newer!=old && model.opened()==7,"reopen has distinct operation token");drain();check(model.opened()==7,"stale queued close must not cancel reopened popup");
-  ctl.emitHmi("dropDownClosed");drain();check(model.opened()==-1,"outside close cancels current operation");
-  for(int i=0;i<8;i++){binding.prepare(s.opener,3);binding.close();check(!binding.isOpen(),"cycle closed");}
-  binding.prepare(s.opener,3);ctl.throwClose=true;boolean threw=false;try{binding.detach();}catch(Throwable expected){threw=true;}check(threw,"injected close exception surfaced");
-  check(s.options.getListItemTransfer()==original,"detach restores transfer even when close throws");
- }
- static void rowRefreshAndPartialClone(){
-  MibrOemSsmTemplate.Binding s=stock();AbstractViewHandler handler=new AbstractViewHandler();final int[] leaves={0};WidgetModel[] original=s.mainList.getChildren();ListItemTransfer originalTransfer=new ListItemTransfer(){public boolean transferData(ListItemModel i,int a,int b){return false;}};s.mainList.setListItemTransfer(originalTransfer);MibrOwnedSsmRows rows=new MibrOwnedSsmRows(handler,s,new Runnable(){public void run(){leaves[0]++;}},new MibrPopupEditorModel(),null);
-  rows.open();check(s.mainList.get_itemCount()==8 && s.mainList.get_selectedIndex()==0,"main list expected 8 rows and selected=0; got count="+s.mainList.get_itemCount()+" selected="+s.mainList.get_selectedIndex());
-  int[] kinds={MibrOemSsmTemplate.VALUE_TARGET_ID,MibrOemSsmTemplate.VALUE_TARGET_ID,MibrOemSsmTemplate.CHECK_TARGET_ID,MibrOemSsmTemplate.CHECK_TARGET_ID,MibrOemSsmTemplate.CHECK_TARGET_ID,MibrOemSsmTemplate.VALUE_TARGET_ID,110,110};
-  for(int r=0;r<8;r++)check(s.mainList.getChildren()[r].get_targetId()==kinds[r],"main row "+r+" stock template");
-  TextArea viewLabel=(TextArea)MibrOemSsmTemplate.target(s.mainList.getChildren()[0],MibrOemSsmTemplate.VALUE_LABEL_TARGET_ID,TextArea.class);
-  check("Ansicht".equals(viewLabel.text()),"view dropdown row label");
-  TextArea viewsLink=(TextArea)MibrOemSsmTemplate.target(s.mainList.getChildren()[6],MibrOemSsmTemplate.PLAIN_TEXT_TARGET_ID,TextArea.class);
-  check("Ansichten".equals(viewsLink.text()),"Ansichten link label");
-  ((ListItemModel)s.mainList.getChildren()[6]).getController().emitList("buttonReleased",6);drain();
-  check(s.mainList.get_itemCount()==7,"Ansichten: seven view rows");
-  s.close.getController().emitHmi("released");drain();
-  check(s.mainList.get_itemCount()==8,"Ansichten Back restores the main list");
-  TextArea link=(TextArea)MibrOemSsmTemplate.target(s.mainList.getChildren()[7],MibrOemSsmTemplate.PLAIN_TEXT_TARGET_ID,TextArea.class);
-  check("Erweitert".equals(link.text()),"Erweitert link label");
-  ((ListItemModel)s.mainList.getChildren()[7]).getController().emitList("buttonReleased",7);drain();
-  check(s.mainList.get_itemCount()==6,"Erweitert: 3 settings, Motorart, Scaling, Diagnose");
-  ((ListItemModel)s.mainList.getChildren()[4]).getController().emitList("buttonReleased",4);drain();
-  check(s.mainList.get_itemCount()==2,"Scaling page has exactly two dropdowns");
-  TextArea mainScale=(TextArea)MibrOemSsmTemplate.target(s.mainList.getChildren()[0],MibrOemSsmTemplate.VALUE_LABEL_TARGET_ID,TextArea.class);
-  TextArea clusterScale=(TextArea)MibrOemSsmTemplate.target(s.mainList.getChildren()[1],MibrOemSsmTemplate.VALUE_LABEL_TARGET_ID,TextArea.class);
-  check("Zoomfaktor Hauptdisplay".equals(mainScale.text()) && "Zoomfaktor Virtual Cockpit".equals(clusterScale.text()),"scaling row labels");
-  s.close.getController().emitHmi("released");drain();
-  check(s.mainList.get_itemCount()==6,"Scaling Back returns to Erweitert");
-  ((ListItemModel)s.mainList.getChildren()[5]).getController().emitList("buttonReleased",5);drain();
-  check(s.mainList.get_itemCount()==8,"Diagnostics: seven vehicle-data lines plus the read-only service state");
-  TextArea state=(TextArea)MibrOemSsmTemplate.target(s.mainList.getChildren()[7],MibrOemSsmTemplate.PLAIN_TEXT_TARGET_ID,TextArea.class);
-  check("Dienst nicht verbunden".equals(state.text()),"service state text");
-  ((ListItemModel)s.mainList.getChildren()[0]).getController().emitList("buttonReleased",0);drain();
-  check(s.mainList.get_itemCount()==8,"service state row is not an action");
-  s.close.getController().emitHmi("released");drain();
-  check(s.mainList.get_itemCount()==6,"Diagnose Back returns to Erweitert");
-  s.close.getController().emitHmi("released");drain();
-  check(s.mainList.get_itemCount()==8,"Erweitert Back restores the main list");
-  TextArea eta=(TextArea)MibrOemSsmTemplate.target(s.mainList.getChildren()[2],MibrOemSsmTemplate.CHECK_TEXT_TARGET_ID,TextArea.class);
-  Button unknownButton=(Button)MibrOemSsmTemplate.target(s.mainList.getChildren()[2],MibrOemSsmTemplate.CHECK_BUTTON_TARGET_ID,Button.class);check("Ankunftszeit".equals(eta.text()) && unknownButton.imagesState==null && unknownButton.get_imageStateRef().is_visible() && !unknownButton.is_activated(),"stock CHECK row; unknown shows the empty OEM box");
-  ((ListItemModel)s.mainList.getChildren()[2]).getController().emitList("buttonReleased",2);drain();
-  Button draftedButton=(Button)MibrOemSsmTemplate.target(s.mainList.getChildren()[2],MibrOemSsmTemplate.CHECK_BUTTON_TARGET_ID,Button.class);check(draftedButton.get_imageStateRef().is_visible() && draftedButton.is_activated() && draftedButton.imagesState==null,"checkbox toggles to yes without image graft");
-  TextArea surface=(TextArea)MibrOemSsmTemplate.target(s.mainList.getChildren()[1],MibrOemSsmTemplate.VALUE_TEXT_TARGET_ID,TextArea.class);
-  check("".equals(surface.text()),"unknown choice shows no developer marker");
-  s.mainList.set_selectedIndex(2);s.mainList.setFocusedIndex(1);s.mainList.snap(1,0);
-  int made=handler.created,disposed=handler.destroyed,updates=MibrHomeList.replacements;
-  WidgetModel kept=s.mainList.getChildren()[1];rows.changed();drain();
-  check(s.mainList.get_selectedIndex()==2 && s.mainList.getFocusedIndex()==1 && s.mainList.getFirstVisibleIndex()==1,"same-page refresh preserves selection, focus, and viewport");
-  check(handler.created==made && handler.destroyed==disposed && MibrHomeList.replacements==updates && s.mainList.getChildren()[1]==kept,"same-page update retains OEM row identity without widget-list replacement");
-  rows.changed();drain();check(handler.created==made && handler.destroyed==disposed,"repeat snapshot refresh has zero clone churn");
-  rows.detach();check(s.mainList.getChildren()==original,"detach restores original children");check(s.mainList.getListItemTransfer()==originalTransfer,"detach restores original transfer");check(handler.created==handler.destroyed,"all allocated rows disposed exactly once");
-  MibrOemSsmTemplate.Binding failing=stock();ListItemTransfer saved=new ListItemTransfer(){public boolean transferData(ListItemModel i,int a,int b){return false;}};failing.mainList.setListItemTransfer(saved);AbstractViewHandler fh=new AbstractViewHandler();MibrOwnedSsmRows fr=new MibrOwnedSsmRows(fh,failing,new Runnable(){public void run(){}});fr.open();((ListItemModel)failing.mainList.getChildren()[0]).getController().emitList("buttonReleased",0);drain();WidgetModel popupRow=failing.mainList.getChildren()[2]; // the first TWO canonical rows are native binary controlsButton popupButton=(Button)MibrOemSsmTemplate.target(popupRow,MibrOemSsmTemplate.OPENER_TARGET_ID,Button.class);popupButton.getController().emitHmi("pressed");DefaultDropDownButtonController popupController=(DefaultDropDownButtonController)popupButton.getController();popupController.throwClose=true;boolean closeThrew=false;try{fr.detach();}catch(Throwable expected){closeThrew=true;}check(closeThrew,"rows detach reports injected native close failure");check(failing.mainList.getChildren().length==2 && failing.mainList.getListItemTransfer()==saved,"rows detach continues restoring OEM children and transfer after close exception");check(fh.created==fh.destroyed,"rows detach still destroys all masters after close exception");fr.detach();check(fh.created==fh.destroyed,"retry after failure does not double-destroy masters");
-  AbstractViewHandler partial=new AbstractViewHandler();partial.failCreate=1;MibrOemSsmTemplate.Binding p=stock();MibrOwnedSsmRows r=new MibrOwnedSsmRows(partial,p,new Runnable(){public void run(){}});boolean threw=false;try{r.open();}catch(Throwable expected){threw=true;}check(threw,"partial clone fault injected");r.detach();check(partial.created==1 && partial.destroyed==1,"partial clone released on detach");
- }
- public static void main(String[] args){MibrI18n.forced="de_DE";MibrMenuLayout.storedPath=System.getProperty("mibr.menu.standard");de.vw.mib.widgets.internal.ServiceManager.eventDispatcher=new de.vw.mib.widgets.internal.ServiceManager.Dispatcher();popupCallbacks();drain();if(!"popup".equals(System.getProperty("mibr.test.scenario"))){rowRefreshAndPartialClone();drain();}System.out.println("NATIVE_ROWS_CALLBACKS_PASS");}
-}'''
+#define MAN_TYPE_SLIGHT_RIGHT_TURN          50
+#define MAN_TYPE_CHANGE_HIGHWAY             51
+#define MAN_TYPE_CHANGE_HIGHWAY_LEFT        52
+#define MAN_TYPE_CHANGE_HIGHWAY_RIGHT       53
 
+/*
+ * Distance units (as observed in MHI3 dio_manager type-info strings).
+ *
+ * mediabase::CDIONavigationMetadataTypeInfo::toString(EDistanceRemainingDisplayUnits):
+ *   0=KM, 1=MILES, 2=M, 3=YARDS, 4=FT
+ */
+#define DIST_UNIT_KM        0
+#define DIST_UNIT_MILES     1
+#define DIST_UNIT_METERS    2
+#define DIST_UNIT_YARDS     3
+#define DIST_UNIT_FEET      4
 
-class NativeRowsCallbacks(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.tmp = Path(tempfile.mkdtemp(prefix="mibr-native-rows-callbacks-"))
-        configured = os.environ.get("MIBR_TEST_JAVA_HOME")
-        cls.javac = str(Path(configured) / "bin/javac") if configured else shutil.which("javac")
-        cls.java = str(Path(configured) / "bin/java") if configured else shutil.which("java")
-        if os.name == "nt" and configured:
-            cls.javac += ".exe"
-            cls.java += ".exe"
-        if not cls.javac or not cls.java:
-            raise RuntimeError("Existing JDK required; set MIBR_TEST_JAVA_HOME (no installation/setup)")
-        sources = []
-        for relative, body in STUBS.items():
-            path = cls.tmp / "src" / relative
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(body, encoding="utf-8")
-            sources.append(str(path))
-        harness = cls.tmp / "src/de/mibr/hmi/Harness.java"
-        harness.parent.mkdir(parents=True, exist_ok=True)
-        harness.write_text(HARNESS, encoding="utf-8")
-        sources.append(str(harness))
-        for name in ("MibrControlProtocol", "MibrControlClient", "MibrControlSession", "MibrOwnedSsmRows", "MibrOemPageEntry", "MibrElementDetailRows", "MibrNativeDropdownEditor",
-                     "MibrElementSpec", "MibrElementEngine", "MibrElementTree", "MibrCanonicalElementMenu", "MibrPopupEditorModel",
-                     "MibrDraftChoiceModel", "MibrScalingState", "MibrCarPlayMenuModel", "MibrVdataDiag", "MibrEngineState", "MibrViewState", "MibrMenuDefinition", "MibrI18n",
-                     "MibrDurableSwitch", "MibrPlatformDefaults", "MibrSafeArea", "MibrGpsDemoState", "MibrVersionInfo",
-                     "MibrMenuCatalog", "MibrMenuFunctions", "MibrMenuLayout", "MibrExpert",
-                     "MibrV3Protocol", "MibrV3Client", "MibrV3Session",
-                     "MibrSettingsCatalog"):
-            sources.append(str(H / (name + ".java")))
-        cls.out = cls.tmp / "classes"
-        cls.out.mkdir()
-        run = subprocess.run([cls.javac, "-encoding", "UTF-8", "-source", "8", "-target", "8", "-d", str(cls.out)] + sources,
-                             capture_output=True, text=True)
-        if run.returncode:
-            raise AssertionError(run.stdout + run.stderr)
+/*
+ * Driving side (as observed in MHI3 tbt_renderer logging and captured iAP2 packets):
+ *   0 = right-hand traffic
+ *   1 = left-hand traffic
+ *
+ * Note: this field is optional; if the TLV is missing, we don't publish the bus key.
+ */
+#define DRIVING_SIDE_RIGHT   0
+#define DRIVING_SIDE_LEFT    1
 
-    def test_native_rows_popup_callbacks_and_cleanup(self):
-        run = subprocess.run([self.java, "-Dmibr.test.scenario=popup",
-                              "-Dmibr.menu.standard=" + str(ROOT / "tools/menu-editor/standard-menu.txt"),
-                              "-cp", str(self.out), "de.mibr.hmi.Harness"],
-                             capture_output=True, text=True, timeout=30)
-        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-        self.assertIn("NATIVE_ROWS_CALLBACKS_PASS", run.stdout)
+/* ============================================================
+ * Data Structures
+ * ============================================================ */
 
-    def test_legacy_r56_row_refresh_fixture(self):
-        self.skipTest("legacy R56 row-refresh fixture is not retained in the public source tree; current popup callbacks are tested separately")
+#define MAX_MANEUVER_LIST   16
+#define MAX_COMPONENT_LIST  8
+#define MAX_LANE_GUIDANCE   8
+#define MAX_LANE_ANGLES     16
+/* Must align with Java RouteGuidance.MAX_MANEUVERS.
+ * Sized for routes with many active events.  iOS publishes the entire
+ * route (sendLaneGuidances batch-sends every cached event;
+ * sendManeuvers walks the full source) — long highway trips routinely
+ * cross 20+ events.  iOS's own CRAccNavInfoCache defaults to 1000
+ * entries; we keep a much smaller LRU here, with active-list eviction
+ * protection (rgd_is_active_index); lane events drop the lowest index. */
+#define MANEUVER_CACHE_SIZE 32
+#define RGD_HEX_PREVIEW_MAX 96
+/*
+ * Exit info (MAN_TLV_EXIT_INFO) in MHI3 dio_manager is treated as a string and fed into util::UnicodeString8
+ * without an explicit length (CRouteGuidanceUpdateProcessorImpl::getRouteGuidanceManeuverInformation, a1+240).
+ * We keep the raw+hex preview for debugging, but also publish a decoded string key to the bus.
+ */
+#define RGD_EXIT_INFO_MAX   256
 
+/*
+ * MAN_TLV_LINKED_LANE_GUIDANCE (0x000C) is treated as native scalar linked-lane index
+ * (u16, with occasional component+index compact forms).
+ * Detailed per-lane content is parsed from 0x5204 LaneInformations.
+ */
 
-if __name__ == "__main__":
-    unittest.main()
+/*
+ * Lane-information sub-TLV IDs inside 0x5204 / TLV 0x0002.
+ *
+ * Native parser (libesoiap2 processLaneGuidanceInformation + parseLaneInformation):
+ * 0x0000=index, 0x0001=laneStatus, 0x0002=laneAngles (repeated), 0x0003=laneAngleHighlight.
+ */
+#define LANE_INFO_TLV_INDEX           0x0000  /* u16 */
+#define LANE_INFO_TLV_STATUS          0x0001  /* u8 */
+#define LANE_INFO_TLV_ANGLES          0x0002  /* repeated u16 */
+#define LANE_INFO_TLV_ANGLE_HIGHLIGHT 0x0003  /* u16, sentinel 1000 is valid */
+
+/* Lane guidance per-lane info */
+typedef struct {
+    uint16_t position;       /* lane position from TLV 0x0000 (fallback: parse index) */
+    int16_t  direction;      /* raw u16/s16 lane direction/angle; preserves sentinel 1000 */
+    uint8_t  status;         /* 0=NOT_GOOD, 1=GOOD, 2=PREFERRED */
+    int16_t  angles[MAX_LANE_ANGLES]; /* full laneAngles vector from 0x5204/0x0002 */
+    uint8_t  angle_count;
+    char     description[64];
+} rgd_lane_t;
+
+/* Lane guidance data (from 0x5204) */
+typedef struct {
+    uint64_t present;
+    uint16_t component_ids[MAX_COMPONENT_LIST];
+    uint16_t component_count;
+    uint16_t lane_guidance_index;
+    rgd_lane_t lanes[MAX_LANE_GUIDANCE];
+    uint8_t lane_count;
+    uint8_t lane_complete; /* full, explicit ordered snapshot; no capacity truncation */
+    char lane_guidance_description[64];
+} rgd_lane_guidance_t;
+
+/* Route update data (from 0x5201) */
+typedef struct {
+    uint64_t present;
+    uint16_t component_ids[MAX_COMPONENT_LIST];
+    uint16_t component_count;
+    uint8_t route_state;
+    uint8_t maneuver_state;
+    uint8_t distance_units;
+    uint8_t dist_to_maneuver_units;
+    uint8_t visible_in_app;
+    uint8_t lane_guidance_showing;
+    uint8_t source_supports_route_guidance;
+    uint16_t maneuver_count;
+    uint16_t lane_guidance_index;
+    uint16_t lane_guidance_total;
+    uint32_t distance_remaining;
+    uint32_t dist_to_maneuver;
+    uint64_t eta;
+    uint64_t time_remaining;
+    char current_road[256];
+    char destination[256];
+    char distance_string[64];
+    char dist_to_maneuver_string[64];
+    char source_name[64];
+    uint16_t maneuver_list[MAX_MANEUVER_LIST];
+    uint16_t maneuver_list_count;
+} rgd_update_t;
+
+/* rgd_update_t present bits */
+#define RGD_UPD_COMPONENT_IDS        (1ULL << 0)
+#define RGD_UPD_ROUTE_STATE          (1ULL << 1)
+#define RGD_UPD_MANEUVER_STATE       (1ULL << 2)
+#define RGD_UPD_CURRENT_ROAD         (1ULL << 3)
+#define RGD_UPD_DESTINATION          (1ULL << 4)
+#define RGD_UPD_ETA                  (1ULL << 5)
+#define RGD_UPD_TIME_REMAINING       (1ULL << 6)
+#define RGD_UPD_DISTANCE_REMAINING   (1ULL << 7)
+#define RGD_UPD_DISTANCE_STRING      (1ULL << 8)
+#define RGD_UPD_DISTANCE_UNITS       (1ULL << 9)
+#define RGD_UPD_DIST_TO_MANEUVER     (1ULL << 10)
+#define RGD_UPD_DIST_TO_MANEUVER_STR (1ULL << 11)
+#define RGD_UPD_DIST_TO_MANEUVER_UNI (1ULL << 12)
+#define RGD_UPD_MANEUVER_COUNT       (1ULL << 13)
+#define RGD_UPD_MANEUVER_LIST        (1ULL << 14)
+#define RGD_UPD_VISIBLE_IN_APP       (1ULL << 15)
+#define RGD_UPD_LANE_INDEX           (1ULL << 16)
+#define RGD_UPD_LANE_TOTAL           (1ULL << 17)
+#define RGD_UPD_LANE_SHOWING         (1ULL << 18)
+#define RGD_UPD_SOURCE_NAME          (1ULL << 19)
+#define RGD_UPD_SOURCE_SUPPORTS_RG   (1ULL << 20)
+
+/* rgd_lane_guidance_t present bits */
+#define RGD_LANE_COMPONENT_IDS       (1ULL << 0)
+#define RGD_LANE_GUIDANCE_INDEX      (1ULL << 1)
+#define RGD_LANE_INFORMATIONS        (1ULL << 2)
+#define RGD_LANE_GUIDANCE_DESC       (1ULL << 3)
+
+/* Maneuver data (from 0x5202) */
+typedef struct {
+    uint64_t present;
+    uint16_t component_ids[MAX_COMPONENT_LIST];
+    uint16_t component_count;
+    uint16_t index;
+    uint8_t maneuver_type;
+    uint8_t distance_units;
+    uint8_t driving_side;
+    uint8_t junction_type;
+    int16_t exit_angle;
+    int16_t junction_angles[MAX_MANEUVER_LIST];
+    uint16_t junction_angle_count;
+    uint32_t distance_between;
+    char description[256];
+    char after_road_name[256];
+    char distance_string[64];
+    uint16_t lane_guidance_raw_len;
+#if RGD_TRACE_RAW_FULL
+    char lane_guidance_hex[(RGD_HEX_PREVIEW_MAX * 3) + 1];
+#endif
+    uint16_t linked_lane_guidance_index;
+    uint16_t exit_info_raw_len;
+#if RGD_TRACE_RAW_FULL
+    char exit_info_hex[(RGD_HEX_PREVIEW_MAX * 3) + 1];
+#endif
+    char exit_info_str[RGD_EXIT_INFO_MAX + 1];
+    uint8_t valid;
+} rgd_maneuver_t;
+
+/* rgd_maneuver_t present bits */
+#define RGD_MAN_COMPONENT_IDS        (1ULL << 0)
+#define RGD_MAN_INDEX                (1ULL << 1)
+#define RGD_MAN_DESCRIPTION          (1ULL << 2)
+#define RGD_MAN_TYPE                 (1ULL << 3)
+#define RGD_MAN_AFTER_ROAD           (1ULL << 4)
+#define RGD_MAN_DISTANCE_BETWEEN     (1ULL << 5)
+#define RGD_MAN_DISTANCE_STRING      (1ULL << 6)
+#define RGD_MAN_DISTANCE_UNITS       (1ULL << 7)
+#define RGD_MAN_DRIVING_SIDE         (1ULL << 8)
+#define RGD_MAN_JUNCTION_TYPE        (1ULL << 9)
+#define RGD_MAN_JUNCTION_ANGLES      (1ULL << 10)
+#define RGD_MAN_EXIT_ANGLE           (1ULL << 11)
+#define RGD_MAN_LANE_GUIDANCE_RAW    (1ULL << 12)
+#define RGD_MAN_EXIT_INFO_RAW        (1ULL << 13)
+#define RGD_MAN_EXIT_INFO_STR        (1ULL << 14)
+#define RGD_MAN_LINKED_LANE_INDEX    (1ULL << 16)  /* Scalar linked lane guidance index */
+
+/* ============================================================
+ * Parsing Functions
+ * ============================================================ */
+
+/* Parse complete iAP2 messages. False rejects the entire malformed delta;
+ * output remains empty (maneuver linked-lane sentinel remains 0xFFFF). */
+/* Parse RouteGuidanceUpdate (0x5201) payload */
+bool rgd_parse_update(const uint8_t* buf, size_t len, rgd_update_t* out);
+
+/* Parse RouteGuidanceManeuverUpdate (0x5202) payload */
+bool rgd_parse_maneuver(const uint8_t* buf, size_t len, rgd_maneuver_t* out);
+
+/* Parse RouteGuidanceLaneGuidanceInformation (0x5204) payload */
+bool rgd_parse_lane_guidance(const uint8_t* buf, size_t len, rgd_lane_guidance_t* out);
+
+/* ============================================================
+ * Building Functions (for Identify patching)
+ * ============================================================ */
+
+/* Build RouteGuidanceDisplayComponent TLV for Identify
+ * Returns total TLV length, or 0 on error */
+size_t rgd_build_component_tlv(uint8_t* out, size_t max_len, uint16_t component_id);
+
+/* Extract component ID from existing RouteGuidanceDisplayComponent
+ * Returns component ID, or 0 if not found */
+uint16_t rgd_extract_component_id(const uint8_t* tlv_start, size_t tlv_len);
+
+#endif /* RGD_TLV_H */

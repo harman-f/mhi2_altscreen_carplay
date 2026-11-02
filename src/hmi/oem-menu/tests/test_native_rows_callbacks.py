@@ -14,6 +14,7 @@ import unittest
 from pathlib import Path
 
 P = Path(__file__).resolve().parents[1]
+ROOT = P.parents[2]
 H = P / "java/de/mibr/hmi"
 
 
@@ -251,7 +252,7 @@ class NativeRowsCallbacks(unittest.TestCase):
 
     def test_native_rows_popup_callbacks_and_cleanup(self):
         run = subprocess.run([self.java, "-Dmibr.test.scenario=popup",
-                              "-Dmibr.menu.standard=" + str(P / "menu-editor/standard-menu.txt"),
+                              "-Dmibr.menu.standard=" + str(ROOT / "tools/menu-editor/standard-menu.txt"),
                               "-cp", str(self.out), "de.mibr.hmi.Harness"],
                              capture_output=True, text=True, timeout=30)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
