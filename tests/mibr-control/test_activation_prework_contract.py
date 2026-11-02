@@ -1,4 +1,4 @@
-"""Read-only guard on original 48-key apply metadata for the future controller.
+"""Read-only guard on current 48-key apply metadata for the future controller.
 
 This does NOT test durability, runtime effect, a reconnect mechanism or a Unit.
 It simply freezes the exact input contract before any product implementation.
@@ -25,10 +25,10 @@ class ActivationProductPreworkContract(unittest.TestCase):
         self.assertEqual(len(self.rows), 48)
         self.assertEqual(len(self.reg["settings"]), len(self.rows))
         self.assertEqual(Counter(r["apply"] for r in self.rows.values()),
-                         {"live": 8, "presentation": 7, "session": 3, "reconnect": 29,
-                          "unit_reboot": 1})
+                         {"live": 6, "presentation": 7, "session": 3, "reconnect": 29,
+                          "unit_reboot": 3})
         self.assertEqual({key for key, row in self.rows.items()
-                          if row["apply"] == "unit_reboot"}, {"maxFPS"})
+                          if row["apply"] == "unit_reboot"}, {"maxFPS", "keyframe.mode", "keyframe.interval_frames"})
 
     def test_visible_keys_project_into_three_ui_activation_buckets(self):
         groups = self.menu["sections"]
