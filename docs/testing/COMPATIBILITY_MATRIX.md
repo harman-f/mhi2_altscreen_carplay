@@ -6,6 +6,11 @@ For the detailed cross-brand cluster/transport matrix, including panel resolutio
 
 ## Platform matrix
 
+The newer [three-profile research candidate](MULTI_PROFILE_TESTING.md) separates
+exact MU1409/P4708, MU1440/P4526 and MU1447/P4709 profiles. Its target builds and
+static checks do not change the vehicle-support classification below, and this
+page does not offer a complete multi-platform installer download.
+
 | Platform | Firmware / baseline | Status | Evidence |
 | --- | --- | --- | --- |
 | Škoda MHI2 / MU1440 + AID10-class | `MHI2_ER_SKG13_P4526_MU1440` | primary proven target | vehicle-tested on one 10.x-inch MQB Virtual Cockpit |

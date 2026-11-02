@@ -21,6 +21,9 @@ The [MU1440 R57 source/build baseline](build/MU1440_R57_SOURCE.md) is the curren
 
 ## SEAT/CUPRA contributor port
 
+- [Multi-profile research candidates and tester reports](testing/MULTI_PROFILE_TESTING.md) — exact MU1409/MU1440/MU1447 status, remaining vehicle acceptance and useful SEAT visual references.
+- [Binding modular ZIP/source layout](build/PACKAGE_LAYOUT.md) — common feature modules, symmetric firmware profiles, default menu, source inventory and build-coverage rules.
+
 - [MU1409 / P4708_1 joint AltScreen and native Settings port — public collaboration guide](porting/SEAT_CUPRA_MU1409_COLLABORATION.md). This is a staged development proposal, not a supported installer or a vehicle compatibility claim for our binary.
 - [Local Mac/QNX build and firmware-analysis environment for the SEAT MU1409 contributor](porting/SEAT_CUPRA_MU1409_LOCAL_ENVIRONMENT.md) — host-only prerequisites, reproducibility gates and steps before any vehicle tests.
 

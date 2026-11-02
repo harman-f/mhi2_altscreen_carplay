@@ -36,5 +36,7 @@ Evidence labels: **VEHICLE-PROVEN MMX**, **VEHICLE-PROVEN RCC**, **STOCK-FIRMWAR
 document and source-specific reports contain dates and applicability; this root file exists to
 make their preflight impossible to miss.
 
+For all distribution ZIPs, follow the binding [modular package layout contract](docs/build/PACKAGE_LAYOUT.md): one common module tree, one symmetric platform-profile tree, a shared deployed default menu, and a separately inventoried source section in the same ZIP. Packaging must validate manifest references and exact profile selection. Describe missing source/build lineage explicitly; a successful host check is not vehicle acceptance.
+
 For firmware extraction tooling (run on a workstation, NOT QNX) use that project's
 own agent and tool documentation instead of transplanting target-shell constraints.
