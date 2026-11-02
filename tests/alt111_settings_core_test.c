@@ -68,7 +68,8 @@ int main(void)
     assert(!strcmp(before.value[ALTSET_VIEWAREAS_COUNT], "1"));
     assert(!strcmp(before.value[ALTSET_VIEWAREA_0_SAFE_X], "202"));
     assert(!strcmp(before.value[ALTSET_VIEWAREA_SELECTED], "0"));
-    assert(!strcmp(before.value[ALTSET_KEYFRAME_INTERVAL_FRAMES], "37"));
+    /* interval_frames is unit_reboot, so LIVE overlay keeps the active value. */
+    assert(!strcmp(before.value[ALTSET_KEYFRAME_INTERVAL_FRAMES], "20"));
     assert(!strcmp(before.value[ALTSET_NAVIGATION_QUERY], "0"));
     alt111_settings_runtime_overlay(&before, &s, ALT111_OVERLAY_PRESENTATION);
     assert(!strcmp(before.value[ALTSET_NAVIGATION_QUERY], "1"));
