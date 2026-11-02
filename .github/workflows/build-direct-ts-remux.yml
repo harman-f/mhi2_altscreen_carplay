@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: public-direct-ts-remux
+  group: public-direct-ts-remux-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
