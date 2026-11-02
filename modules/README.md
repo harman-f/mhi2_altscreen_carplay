@@ -9,3 +9,9 @@ for each component. The existing physical paths remain authoritative for builds
 and links until a particular move and its dependent paths have been migrated.
 The distribution layout itself is specified in the
 [package contract](../docs/build/PACKAGE_LAYOUT.md).
+
+The machine-readable [ownership and dependency index](module-index.json) records
+current canonical paths, module build recipes and output names, plus migration
+status. Its [host-only validation gate](../tools/check_module_index.py) checks
+ownership conflicts and reports dependency-aware change impact; it does **not**
+claim full reproducible builds or a qualified multi-target release.
