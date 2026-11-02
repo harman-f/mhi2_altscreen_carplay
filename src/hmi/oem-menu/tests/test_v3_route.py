@@ -36,20 +36,20 @@ class V3JavaHost(unittest.TestCase):
                              capture_output=True, text=True)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         for cls, marker in (("MibrV3RouteTest", "MIBR_V3_ROUTE_PASS"),):
-            run = subprocess.run([java, "-Dmibr.menu.standard=" + str(P / "menu-editor/standard-menu.txt"),
+            run = subprocess.run([java, "-Dmibr.menu.standard=" + str(ROOT / "tools/menu-editor/standard-menu.txt"),
                                   "-cp", str(out), "de.mibr.hmi." + cls], capture_output=True, text=True, timeout=60)
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
             self.assertIn(marker, run.stdout)
-        run = subprocess.run([java, "-Dmibr.menu.standard=" + str(P / "menu-editor/standard-menu.txt"),
+        run = subprocess.run([java, "-Dmibr.menu.standard=" + str(ROOT / "tools/menu-editor/standard-menu.txt"),
                               "-cp", str(out), "de.mibr.hmi.MibrCarPlayMenuModelTest"], capture_output=True, text=True, timeout=60)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         self.assertIn("MIBR_CARPLAY_MENU_MODEL_PASS", run.stdout)
-        run = subprocess.run([java, "-Dmibr.menu.standard=" + str(P / "menu-editor/standard-menu.txt"),
+        run = subprocess.run([java, "-Dmibr.menu.standard=" + str(ROOT / "tools/menu-editor/standard-menu.txt"),
                               "-cp", str(out), "de.mibr.hmi.MibrAdvancedOptionsTest"], capture_output=True, text=True, timeout=60)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         self.assertIn("MIBR_ADVANCED_OPTIONS_HOST_PASS", run.stdout)
         for cls in ("MibrV3BindingTest", "MibrV3SocketTest", "MibrScalingBindingTest"):
-            run = subprocess.run([java, "-Dmibr.menu.standard=" + str(P / "menu-editor/standard-menu.txt"),
+            run = subprocess.run([java, "-Dmibr.menu.standard=" + str(ROOT / "tools/menu-editor/standard-menu.txt"),
                                   "-cp", str(out), "de.mibr.hmi." + cls], capture_output=True, text=True, timeout=60)
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
 

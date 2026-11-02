@@ -38,5 +38,7 @@ make their preflight impossible to miss.
 
 For all distribution ZIPs, follow the binding [modular package layout contract](docs/build/PACKAGE_LAYOUT.md): one common module tree, one symmetric platform-profile tree, a shared deployed default menu, and a separately inventoried source section in the same ZIP. Packaging must validate manifest references and exact profile selection. Describe missing source/build lineage explicitly; a successful host check is not vehicle acceptance.
 
+For repository organization, maintain the module index in `modules/` consistently with the distribution's CarPlay/video, broker/input, menu, navigation, and platform-profile boundaries. Each module must link its canonical source, runtime, build/test tools, relevant binary artifacts and documentation. Keep a single canonical copy of each file. When moving files, update build scripts, workflows, manifests, references and documentation together, and verify the affected builds; historical released artifacts and pinned references must retain their meaning. Distinguish reference vehicle results, host-only evidence and untested platform candidates.
+
 For firmware extraction tooling (run on a workstation, NOT QNX) use that project's
 own agent and tool documentation instead of transplanting target-shell constraints.

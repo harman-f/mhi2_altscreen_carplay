@@ -7,9 +7,9 @@ published vehicle-version binaries or installer ZIP.
 
 ## Menu and settings
 
-`src/hmi/oem-menu/menu-editor/` contains the function catalog and browser editor.
+`tools/menu-editor/` contains the function catalog and browser editor.
 The saved menu format and loader limits are documented in
-[MENU_FILE_FORMAT.md](../../src/hmi/oem-menu/menu-editor/MENU_FILE_FORMAT.md).
+[MENU_FILE_FORMAT.md](../../tools/menu-editor/MENU_FILE_FORMAT.md).
 The model and native controller use the canonical registry and generated catalogs.
 The paired FPS choices are30FPS/20 frames per keyframe or60FPS/180; applying them
 requires a Unit restart. The selected maximum does not prove the phone sends60FPS.
@@ -28,7 +28,7 @@ integration.
 - Menu host contracts: `bash src/hmi/oem-menu/tests/run_view_model_test.sh` with a
   host JDK. The IBM J9 production compiler additionally requires locally supplied
   firmware API classes; those bytes are not part of this repository.
-- Route Guidance: follow [its standalone build inputs](../../src/native/carplay-rgi/README.md).
+- Route Guidance: follow [its standalone build inputs](../../modules/navigation/source/README.md).
   It builds two artifacts with a locally supplied, hash-verified firmware library.
   The GPL TLV parser is pinned and attributed. The public CI cannot substitute a
   firmware library it does not redistribute.

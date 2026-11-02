@@ -221,7 +221,7 @@ vehicle validation are documented under `THIRD_PARTY/Most20FPS/`.
 
 ## Route Guidance TLV parser
 
-The source subset under `src/native/carplay-rgi/third_party/luka-rgd` comes from
+The source subset under `modules/navigation/source/third_party/luka-rgd` comes from
 [luka-dev/mib2q-carplay-rgi](https://github.com/luka-dev/mib2q-carplay-rgi), commit
 `df73e061a29c4d996550716987f42a9243daa09a`. Its GPL-3.0 license and exact file
 provenance are included in that directory. Firmware libraries required for local
