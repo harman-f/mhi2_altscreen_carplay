@@ -40,3 +40,7 @@ For all distribution ZIPs, follow the binding [modular package layout contract](
 
 For firmware extraction tooling (run on a workstation, NOT QNX) use that project's
 own agent and tool documentation instead of transplanting target-shell constraints.
+
+## Modular repository architecture and release lineage
+
+For repository layout/migrations, module source ownership, build-to-binary traceability, and staged multi-target release assembly, follow [the development repository contract](docs/architecture/REPOSITORY_LAYOUT.md) together with the existing [R3 package layout](docs/build/PACKAGE_LAYOUT.md). These specify the migration target, not permission to publish private material or bypass platform/release qualification.
