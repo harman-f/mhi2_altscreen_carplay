@@ -8,7 +8,7 @@ This page maps the existing CarPlay/video implementation. The repository has not
 - [GEN2 source build and evidence](../../docs/build/INSTALLED_GEN2_SOURCE.md)
 - [Direct-TS remux source](../../src/native/direct-ts-remux/)
 - [Direct-TS parity source](../../src/native/direct-ts-parity/)
-- [MOST transport writer](../../src/native/most-ts-writer/)
+- [MOST transport writer](source/most-ts-writer/)
 - [Automatic direct runtime](../../runtime/auto-direct/)
 - [Exclusive native display gate](../../src/native/isotx2-gate/)
 - [Vehicle-tested artifact inventory](../../artifacts/mu1440/)
