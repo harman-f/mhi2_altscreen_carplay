@@ -249,5 +249,77 @@
       "de": "Legacy Autodirect",
       "en": "Legacy autodirect"
     }
-  }
+  },
+  "virtual_pages": [
+    {
+      "id": "scaling",
+      "parent": "advanced",
+      "name": {
+        "de": "Scaling",
+        "en": "Scaling"
+      },
+      "notice": {
+        "de": "Änderungen werden bei der nächsten CarPlay-Verbindung übertragen.",
+        "en": "Changes are sent on the next CarPlay connection."
+      },
+      "controls": [
+        {
+          "id": "scaling.main.zoomFactor",
+          "label": {
+            "de": "Zoomfaktor Hauptdisplay",
+            "en": "Main display zoom factor"
+          },
+          "options": [
+            "AUTO",
+            "70",
+            "85",
+            "100",
+            "125",
+            "150"
+          ]
+        },
+        {
+          "id": "scaling.cluster.zoomFactor",
+          "label": {
+            "de": "Zoomfaktor Virtual Cockpit",
+            "en": "Virtual Cockpit zoom factor"
+          },
+          "options": [
+            "AUTO",
+            "70",
+            "85",
+            "100",
+            "125",
+            "150"
+          ]
+        },
+        {
+          "id": "scaling.cluster.physicalSize",
+          "label": {
+            "de": "Physische Displaygröße Virtual Cockpit",
+            "en": "Virtual Cockpit physical size"
+          },
+          "options": [
+            "BASE",
+            "P20",
+            "P30",
+            "P50"
+          ]
+        },
+        {
+          "id": "scaling.main.physicalSize",
+          "label": {
+            "de": "Physische Displaygröße Hauptdisplay",
+            "en": "Main display physical size"
+          },
+          "options": [
+            "BASE",
+            "P20",
+            "P30",
+            "P50"
+          ]
+        }
+      ]
+    }
+  ]
 }

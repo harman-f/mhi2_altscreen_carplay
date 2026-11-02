@@ -98,8 +98,11 @@ jobs:
             runtime/parity/parity_session.sh \
             runtime/parity/parity_status.sh \
             runtime/mibr-control/mibr-engine.ksh \
+            runtime/mibr-control/mibr-menu.ksh \
             runtime/mibr-control/mibr-view.ksh \
+            runtime/mibr-control/mibr-watch.ksh \
             runtime/mibr-control/mibr-v3-boot.ksh \
+            runtime/mibr-control/parity_drive_supervisor_r53.sh \
             deployment/mu1440-parity-drive-v1/session-logging.sh
 
       - name: Build and test MIBR/3 host controller
@@ -112,14 +115,36 @@ jobs:
           export PYTHONPATH="$PWD/tests/mibr-control${PYTHONPATH:+:$PYTHONPATH}"
           export MIBR_CONTROL_OUT="$PWD/build/host/mibr-control"
           bash tools/build_mibr_control.sh host
+          gcc -O2 -g -std=gnu99 -Wall -Wextra -Werror \
+            -DALT111_SETTINGS_TEST -DMIBR_SHA256_LIBRARY_ONLY \
+            -Isrc/native/altscreen111-gen2/include -Isrc/native/alt111-settings/include \
+            src/native/alt111-settings/settings_cli.c \
+            src/native/alt111-settings/settings_core.c \
+            src/native/alt111-settings/settings_posix.c \
+            src/native/altscreen111-gen2/src/alt111_policy.c \
+            src/native/sha256sum-compat/sha256sum_compat.c \
+            -o "$PWD/build/host/alt111-settings"
+          export MIBR_PINNED_ALT111_CLI="$PWD/build/host/alt111-settings"
+          export MIBR_V3_NATIVE_SERVICE_BIN="$MIBR_CONTROL_OUT/mibr-v3-service-host"
+          export MIBR_V3_NATIVE_CLIENT_BIN="$MIBR_CONTROL_OUT/mibrctl-v3-host"
           MIBR_V3_NATIVE_HOST_BIN="$MIBR_CONTROL_OUT/mibr-v3-service-host" \
+          MIBR_V3_NATIVE_READONLY_HOST_BIN="$MIBR_CONTROL_OUT/mibr-v3-host-harness" \
             python3 -B -m unittest discover -s tests/mibr-control -p 'test_*.py' -v
 
       - name: Validate OEM menu catalog and source adapters
         shell: bash
         run: |
           set -euxo pipefail
-          python3 -B -m unittest discover -s src/hmi/oem-menu/tests -v
+          # Portable source contracts. Optional OEM-reference/capture suites
+          # remain available locally when their external fixtures are supplied.
+          python3 -B -m unittest -v \
+            src.hmi.oem-menu.tests.test_generate_catalog \
+            src.hmi.oem-menu.tests.test_menu_generator \
+            src.hmi.oem-menu.tests.test_i18n \
+            src.hmi.oem-menu.tests.test_prepare_oem_sources \
+            src.hmi.oem-menu.tests.test_verify_class_major \
+            src.hmi.oem-menu.tests.test_v3_route \
+            src.hmi.oem-menu.tests.test_native_rows_callbacks
           bash src/hmi/oem-menu/tests/run_view_model_test.sh
           python3 -B src/hmi/oem-menu/generate_catalog.py \
             --registry settings/registry.json \
@@ -138,6 +163,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Build pinned QNX 6.5 toolchain image
         shell: bash
@@ -160,28 +186,50 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          expect_sha() {
-            local file=$1 expected=$2 actual
-            actual=$(sha256sum "$file" | awk '{print $1}')
-            if [[ "$actual" != "$expected" ]]; then
-              echo "SHA-256 mismatch for $file: expected $expected, got $actual" >&2
-              exit 1
-            fi
-            echo "$file SHA256=$actual"
-          }
           OUT=build/mu1440-source
-          expect_sha "$OUT/libaltscreen111.so" 304b5079374a08ed9a763528217476b29ad49e000ba25d0372ed4147cbb9a705
-          expect_sha "$OUT/alt111-settings" b0d61578452a93b966f268e2bd400029bb1b6fa249dfd18e8895f851ca89073c
-          expect_sha "$OUT/direct-ts-parity" 3098cdd4469a4a3b4ee92c583518b3af362e02e41921ed3d80641853ced0827b
-          expect_sha "$OUT/libmibr_isotx2_guard.so" cad06d69c698c8940dec9596b96c6b90ec822bdd437c4b0d02a35881ad71fae4
-          expect_sha "$OUT/libmibr_isotx2_gate.so" 05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957
-          expect_sha "$OUT/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY" 97177ddbfe78d49dc0d672c5b70e717a87c0aeebb6ac65ab4e1b7df12e60bb58
-          expect_sha "$OUT/mibr-control/mibrctl-v3-QNX65-ARMv7-NOT-INSTALL-READY" fa4a580337a6a0a1d67e15ee1abc7f809591978cbfdecada5b87259fb8a5f351
-          expect_sha "$OUT/mibr-control/mibr-v3-genkey-QNX65-ARMv7-NOT-INSTALL-READY" 328837d6df6daaeec25197d8cb9f7e9070c194e012f86dfc3c75256cb36d5474
-          expect_sha "$OUT/mibr-control/mibr-key40d-QNX65-ARMv7-NOT-INSTALL-READY" 3612c686a6de43c7cfbcb4e96645bca83ba9db33f8c03b19e33c0c73efbaf9d2
-          test -s "$OUT/parity-session"
-          echo 'Canonical owner includes an additional stopped-until-dead safety correction; original R52 a7382451 was reproduced separately.'
+          FROZEN_SOURCE_BASELINE=960d808f4e80622808c4b57b777723fbddb81839
+          git cat-file -e "$FROZEN_SOURCE_BASELINE^{commit}"
+          expected=(
+            libaltscreen111.so alt111-settings direct-ts-parity libmibr_isotx2_guard.so
+            libmibr_isotx2_gate.so parity-session
+            mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY
+            mibr-control/mibrctl-v3-QNX65-ARMv7-NOT-INSTALL-READY
+            mibr-control/mibr-v3-genkey-QNX65-ARMv7-NOT-INSTALL-READY
+            mibr-control/mibr-key40d-QNX65-ARMv7-NOT-INSTALL-READY
+          )
+          if git diff --quiet "$FROZEN_SOURCE_BASELINE" HEAD -- settings src/native tools/build_*.sh tools/generate_alt111_settings.py; then
+            echo "Frozen installed-output verification: source inputs match $FROZEN_SOURCE_BASELINE"
+            expect_sha() {
+              local file=$1 expected=$2 actual
+              actual=$(sha256sum "$file" | awk '{print $1}')
+              if [[ "$actual" != "$expected" ]]; then
+                echo "SHA-256 mismatch for $file: expected $expected, got $actual" >&2
+                exit 1
+              fi
+              echo "$file SHA256=$actual"
+            }
+            expect_sha "$OUT/libaltscreen111.so" 304b5079374a08ed9a763528217476b29ad49e000ba25d0372ed4147cbb9a705
+            expect_sha "$OUT/alt111-settings" b0d61578452a93b966f268e2bd400029bb1b6fa249dfd18e8895f851ca89073c
+            expect_sha "$OUT/direct-ts-parity" 3098cdd4469a4a3b4ee92c583518b3af362e02e41921ed3d80641853ced0827b
+            expect_sha "$OUT/libmibr_isotx2_guard.so" cad06d69c698c8940dec9596b96c6b90ec822bdd437c4b0d02a35881ad71fae4
+            expect_sha "$OUT/libmibr_isotx2_gate.so" 05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957
+            expect_sha "$OUT/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY" 97177ddbfe78d49dc0d672c5b70e717a87c0aeebb6ac65ab4e1b7df12e60bb58
+            expect_sha "$OUT/mibr-control/mibrctl-v3-QNX65-ARMv7-NOT-INSTALL-READY" fa4a580337a6a0a1d67e15ee1abc7f809591978cbfdecada5b87259fb8a5f351
+            expect_sha "$OUT/mibr-control/mibr-v3-genkey-QNX65-ARMv7-NOT-INSTALL-READY" 328837d6df6daaeec25197d8cb9f7e9070c194e012f86dfc3c75256cb36d5474
+            expect_sha "$OUT/mibr-control/mibr-key40d-QNX65-ARMv7-NOT-INSTALL-READY" 3612c686a6de43c7cfbcb4e96645bca83ba9db33f8c03b19e33c0c73efbaf9d2
+            echo 'Canonical owner includes an additional stopped-until-dead safety correction; original R52 a7382451 was reproduced separately.'
+          else
+            echo "Development source inputs differ from frozen baseline $FROZEN_SOURCE_BASELINE; validating artifact inventory and ARM ELF identity."
+            for artifact in "${expected[@]}"; do
+              test -s "$OUT/$artifact"
+              readelf -h "$OUT/$artifact" | grep -q 'Machine:.*ARM'
+              echo "QNX_ARM_ELF=PASS $artifact"
+            done
+          fi
+          test -s "$OUT/mibr-control/SERVICE_ELF_HEADER.txt"
           (cd "$OUT" && sha256sum -c SHA256SUMS)
+          echo 'Current artifact SHA-256 values (build identity only; no released/install identity claim):'
+          (cd "$OUT" && sha256sum "${expected[@]}")
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

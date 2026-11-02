@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-NATIVE = Path(__file__).resolve().parents[2] / "src" / "native" / "mibr-control"
+from public_paths import NATIVE
 NL = chr(10)
 
 

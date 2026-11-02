@@ -70,7 +70,8 @@ public final class MibrV3QueueTest {
         check(fake.sets == 2 && "yes".equals(m.draft(COMP)), "queued compass SET sent after #1");
         fake.release();
         check("yes".equals(m.current(COMP)) && m.draft(COMP) == null && s.canWrite(), "compass saved, editor writable");
-        check(s.status().indexOf("Dauerhaft gespeichert") >= 0, "status " + s.status());
+        check(s.status().indexOf("Dauerhaft gespeichert") >= 0 ||
+              s.status().indexOf("Saved persistently") >= 0, "status " + s.status());
         // B: same checkbox tapped twice while its SET runs -> final value is the last tap.
         fake = new Fake();
         m = open(fake, box);

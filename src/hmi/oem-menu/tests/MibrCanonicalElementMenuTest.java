@@ -23,7 +23,7 @@ public final class MibrCanonicalElementMenuTest {
             }
             if("navigation.compass".equals(s.id)||"navigation.ETA".equals(s.id)||"navigation.speedLimit".equals(s.id))
                 ok(s.isOption("yes")&&s.isOption("no"),"yes/no wire kept");
-            if("maxFPS".equals(s.id))ok(s.choices().length==4&&!s.isOption("35"),"fps");
+            if("maxFPS".equals(s.id))ok(s.choices().length==5&&s.isOption("60")&&!s.isOption("35"),"fps");
             if("sourceVersion".equals(s.id))ok(s.readOnly&&s.choices().length==2,"source pending validator");
             settings++;
         }

@@ -1,0 +1,632 @@
+{
+"schema": "mibr-menu-catalog/1",
+"catalog": 2,
+"kinds": {
+"page": {
+"de": "Seite: öffnet eine Unterebene",
+"en": "Page: opens a sub level"
+},
+"fixedpage": {
+"de": "Feste Seite: zeigt Inhalte aus dem Code, nimmt keine Einträge auf",
+"en": "Fixed page: shows content from the code, takes no entries"
+},
+"toggle": {
+"de": "Haken: ein oder aus, wirkt beim Antippen",
+"en": "Checkbox: on or off, acts on tap"
+},
+"list": {
+"de": "Auswahl: Liste fester Werte",
+"en": "Choice: list of fixed values"
+},
+"number": {
+"de": "Zahl: Liste mit Schritten",
+"en": "Number: list with steps"
+},
+"action": {
+"de": "Aktion: löst beim Antippen etwas aus",
+"en": "Action: does something on tap"
+},
+"hint": {
+"de": "Hinweis: Text ohne Funktion, freier Text",
+"en": "Note: text without a function, free text"
+}
+},
+"functions": [
+{
+"id": "viewarea.selected",
+"parent": "root",
+"kind": "list",
+"de": "Ansicht",
+"en": "View",
+"values": "Wide, Voll, Center",
+"desc_de": "Bildbereich der Karte im Cockpit, solange er nicht der Cockpit-Ansicht folgt.",
+"desc_en": "Picture area of the map in the cockpit while it does not follow the cockpit view."
+},
+{
+"id": "navigation.surface",
+"parent": "root",
+"kind": "list",
+"de": "Kartenanzeige",
+"en": "Map display",
+"values": "Standard, Karte, Manöverkarte",
+"desc_de": "Was CarPlay im Cockpit zeichnen soll: Standard der App, die Karte oder nur die Manöverkarte.",
+"desc_en": "What CarPlay draws in the cockpit: the app default, the map or the maneuver card only."
+},
+{
+"id": "navigation.ETA",
+"parent": "root",
+"kind": "toggle",
+"de": "Ankunftszeit",
+"en": "Arrival time",
+"desc_de": "Ankunftszeit im CarPlay-Bild im Cockpit.",
+"desc_en": "Arrival time in the CarPlay picture in the cockpit."
+},
+{
+"id": "navigation.speedLimit",
+"parent": "root",
+"kind": "toggle",
+"de": "Tempolimit",
+"en": "Speed limit",
+"desc_de": "Tempolimit im CarPlay-Bild im Cockpit.",
+"desc_en": "Speed limit in the CarPlay picture in the cockpit."
+},
+{
+"id": "navigation.compass",
+"parent": "root",
+"kind": "toggle",
+"de": "Kompass",
+"en": "Compass",
+"desc_de": "Kompass im CarPlay-Bild im Cockpit.",
+"desc_en": "Compass in the CarPlay picture in the cockpit."
+},
+{
+"id": "navigation.maneuver",
+"parent": "root",
+"kind": "list",
+"de": "Abbiegehinweis",
+"en": "Maneuver hint",
+"values": "Keiner, Links, Rechts, Oben",
+"desc_de": "Wo die App den Abbiegehinweis im CarPlay-Bild zeichnet.",
+"desc_en": "Where the app draws the maneuver hint in the CarPlay picture."
+},
+{
+"id": "carplay_nav",
+"parent": "root",
+"kind": "toggle",
+"de": "CarPlay-Navigation",
+"en": "CarPlay navigation",
+"warn": true,
+"desc_de": "Holt die Abbiegedaten vom iPhone. Aus: keine Pfeile aus der iPhone-Route im Cockpit.",
+"desc_en": "Fetches turn data from the iPhone. Off: no arrows from the iPhone route in the cockpit."
+},
+{
+"id": "nav_hints",
+"parent": "root",
+"kind": "page",
+"de": "Pfeile im Cockpit",
+"en": "Cockpit arrows",
+"desc_de": "Darstellung der Abbiegehinweise im Cockpit.",
+"desc_en": "How turn hints appear in the cockpit."
+},
+{
+"id": "nav_source",
+"parent": "nav_hints",
+"kind": "list",
+"de": "Quelle",
+"en": "Source",
+"values": "Automatisch, Original, iPhone",
+"desc_de": "Woher die Pfeile kommen. Automatisch nimmt das iPhone, solange dort eine Route läuft. Original nie, iPhone auch bei Originalkarte im Cockpit.",
+"desc_en": "Where arrows come from. Automatic uses the iPhone while it guides. Original never, iPhone also with the stock map in the cockpit."
+},
+{
+"id": "nav_display",
+"parent": "nav_hints",
+"kind": "list",
+"de": "Anzeige",
+"en": "Display",
+"values": "Seite, Nur oben, Seite und oben",
+"desc_de": "Pfeil in der Seitenleiste, kleines Symbol oben in der Spurleiste oder beides.",
+"desc_en": "Arrow in the side panel, small symbol in the lane strip at the top, or both."
+},
+{
+"id": "nav_line",
+"parent": "nav_hints",
+"kind": "list",
+"de": "Text über der Karte",
+"en": "Text above the map",
+"values": "Entfernung und Ziel, Nur Straße, Aus",
+"desc_de": "Zeile oben über der Karte, z. B. „300 m · Hauptstraße“.",
+"desc_en": "Line above the map, for example \"300 m · Main Street\"."
+},
+{
+"id": "nav_bottom",
+"parent": "nav_hints",
+"kind": "list",
+"de": "Unten",
+"en": "Bottom",
+"values": "Ankunftszeit, Restfahrzeit",
+"desc_de": "Was unten im Cockpit bei laufender iPhone-Route steht.",
+"desc_en": "What the cockpit shows at the bottom during an iPhone route."
+},
+{
+"id": "nav_side",
+"parent": "nav_hints",
+"kind": "toggle",
+"de": "Seitenstraßen",
+"en": "Side streets",
+"desc_de": "Seitenstraßen im Pfeil mitzeichnen.",
+"desc_en": "Draw side streets into the arrow."
+},
+{
+"id": "nav_lanes",
+"parent": "nav_hints",
+"kind": "toggle",
+"de": "Spurempfehlung",
+"en": "Lane guidance",
+"desc_de": "Echte Spurempfehlung vom iPhone im Cockpit zeigen.",
+"desc_en": "Show real lane guidance from the iPhone in the cockpit."
+},
+{
+"id": "nav_night",
+"parent": "nav_hints",
+"kind": "list",
+"de": "Karte Tag/Nacht",
+"en": "Map day/night",
+"values": "Automatisch, Immer hell, Immer dunkel",
+"desc_de": "Karte im CarPlay-Bild nach Fahrzeug, immer hell oder immer dunkel.",
+"desc_en": "CarPlay map follows the car, always light or always dark."
+},
+{
+"id": "nav_demo",
+"parent": "nav_hints",
+"kind": "toggle",
+"de": "Demo-Route",
+"en": "Demo route",
+"desc_de": "Spielt eine Beispielroute ins Cockpit, ohne iPhone-Navigation. Nur zum Testen, endet nach Neustart.",
+"desc_en": "Plays a sample route into the cockpit without iPhone guidance. Testing only, ends on restart."
+},
+{
+"id": "views",
+"parent": "root",
+"kind": "page",
+"de": "Ansichten",
+"en": "Views",
+"desc_de": "Zusammenspiel von Cockpit-Ansicht und CarPlay-Bildbereich.",
+"desc_en": "How the cockpit view and the CarPlay picture area work together."
+},
+{
+"id": "view.follow",
+"parent": "views",
+"kind": "list",
+"de": "Bildbereich folgt Cockpit-Ansicht",
+"en": "Safe area follows cockpit view",
+"values": "Ein, Aus",
+"desc_de": "Bildbereich wechselt mit, wenn die Cockpit-Ansicht umgeschaltet wird.",
+"desc_en": "Picture area changes along when the cockpit view is switched."
+},
+{
+"id": "view.now",
+"parent": "views",
+"kind": "list",
+"de": "Cockpit-Ansicht jetzt",
+"en": "Cockpit view now",
+"desc_de": "Die aktuell erkannte Cockpit-Ansicht.",
+"desc_en": "The cockpit view currently detected."
+},
+{
+"id": "view.resync",
+"parent": "views",
+"kind": "list",
+"de": "Resync-Ansicht (Langdruck rechts)",
+"en": "Resync view (long press right)",
+"desc_de": "Merkt sich die Ansicht neu, falls die Erkennung aus dem Takt ist. Auch per Langdruck rechts.",
+"desc_en": "Re-learns the view if detection is out of step. Also by long press right."
+},
+{
+"id": "view.area_voll",
+"parent": "views",
+"kind": "list",
+"de": "Bildbereich bei Voll",
+"en": "Safe area at Full",
+"desc_de": "Welcher Bildbereich bei Cockpit-Ansicht Voll gilt.",
+"desc_en": "Which picture area applies in the Full cockpit view."
+},
+{
+"id": "view.area_wide",
+"parent": "views",
+"kind": "list",
+"de": "Bildbereich bei Wide",
+"en": "Safe area at Wide",
+"desc_de": "Welcher Bildbereich bei Cockpit-Ansicht Wide gilt.",
+"desc_en": "Which picture area applies in the Wide cockpit view."
+},
+{
+"id": "view.area_center",
+"parent": "views",
+"kind": "list",
+"de": "Bildbereich bei Center",
+"en": "Safe area at Center",
+"desc_de": "Welcher Bildbereich bei Cockpit-Ansicht Center gilt.",
+"desc_en": "Which picture area applies in the Center cockpit view."
+},
+{
+"id": "view.sport",
+"parent": "views",
+"kind": "list",
+"de": "Sporttacho vorhanden",
+"en": "Sport speedometer present",
+"desc_de": "Sagt der Ansichts-Erkennung, ob das Fahrzeug die Sporttacho-Ansicht hat.",
+"desc_en": "Tells view detection whether the car has the sport speedometer view.",
+"values": "Ja, Nein"
+},
+{
+"id": "calib.image",
+"parent": "views",
+"kind": "toggle",
+"since": 2,
+"de": "Kalibrierbild",
+"en": "Calibration picture",
+"desc_de": "Zeigt im Cockpit statt des iPhone-Bilds ein Raster mit Pixelzahlen, um die Safe Area abzulesen. Die CarPlay-Verbindung bleibt bestehen. Endet beim Verlassen des Menüs.",
+"desc_en": "Shows a grid with pixel numbers in the cockpit instead of the iPhone picture, to read the safe area off. CarPlay stays connected. Ends when you leave the menu."
+},
+{
+"id": "safe_voll",
+"parent": "views",
+"kind": "page",
+"de": "Safe Area Voll",
+"en": "Safe area full",
+"desc_de": "Bereich, in dem CarPlay bei Voll seine Anzeigen platziert. Die Karte bleibt vollflächig.",
+"desc_en": "Area where CarPlay places its overlays at Full. The map stays full size."
+},
+{
+"id": "safe_voll.x",
+"parent": "safe_voll",
+"kind": "number",
+"de": "Linke Kante",
+"en": "Left edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich links beginnt.",
+"desc_en": "Pixel number in the calibration picture where the area starts on the left."
+},
+{
+"id": "safe_voll.y",
+"parent": "safe_voll",
+"kind": "number",
+"de": "Obere Kante",
+"en": "Top edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich oben beginnt.",
+"desc_en": "Pixel number in the calibration picture where the area starts at the top."
+},
+{
+"id": "safe_voll.w",
+"parent": "safe_voll",
+"kind": "number",
+"de": "Rechte Kante",
+"en": "Right edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich rechts endet.",
+"desc_en": "Pixel number in the calibration picture where the area ends on the right."
+},
+{
+"id": "safe_voll.h",
+"parent": "safe_voll",
+"kind": "number",
+"de": "Untere Kante",
+"en": "Bottom edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich unten endet.",
+"desc_en": "Pixel number in the calibration picture where the area ends at the bottom."
+},
+{
+"id": "safe_voll.reset",
+"parent": "safe_voll",
+"kind": "list",
+"de": "Zurücksetzen",
+"en": "Reset",
+"values": "Standard",
+"desc_de": "Setzt die Werte auf die Plattform-Vorgabe.",
+"desc_en": "Returns the values to the platform default."
+},
+{
+"id": "safe_voll.hint",
+"parent": "safe_voll",
+"kind": "hint",
+"de": "Wirkt beim nächsten Verbinden des iPhones",
+"en": "Applies at the next iPhone connection"
+},
+{
+"id": "safe_wide",
+"parent": "views",
+"kind": "page",
+"de": "Safe Area Wide",
+"en": "Safe area wide",
+"desc_de": "Bereich, in dem CarPlay bei Wide seine Anzeigen platziert. Die Karte bleibt vollflächig.",
+"desc_en": "Area where CarPlay places its overlays at Wide. The map stays full size."
+},
+{
+"id": "safe_wide.x",
+"parent": "safe_wide",
+"kind": "number",
+"de": "Linke Kante",
+"en": "Left edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich links beginnt.",
+"desc_en": "Pixel number in the calibration picture where the area starts on the left."
+},
+{
+"id": "safe_wide.y",
+"parent": "safe_wide",
+"kind": "number",
+"de": "Obere Kante",
+"en": "Top edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich oben beginnt.",
+"desc_en": "Pixel number in the calibration picture where the area starts at the top."
+},
+{
+"id": "safe_wide.w",
+"parent": "safe_wide",
+"kind": "number",
+"de": "Rechte Kante",
+"en": "Right edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich rechts endet.",
+"desc_en": "Pixel number in the calibration picture where the area ends on the right."
+},
+{
+"id": "safe_wide.h",
+"parent": "safe_wide",
+"kind": "number",
+"de": "Untere Kante",
+"en": "Bottom edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich unten endet.",
+"desc_en": "Pixel number in the calibration picture where the area ends at the bottom."
+},
+{
+"id": "safe_wide.reset",
+"parent": "safe_wide",
+"kind": "list",
+"de": "Zurücksetzen",
+"en": "Reset",
+"values": "Standard",
+"desc_de": "Setzt die Werte auf die Plattform-Vorgabe.",
+"desc_en": "Returns the values to the platform default."
+},
+{
+"id": "safe_wide.hint",
+"parent": "safe_wide",
+"kind": "hint",
+"de": "Wirkt beim nächsten Verbinden des iPhones",
+"en": "Applies at the next iPhone connection"
+},
+{
+"id": "safe_center",
+"parent": "views",
+"kind": "page",
+"de": "Safe Area Center",
+"en": "Safe area center",
+"desc_de": "Bereich, in dem CarPlay bei Center seine Anzeigen platziert. Die Karte bleibt vollflächig.",
+"desc_en": "Area where CarPlay places its overlays at Center. The map stays full size."
+},
+{
+"id": "safe_center.x",
+"parent": "safe_center",
+"kind": "number",
+"de": "Linke Kante",
+"en": "Left edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich links beginnt.",
+"desc_en": "Pixel number in the calibration picture where the area starts on the left."
+},
+{
+"id": "safe_center.y",
+"parent": "safe_center",
+"kind": "number",
+"de": "Obere Kante",
+"en": "Top edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich oben beginnt.",
+"desc_en": "Pixel number in the calibration picture where the area starts at the top."
+},
+{
+"id": "safe_center.w",
+"parent": "safe_center",
+"kind": "number",
+"de": "Rechte Kante",
+"en": "Right edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich rechts endet.",
+"desc_en": "Pixel number in the calibration picture where the area ends on the right."
+},
+{
+"id": "safe_center.h",
+"parent": "safe_center",
+"kind": "number",
+"de": "Untere Kante",
+"en": "Bottom edge",
+"desc_de": "Pixelzahl im Kalibrierbild, an der der Bereich unten endet.",
+"desc_en": "Pixel number in the calibration picture where the area ends at the bottom."
+},
+{
+"id": "safe_center.reset",
+"parent": "safe_center",
+"kind": "list",
+"de": "Zurücksetzen",
+"en": "Reset",
+"values": "Standard",
+"desc_de": "Setzt die Werte auf die Plattform-Vorgabe.",
+"desc_en": "Returns the values to the platform default."
+},
+{
+"id": "safe_center.hint",
+"parent": "safe_center",
+"kind": "hint",
+"de": "Wirkt beim nächsten Verbinden des iPhones",
+"en": "Applies at the next iPhone connection"
+},
+{
+"id": "advanced",
+"parent": "root",
+"kind": "page",
+"de": "Erweitert",
+"en": "Advanced",
+"desc_de": "Selten gebrauchte Einstellungen.",
+"desc_en": "Rarely used settings."
+},
+{
+"id": "carplay.enabled",
+"parent": "advanced",
+"kind": "list",
+"de": "CarPlay im Cockpit",
+"en": "CarPlay in cockpit",
+"warn": true,
+"desc_de": "Grundschalter für das CarPlay-Bild im Cockpit.",
+"desc_en": "Main switch for the CarPlay picture in the cockpit.",
+"values": "Aktiviert, Deaktiviert"
+},
+{
+"id": "maxFPS",
+"parent": "advanced",
+"kind": "list",
+"de": "Bildrate",
+"en": "Frame rate",
+"values": "30, 60",
+"desc_de": "Bilder pro Sekunde im Cockpit. Wirkt nach Neustart der Unit.",
+"desc_en": "Frames per second in the cockpit. Applies after a unit restart."
+},
+{
+"id": "sourceVersion",
+"parent": "advanced",
+"kind": "list",
+"de": "Quellversion",
+"en": "Source version",
+"desc_de": "Version, die gegenüber dem iPhone gemeldet wird.",
+"desc_en": "Version reported to the iPhone.",
+"values": "950.7.1, 1005.8.1"
+},
+{
+"id": "engine.type",
+"parent": "advanced",
+"kind": "list",
+"de": "Motorart",
+"en": "Engine type",
+"desc_de": "Motorart, die CarPlay beim Verbinden mitgeteilt wird (z. B. für die Routenplanung).",
+"desc_en": "Engine type sent to CarPlay on connection (for example for route planning)."
+},
+{
+"id": "menu.language",
+"parent": "advanced",
+"kind": "list",
+"de": "Menüsprache",
+"en": "Menu language",
+"values": "Fahrzeugsprache, Deutsch, English",
+"desc_de": "Sprache dieses Menüs.",
+"desc_en": "Language of this menu."
+},
+{
+"id": "gps.demo",
+"parent": "advanced",
+"kind": "list",
+"de": "Demo-GPS-Position",
+"en": "Demo GPS location",
+"values": "Aus, Berlin Alexanderplatz, Hamburg Binnenalster, Schwalefeld Ortskern, Winterberg Ortskern",
+"desc_de": "Meldet eine feste Position an das iPhone, zum Testen im Stand.",
+"desc_en": "Reports a fixed location to the iPhone, for parked testing."
+},
+{
+"id": "sd_log",
+"parent": "advanced",
+"kind": "toggle",
+"de": "Logs auf SD-Karte",
+"en": "Logs to SD card",
+"desc_de": "Schreibt Diagnose-Logs auf die SD-Karte.",
+"desc_en": "Writes diagnostic logs to the SD card."
+},
+{
+"id": "menu.load",
+"parent": "advanced",
+"kind": "action",
+"locked": true,
+"de": "Menü laden",
+"en": "Load menu",
+"desc_de": "Lädt /mibr-menu/mibr-menu.txt von der SD-Karte und speichert es auf der Unit. Kann nicht entfernt werden.",
+"desc_en": "Loads /mibr-menu/mibr-menu.txt from the SD card and stores it on the unit. Cannot be removed."
+},
+{
+"id": "expert.mode",
+"parent": "advanced",
+"kind": "list",
+"de": "Expertenmodus",
+"en": "Expert mode",
+"values": "Aus, Bis Neustart, Dauerhaft",
+"desc_de": "Zeigt Einträge mit „nur Experte“. Bis Neustart gilt bis zum nächsten Start der Unit, Dauerhaft bleibt gespeichert.",
+"desc_en": "Shows entries marked expert only. Until restart lasts until the unit starts again, permanent stays stored."
+},
+{
+"id": "scaling",
+"parent": "advanced",
+"kind": "page",
+"de": "Skalierung",
+"en": "Scaling",
+"desc_de": "Zoom und Displaygröße, die CarPlay beim Verbinden erhält.",
+"desc_en": "Zoom and display size sent to CarPlay on connection."
+},
+{
+"id": "scaling.main.zoomFactor",
+"parent": "scaling",
+"kind": "list",
+"de": "Zoomfaktor Hauptdisplay",
+"en": "Main display zoom factor",
+"values": "Automatisch, 70, 85, 100, 125, 150",
+"desc_de": "Zoom von CarPlay auf dem Hauptdisplay.",
+"desc_en": "CarPlay zoom on the main display."
+},
+{
+"id": "scaling.cluster.zoomFactor",
+"parent": "scaling",
+"kind": "list",
+"de": "Zoomfaktor Virtual Cockpit",
+"en": "Virtual Cockpit zoom factor",
+"values": "Automatisch, 70, 85, 100, 125, 150",
+"desc_de": "Zoom von CarPlay im Cockpit.",
+"desc_en": "CarPlay zoom in the cockpit."
+},
+{
+"id": "scaling.cluster.physicalSize",
+"parent": "scaling",
+"kind": "list",
+"de": "Physische Displaygröße Virtual Cockpit",
+"en": "Virtual Cockpit physical size",
+"values": "Original, P20, P30, P50",
+"desc_de": "Gemeldete Größe des Cockpits, beeinflusst die Darstellungsgröße.",
+"desc_en": "Reported cockpit size, affects the rendered size."
+},
+{
+"id": "scaling.main.physicalSize",
+"parent": "scaling",
+"kind": "list",
+"de": "Physische Displaygröße Hauptdisplay",
+"en": "Main display physical size",
+"values": "Original, P20, P30, P50",
+"desc_de": "Gemeldete Größe des Hauptdisplays, beeinflusst die Darstellungsgröße.",
+"desc_en": "Reported main display size, affects the rendered size."
+},
+{
+"id": "scaling.hint",
+"parent": "scaling",
+"kind": "hint",
+"de": "Änderungen werden bei der nächsten CarPlay-Verbindung übertragen.",
+"en": "Changes are sent on the next CarPlay connection."
+},
+{
+"id": "diagnostics",
+"parent": "advanced",
+"kind": "fixedpage",
+"de": "Diagnose",
+"en": "Diagnostics",
+"desc_de": "Live-Werte und Dienstzustand, nur Anzeige.",
+"desc_en": "Live values and service state, display only."
+},
+{
+"id": "version",
+"parent": "root",
+"kind": "fixedpage",
+"locked": true,
+"de": "Version",
+"en": "Version",
+"desc_de": "Installierte Versionen. Kann nicht entfernt werden.",
+"desc_en": "Installed versions. Cannot be removed."
+}
+]
+}

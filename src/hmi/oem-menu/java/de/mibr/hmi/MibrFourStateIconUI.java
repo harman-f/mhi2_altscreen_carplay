@@ -16,6 +16,9 @@ import de.vw.mib.widgets.models.CommonImageModel;
 import de.vw.mib.widgets.models.ViewModel;
 import de.vw.mib.widgets.models.WidgetModel;
 import de.vw.mib.widgets.ui.CommonImageUI;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.Hashtable;
 import org.dsi.ifc.global.ResourceLocator;
 
 /**
@@ -28,6 +31,18 @@ public final class MibrFourStateIconUI extends CommonImageUI {
     private static final int SLOTS = 4;
     private final Slot[] slots = new Slot[SLOTS];
     private long nextToken;
+
+    /** r60: the PNGs also live loose in the common skin (Resources/skin0/Images/). The stock
+     * SkinImageLoader reads them synchronously on the render thread and keeps them in the skin image
+     * cache like every stock tile image; the asynchronous loader below only runs for a name the skin
+     * does not have. Skin images belong to the cache: never disposed here. */
+    private static final long SKIN_RETRY_MS = 10000L;
+    private static final Hashtable SKIN_FAILED = new Hashtable();
+    private static final Hashtable SKIN_LOGGED = new Hashtable();
+    private static final String LOG = "/tmp/mibr-icon.log";
+    private String skinName;
+    private BufferImage skinImage;
+    private ImageDrawable skinDrawable;
 
     private static final class Slot {
         final String path;
@@ -93,10 +108,87 @@ public final class MibrFourStateIconUI extends CommonImageUI {
         String wanted = ((CommonImageModel)widget).get_imageFile();
         if (wanted == null || wanted.length() == 0) return;
         String other = MibrIconState.counterpart(wanted);
+        if (paintFromSkin(graphics, widget, wanted, other, alpha)) return;
         Slot slot = ensure(wanted, other);
-        Slot fallback = other == null ? null : ensure(other, wanted);
-        // Until the wanted art is decoded keep showing its counterpart, never a blank tile.
-        if (!settled(slot) || !draw(graphics, widget, slot, alpha)) draw(graphics, widget, fallback, alpha);
+        Slot counterpart = other == null ? null : ensure(other, wanted);
+        // Preload both states, but never paint pressed art as a substitute
+        // for normal art while the normal image loads or retries.
+        Slot fallback = MibrIconState.fallbackPath(wanted) == null ? null : counterpart;
+        if (!settled(slot) || !draw(graphics, widget, slot, alpha)) {
+            if (settled(fallback)) draw(graphics, widget, fallback, alpha);
+        }
+    }
+
+    private static String fileName(String path) {
+        return path.substring(path.lastIndexOf('/') + 1);
+    }
+
+    /** The cached skin image for {@code path}, or null (then retried after SKIN_RETRY_MS). */
+    static BufferImage skinImage(String path) {
+        String name = fileName(path);
+        long now = System.currentTimeMillis();
+        Long failedAt = (Long)SKIN_FAILED.get(name);
+        if (failedAt != null && now - failedAt.longValue() < SKIN_RETRY_MS) return null;
+        try {
+            BufferImage image = ServiceManager.imageManager.getImageFromCommonSkin(name);
+            if (image != null) {
+                SKIN_FAILED.remove(name);
+                logOnce("ok " + name, "skin image " + name + " " + image.getWidth() + "x" + image.getHeight());
+                return image;
+            }
+            logOnce("null " + name, "skin image " + name + " = null");
+        } catch (Throwable error) {
+            logOnce("fail " + name, "skin image " + name + " not available: " + error);
+        }
+        SKIN_FAILED.put(name, new Long(now));
+        return null;
+    }
+
+    /** Draws the wanted art through the skin cache; false sends the caller to the asynchronous path. */
+    private boolean paintFromSkin(Graphics3D graphics, WidgetModel widget, String wanted, String other,
+            float alpha) {
+        BufferImage image = skinImage(wanted);
+        if (image == null) return false;
+        if (other != null) skinImage(other); /* warm the press art, so a short tap shows it at once */
+        String name = fileName(wanted);
+        /* the cache may hand out a new object after a skin change or eviction: follow it */
+        if (skinDrawable == null || skinImage != image || !name.equals(skinName)) {
+            releaseSkinDrawable();
+            skinDrawable = makeDrawable(graphics, widget, image);
+            skinImage = image;
+            skinName = name;
+            if (skinDrawable == null) return false;
+        }
+        try {
+            skinDrawable.setAlpha(alpha);
+            skinDrawable.draw();
+            return true;
+        } catch (Throwable ignored) {
+            releaseSkinDrawable();
+            return false;
+        }
+    }
+
+    private void releaseSkinDrawable() {
+        if (skinDrawable != null) {
+            try { skinDrawable.dispose(); } catch (Throwable ignored) { }
+        }
+        skinDrawable = null;
+        skinImage = null;
+        skinName = null;
+    }
+
+    private static void logOnce(String key, String msg) {
+        if (SKIN_LOGGED.put(key, key) != null) return;
+        FileOutputStream out = null;
+        try {
+            if (new File(LOG).length() > 65536L) return;
+            out = new FileOutputStream(LOG, true);
+            out.write((System.currentTimeMillis() + " " + msg + "\n").getBytes("UTF-8"));
+        } catch (Throwable ignored) {
+        } finally {
+            if (out != null) try { out.close(); } catch (Throwable ignored) { }
+        }
     }
 
     /** True when the slot's art has been decoded for SETTLE_MS (or has no image yet: draw() then returns false). */
@@ -180,31 +272,36 @@ public final class MibrFourStateIconUI extends CommonImageUI {
     }
 
     private boolean createDrawable(Graphics3D graphics, WidgetModel widget, Slot slot) {
-        int originalWidth = slot.image.getWidth();
-        int originalHeight = slot.image.getHeight();
+        slot.drawable = makeDrawable(graphics, widget, slot.image);
+        return slot.drawable != null;
+    }
+
+    private static ImageDrawable makeDrawable(Graphics3D graphics, WidgetModel widget, BufferImage image) {
+        int originalWidth = image.getWidth();
+        int originalHeight = image.getHeight();
         int width = widget.get_width();
         int height = widget.get_height();
         if (originalWidth <= 0 || originalHeight <= 0 || width <= 0 || height <= 0) {
-            return false;
+            return null;
         }
         float fit = Math.min((float)width / (float)originalWidth,
                 (float)height / (float)originalHeight);
         int drawWidth = (int)(fit * (float)originalWidth);
         int drawHeight = (int)(fit * (float)originalHeight);
+        ImageDrawable next = null;
         try {
-            ImageDrawable next = graphics.getDrawableManager().createImageDrawable();
-            next.setImage(slot.image);
+            next = graphics.getDrawableManager().createImageDrawable();
+            next.setImage(image);
             next.setSourceWidth(originalWidth);
             next.setSourceHeight(originalHeight);
             next.setDestinationWidth(drawWidth);
             next.setDestinationHeight(drawHeight);
             next.setDestinationX((width - drawWidth) / 2);
             next.setDestinationY((height - drawHeight) / 2);
-            slot.drawable = next;
-            return true;
+            return next;
         } catch (Throwable ignored) {
-            releaseDrawable(slot);
-            return false;
+            if (next != null) try { next.dispose(); } catch (Throwable alsoIgnored) { }
+            return null;
         }
     }
 
@@ -263,6 +360,7 @@ public final class MibrFourStateIconUI extends CommonImageUI {
     }
 
     public void deInit() {
+        releaseSkinDrawable();
         for (int i = 0; i < SLOTS; i++) {
             if (slots[i] != null) { release(slots[i]); slots[i] = null; }
         }

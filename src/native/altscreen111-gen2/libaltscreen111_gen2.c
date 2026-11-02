@@ -25,6 +25,7 @@
 #include "alt111_zoom_adapter.h"
 #include "alt111_zoom_debugspi.h"
 #include "alt111_settings.h"
+#include "mibr_display_scaling.h"
 #define ALT111_RECOVERY_POSIX 1
 #include "alt111_recovery.h"
 
@@ -435,6 +436,12 @@ static void gen2_video_begin_current(void);
 static void gen2_video_end_current(void);
 static void gen2_close_consumer(void);
 static void gen2_keyframe_intent(unsigned reason);
+static int g2_calib_active,g2_calib_wait_idr;
+static uint8_t g2_calib_ts[8];
+static uint8_t g2_phone_params[1024];
+static size_t g2_phone_params_n;
+static void gen2_calib_note_config(const uint8_t *p,size_t n);
+static int gen2_calib_take_frame(const uint8_t *p,size_t n,const uint8_t ts[8]);
 static void gen2_resync_poll(void);
 static void gen2_resync_snapshot_locked(struct alt111_resync_snapshot *snap);
 static const char *config_layer_name(unsigned layer);
@@ -843,14 +850,32 @@ static struct gen2_settings_scope *settings_scope(void)
 static int settings_refresh(void)
 {
     static const struct alt111_settings_paths paths={MIBR_CFG_TEMP_ROOT,MIBR_CFG_PERSIST_ROOT};
+    static unsigned failed_attempts;
     struct alt111_settings *next=malloc(sizeof(*next));
     struct alt111_policy_config policy;
     char error[256]={0};
+    unsigned log_failed=0,recovered=0;
     int rc;
     if(!next)return -1;
     pthread_mutex_lock(&g_settings_io_lock);
     rc=alt111_settings_load(&paths,next,error,sizeof(error));
+    /* Count under the existing process-local IO mutex; log only after the
+     * shared settings lock has been released. No values/credentials logged. */
+    if(rc){
+        if(failed_attempts<0xffffffffu)++failed_attempts;
+        if(failed_attempts==1u || (failed_attempts%16u)==0u)log_failed=failed_attempts;
+    }else{recovered=failed_attempts;failed_attempts=0;}
     pthread_mutex_unlock(&g_settings_io_lock);
+    if(log_failed || recovered){
+        struct timespec stamp={0,0};
+        unsigned long long ms;
+        (void)clock_gettime(CLOCK_MONOTONIC,&stamp);
+        ms=(unsigned long long)stamp.tv_sec*1000u+(unsigned long long)stamp.tv_nsec/1000000u;
+        if(log_failed)logf_u2("SETTINGS_REFRESH_FAILED mono_ms=%llu pid=%ld failed_attempts=%u error=%s",
+                            ms,(long)getpid(),log_failed,error);
+        else logf_u2("SETTINGS_REFRESH_RECOVERED mono_ms=%llu pid=%ld failed_attempts=%u",
+                     ms,(long)getpid(),recovered);
+    }
     pthread_mutex_lock(&g_settings_lock);
     g_settings_valid=rc==0;
     if(rc==0){
@@ -1031,7 +1056,7 @@ static int current_advertised_fps(void)
     int v;
     if(read_layered_value(g_fps_config_name,b,sizeof(b),NULL)!=0)return g_fps;
     v=atoi(b);
-    if(v==20||v==25||v==30||v==40)return v;
+    if(v==20||v==25||v==30||v==40||v==60)return v;
     return g_fps;
 }
 
@@ -1228,6 +1253,45 @@ static void viewareas_defaults(struct mibr_viewareas_config *cfg)
     cfg->view[2].adjacent=0;
 }
 
+/* Safe area chosen in the menu (broker-owned file "...\nrevision=N\nvalue=x,y,w,h\n"). A missing or
+ * invalid file leaves the configured area untouched. */
+static void apply_safe_override(struct mibr_viewareas_config *cfg,int i,const char *name)
+{
+    char path[128],buf[96];
+    const char *v;
+    int x,y,w,h,n=-1,fd;
+    ssize_t got;
+    if(i>=(int)cfg->count)return;
+    snprintf(path,sizeof(path),"/mnt/app/root/altscreen-u2/config/%s.conf",name);
+    fd=open(path,O_RDONLY);
+    got=fd<0?-1:read(fd,buf,sizeof(buf)-1);
+    if(fd>=0)close(fd);
+    if(got>0){
+        buf[got]=0;
+        v=strstr(buf,"\nvalue=");
+        if(!v||sscanf(v+7,"%d,%d,%d,%d\n%n",&x,&y,&w,&h,&n)!=4||n<0||v[7+n])return;
+    }else{
+        /* No choice in the menu yet: the platform default, if the file has one. */
+        static char plat[1024];
+        char key[32];
+        fd=open("/mnt/app/root/altscreen-u2/config/mibr-platform-defaults.conf",O_RDONLY);
+        if(fd<0)return;
+        got=read(fd,plat,sizeof(plat)-1);
+        close(fd);
+        if(got<=0)return;
+        plat[got]=0;
+        /* name is mibr-safe-<view>, the key safe_<view> */
+        snprintf(key,sizeof(key),"safe_%s=",name+10);
+        v=strstr(plat,key);
+        if(!v||(v!=plat&&v[-1]!='\n'))return;
+        v+=strlen(key);
+        if(sscanf(v,"%d,%d,%d,%d%n",&x,&y,&w,&h,&n)!=4||n<0||(v[n]&&v[n]!='\n'))return;
+    }
+    if(w<100||h<60||!mibr_rect_valid(x,y,w,h,cfg->view[i].w,cfg->view[i].h))return;
+    cfg->view[i].safe_x=x;cfg->view[i].safe_y=y;cfg->view[i].safe_w=w;cfg->view[i].safe_h=h;
+    logf_u2("GEN2 ViewArea safe override area=%d %d,%d %dx%d",i,x,y,w,h);
+}
+
 static void load_viewareas_config(struct mibr_viewareas_config *cfg)
 {
     struct mibr_display_config display;
@@ -1264,6 +1328,9 @@ static void load_viewareas_config(struct mibr_viewareas_config *cfg)
 
     if(cfg->count<1u||cfg->count>3u)cfg->count=2u;
     if(cfg->initial>=cfg->count)cfg->initial=0u;
+    apply_safe_override(cfg,0,"mibr-safe-wide");
+    apply_safe_override(cfg,1,"mibr-safe-voll");
+    apply_safe_override(cfg,2,"mibr-safe-center");
     for(i=0;i<(int)cfg->count;++i){
         if(!mibr_rect_valid(cfg->view[i].x,cfg->view[i].y,
                             cfg->view[i].w,cfg->view[i].h,display.width,display.height)){
@@ -2302,6 +2369,7 @@ static void *alt_receiver_thread(void *arg)
                     logf_u2("VideoConfig header source=%.1fx%.1f flags=0x%02x body=%u",
                             (double)source_w, (double)source_h,
                             (unsigned)h.smallParam[1], (unsigned)h.bodySize);
+                    gen2_calib_note_config(body, h.bodySize);
                     {
                         int vrc = gen2_video_config(body, h.bodySize);
                         if (vrc == ALT111_OK || vrc == ALT111_RESTART_CONSUMER) {
@@ -2329,6 +2397,7 @@ static void *alt_receiver_thread(void *arg)
                         logf_u2("video frame ignored before valid avcC config body=%u", (unsigned)h.bodySize);
                         break;
                     }
+                    if (gen2_calib_take_frame(body, h.bodySize, h.params)) break;
                     {
                         int accepted = 0, consumer_attached = 0;
                         int vrc = gen2_video_submit_au(body, h.bodySize, h.params,
@@ -2554,6 +2623,87 @@ static void remove_key(CFMutableDictionaryRef d, const char *name)
     if(k){p_CFDictionaryRemoveValue(d,k);p_CFRelease(k);}
 }
 
+/* Display scaling is a descriptor property, independent of momentary map zoom.
+ * One immutable settings snapshot is used for both cloned displays. The broker
+ * is the only persistent writer; GEN2 only reads the shared finite format. */
+#define MIBR_SCALING_PROFILE "/mnt/app/root/altscreen-u2/config/display-scaling.conf"
+static void scaling_log_display(const char *source, CFDictionaryRef display)
+{
+    static const char *keys[]={"type","widthPixels","heightPixels",
+        "widthPhysical","heightPhysical","maxFPS","features",
+        "ZoomFactor","zoomFactor"};
+    unsigned i;
+    for(i=0;i<sizeof(keys)/sizeof(keys[0]);++i){
+        CFStringRef key=s_cf(keys[i]);
+        CFTypeRef value=key?p_CFDictionaryGetValue(display,key):NULL;
+        OSStatus error=-1;
+        int64_t number=value?p_CFDictionaryGetInt64(display,key,&error):0;
+        logf_u2("GEN2 scaling %s %s: present=%u CFType=%lu numeric=%u value=%lld",
+                source,keys[i],value?1u:0u,
+                value?(unsigned long)p_CFGetTypeID(value):0ul,
+                value&&!error?1u:0u,(long long)number);
+        if(key)p_CFRelease(key);
+    }
+}
+static int scaling_apply_display(CFMutableDictionaryRef display,
+                                 const char *value,int secondary)
+{
+    CFStringRef key;
+    const char *wire_key="zoomFactor";
+    (void)secondary;
+    int absent;
+    if(!mibr_display_scaling_value_valid(value))return -1;
+    /* Drop both inherited spellings, then emit the selected value under the
+     * owner's lowercase zoomFactor key for either display. */
+    remove_key(display,"ZoomFactor");
+    remove_key(display,"zoomFactor");
+    if(strcmp(value,"AUTO"))return set_i64(display,wire_key,strtol(value,NULL,10));
+    key=s_cf(wire_key);
+    if(!key)return -1;
+    absent=p_CFDictionaryGetValue(display,key)==NULL;
+    p_CFRelease(key);
+    return absent?0:-1;
+}
+/* Type-110 physical dimensions are relative to the exact OEM descriptor,
+ * never the synthetic cluster's 200x74 baseline. BASE is a byte-preserving
+ * no-op, including when stock does not expose numeric millimetres. */
+static int scaling_apply_main_physical(CFMutableDictionaryRef display,const char *value)
+{
+    CFStringRef wk=NULL,hk=NULL;
+    OSStatus we=-1,he=-1;
+    int64_t ow,oh;
+    int width,height;
+    if(!mibr_display_physical_value_valid(value))return -1;
+    if(!strcmp(value,"BASE"))return 0;
+    wk=s_cf("widthPhysical");hk=s_cf("heightPhysical");
+    if(!wk||!hk){if(wk)p_CFRelease(wk);if(hk)p_CFRelease(hk);return -1;}
+    ow=p_CFDictionaryGetInt64(display,wk,&we);
+    oh=p_CFDictionaryGetInt64(display,hk,&he);
+    p_CFRelease(wk);p_CFRelease(hk);
+    if(we||he||ow<=0||oh<=0||ow>INT32_MAX||oh>INT32_MAX||
+       mibr_display_main_physical_dimensions(value,(int)ow,(int)oh,&width,&height))return -1;
+    if(set_i64(display,"widthPhysical",width)||set_i64(display,"heightPhysical",height))return -1;
+    return 0;
+}
+static void scaling_advertised_receipt(const struct mibr_display_scaling_state *state)
+{
+    static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
+    const char *target="/tmp/mibr-display-scaling.status";
+    char stage[128],text[256];int fd,count;ssize_t written;
+    pthread_mutex_lock(&lock);
+    snprintf(stage,sizeof(stage),"%s.%ld",target,(long)getpid());
+    count=snprintf(text,sizeof(text),"MIBR_SCALING_ADVERTISED/3\nrevision=%llu\nmain=%s\ncluster=%s\nphysical=%s\nmain_physical=%s\n",
+        (unsigned long long)state->revision,state->main,state->cluster,state->physical,state->main_physical);
+    fd=open(stage,O_WRONLY|O_CREAT|O_EXCL,0600);
+    if(fd>=0){
+        written=write(fd,text,(size_t)count);
+        if(close(fd)==0 && written==count){
+            if(rename(stage,target))unlink(stage);
+        }else unlink(stage);
+    }
+    pthread_mutex_unlock(&lock);
+}
+
 /*
  * iOS 27.2 builds navigator cluster UI candidates and intersects them with the
  * receiver-advertised altScreenSuggestUIURLs list.  Stock MU1440 has no such
@@ -2563,17 +2713,17 @@ static void remove_key(CFMutableDictionaryRef d, const char *name)
  * This is capability metadata only: it does not issue showUI/stopUI, rebuild
  * Stream111, change codec state, or synthesize a provider suggestion.
  */
-static void add_alt_suggest_ui_urls(CFMutableDictionaryRef alt)
+static int add_alt_suggest_ui_urls(CFMutableDictionaryRef info)
 {
     CFMutableArrayRef urls=NULL;
     CFStringRef key=NULL,item=NULL;
     char blob[2048],url[192];
     unsigned layer=0u;
-    int i,count=0;
-    if(!alt)return;
+    int i,count=0,ok=0;
+    if(!info)return 0;
 
     urls=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
-    if(!urls)return;
+    if(!urls)return 0;
 
     if(read_layered_value(g_ui_urls_config_name,blob,sizeof(blob),&layer)==0){
         if(config_line_value(blob,"urls",url,sizeof(url))==0){
@@ -2581,7 +2731,9 @@ static void add_alt_suggest_ui_urls(CFMutableDictionaryRef alt)
             for(i=0;i<8 && p && *p;++i){
                 char *end=strchr(p,'|');if(end)*end=0;
                 item=s_cf(p);
-                if(item){p_CFArrayAppendValue(urls,item);p_CFRelease(item);item=NULL;++count;}
+                if(!item)goto done;
+                p_CFArrayAppendValue(urls,item);p_CFRelease(item);item=NULL;++count;
+                if(!p_CFArrayGetCount || p_CFArrayGetCount(urls)!=count)goto done;
                 p=end ? end+1 : NULL;
             }
         }
@@ -2593,24 +2745,31 @@ static void add_alt_suggest_ui_urls(CFMutableDictionaryRef alt)
         };
         for(i=0;i<3;++i){
             item=s_cf(defaults[i]);
-            if(!item)continue;
+            if(!item)goto done;
             p_CFArrayAppendValue(urls,item);
             p_CFRelease(item); item=NULL;
             ++count;
+            if(!p_CFArrayGetCount || p_CFArrayGetCount(urls)!=count)goto done;
         }
         layer=0u;
     }
 
     key=s_cf("altScreenSuggestUIURLs");
-    if(!key)goto done;
-    p_CFDictionarySetValue(alt,key,urls);
-    logf_u2("GEN2 advertised altScreenSuggestUIURLs count=%d source=%s",
+    if(!key || count<=0)goto done;
+    p_CFDictionarySetValue(info,key,urls);
+    if(p_CFDictionaryGetValue(info,key)!=urls){
+        logf_u2("GEN2 /info root altScreenSuggestUIURLs failed readback");
+        goto done;
+    }
+    ok=1;
+    logf_u2("GEN2 /info root altScreenSuggestUIURLs count=%d source=%s",
             count,config_layer_name(layer));
 
 done:
     if(item)p_CFRelease(item);
     if(key)p_CFRelease(key);
     if(urls)p_CFRelease(urls);
+    return ok;
 }
 
 /*
@@ -3055,6 +3214,8 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
     int advertised_fps;
     struct mibr_display_config display;
     struct mibr_viewareas_config views;
+    struct mibr_display_scaling_state scaling;
+    char scaling_error[96];
 
     load_display_config(&display);
     load_viewareas_config(&views);
@@ -3096,11 +3257,37 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
         p_CFRelease(kdisplays);p_CFRelease(info);
         return base;
     }
+    /* Passive original-main capture, before either clone is transformed. No
+     * full /info, URLs, tokens or navigation data are dumped. */
+    scaling_log_display("stock-main-before-clone",stock_display);
+    if(mibr_display_scaling_load(MIBR_SCALING_PROFILE,&scaling,
+                                 scaling_error,sizeof(scaling_error))){
+        logf_u2("GEN2 scaling profile invalid: %s; preserve stock /info",scaling_error);
+        p_CFRelease(kdisplays);p_CFRelease(info);
+        return base;
+    }
+    /* The cluster retains its independent 200x74 baseline. Main physical
+     * dimensions are applied to its clone separately from the OEM baseline. */
+    if(mibr_display_physical_dimensions(scaling.physical,
+            &display.width_mm,&display.height_mm)){
+        logf_u2("GEN2 physical preset invalid; preserve stock /info");
+        p_CFRelease(kdisplays);p_CFRelease(info);return base;
+    }
     /*
      * iOS 27.2 intersects provider suggestions with receiver-advertised
      * cluster URL capabilities.  Observe the exact stock MU1440 baseline
      * before mutating the clone; do not synthesize capability arrays here.
      */
+    {
+        CFStringRef key=s_cf("altScreenSuggestUIURLs");
+        CFTypeRef value=key?(CFTypeRef)p_CFDictionaryGetValue(base,key):NULL;
+        if(!value)logf_u2("GEN2 stock ROOT altScreenSuggestUIURLs=<absent>");
+        else if(p_CFGetTypeID(value)==p_CFArrayGetTypeID())
+            logf_u2("GEN2 stock ROOT altScreenSuggestUIURLs=array count=%ld",
+                    (long)p_CFArrayGetCount((CFArrayRef)value));
+        else logf_u2("GEN2 stock ROOT altScreenSuggestUIURLs=invalid-type");
+        if(key)p_CFRelease(key);
+    }
     log_stock_url_capability(stock_display,"altScreenSuggestUIURLs");
     log_stock_url_capability(stock_display,"altScreenURLs");
     log_stock_url_capability(stock_display,"uiContextURLs");
@@ -3142,6 +3329,12 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
             if(displays)p_CFRelease(displays);
             p_CFRelease(kdisplays);p_CFRelease(info);
             return base;
+        }
+        if(scaling_apply_display(main,scaling.main,0)||
+           scaling_apply_main_physical(main,scaling.main_physical)){
+            logf_u2("GEN2 main scaling construction failed; stock fallback");
+            p_CFRelease(main);p_CFRelease(alt);p_CFRelease(displays);
+            p_CFRelease(kdisplays);p_CFRelease(info);return base;
         }
         p_CFArrayAppendValue(displays,main);
         p_CFRelease(main);main=NULL;
@@ -3232,15 +3425,20 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
             }
         }
         set_str(alt,"initialURL",active_url);
-        /* The strict single-view profile does not advertise altScreenSuggestUIURLs. Keep the M.I.B.
-         * extension available outside the strict parity profile. */
-        if(!compat_profile_exact_reference())add_alt_suggest_ui_urls(alt);
+        /* The URL allowance is an EndpointInfo ROOT capability, not a display-scoped key.
+         * Drop any stray inherited value on the synthetic display only. */
+        if(!compat_profile_exact_reference())remove_key(alt,"altScreenSuggestUIURLs");
         if(views.enabled && !add_reference_viewarea(alt)){
             logf_u2("GEN2 /info incomplete ViewArea descriptor; returning stock info");
             p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
             return base;
         }
 
+        if(scaling_apply_display(alt,scaling.cluster,1)){
+            logf_u2("GEN2 cluster ZoomFactor construction failed; stock fallback");
+            p_CFRelease(alt);p_CFRelease(displays);
+            p_CFRelease(kdisplays);p_CFRelease(info);return base;
+        }
         p_CFArrayAppendValue(displays,alt);
         if(p_CFArrayGetCount(displays)!=p_CFArrayGetCount(old)+1){
             p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
@@ -3266,7 +3464,23 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
             }
             p_CFRelease(panels);
         }
+        if(!compat_profile_exact_reference() && !add_alt_suggest_ui_urls(info)){
+            logf_u2("GEN2 /info root altScreenSuggestUIURLs unavailable; stock fallback");
+            p_CFRelease(alt);p_CFRelease(displays);p_CFRelease(kdisplays);p_CFRelease(info);
+            return base;
+        }
         if(settings_scope())settings_scope()->descriptor_complete=1u;
+        /* These are called advertised only after the complete two-display
+         * descriptor has been assembled and installed in the returned /info. */
+        scaling_log_display("advertised-main",
+            (CFDictionaryRef)p_CFArrayGetValueAtIndex(displays,0));
+        scaling_log_display("advertised-cluster",
+            (CFDictionaryRef)p_CFArrayGetValueAtIndex(displays,
+                p_CFArrayGetCount(displays)-1));
+        scaling_advertised_receipt(&scaling);
+        logf_u2("GEN2 scaling advertised revision=%llu main=%s cluster=%s physical=%s main_physical=%s cluster_mm=%ux%u; iPhone effective=UNKNOWN",
+                (unsigned long long)scaling.revision,scaling.main,scaling.cluster,
+                scaling.physical,scaling.main_physical,(unsigned)display.width_mm,(unsigned)display.height_mm);
         logf_u2("GEN2 /info ready: profile=%s root=altScreen%s type=%u maxFPS=%u features=%u primaryInput=%s geometry=%ux%u physical=%ux%u uuid=%s url=%s",
                 compat_profile_classic_single_view()?"classic_single_view":"mibr",
                 views.enabled?"+viewAreas":"",
@@ -4438,6 +4652,198 @@ static void *gen2_zoom_spi_worker(void *arg)
     return NULL;
 }
 
+/*
+ * Calibration picture. While the menu's marker exists the phone's frames are not forwarded and a short looped clip
+ * takes their place on the same way to the cockpit; the CarPlay session itself stays untouched. The clip is
+ * <u32 BE length><AU in 4-byte NAL lengths> records with SPS/PPS in-band, starting with an IDR.
+ * Leaving: wait for the phone's next IDR and put the phone's parameter sets in front of it, the bridge caches
+ * the last ones it saw. A stale marker ends by itself.
+ */
+#define G2_CALIB_MAX_BYTES (4u*1024u*1024u)
+#define G2_CALIB_MAX_AGE_S 600
+#define G2_CALIB_FRAME_US 33333
+static const char *g2_calib_marker = "/tmp/mibr-calib.enabled";
+static const char *g2_calib_clip = "/mnt/app/root/altscreen-u2/config/mibr-calib.avcc";
+static pthread_t g2_calib_thread;
+
+/* Reader thread: avcC -> SPS and PPS in 4-byte NAL lengths; nothing if the phone uses another length. */
+static void gen2_calib_note_config(const uint8_t *p,size_t n)
+{
+    size_t pos=6,used=0;
+    unsigned count,i,round;
+    g2_phone_params_n=0;
+    if(n<7||(p[4]&3u)!=3u)return;
+    for(round=0;round<2u;++round){
+        if(pos>=n)return;
+        count=round?p[pos]:(p[5]&31u);
+        if(round)++pos;
+        for(i=0;i<count;++i){
+            size_t len;
+            if(pos+2u>n)return;
+            len=((size_t)p[pos]<<8)|p[pos+1u];
+            pos+=2u;
+            if(len>n-pos||len>sizeof(g2_phone_params)-used-4u)return;
+            g2_phone_params[used]=0;g2_phone_params[used+1u]=0;
+            g2_phone_params[used+2u]=(uint8_t)(len>>8);g2_phone_params[used+3u]=(uint8_t)len;
+            memcpy(g2_phone_params+used+4u,p+pos,len);
+            used+=4u+len;pos+=len;
+        }
+    }
+    g2_phone_params_n=used;
+}
+
+static int gen2_au_has_idr(const uint8_t *p,size_t n)
+{
+    size_t pos=0;
+    while(pos+4u<n){
+        size_t len=((size_t)p[pos]<<24)|((size_t)p[pos+1u]<<16)|((size_t)p[pos+2u]<<8)|p[pos+3u];
+        pos+=4u;
+        if(len>n-pos||!len)return 0;
+        if((p[pos]&31u)==5u)return 1;
+        pos+=len;
+    }
+    return 0;
+}
+
+/* Reader thread: 1 when the calibration owns this frame. */
+static int gen2_calib_take_frame(const uint8_t *p,size_t n,const uint8_t ts[8])
+{
+    static uint64_t last_request;
+    int active,wait_idr;
+    uint8_t *with_params;
+    pthread_mutex_lock(&g2_core_lock);
+    memcpy(g2_calib_ts,ts,8u);
+    active=g2_calib_active;wait_idr=g2_calib_wait_idr;
+    pthread_mutex_unlock(&g2_core_lock);
+    if(active)return 1;
+    if(!wait_idr)return 0;
+    if(!gen2_au_has_idr(p,n)){
+        uint64_t now=monotonic_ms();
+        if(now-last_request>=1000u){last_request=now;gen2_keyframe_intent(ALT111_KF_SOURCE_GAP);}
+        return 1;
+    }
+    pthread_mutex_lock(&g2_core_lock);
+    g2_calib_wait_idr=0;
+    pthread_mutex_unlock(&g2_core_lock);
+    with_params=malloc(g2_phone_params_n+n);
+    if(!with_params)return 0;
+    memcpy(with_params,g2_phone_params,g2_phone_params_n);
+    memcpy(with_params+g2_phone_params_n,p,n);
+    (void)gen2_video_submit_au(with_params,g2_phone_params_n+n,ts,NULL,NULL);
+    free(with_params);
+    logf_u2("calibration picture left, phone IDR forwarded");
+    return 1;
+}
+
+static uint8_t *gen2_calib_load(size_t *size)
+{
+    struct stat st;
+    uint8_t *clip;
+    size_t off=0;
+    int fd=open(g2_calib_clip,O_RDONLY);
+    if(fd<0)return NULL;
+    if(fstat(fd,&st)||st.st_size<8||(size_t)st.st_size>G2_CALIB_MAX_BYTES||!(clip=malloc((size_t)st.st_size))){
+        close(fd);
+        return NULL;
+    }
+    while(off<(size_t)st.st_size){
+        ssize_t got=read(fd,clip+off,(size_t)st.st_size-off);
+        if(got<=0){free(clip);close(fd);return NULL;}
+        off+=(size_t)got;
+    }
+    close(fd);
+    *size=off;
+    return clip;
+}
+
+static int gen2_calib_wanted(void)
+{
+    struct stat st;
+    return !stat(g2_calib_marker,&st)&&time(NULL)-st.st_mtime<G2_CALIB_MAX_AGE_S;
+}
+
+static void gen2_calib_nap(long us)
+{
+    struct timespec d;
+    d.tv_sec=us/1000000L;
+    d.tv_nsec=(us%1000000L)*1000L;
+    (void)nanosleep(&d,NULL);
+}
+
+static void *gen2_calib_worker(void *arg)
+{
+    uint8_t *clip=NULL;
+    size_t clip_n=0,at=0;
+    uint64_t base=0;
+    int64_t started=0,next=0;
+    int active=0;
+    (void)arg;
+    for(;;){
+        int rc;
+        size_t len;
+        uint64_t ts_value;
+        uint8_t ts[8];
+        int64_t now;
+        if(!gen2_calib_wanted()||!g_video_config_seen){
+            if(active){
+                active=0;
+                pthread_mutex_lock(&g2_core_lock);
+                g2_calib_active=0;g2_calib_wait_idr=1;
+                g2_video.foreign_parameters=0;
+                pthread_mutex_unlock(&g2_core_lock);
+                gen2_keyframe_intent(ALT111_KF_SOURCE_GAP);
+                logf_u2("calibration picture off");
+            }
+            gen2_calib_nap(100000L);
+            continue;
+        }
+        if(!clip&&!(clip=gen2_calib_load(&clip_n))){
+            logf_u2("calibration clip not readable");
+            gen2_calib_nap(5000000L);
+            continue;
+        }
+        if(!active){
+            /* without the phone's parameter sets there would be no way back */
+            if(!g2_phone_params_n){
+                logf_u2("calibration refused: phone parameter sets unknown");
+                gen2_calib_nap(5000000L);
+                continue;
+            }
+            pthread_mutex_lock(&g2_core_lock);
+            memcpy(&base,g2_calib_ts,8u);
+            g2_video.foreign_parameters=1;
+            g2_calib_active=1;g2_calib_wait_idr=0;
+            pthread_mutex_unlock(&g2_core_lock);
+            active=1;at=0;
+            started=next=monotonic_us();
+            logf_u2("calibration picture on");
+        }
+        if(at+4u>clip_n)at=0;
+        len=((size_t)clip[at]<<24)|((size_t)clip[at+1u]<<16)|((size_t)clip[at+2u]<<8)|clip[at+3u];
+        if(len>clip_n-at-4u){
+            logf_u2("calibration clip damaged");
+            free(clip);clip=NULL;clip_n=0;
+            (void)unlink(g2_calib_marker);
+            continue;
+        }
+        /* The same 32.32 clock the phone uses, so the bridge sees no jump in either direction. */
+        ts_value=base+(((uint64_t)(monotonic_us()-started)<<32)/1000000u);
+        memcpy(ts,&ts_value,8u);
+        rc=gen2_video_submit_au(clip+at+4u,len,ts,NULL,NULL);
+        if(rc==ALT111_INVALID){
+            logf_u2("calibration clip refused by the core");
+            (void)unlink(g2_calib_marker);
+            continue;
+        }
+        at+=4u+len;
+        next+=G2_CALIB_FRAME_US;
+        now=monotonic_us();
+        if(next>now)gen2_calib_nap((long)(next-now));
+        else next=now;
+    }
+    return NULL;
+}
+
 static int gen2_start_workers(void)
 {
     if(g2_workers_started)return 0;
@@ -4446,6 +4852,9 @@ static int gen2_start_workers(void)
     if(pthread_create(&g2_output_thread,NULL,gen2_output_worker,NULL)!=0)return -1;
     pthread_detach(g2_output_thread);
     g2_workers_started=1;
+    /* Inert without the menu's marker; failure leaves video untouched. */
+    if(pthread_create(&g2_calib_thread,NULL,gen2_calib_worker,NULL)==0)
+        pthread_detach(g2_calib_thread);
     /* Background worker is inert without the explicit volatile V1 marker.
      * Failure is nonfatal for all stock/CarPlay video/media paths. */
     if(pthread_create(&g2_zoom_spi_thread,NULL,gen2_zoom_spi_worker,NULL)==0)

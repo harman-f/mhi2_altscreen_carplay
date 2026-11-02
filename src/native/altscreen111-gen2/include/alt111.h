@@ -165,6 +165,7 @@ struct alt111_chunk {
 struct alt111_video {
     uint64_t session, stream, codec, consumer, sequence, source_ordinal;
     unsigned active, attached, config_valid, config_blocked, nal_length_size;
+    int foreign_parameters; /* calibration clip: in-band SPS/PPS need not match the avcC */
     unsigned priming_queued, consumer_primed, keyframe_needed;
     /* Overflow never closes the consumer or invalidates a partially sent AU. */
     unsigned recovery_wait_idr, recovery_draining, recovery_request_due;

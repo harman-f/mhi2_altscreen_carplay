@@ -29,8 +29,8 @@ final class MibrControlSession {
             if(key.equals(MibrSettingsCatalog.KEYS[i]))return i;
         return -1;
     }
-    String status(){return message;}
-    String actionLabel(){return busy?"Bitte warten":connected?"Temporär übernehmen":"Übernehmen (Dienst offline)";}
+    String status(){return MibrI18n.localize(message);}
+    String actionLabel(){return MibrI18n.localize(busy?"Bitte warten":connected?"Temporär übernehmen":"Übernehmen (Dienst offline)");}
     void open(){
         if(!attached || client==null)return;
         connected=false;busy=true;message="Konfigurationsdienst prüfen";changed();

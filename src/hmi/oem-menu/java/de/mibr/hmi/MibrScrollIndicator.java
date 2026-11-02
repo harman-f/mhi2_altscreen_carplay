@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  * Scroll indicator for the owned SMI_SETUP_MAIN page: the live skin has no Scrollbar
- * widget in this view, so a track and a thumb are drawn from project-owned assets.
+ * widget in this view (diag 2026-10-21), so a track and a thumb are drawn from two PNGs.
  */
 package de.mibr.hmi;
 

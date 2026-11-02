@@ -4,6 +4,9 @@
 #ifndef MIBR_V3_READONLY_H
 #define MIBR_V3_READONLY_H
 #include "alt111_settings.h"
+#include "mibr_display_scaling.h"
+#include "mibr_menu_language.h"
+#include "mibr_durable_switch.h"
 #include "mibr_v3_runtime_observer.h"
 #include <stddef.h>
 struct mibr_v3_receipt {
@@ -42,9 +45,28 @@ struct mibr_v3_route_receipt {
     unsigned role;
     int active; /* last verified owner ACK; historical receipt, not current UI */
 };
+struct mibr_v3_scaling_receipt {
+    char rid[65],frame[4097],response[1024];
+    size_t n;
+};
+struct mibr_v3_switch_slot {
+    struct mibr_switch state;
+    char path[512];
+    int ready;
+    int (*set)(void *,const struct mibr_switch_def *,const char *,const struct mibr_switch *,
+        const char *,uint64_t,char *,size_t);
+    void *context;
+    struct mibr_v3_scaling_receipt receipts[8];
+    unsigned receipt_cursor;
+};
+typedef int (*mibr_v3_scaling_set_fn)(void *,const char *,
+    const struct mibr_display_scaling_state *,const char *,const char *,
+    uint64_t,char *,size_t);
 struct mibr_v3_reader {
     struct alt111_settings cached;
     int ready;
+    /* Hard durable/RO safety failure; only a new reader/open may clear it. */
+    int refresh_blocked;
     struct alt111_settings_paths paths;
     /* NULL in the test read-only harness and on unqualified target media. */
     int (*durable_set)(void *,const struct alt111_settings_paths *,
@@ -73,6 +95,31 @@ struct mibr_v3_reader {
      * out receives key=value lines. Returns 0 when the helper ran and reported result=OK. */
     int (*view_op)(void *,const char *op,const char *key,const char *value,char *out,size_t cap);
     void *view_context;
+    /* Two-key per-display ZoomFactor extension. It is deliberately outside
+     * the Classic111 48-key registry; GEN2 links the same strict parser. */
+    struct mibr_display_scaling_state scaling;
+    char scaling_path[512];
+    char scaling_status_path[512];
+    int scaling_ready;
+    mibr_v3_scaling_set_fn scaling_set;
+    void *scaling_context;
+    struct mibr_v3_scaling_receipt scaling_receipts[8];
+    unsigned scaling_receipt_cursor;
+    /* Independent MIBR-only locale; no Classic111 setting or OEM language mutation. */
+    struct mibr_menu_language menu_language;
+    char menu_language_path[512];
+    int menu_language_ready;
+    int (*menu_language_set)(void *,const char *,const struct mibr_menu_language *,
+        const char *,uint64_t,char *,size_t);
+    void *menu_language_context;
+    struct mibr_v3_scaling_receipt menu_language_receipts[8];
+    unsigned menu_language_receipt_cursor;
+    /* MIBR-only durable on/off switches, one slot per row of mibr_switch_defs. */
+    struct mibr_v3_switch_slot switches[MIBR_SWITCH_COUNT];
+    /* Low-frequency demo control forwarded to original iAP2 owner only. */
+    int (*gps_demo_op)(void *,const char *,const char *,const char *,
+                       char *,size_t);
+    void *gps_demo_context;
     /* r13 live-first hooks (implemented in the storage layer, never in this library). */
     int (*live_apply)(const struct alt111_settings_paths *,const struct alt111_settings *,unsigned,const char *,uint64_t *);
     int (*live_revert)(const struct alt111_settings_paths *,unsigned,const char *,uint64_t);

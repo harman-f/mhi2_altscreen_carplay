@@ -39,7 +39,7 @@ EXPECTED_NATIVE_UI = (
 )
 EXPECTED_VISIBLE_COUNT = 9
 ALLOWED_TOP_FIELDS = {"schema", "target", "title", "root", "sections",
-                      "native_ui_keys", "labels"}
+                      "native_ui_keys", "labels", "virtual_pages"}
 LANGUAGES = {"de", "en"}
 ALLOWED_SECTION_FIELDS = {"id", "label", "keys"}
 
@@ -154,6 +154,25 @@ def validate_menu(menu, keys):
         raise ValueError("MENU_NATIVE_UI_PROJECTION_INVALID")
     if not set(assigned) <= set(native):
         raise ValueError("MENU_VISIBLE_NOT_IN_NATIVE_PROJECTION")
+    pages = menu["virtual_pages"]
+    if not isinstance(pages, list) or len(pages) != 1:
+        raise ValueError("MENU_VIRTUAL_PAGE_POLICY_INVALID")
+    page = pages[0]
+    if (set(page) != {"id", "parent", "name", "notice", "controls"} or
+            page["id"] != "scaling" or page["parent"] != "advanced" or
+            not valid_text(page["name"]) or not valid_text(page["notice"]) or
+            not isinstance(page["controls"], list) or len(page["controls"]) != 4):
+        raise ValueError("MENU_VIRTUAL_PAGE_POLICY_INVALID")
+    expected_controls = (
+        ("scaling.main.zoomFactor", ["AUTO", "70", "85", "100", "125", "150"]),
+        ("scaling.cluster.zoomFactor", ["AUTO", "70", "85", "100", "125", "150"]),
+        ("scaling.cluster.physicalSize", ["BASE", "P20", "P30", "P50"]),
+        ("scaling.main.physicalSize", ["BASE", "P20", "P30", "P50"]),
+    )
+    for control, (expected_id, expected_options) in zip(page["controls"], expected_controls):
+        if (set(control) != {"id", "label", "options"} or control["id"] != expected_id or
+                not valid_text(control["label"]) or control["options"] != expected_options):
+            raise ValueError("MENU_VIRTUAL_PAGE_POLICY_INVALID")
 
 
 def valid_text(value):
@@ -228,6 +247,8 @@ def render_catalog(settings, menu):
 
 def render_menu(menu):
     sections = menu["sections"]
+    virtual_pages = menu["virtual_pages"]
+    controls = [page["controls"] for page in virtual_pages]
     out = [
         "/* Generated from menu-definition.json schema 3. UI navigation metadata only. */\n",
         "package de.mibr.hmi;\npublic final class MibrMenuDefinition {\n",
@@ -248,6 +269,28 @@ def render_menu(menu):
                                               for key in section["keys"]]),
         " /** Exact native MIBR/3 SNAPSHOT scope=ui row order; includes HMI-hidden keys. */\n",
         array("NATIVE_UI_KEYS", menu["native_ui_keys"]),
+        array("VIRTUAL_PAGE_IDS", [page["id"] for page in virtual_pages]),
+        array("VIRTUAL_PAGE_PARENTS", [page["parent"] for page in virtual_pages]),
+        array("VIRTUAL_PAGE_NAMES_DE", [page["name"]["de"] for page in virtual_pages]),
+        array("VIRTUAL_PAGE_NAMES_EN", [page["name"]["en"] for page in virtual_pages]),
+        array("VIRTUAL_PAGE_NOTICES_DE", [page["notice"]["de"] for page in virtual_pages]),
+        array("VIRTUAL_PAGE_NOTICES_EN", [page["notice"]["en"] for page in virtual_pages]),
+        " public static String virtualPageName(int page){return MibrI18n.german()?VIRTUAL_PAGE_NAMES_DE[page]:VIRTUAL_PAGE_NAMES_EN[page];}\n",
+        " public static String virtualPageNotice(int page){return MibrI18n.german()?VIRTUAL_PAGE_NOTICES_DE[page]:VIRTUAL_PAGE_NOTICES_EN[page];}\n",
+        " public static final String[][] VIRTUAL_CONTROL_IDS={\n  " + ",\n  ".join(
+            "{" + ", ".join(map(java_string, [control["id"] for control in page])) + "}"
+            for page in controls) + "\n };\n",
+        " public static final String[][][] VIRTUAL_CONTROL_OPTIONS={\n  " + ",\n  ".join(
+            "{" + ", ".join("{" + ", ".join(map(java_string, control["options"])) + "}"
+                              for control in page) + "}"
+            for page in controls) + "\n };\n",
+        " public static final String[][] VIRTUAL_CONTROL_LABELS_DE={\n  " + ",\n  ".join(
+            "{" + ", ".join(map(java_string, [control["label"]["de"] for control in page])) + "}"
+            for page in controls) + "\n };\n",
+        " public static final String[][] VIRTUAL_CONTROL_LABELS_EN={\n  " + ",\n  ".join(
+            "{" + ", ".join(map(java_string, [control["label"]["en"] for control in page])) + "}"
+            for page in controls) + "\n };\n",
+        " public static String virtualControlLabel(int page,int row){return MibrI18n.german()?VIRTUAL_CONTROL_LABELS_DE[page][row]:VIRTUAL_CONTROL_LABELS_EN[page][row];}\n",
         "}\n",
     ]
     return "".join(out)

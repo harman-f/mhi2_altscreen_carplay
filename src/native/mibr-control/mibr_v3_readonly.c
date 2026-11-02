@@ -152,7 +152,10 @@ int mibr_v3_flush_due(struct mibr_v3_reader *r,int force){
     now=mono_ms();
     if(!force&&now-r->persist_last_ms<r->persist_delay_ms&&
        now-r->persist_first_ms<r->persist_max_ms)return 1;
-    if(!r->durable_set||!r->ready||mibr_v3_refresh(r,&r->paths))return 1;
+    /* A prior uncertain refresh can leave ready clear while a live TEMP write
+     * is still queued for persistence. Revalidate the complete original-core
+     * snapshot before flushing; never replay the original SET request. */
+    if(!r->durable_set||mibr_v3_refresh(r,&r->paths))return 1;
     for(id=0;id<ALTSET_COUNT;id++){
         struct alt111_settings obs;char err[80]={0};int rc;
         if(!r->persist_dirty[id])continue;
@@ -163,7 +166,9 @@ int mibr_v3_flush_due(struct mibr_v3_reader *r,int force){
         if(rc>=0){r->persist_dirty[id]=0;continue;}
         failed=1;
         fprintf(stderr,"MIBR_V3_PERSIST_FAILED id=%u rc=%d err=%s\n",id,rc,err);
-        if(rc==-2||!strcmp(err,"RO_RESTORE_FAILED")){r->durable_set=NULL;r->ready=0;break;}
+        if(rc==-2||!strcmp(err,"RO_RESTORE_FAILED")){
+            r->durable_set=NULL;r->ready=0;r->refresh_blocked=1;break;
+        }
     }
     (void)mibr_v3_refresh(r,&r->paths);
     if(failed){r->persist_last_ms=mono_ms();r->persist_first_ms=r->persist_last_ms;return 1;}
@@ -174,12 +179,22 @@ int mibr_v3_flush_due(struct mibr_v3_reader *r,int force){
 int mibr_v3_refresh(struct mibr_v3_reader *r,const struct alt111_settings_paths *paths){
     struct alt111_settings staged;
     char err[256]={0};
+    int rc;
     if(!r)return -1;
+    if(r->refresh_blocked){
+        fprintf(stderr,"MIBR_V3_REFRESH_BLOCKED hard_storage_failure\n");return -1;
+    }
     /* Fail closed until a complete original-core snapshot has been loaded.
      * Caller serializes refresh and handle, including on QNX. */
     r->ready=0;r->stored_verified=0;r->stored_pending=0;
-    if(!paths||ALTSET_COUNT!=48u||
-       alt111_settings_load(paths,&staged,err,sizeof(err)))return -1;
+    if(!paths||ALTSET_COUNT!=48u){
+        fprintf(stderr,"MIBR_V3_REFRESH_FAILED error=invalid_paths\n");return -1;
+    }
+    rc=alt111_settings_load(paths,&staged,err,sizeof(err));
+    if(rc){
+        fprintf(stderr,"MIBR_V3_REFRESH_FAILED rc=%d error=%s\n",rc,err[0]?err:"unspecified");
+        return -1;
+    }
     r->cached=staged;
     r->ready=1;
     return 0;
@@ -199,6 +214,7 @@ static const char *activation_kind(const char *apply){
     if(!strcmp(apply,"presentation"))return "PRESENTATION";
     if(!strcmp(apply,"session"))return "SESSION";
     if(!strcmp(apply,"reconnect"))return "RECONNECT";
+    if(!strcmp(apply,"unit_reboot"))return "UNIT_REBOOT";
     return "UNKNOWN";
 }
 static const char *layer(unsigned n){
@@ -268,6 +284,7 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
                    const char *frame,size_t length,char *out,size_t cap){
     struct request req;struct writer w;unsigned i;int rc,id;
     const char *scope="ui";
+    const struct mibr_switch_def *switch_def;int switch_set=0;
     enum mibr_v3_visible_route action_target=MIBR_ROUTE_UNKNOWN;
     uint64_t action_session=0,action_generation=0;
     if(!out||cap<80)return -1;
@@ -280,6 +297,7 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
        strcmp(req.op,"ACTION") && strcmp(req.op,"ACTION_STATUS")){
         error_frame(out,cap,req.rid,"FORBIDDEN");return -1;
     }
+    switch_def=mibr_switch_for_op(req.op,&switch_set);
     w.s=out;w.n=0;w.cap=cap<OUTPUT_MAX?cap:OUTPUT_MAX;w.failed=0;w.fields=0;
     if(!strcmp(req.op,"HELLO")||!strcmp(req.op,"CAPABILITIES")||
        !strcmp(req.op,"STATUS")||!strcmp(req.op,"SHOW_STATUS")){
@@ -290,6 +308,32 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
             field(&w,"registry_keys","48");field(&w,"phase",r&&r->durable_set?"NATIVE_PROFILE_GUARDED":"NATIVE_READONLY_OFFLINE");
         }else if(!strcmp(req.op,"CAPABILITIES")){
             field(&w,"snapshot","1");field(&w,"durable_set",r&&r->durable_set?"1":"0");
+            field(&w,"scaling",r&&r->scaling_ready&&r->scaling_set?"1":"0");
+            field(&w,"menu_language",r&&r->menu_language_ready?"1":"0");
+            for(i=0;i<MIBR_SWITCH_COUNT;i++)
+                field(&w,mibr_switch_defs[i].capability,r&&r->switches[i].ready?"1":"0");
+            /* Owner readiness is a *live current-session GET*, not the
+             * presence of the broker's always-registered IPC callback.
+             * Missing DIO original-owner socket must advertise unavailable. */
+            {int owner_ready=0;
+             char reply[128]={0},mode[32]={0},epoch[32]={0},active[8]={0},
+                  stationary[8]={0},extra[8]={0};
+             if(r&&r->gps_demo_op&&
+                !r->gps_demo_op(r->gps_demo_context,"GET",NULL,NULL,
+                                reply,sizeof(reply))&&
+                sscanf(reply,"OK %31s %31s %7s %7s %7s",
+                       mode,epoch,active,stationary,extra)==4&&
+                (!strcmp(mode,"OFF")||!strcmp(mode,"BERLIN_DEMO")||
+                 !strcmp(mode,"HAMBURG_DEMO")||
+                 !strcmp(mode,"SCHWALEFELD_DEMO")||
+                 !strcmp(mode,"WINTERBERG_DEMO"))&&
+                epoch[0]&&strspn(epoch,"0123456789")==strlen(epoch)&&
+                (!strcmp(active,"0")||!strcmp(active,"1"))&&
+                (!strcmp(stationary,"0")||!strcmp(stationary,"1"))&&
+                (strcmp(active,"1")||strcmp(mode,"OFF")))
+                 owner_ready=1;
+             field(&w,"gps_demo",owner_ready?"1":"0");
+            }
             field(&w,"test_override","0");field(&w,"presentation_refresh","0");
             field(&w,"reconnect","0");field(&w,"session_control","0");
             {struct mibr_v3_route_observation current;
@@ -379,6 +423,284 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
         response_start(&w,req.rid,"OK");
         field(&w,"follow",follow);field(&w,"sport",sport);field(&w,"m0",m0);field(&w,"m1",m1);field(&w,"m4",m4);
         field(&w,"rs",rs);field(&w,"pos",pos);
+    }else if(!strcmp(req.op,"MENU_LOAD")){
+        /* The helper copies the fixed SD file over the fixed target; the menu has checked it and checks the result. */
+        char res[64],result[16];
+        if(role==MIBR_V3_INPUT){error_frame(out,cap,req.rid,"FORBIDDEN");return -1;}
+        if(req.count){error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;}
+        if(!r||!r->view_op){error_frame(out,cap,req.rid,"POLICY_BLOCKED");return -1;}
+        res[0]=0;
+        if(r->view_op(r->view_context,"menu",NULL,NULL,res,sizeof(res))||
+           kv_line(res,"result",result,sizeof(result))||strcmp(result,"OK")){
+            error_frame(out,cap,req.rid,"MENU_LOAD_FAILED");return -1;
+        }
+        response_start(&w,req.rid,"OK");
+        field(&w,"result",result);
+    }else if(!strcmp(req.op,"GPS_DEMO_GET")||!strcmp(req.op,"GPS_DEMO_SET")){
+        /* This transport never creates a second sender. The qualified ORIGINAL
+         * DIO owner controls all fixes and reports its current-session state. */
+        int set=!strcmp(req.op,"GPS_DEMO_SET"),matched=0;
+        const char *choice=NULL,*expected=NULL,*rid=NULL;
+        char reply[128]={0},current[32]={0},epoch[32]={0},active[8]={0},stationary[8]={0};
+        char extra[8]={0};
+        if(role==MIBR_V3_INPUT){error_frame(out,cap,req.rid,"FORBIDDEN");return -1;}
+        if(set){
+            for(i=0;i<req.count;i++){
+                if(!strcmp(req.f[i].key,"value"))choice=req.f[i].value;
+                else if(!strcmp(req.f[i].key,"expected_epoch"))expected=req.f[i].value;
+                else if(!strcmp(req.f[i].key,"request_id"))rid=req.f[i].value;
+                else {error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;}
+            }
+            if(req.count!=3||!choice||!expected||!rid||strcmp(req.rid,rid)||
+               !(!strcmp(choice,"OFF")||!strcmp(choice,"BERLIN_DEMO")||
+                 !strcmp(choice,"HAMBURG_DEMO")||
+                 !strcmp(choice,"SCHWALEFELD_DEMO")||
+                 !strcmp(choice,"WINTERBERG_DEMO"))){
+                error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+            }
+            if(!*expected||(expected[0]=='0'&&expected[1])){
+                error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+            }
+            for(i=0;expected[i];i++){
+                if(expected[i]<'0'||expected[i]>'9'||i>=19){
+                    error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+                }
+            }
+        }else if(req.count){
+            error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+        }
+        if(!r||!r->gps_demo_op){
+            error_frame(out,cap,req.rid,"NOT_READY");return -1;
+        }
+        if(r->gps_demo_op(r->gps_demo_context,set?"SET":"GET",choice,expected,
+                          reply,sizeof(reply))){
+            error_frame(out,cap,req.rid,"NOT_READY");return -1;
+        }
+        /* Exact bounded owner-IPC reply: OK MODE EPOCH ACTIVE STATIONARY. */
+        matched=sscanf(reply,"OK %31s %31s %7s %7s %7s",
+                       current,epoch,active,stationary,extra);
+        if(matched!=4||(strcmp(current,"OFF")&&strcmp(current,"BERLIN_DEMO")&&
+           strcmp(current,"HAMBURG_DEMO")&&
+           strcmp(current,"SCHWALEFELD_DEMO")&&
+           strcmp(current,"WINTERBERG_DEMO"))||
+           !(!strcmp(active,"0")||!strcmp(active,"1"))||
+           !(!strcmp(stationary,"0")||!strcmp(stationary,"1"))||
+           !*epoch){
+            error_frame(out,cap,req.rid,"OWNER_UNCONFIRMED");return -1;
+        }
+        for(i=0;epoch[i];i++){
+            if(epoch[i]<'0'||epoch[i]>'9'||i>=19){
+                error_frame(out,cap,req.rid,"OWNER_UNCONFIRMED");return -1;
+            }
+        }
+        /* Even matching SET is only current owner acceptance, never a
+         * statement that Apple's Maps renderer used accessory coordinates. */
+        if(set&&strcmp(choice,current)){
+            error_frame(out,cap,req.rid,"OWNER_UNCONFIRMED");return -1;
+        }
+        response_start(&w,req.rid,"OK");
+        field(&w,"choice",current);field(&w,"epoch",epoch);
+        field(&w,"active",active);field(&w,"stationary",stationary);
+        field(&w,"owner","MANUAL_CONTROL");field(&w,"effect","UNVERIFIED_IOS");
+    }else if(!strcmp(req.op,"MENU_LANGUAGE_GET")||!strcmp(req.op,"MENU_LANGUAGE_SET")){
+        struct mibr_menu_language fresh;
+        int set=!strcmp(req.op,"MENU_LANGUAGE_SET");
+        const char *value=NULL,*rv=NULL,*rid=NULL;
+        uint64_t revision=0;char err[80]={0};
+        if(role==MIBR_V3_INPUT){error_frame(out,cap,req.rid,"FORBIDDEN");return -1;}
+        if(set){
+            for(i=0;i<req.count;i++){
+                if(!strcmp(req.f[i].key,"value"))value=req.f[i].value;
+                else if(!strcmp(req.f[i].key,"expected_revision"))rv=req.f[i].value;
+                else if(!strcmp(req.f[i].key,"request_id"))rid=req.f[i].value;
+                else {error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;}
+            }
+            if(req.count!=3||!mibr_menu_language_valid(value)||!rv||!rid||
+               strcmp(rid,req.rid)||!*rv||(rv[0]=='0'&&rv[1])){
+                error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+            }
+            for(i=0;rv[i];i++){
+                unsigned d=(unsigned)(rv[i]-'0');
+                if(rv[i]<'0'||rv[i]>'9'||revision>(UINT64_MAX-d)/10u){
+                    error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+                }
+                revision=revision*10u+d;
+            }
+            for(i=0;i<8;i++)if(r&&!strcmp(req.rid,r->menu_language_receipts[i].rid)){
+                struct mibr_v3_scaling_receipt *receipt=&r->menu_language_receipts[i];
+                if(receipt->n!=length||memcmp(frame,receipt->frame,length)){
+                    error_frame(out,cap,req.rid,"IDEMPOTENCY_COLLISION");return -1;
+                }
+                if(strlen(receipt->response)+1>cap){error_frame(out,cap,req.rid,"SNAPSHOT_TOO_LARGE");return -1;}
+                strcpy(out,receipt->response);return 0;
+            }
+        }else if(req.count){
+            error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+        }
+        if(!r||!r->menu_language_ready||!r->menu_language_path[0]||
+           mibr_menu_language_load(r->menu_language_path,&fresh,err,sizeof(err))){
+            error_frame(out,cap,req.rid,"NOT_READY");return -1;
+        }
+        r->menu_language=fresh;
+        if(set){
+            int result;
+            if(!r->menu_language_set){error_frame(out,cap,req.rid,"POLICY_BLOCKED");return -1;}
+            result=r->menu_language_set(r->menu_language_context,r->menu_language_path,
+              &fresh,value,revision,err,sizeof(err));
+            if(result<0){error_frame(out,cap,req.rid,
+                 !strcmp(err,"STALE_REVISION")?"STALE_REVISION":
+                 !strcmp(err,"RO_RESTORE_FAILED")?"RO_RESTORE_FAILED":
+                 !strcmp(err,"UNKNOWN_COMMIT")?"UNKNOWN_COMMIT":"STORAGE_UNAVAILABLE");return -1;}
+            if(mibr_menu_language_load(r->menu_language_path,&r->menu_language,err,sizeof(err))||
+               strcmp(r->menu_language.value,value)){
+                r->menu_language_ready=0;error_frame(out,cap,req.rid,"UNKNOWN_COMMIT");return -1;
+            }
+        }
+        response_start(&w,req.rid,"OK");
+        field(&w,"value",r->menu_language.value);
+        field(&w,"stored",r->menu_language.stored?"VERIFIED":"DEFAULT");
+        field(&w,"writer",r->menu_language_set?"ENABLED":"DISABLED");
+        numeric(&w,"revision",r->menu_language.revision);
+        field(&w,"scope","MIBR_ONLY");
+        field(&w,"apply","IMMEDIATE");
+    }else if(switch_def){
+        struct mibr_switch fresh;
+        struct mibr_v3_switch_slot *slot=r?&r->switches[switch_def-mibr_switch_defs]:NULL;
+        int set=switch_set;
+        const char *value=NULL,*rv=NULL,*rid=NULL;
+        uint64_t revision=0;char err[80]={0};
+        if(role==MIBR_V3_INPUT){error_frame(out,cap,req.rid,"FORBIDDEN");return -1;}
+        if(set){
+            for(i=0;i<req.count;i++){
+                if(!strcmp(req.f[i].key,"value"))value=req.f[i].value;
+                else if(!strcmp(req.f[i].key,"expected_revision"))rv=req.f[i].value;
+                else if(!strcmp(req.f[i].key,"request_id"))rid=req.f[i].value;
+                else {error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;}
+            }
+            if(req.count!=3||!mibr_switch_valid(switch_def,value)||!rv||!rid||
+               strcmp(rid,req.rid)||!*rv||(rv[0]=='0'&&rv[1])){
+                error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+            }
+            for(i=0;rv[i];i++){
+                unsigned d=(unsigned)(rv[i]-'0');
+                if(rv[i]<'0'||rv[i]>'9'||revision>(UINT64_MAX-d)/10u){
+                    error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+                }
+                revision=revision*10u+d;
+            }
+            for(i=0;i<8;i++)if(slot&&!strcmp(req.rid,slot->receipts[i].rid)){
+                struct mibr_v3_scaling_receipt *receipt=&slot->receipts[i];
+                if(receipt->n!=length||memcmp(frame,receipt->frame,length)){
+                    error_frame(out,cap,req.rid,"IDEMPOTENCY_COLLISION");return -1;
+                }
+                if(strlen(receipt->response)+1>cap){error_frame(out,cap,req.rid,"SNAPSHOT_TOO_LARGE");return -1;}
+                strcpy(out,receipt->response);return 0;
+            }
+        }else if(req.count){
+            error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+        }
+        if(!slot||!slot->ready||!slot->path[0]||
+           mibr_switch_load(switch_def,slot->path,&fresh,err,sizeof(err))){
+            error_frame(out,cap,req.rid,"NOT_READY");return -1;
+        }
+        slot->state=fresh;
+        if(set){
+            int result;
+            if(!slot->set){error_frame(out,cap,req.rid,"POLICY_BLOCKED");return -1;}
+            result=slot->set(slot->context,switch_def,slot->path,
+              &fresh,value,revision,err,sizeof(err));
+            if(result<0){error_frame(out,cap,req.rid,
+                 !strcmp(err,"STALE_REVISION")?"STALE_REVISION":
+                 !strcmp(err,"RO_RESTORE_FAILED")?"RO_RESTORE_FAILED":
+                 !strcmp(err,"UNKNOWN_COMMIT")?"UNKNOWN_COMMIT":"STORAGE_UNAVAILABLE");return -1;}
+            if(mibr_switch_load(switch_def,slot->path,&slot->state,err,sizeof(err))||
+               strcmp(slot->state.value,value)){
+                slot->ready=0;error_frame(out,cap,req.rid,"UNKNOWN_COMMIT");return -1;
+            }
+        }
+        response_start(&w,req.rid,"OK");
+        field(&w,"value",slot->state.value);
+        field(&w,"stored",slot->state.stored?"VERIFIED":"DEFAULT");
+        field(&w,"writer",slot->set?"ENABLED":"DISABLED");
+        numeric(&w,"revision",slot->state.revision);
+        field(&w,"scope","MIBR_ONLY");
+        field(&w,"apply","IMMEDIATE");
+    }else if(!strcmp(req.op,"SCALE_GET")||!strcmp(req.op,"SCALE_SET")){
+        int set=!strcmp(req.op,"SCALE_SET");const char *idv=NULL,*value=NULL,*revtext=NULL,*request_id=NULL;
+        uint64_t revision=0;char err[80]={0};const char *desired=NULL,*advertised="UNKNOWN";
+        struct mibr_display_scaling_state observed_advertised,fresh;
+        int is_main,is_main_physical,advertised_known=0,wr;
+        if(role==MIBR_V3_INPUT){error_frame(out,cap,req.rid,"FORBIDDEN");return -1;}
+        if(set){
+            for(i=0;i<req.count;i++){
+                if(!strcmp(req.f[i].key,"id"))idv=req.f[i].value;
+                else if(!strcmp(req.f[i].key,"value"))value=req.f[i].value;
+                else if(!strcmp(req.f[i].key,"expected_revision"))revtext=req.f[i].value;
+                else if(!strcmp(req.f[i].key,"request_id"))request_id=req.f[i].value;
+                else {error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;}
+            }
+            if(req.count!=4||!idv||!value||!revtext||!request_id||strcmp(request_id,req.rid)||!*revtext||(*revtext=='0'&&revtext[1])){
+                error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+            }
+            for(i=0;revtext[i];i++){
+                if(revtext[i]<'0'||revtext[i]>'9'||revision>(UINT64_MAX-(unsigned)(revtext[i]-'0'))/10u){
+                    error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+                }
+                revision=revision*10u+(unsigned)(revtext[i]-'0');
+            }
+            for(i=0;i<8;i++)if(r&&!strcmp(req.rid,r->scaling_receipts[i].rid)){
+                if(length!=r->scaling_receipts[i].n||memcmp(frame,r->scaling_receipts[i].frame,length)){
+                    error_frame(out,cap,req.rid,"IDEMPOTENCY_COLLISION");return -1;
+                }
+                if(strlen(r->scaling_receipts[i].response)+1>cap){error_frame(out,cap,req.rid,"SNAPSHOT_TOO_LARGE");return -1;}
+                strcpy(out,r->scaling_receipts[i].response);return 0;
+            }
+        }else if(req.count!=1||strcmp(req.f[0].key,"id")){
+            error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+        }else idv=req.f[0].value;
+        if(!mibr_display_scaling_id_valid(idv)||
+           (set && !((!strcmp(idv,"scaling.cluster.physicalSize")||!strcmp(idv,"scaling.main.physicalSize"))?
+                       mibr_display_physical_value_valid(value):
+                       mibr_display_scaling_value_valid(value)))){
+            error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
+        }
+        if(!r||!r->scaling_ready||!r->scaling_path[0]){error_frame(out,cap,req.rid,"NOT_READY");return -1;}
+        /* Refresh from the shared native file on every operation. A lost ACK can
+         * therefore be reconciled by GET, and external changes cannot leave Java
+         * holding a stale CAS revision. */
+        if(mibr_display_scaling_load(r->scaling_path,&fresh,err,sizeof(err))){
+            r->scaling_ready=0;error_frame(out,cap,req.rid,"NOT_READY");return -1;
+        }
+        r->scaling=fresh;
+        is_main=!strcmp(idv,"scaling.main.zoomFactor");
+        is_main_physical=!strcmp(idv,"scaling.main.physicalSize");
+        if(set){
+            if(!r->scaling_set){error_frame(out,cap,req.rid,"POLICY_BLOCKED");return -1;}
+            wr=r->scaling_set(r->scaling_context,r->scaling_path,&r->scaling,idv,value,revision,err,sizeof(err));
+            if(wr<0){
+                if(!strcmp(err,"RO_RESTORE_FAILED"))r->scaling_set=NULL;
+                error_frame(out,cap,req.rid,!strcmp(err,"STALE_REVISION")?"STALE_REVISION":
+                    !strcmp(err,"INVALID_VALUE")?"INVALID_VALUE":!strcmp(err,"RO_RESTORE_FAILED")?"RO_RESTORE_FAILED":
+                    !strcmp(err,"UNKNOWN_COMMIT")?"UNKNOWN_COMMIT":"STORAGE_UNAVAILABLE");return -1;
+            }
+            if(mibr_display_scaling_load(r->scaling_path,&r->scaling,err,sizeof(err))){
+                r->scaling_ready=0;error_frame(out,cap,req.rid,"UNKNOWN_COMMIT");return -1;
+            }
+        }
+        desired=is_main?r->scaling.main:is_main_physical?r->scaling.main_physical:
+            !strcmp(idv,"scaling.cluster.zoomFactor")?r->scaling.cluster:r->scaling.physical;
+        response_start(&w,req.rid,"OK");field(&w,"id",idv);field(&w,"desired",desired);
+        field(&w,"source",r->scaling.stored?"persistent":"compiled");
+        field(&w,"stored",r->scaling.stored?"VERIFIED":"DEFAULT");
+        field(&w,"writer",r->scaling_set?"ENABLED":"DISABLED");numeric(&w,"revision",r->scaling.revision);
+        if(r->scaling_status_path[0]&&mibr_display_scaling_advertised_load(r->scaling_status_path,&r->scaling,&observed_advertised)){
+            advertised_known=1;advertised=is_main?observed_advertised.main:is_main_physical?observed_advertised.main_physical:
+                !strcmp(idv,"scaling.cluster.zoomFactor")?observed_advertised.cluster:
+                observed_advertised.physical;
+        }
+        field(&w,"advertised",advertised);field(&w,"effective","UNKNOWN");
+        field(&w,"advertised_scope",advertised_known?"HISTORICAL":"UNKNOWN");
+        field(&w,"apply","RECONNECT");field(&w,"pending",r->scaling.revision?"1":"0");
     }else if(!strcmp(req.op,"SNAPSHOT")){
         if(req.count>1||(req.count==1&&strcmp(req.f[0].key,"scope"))){
             error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
@@ -390,7 +712,7 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
         if(!strcmp(scope,"all")&&role!=MIBR_V3_SHELL){
             error_frame(out,cap,req.rid,"FORBIDDEN");return -1;
         }
-        if(!r||!r->ready){error_frame(out,cap,req.rid,"NOT_READY");return -1;}
+        if(!r||(!r->ready&&mibr_v3_refresh(r,&r->paths))){error_frame(out,cap,req.rid,"NOT_READY");return -1;}
         response_start(&w,req.rid,"OK");
         numeric(&w,"row_count",!strcmp(scope,"ui")?UI_COUNT:ALTSET_COUNT);
         numeric(&w,"revision",r->cached.revision);
@@ -419,7 +741,7 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
         if(role!=MIBR_V3_SHELL&&!is_visible(req.f[0].value)){
             error_frame(out,cap,req.rid,"FORBIDDEN");return -1;
         }
-        if(!r||!r->ready){error_frame(out,cap,req.rid,"NOT_READY");return -1;}
+        if(!r||(!r->ready&&mibr_v3_refresh(r,&r->paths))){error_frame(out,cap,req.rid,"NOT_READY");return -1;}
         response_start(&w,req.rid,"OK");numeric(&w,"revision",r->cached.revision);
         field(&w,"stored",r&&r->stored_verified?"VERIFIED":"UNCONFIRMED");field(&w,"runtime_correlated","0");
         field(&w,"key",req.f[0].value);
@@ -505,7 +827,9 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
             struct alt111_settings fresh;
             char load_error[128]={0};int drift=0;
             if(alt111_settings_load(&r->paths,&fresh,load_error,sizeof(load_error))){
-                r->durable_set=NULL;r->ready=0;
+                fprintf(stderr,"MIBR_V3_SET_PREFLIGHT_LOAD_FAILED error=%s\n",
+                        load_error[0]?load_error:"unspecified");
+                r->ready=0;
                 error_frame(out,cap,req.rid,"NOT_READY");return -1;
             }
             if(fresh.revision!=r->cached.revision)drift=1;
@@ -514,7 +838,6 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
                    strcmp(fresh.value[i],r->cached.value[i])){drift=1;break;}
             if(drift){
                 if(mibr_v3_refresh(r,&r->paths)){
-                    r->durable_set=NULL;r->ready=0;
                     error_frame(out,cap,req.rid,"NOT_READY");return -1;
                 }
                 error_frame(out,cap,req.rid,"STALE_REVISION");return -1;
@@ -524,7 +847,11 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
          * remount ro) took seconds before the cockpit saw anything. Write the
          * volatile TEMP layer and request the presentation first, then persist.
          * A verified durable failure reverts TEMP to the previous value. */
-        if(r->live_apply&&strcmp(r->cached.value[id],value)&&
+        /* Reboot-required settings must reach verified durable storage before
+         * ACK. The operator may restart immediately: no TEMP-first write or
+         * deferred flush here. This also keeps FPS/keyframe tuples atomic. */
+        if(strcmp(alt111_setting((unsigned)id)->apply,"unit_reboot")&&
+           r->live_apply&&strcmp(r->cached.value[id],value)&&
            !r->live_apply(&r->paths,&r->cached,(unsigned)id,value,&live_revision)){
             live_done=1;
             if(r->presentation_request&&
@@ -540,7 +867,12 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
             }
             if(!r->persist_pending)r->persist_first_ms=now;
             r->persist_pending=1;r->persist_last_ms=now;
-            if(mibr_v3_refresh(r,&r->paths)||strcmp(r->cached.value[id],value)){
+            if(mibr_v3_refresh(r,&r->paths)){
+                error_frame(out,cap,req.rid,"UNKNOWN_COMMIT");return -1;
+            }
+            if(strcmp(r->cached.value[id],value)){
+                fprintf(stderr,"MIBR_V3_REFRESH_KEY_MISMATCH key=%s wanted=%s observed=%s\n",
+                        key,value,r->cached.value[id]);
                 r->ready=0;error_frame(out,cap,req.rid,"UNKNOWN_COMMIT");return -1;
             }
             response_start(&w,req.rid,"OK");field(&w,"stored","PENDING_PERSIST");
@@ -566,7 +898,7 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
         }
         if(rc<0){
             if(!strcmp(storage_error,"RO_RESTORE_FAILED")){
-                r->durable_set=NULL;r->stored_verified=0;r->ready=0;
+                r->durable_set=NULL;r->stored_verified=0;r->ready=0;r->refresh_blocked=1;
             }
             const char *code=rc==-2?"UNKNOWN_COMMIT":"STORAGE_UNAVAILABLE";
             if(!strcmp(storage_error,"RO_RESTORE_FAILED"))code="RO_RESTORE_FAILED";
@@ -580,6 +912,8 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
             error_frame(out,cap,req.rid,"UNKNOWN_COMMIT");return -1;
         }
         if(rc==1&&strcmp(r->cached.value[id],value)){
+            fprintf(stderr,"MIBR_V3_REFRESH_KEY_MISMATCH key=%s wanted=%s observed=%s\n",
+                    key,value,r->cached.value[id]);
             r->ready=0;error_frame(out,cap,req.rid,"UNKNOWN_COMMIT");return -1;
         }
         if(rc==1&&!live_done&&r->presentation_request&&
@@ -763,9 +1097,30 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
         struct mibr_v3_receipt *saved=&r->receipts[r->receipt_cursor++%8];
         strcpy(saved->rid,req.rid);
         memcpy(saved->frame,frame,length);saved->frame[length]=0;saved->n=length;
-        strcpy(saved->response,out);
+        /* a response that does not fit is not replayable: drop the receipt, never overflow */
+        if(strlen(out)<sizeof(saved->response))strcpy(saved->response,out);
+        else saved->rid[0]=0;
         saved->materialized=!r->stored_pending;
         saved->unchanged=strstr(out,"apply=UNCHANGED")!=NULL;
+    }
+    if(r&&!strcmp(req.op,"MENU_LANGUAGE_SET")){
+        struct mibr_v3_scaling_receipt *saved=&r->menu_language_receipts[r->menu_language_receipt_cursor++%8];
+        if(length>=sizeof(saved->frame)||strlen(out)>=sizeof(saved->response))saved->rid[0]=0;
+        else {strcpy(saved->rid,req.rid);memcpy(saved->frame,frame,length);saved->frame[length]=0;
+              saved->n=length;strcpy(saved->response,out);}
+    }
+    if(r&&switch_def&&switch_set){
+        struct mibr_v3_switch_slot *slot=&r->switches[switch_def-mibr_switch_defs];
+        struct mibr_v3_scaling_receipt *saved=&slot->receipts[slot->receipt_cursor++%8];
+        if(length>=sizeof(saved->frame)||strlen(out)>=sizeof(saved->response))saved->rid[0]=0;
+        else {strcpy(saved->rid,req.rid);memcpy(saved->frame,frame,length);saved->frame[length]=0;
+              saved->n=length;strcpy(saved->response,out);}
+    }
+    if(r&&!strcmp(req.op,"SCALE_SET")){
+        struct mibr_v3_scaling_receipt *saved=&r->scaling_receipts[r->scaling_receipt_cursor++%8];
+        if(length>=sizeof(saved->frame)||strlen(out)>=sizeof(saved->response))saved->rid[0]=0;
+        else {strcpy(saved->rid,req.rid);memcpy(saved->frame,frame,length);saved->frame[length]=0;
+              saved->n=length;strcpy(saved->response,out);}
     }
     return 0;
 }
