@@ -18,3 +18,8 @@
 A published C/Java interface or host-tested prototype is **not** an installed feature; UI STORE/TEMP and accepted ACTION are not a physically displayed result; stream-111 state and writer-gate state are independent. A third-party working port is not a compatibility certificate for this project's executable. Original vendor source, extracted graphics, raw private sessions, internal audits and work handoffs are not mirrored here.
 
 The module descriptions intentionally cross-link instead of repeating the full state-machine/installation details. For new public work, edit the owning page and its specific source README, then update [docs index](../README.md) and [public source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md) if a new module is actually published. Retain historical evidence only with its date and superseding reference.
+
+
+## Development repository organization
+
+The binding target for module source/runtime/test ownership, phased repository migrations, build artifact lineage, and staged release automation is [Development repository layout and release lineage contract](REPOSITORY_LAYOUT.md). The separate [multi-profile ZIP layout](../build/PACKAGE_LAYOUT.md) specifies distribution, not another canonical source tree.
