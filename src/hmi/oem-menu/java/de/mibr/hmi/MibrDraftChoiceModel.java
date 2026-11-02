@@ -27,7 +27,14 @@ public final class MibrDraftChoiceModel {
 
     public String[] options() {
         if (index == MibrPopupEditorModel.ENGINE) return MibrEngineState.VALUES;
-        if (index > MibrPopupEditorModel.ENGINE) return MibrViewState.options(index - MibrPopupEditorModel.VIEW_FOLLOW);
+        if (index == MibrPopupEditorModel.MENU_LANGUAGE) return new String[]{"AUTO","de","en"};
+        if (index == MibrPopupEditorModel.NAV_DEMO || index == MibrPopupEditorModel.CALIB_IMAGE) return new String[]{"off","on"};
+        if (MibrPopupEditorModel.isSafe(index)) return MibrPopupEditorModel.safeField(index) == MibrSafeArea.RESET_FIELD ? MibrSafeArea.RESET_OPTIONS : MibrSafeArea.OPTIONS;
+        if (index == MibrPopupEditorModel.EXPERT_MODE) return new String[]{"off","session","on"};
+        if (MibrPopupEditorModel.durable(index) != null) return MibrPopupEditorModel.durable(index).values;
+        if (index == MibrPopupEditorModel.GPS_DEMO) return new String[]{"OFF","BERLIN_DEMO","HAMBURG_DEMO","SCHWALEFELD_DEMO","WINTERBERG_DEMO"};
+        if (MibrPopupEditorModel.isScaling(index)) return MibrMenuDefinition.VIRTUAL_CONTROL_OPTIONS[0][MibrScalingState.slot(index)];
+        if (index > MibrPopupEditorModel.ENGINE && index < MibrPopupEditorModel.SCALE_MAIN) return MibrViewState.options(index - MibrPopupEditorModel.VIEW_FOLLOW);
         String kind = MibrSettingsCatalog.UI_KINDS[index];
         String key = MibrSettingsCatalog.KEYS[index];
         if ("STATUS".equals(kind)) return new String[0];
@@ -65,8 +72,77 @@ public final class MibrDraftChoiceModel {
     }
 
     public String labelFor(String value) {
+        if(index>=0&&index<MibrSettingsCatalog.KEYS.length&&"maxFPS".equals(MibrSettingsCatalog.KEYS[index])){
+            if("30".equals(value))return MibrI18n.pick("30 FPS · Keyframe alle 20 Frames","30 FPS · keyframe every 20 frames");
+            if("60".equals(value))return MibrI18n.pick("60 FPS · Keyframe alle 180 Frames","60 FPS · keyframe every 180 frames");
+        }
         if (index == MibrPopupEditorModel.ENGINE) return MibrEngineState.valueLabel(value);
-        if (index > MibrPopupEditorModel.ENGINE) return MibrViewState.valueLabel(index - MibrPopupEditorModel.VIEW_FOLLOW, value);
+        if (index == MibrPopupEditorModel.MENU_LANGUAGE) {
+            if ("AUTO".equals(value)) return MibrI18n.pick("Fahrzeugsprache","Vehicle language");
+            if ("de".equals(value)) return "Deutsch";
+            if ("en".equals(value)) return "English";
+            return MibrI18n.pick("Unbekannt","Unknown");
+        }
+        if (MibrPopupEditorModel.isSafe(index)) {
+            return MibrSafeArea.STANDARD.equals(value) ? MibrI18n.pick("Standard","Default") : value;
+        }
+        if (index == MibrPopupEditorModel.NAV_SOURCE) {
+            if ("stock".equals(value)) return MibrI18n.pick("Original","Original");
+            if ("phone".equals(value)) return "iPhone";
+            return MibrI18n.pick("Automatisch","Automatic");
+        }
+        if (index == MibrPopupEditorModel.NAV_DISPLAY) {
+            if ("top".equals(value)) return MibrI18n.pick("Nur oben","Top only");
+            if ("both".equals(value)) return MibrI18n.pick("Seite und oben","Side and top");
+            return MibrI18n.pick("Seite","Side");
+        }
+        if (index == MibrPopupEditorModel.NAV_BOTTOM) {
+            return "rtt".equals(value) ? MibrI18n.pick("Restfahrzeit","Time remaining") : MibrI18n.pick("Ankunftszeit","Arrival time");
+        }
+        if (index == MibrPopupEditorModel.NAV_TEXT) {
+            if ("dist".equals(value)) return MibrI18n.pick("Entfernung und Ziel","Distance and target");
+            if ("street".equals(value)) return MibrI18n.pick("Nur Straße","Street only");
+            return MibrI18n.pick("Aus","Off");
+        }
+        if (index == MibrPopupEditorModel.NAV_NIGHT) {
+            if ("light".equals(value)) return MibrI18n.pick("Immer hell","Always light");
+            if ("dark".equals(value)) return MibrI18n.pick("Immer dunkel","Always dark");
+            return MibrI18n.pick("Automatisch","Automatic");
+        }
+        if (index == MibrPopupEditorModel.EXPERT_MODE) {
+            if ("session".equals(value)) return MibrI18n.pick("Bis Neustart","Until restart");
+            if ("on".equals(value)) return MibrI18n.pick("Dauerhaft","Permanent");
+            return MibrI18n.pick("Aus","Off");
+        }
+        if (index == MibrPopupEditorModel.GPS_DEMO) {
+            if ("OFF".equals(value)) return MibrI18n.pick("Aus","Off");
+            if ("BERLIN_DEMO".equals(value)) return "Berlin Alexanderplatz";
+            if ("HAMBURG_DEMO".equals(value)) return "Hamburg Binnenalster";
+            if ("SCHWALEFELD_DEMO".equals(value)) return MibrI18n.pick("Schwalefeld Ortskern","Schwalefeld centre");
+            if ("WINTERBERG_DEMO".equals(value)) return MibrI18n.pick("Winterberg Ortskern","Winterberg centre");
+            return MibrI18n.pick("Unbekannt","Unknown");
+        }
+        if (MibrPopupEditorModel.isScaling(index)) {
+            if (index==MibrPopupEditorModel.SCALE_PHYSICAL || index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL) {
+                boolean main=index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL;
+                if("BASE".equals(value))return MibrI18n.pick("Original","Original");
+                if(main){
+                    if("P20".equals(value))return "+20 %";
+                    if("P30".equals(value))return "+30 %";
+                    if("P50".equals(value))return "+50 %";
+                }
+                if ("BASE".equals(value)) return MibrI18n.pick("Original (200 x 74 mm)","Baseline (200 x 74 mm)");
+                if ("P20".equals(value)) return "+20 % (240 x 89 mm)";
+                if ("P30".equals(value)) return "+30 % (260 x 96 mm)";
+                if ("P50".equals(value)) return "+50 % (300 x 111 mm)";
+                return value;
+            }
+            if("AUTO".equals(value))return MibrI18n.pick("Automatisch", "Automatic");
+            if("70".equals(value)||"85".equals(value)||"100".equals(value)||"125".equals(value)||"150".equals(value))return value+" %";
+            return value;
+        }
+        if (index > MibrPopupEditorModel.ENGINE && index < MibrPopupEditorModel.SCALE_MAIN) return MibrViewState.valueLabel(index - MibrPopupEditorModel.VIEW_FOLLOW, value);
+        if (MibrPopupEditorModel.durableCheck(index)||index==MibrPopupEditorModel.NAV_DEMO||index==MibrPopupEditorModel.CALIB_IMAGE) return "on".equals(value) ? MibrI18n.pick("Ein","On") : MibrI18n.pick("Aus","Off");
         if ("user".equals(value) && "TRISTATE".equals(MibrSettingsCatalog.UI_KINDS[index]))
             return MibrI18n.pick("App-Vorgabe", "App default");
         // Display labels only. chooseDraft retains exact canonical URL bytes.

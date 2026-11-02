@@ -101,7 +101,14 @@ public final class MibrV3Protocol {
            // r46: engine type of the CarPlay Identify (iap2.cfg [vehicle] engine=) via the helper in the broker
            !op.equals("ENGINE_GET")&&!op.equals("ENGINE_SET")&&
            // r55: cockpit view follow (position counter and safe area per view) via the helper in the broker
-           !op.equals("VIEW_GET")&&!op.equals("VIEW_SET"))
+           !op.equals("VIEW_GET")&&!op.equals("VIEW_SET")&&
+           !op.equals("SCALE_GET")&&!op.equals("SCALE_SET")&&
+           !op.equals("MENU_LANGUAGE_GET")&&!op.equals("MENU_LANGUAGE_SET")&&
+           !op.equals("CARPLAY_NAV_GET")&&!op.equals("CARPLAY_NAV_SET")&&
+           !op.equals("SD_LOG_GET")&&!op.equals("SD_LOG_SET")&&
+           !op.startsWith("NAV_")&&!op.startsWith("SAFE_")&&
+           !op.equals("EXPERT_MODE_GET")&&!op.equals("EXPERT_MODE_SET")&&!op.equals("MENU_LOAD")&&
+           !op.equals("GPS_DEMO_GET")&&!op.equals("GPS_DEMO_SET"))
             throw new IllegalArgumentException("BAD_VERB_OR_ID");
         if(names==null||values==null||names.length!=values.length||names.length>64||
            secret==null||secret.length()!=64)throw new IllegalArgumentException("BAD_FIELDS");
@@ -169,6 +176,52 @@ public final class MibrV3Protocol {
             ("0".equals(f.get("durable_set"))||"1".equals(f.get("durable_set")))&&
             "0".equals(f.get("reconnect"))&&"0".equals(f.get("presentation_refresh"))&&
             "0".equals(f.get("session_control"));
+    }
+    public static String[] gpsDemo(Frame f){
+        if(f==null||!f.ok())throw new IllegalArgumentException("GPS_DEMO_READBACK_INVALID");
+        String choice=required(f,"choice"),epoch=required(f,"epoch"),active=required(f,"active"),
+               stationary=required(f,"stationary"),owner=required(f,"owner");
+        if(!MibrGpsDemoState.valid(choice)||epoch.length()==0||epoch.length()>20||
+           !("0".equals(active)||"1".equals(active))||
+           !("0".equals(stationary)||"1".equals(stationary))||
+           !("READY".equals(owner)||"MANUAL_CONTROL".equals(owner))||!"UNVERIFIED_IOS".equals(required(f,"effect")))
+            throw new IllegalArgumentException("GPS_DEMO_READBACK_INVALID");
+        for(int i=0;i<epoch.length();i++)
+            if(epoch.charAt(i)<'0'||epoch.charAt(i)>'9')
+                throw new IllegalArgumentException("GPS_DEMO_EPOCH_INVALID");
+        return new String[]{choice,epoch,active,stationary};
+    }
+    public static String[] menuLanguage(Frame f){
+        if(f==null||!f.ok())throw new IllegalArgumentException("MENU_LANGUAGE_READBACK_INVALID");
+        String v=required(f,"value"),revision=required(f,"revision");
+        String writer=required(f,"writer"),stored=required(f,"stored");
+        if(!MibrI18n.validMenuOverride(v)||!"MIBR_ONLY".equals(required(f,"scope"))||
+           !"IMMEDIATE".equals(required(f,"apply"))||
+           !("ENABLED".equals(writer)||"DISABLED".equals(writer))||
+           !("VERIFIED".equals(stored)||"DEFAULT".equals(stored))||
+           revision.length()==0||revision.length()>20||revision.length()>1&&revision.charAt(0)=='0')
+            throw new IllegalArgumentException("MENU_LANGUAGE_READBACK_INVALID");
+        for(int i=0;i<revision.length();i++)
+            if(revision.charAt(i)<'0'||revision.charAt(i)>'9')
+                throw new IllegalArgumentException("MENU_LANGUAGE_REVISION_INVALID");
+        return new String[]{v,revision,writer,stored};
+    }
+    /** Readback of a durable switch (MibrDurableSwitch): {value, revision, writer, stored}. */
+    static String[] durableSwitch(Frame f,MibrDurableSwitch sw){
+        String verb=sw.verb;
+        if(f==null||!f.ok())throw new IllegalArgumentException(verb+"_READBACK_INVALID");
+        String v=required(f,"value"),revision=required(f,"revision");
+        String writer=required(f,"writer"),stored=required(f,"stored");
+        if(!sw.valid(v)||!"MIBR_ONLY".equals(required(f,"scope"))||
+           !"IMMEDIATE".equals(required(f,"apply"))||
+           !("ENABLED".equals(writer)||"DISABLED".equals(writer))||
+           !("VERIFIED".equals(stored)||"DEFAULT".equals(stored))||
+           revision.length()==0||revision.length()>20||revision.length()>1&&revision.charAt(0)=='0')
+            throw new IllegalArgumentException(verb+"_READBACK_INVALID");
+        for(int i=0;i<revision.length();i++)
+            if(revision.charAt(i)<'0'||revision.charAt(i)>'9')
+                throw new IllegalArgumentException(verb+"_REVISION_INVALID");
+        return new String[]{v,revision,writer,stored};
     }
     public static boolean durable(Frame f){
         return capabilities(f)&&"1".equals(f.get("durable_set"))&&

@@ -43,13 +43,14 @@ static int read_profile(const char *p,char *buf,size_t *size){
     buf[n]=0;*size=n;return 0;
 }
 static int profile_candidate(const char *old,size_t n,
-    const struct alt111_settings *observed,unsigned selected,const char *value,
+    const struct alt111_settings *observed,const unsigned *selected,
+    const char *const *values,unsigned selected_count,
     int strict,char *candidate,size_t *next_size){
     char line[ALT111_SETTING_VALUE_CAP+80];unsigned seen[ALTSET_COUNT]={0},count=0;
     size_t p=0,used=0;int found=0;
     while(p<n){
         const char *end=memchr(old+p,'\n',n-p);const char *equal;
-        size_t width,keylen,newlen;int id;const char *selected_value;
+        size_t width,keylen,newlen;int id;const char *selected_value;unsigned k;
         if(!end||end==old+p)return -1;
         width=(size_t)(end-(old+p));if(width>=sizeof(line))return -1;
         memcpy(line,old+p,width);line[width]=0;
@@ -66,8 +67,10 @@ static int profile_candidate(const char *old,size_t n,
          * value was rewritten from outside (iPhone reconnect, GEN2) keeps its
          * profile bytes; only the selected line changes. */
         if(strict&&strcmp(observed->value[id],equal+1))return -1; /* old TEMP/profile parity */
-        selected_value=(unsigned)id==selected?value:equal+1;
-        if((unsigned)id==selected)found=1;
+        selected_value=equal+1;
+        for(k=0;k<selected_count;k++)if((unsigned)id==selected[k]){
+            selected_value=values[k];found++;
+        }
         newlen=keylen+1+strlen(selected_value)+1;
         if(newlen>PROFILE_CAP-used)return -1;
         memcpy(candidate+used,line,keylen);used+=keylen;
@@ -76,14 +79,18 @@ static int profile_candidate(const char *old,size_t n,
         used+=strlen(selected_value);candidate[used++]='\n';
         count++;p=(size_t)(end-old)+1;
     }
-    if(count!=45||!found)return -1;
+    if(count!=45||found!=(int)selected_count)return -1;
     candidate[used]=0;*next_size=used;return 0;
 }
 int mibr_v3_profile_parity(const char *path,const struct alt111_settings *observed){
     char original[PROFILE_CAP+1],candidate[PROFILE_CAP+1];size_t n=0,next=0;
-    int id=alt111_setting_find("maxFPS");
-    if(!observed||id<0||read_profile(path,original,&n)||
-       profile_candidate(original,n,observed,(unsigned)id,observed->value[id],
+    int found_id=alt111_setting_find("maxFPS");unsigned id;
+    const char *values[1];
+    if(found_id<0)return -1;
+    id=(unsigned)found_id;
+    values[0]=observed&&id<ALTSET_COUNT?observed->value[id]:"";
+    if(!observed||read_profile(path,original,&n)||
+       profile_candidate(original,n,observed,&id,values,1,
                          1,candidate,&next)||next!=n||memcmp(candidate,original,n))return -1;
     return 0;
 }
@@ -114,7 +121,7 @@ int mibr_v3_profile_set(const struct alt111_settings_paths *paths,
     struct alt111_settings candidate,after;
     char original[PROFILE_CAP+1],next[PROFILE_CAP+1],readback[PROFILE_CAP+1];
     char staged[FILEPATH_CAP],bakstage[FILEPATH_CAP],backup[FILEPATH_CAP],err[256]={0};
-    const char *values[1];unsigned ids[1];size_t oldn=0,newn=0,n=0;
+    const char *values[3];unsigned ids[3];size_t oldn=0,newn=0,n=0,count=1,i;
     int rw=0,renamed=0,rc=-1,ro=0,materialized=0;
     if(!paths||!profile_path||profile_path[0]!='/'||!observed||id>=ALTSET_COUNT||
        !value||!guard||!guard->enter_rw||!guard->restore_verified_ro)
@@ -125,21 +132,36 @@ int mibr_v3_profile_set(const struct alt111_settings_paths *paths,
         return fail(error,error_cap,"INVALID_VALUE");
     if(read_profile(profile_path,original,&oldn))
         return fail(error,error_cap,"STORAGE_UNAVAILABLE");
-    if(profile_candidate(original,oldn,observed,id,value,0,next,&newn))
+    ids[0]=id;values[0]=value;
+    /* The menu offers two approved FPS profiles. Save each as one profile
+     * transaction so the keyframe cadence can never be left half-updated. */
+    if(!strcmp(alt111_setting(id)->key,"maxFPS")&&
+       (!strcmp(value,"30")||!strcmp(value,"60"))){
+        int mode=alt111_setting_find("keyframe.mode");
+        int interval=alt111_setting_find("keyframe.interval_frames");
+        if(mode<0||interval<0)
+            return fail(error,error_cap,"INVALID_VALUE");
+        ids[1]=(unsigned)mode;values[1]="source_frames";
+        ids[2]=(unsigned)interval;values[2]=!strcmp(value,"30")?"20":"180";
+        count=3;
+    }
+    if(profile_candidate(original,oldn,observed,ids,values,count,0,next,&newn))
         return fail(error,error_cap,"DEPENDENCY_CONFLICT");
     candidate=*observed;
-    if(alt111_settings_set(&candidate,id,value,ALT111_TEMP)||
-       alt111_settings_validate(&candidate,err,sizeof(err)))
+    for(i=0;i<count;i++)if(alt111_settings_set(&candidate,ids[i],values[i],ALT111_TEMP))
+        return fail(error,error_cap,"DEPENDENCY_CONFLICT");
+    if(alt111_settings_validate(&candidate,err,sizeof(err)))
         return fail(error,error_cap,"DEPENDENCY_CONFLICT");
     /* r13: decide "no flash" on the profile bytes, not on the resolved TEMP
      * value. After an outside TEMP rewrite both may differ, and skipping the
      * write would lose the user's choice at the next boot replay. */
     if(newn==oldn&&!memcmp(next,original,oldn)){
         if(!strcmp(observed->value[id],value))return 0; /* no flash, no change */
-        ids[0]=id;values[0]=value;
-        if(!alt111_settings_mutate(paths,ALT111_TEMP,ids,values,1,
-                                  observed->revision,&after,err,sizeof(err))&&
-           !strcmp(after.value[id],value))return 1;
+        if(!alt111_settings_mutate(paths,ALT111_TEMP,ids,values,count,
+                                  observed->revision,&after,err,sizeof(err))){
+            for(i=0;i<count;i++)if(strcmp(after.value[ids[i]],values[i]))break;
+            if(i==count)return 1;
+        }
         return 2;
     }
     if(snprintf(staged,sizeof(staged),"%s.stage.%ld",profile_path,(long)getpid())>=
@@ -170,6 +192,9 @@ int mibr_v3_profile_set(const struct alt111_settings_paths *paths,
        n!=newn||memcmp(readback,next,n))goto done;
     rc=2;
 done:
+    /* Clean up while still RW: a stage left on flash makes the recovery gate refuse the next
+     * broker start. After the rename the stage name no longer exists (ENOENT is harmless). */
+    if(rw&&rc<0){(void)unlink(staged);(void)unlink(bakstage);}
     /* This must be attempted on EVERY path after successful enter_rw. */
     if(rw){ro=guard->restore_verified_ro(guard->context);}
     if(ro){
@@ -183,12 +208,13 @@ done:
         if(read_profile(profile_path,readback,&n)||n!=newn||memcmp(readback,next,n)){
             rc=-2;fail(error,error_cap,"UNKNOWN_COMMIT");
         } else {
-            ids[0]=id;values[0]=value;
             /* Volatile compatibility materialization is AFTER durable+RO
              * readback. Failure leaves VERIFIED profile for CPVC boot replay. */
-            if(!alt111_settings_mutate(paths,ALT111_TEMP,ids,values,1,
-                                      observed->revision,&after,err,sizeof(err))&&
-               !strcmp(after.value[id],value))materialized=1;
+            if(!alt111_settings_mutate(paths,ALT111_TEMP,ids,values,count,
+                                      observed->revision,&after,err,sizeof(err))){
+                for(i=0;i<count;i++)if(strcmp(after.value[ids[i]],values[i]))break;
+                if(i==count)materialized=1;
+            }
             rc=materialized?1:2;
         }
     }

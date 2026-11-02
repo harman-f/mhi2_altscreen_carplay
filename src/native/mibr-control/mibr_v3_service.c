@@ -7,7 +7,9 @@
 #include "mibr_v3_readonly.h"
 #include "mibr_v3_runtime_observer.h"
 #include "mibr_v3_recovery_gate.h"
+#include "mibr_gps_demo_ipc.h"
 #include <stdlib.h>
+#include <string.h>
 #if defined(__QNXNTO__) && defined(MIBR_V3_TARGET_STORAGE_QUALIFIED)
 #include "mibr_v3_qnx_mount.h"
 #endif
@@ -15,6 +17,9 @@
 #include "mibr_v3_profile_store.h"
 #include <stdio.h>
 struct host_store {const char *profile;};
+struct host_scaling_store {const char *path;};
+struct host_menu_store {const char *path;};
+struct host_switch_store {const char *path;};
 struct mock_route {struct mibr_v3_route_observation state;unsigned calls;};
 static int route_read(void *ctx,struct mibr_v3_route_observation *out){
     *out=((struct mock_route*)ctx)->state;return 0;
@@ -42,6 +47,32 @@ static int host_set(void *ctx,const struct alt111_settings_paths *paths,
     struct host_store *s=(struct host_store*)ctx;
     struct mibr_v3_mount_guard guard={host_rw,host_ro,ctx};
     return mibr_v3_profile_set(paths,s->profile,observed,id,value,revision,&guard,error,cap);
+}
+static int host_scaling_rw(void *ctx){(void)ctx;return getenv("MIBR_V3_HOST_SCALING_FAIL_RW")?-1:0;}
+static int host_scaling_ro(void *ctx){(void)ctx;return getenv("MIBR_V3_HOST_SCALING_FAIL_RO")?-1:0;}
+static int host_scaling_set(void *ctx,const char *path,
+    const struct mibr_display_scaling_state *observed,const char *id,const char *value,
+    uint64_t revision,char *error,size_t cap){
+    struct host_scaling_store *s=(struct host_scaling_store*)ctx;
+    struct mibr_display_scaling_guard guard={host_scaling_rw,host_scaling_ro,ctx};
+    if(!s||!s->path||strcmp(path,s->path))return -1;
+    return mibr_display_scaling_set(path,observed,id,value,revision,&guard,error,cap);
+}
+static int host_menu_set(void *ctx,const char *path,
+    const struct mibr_menu_language *observed,const char *value,
+    uint64_t revision,char *error,size_t cap){
+    struct host_menu_store *s=(struct host_menu_store*)ctx;
+    struct mibr_menu_language_guard guard={host_rw,host_ro,ctx};
+    if(!s||!s->path||strcmp(path,s->path))return -1;
+    return mibr_menu_language_set(path,observed,value,revision,&guard,error,cap);
+}
+static int host_switch_set(void *ctx,const struct mibr_switch_def *def,const char *path,
+    const struct mibr_switch *observed,const char *value,
+    uint64_t revision,char *error,size_t cap){
+    struct host_switch_store *s=(struct host_switch_store*)ctx;
+    struct mibr_switch_guard guard={host_rw,host_ro,ctx};
+    if(!s||!s->path||strcmp(path,s->path))return -1;
+    return mibr_switch_set(def,path,observed,value,revision,&guard,error,cap);
 }
 #endif
 #include <arpa/inet.h>
@@ -279,11 +310,12 @@ static int view_op(void *context,const char *op,const char *key,const char *valu
     int fds[2],status=0,rc=-1,w;pid_t pid;size_t n=0;long long t0;
     const char *script,*shell="/bin/ksh";
     (void)context;
-    if(!out||cap<16||!op||(strcmp(op,"get")&&strcmp(op,"set")))return -1;
+    if(!out||cap<16||!op||(strcmp(op,"get")&&strcmp(op,"set")&&strcmp(op,"menu")))return -1;
     if(!strcmp(op,"set")&&(!key||!value))return -1;
-    script="/mnt/app/root/altscreen-u2/scripts/mibr-view.ksh";
+    script=!strcmp(op,"menu")?"/mnt/app/root/altscreen-u2/scripts/mibr-menu.ksh":"/mnt/app/root/altscreen-u2/scripts/mibr-view.ksh";
 #ifdef ALT111_SETTINGS_TEST
-    if(getenv("MIBR_VIEW_SCRIPT"))script=getenv("MIBR_VIEW_SCRIPT");
+    if(strcmp(op,"menu")&&getenv("MIBR_VIEW_SCRIPT"))script=getenv("MIBR_VIEW_SCRIPT");
+    if(!strcmp(op,"menu")&&getenv("MIBR_MENU_SCRIPT"))script=getenv("MIBR_MENU_SCRIPT");
     if(getenv("MIBR_VIEW_SHELL"))shell=getenv("MIBR_VIEW_SHELL");
 #endif
     out[0]=0;
@@ -295,6 +327,7 @@ static int view_op(void *context,const char *op,const char *key,const char *valu
         if(dup2(fds[1],1)<0)_exit(126);
         (void)close(fds[1]);
         if(!strcmp(op,"set"))(void)execl(shell,"ksh",script,"set",key,value,(char *)NULL);
+        else if(!strcmp(op,"menu"))(void)execl(shell,"ksh",script,"load",(char *)NULL);
         else (void)execl(shell,"ksh",script,"get",(char *)NULL);
         _exit(127);
     }
@@ -330,7 +363,7 @@ static void audit(int role,const char *in,const char *out,unsigned long t0){
     int mutating=0;
     if(op){op=strchr(op+1,' ');
         if(op){op++;
-            mutating=!strncmp(op,"SET",3)||!strncmp(op,"ACTION",6)||!strncmp(op,"REQUEST_STATUS",14)||!strncmp(op,"ENGINE_SET",10)||!strncmp(op,"VIEW_SET",8);}}
+            mutating=!strncmp(op,"SET",3)||!strncmp(op,"ACTION",6)||!strncmp(op,"REQUEST_STATUS",14)||!strncmp(op,"ENGINE_SET",10)||!strncmp(op,"VIEW_SET",8)||!strncmp(op,"MENU_LOAD",9);}}
     if(!mutating&&!strstr(out," ERR "))return;
     for(i=0;i<sizeof(req)-1&&in[i]&&in[i]!='\n';i++){req[i]=in[i];}
     req[i]=0;
@@ -373,7 +406,12 @@ int main(int argc,char **argv){
     struct mock_route mock={0};
 #endif
 #if defined(__QNXNTO__) && defined(MIBR_V3_TARGET_STORAGE_QUALIFIED)
-    struct mibr_v3_qnx_store target_store;
+    struct mibr_v3_qnx_store target_store={0};
+#endif
+#ifdef ALT111_SETTINGS_TEST
+    struct host_scaling_store scaling_store;
+    struct host_menu_store menu_store;
+    struct host_switch_store switch_stores[MIBR_SWITCH_COUNT];
 #endif
     if(argc<5||argc>8||strcmp(argv[1],"--port")||strcmp(argv[3],"--secret-file"))return 2;
     if(argc>=7&&!strcmp(argv[5],"--input-secret-file")){
@@ -408,6 +446,84 @@ int main(int argc,char **argv){
     reader=(struct mibr_v3_reader*)calloc(1,sizeof(*reader));
     if(!reader){memset(secret,0,sizeof(secret));return 3;}
     if(mibr_v3_open(reader,&paths)){free(reader);memset(secret,0,sizeof(secret));return 4;}
+    {
+        const char *scaling_path=NULL;char scaling_error[80]={0};
+#ifdef ALT111_SETTINGS_TEST
+        scaling_path=getenv("MIBR_V3_HOST_SCALING_PATH");
+        if(!scaling_path||!*scaling_path)scaling_path="/tmp/mibr-display-scaling-readonly.conf";
+#else
+        scaling_path="/mnt/app/root/altscreen-u2/config/display-scaling.conf";
+#endif
+        if(strlen(scaling_path)<sizeof(reader->scaling_path)){
+            strcpy(reader->scaling_path,scaling_path);
+            if(!mibr_display_scaling_load(scaling_path,&reader->scaling,scaling_error,sizeof(scaling_error)))
+                reader->scaling_ready=1;
+            else fprintf(stderr,"MIBR scaling disabled: %s\n",scaling_error);
+        }
+#ifdef ALT111_SETTINGS_TEST
+        {const char *status=getenv("MIBR_V3_HOST_SCALING_STATUS_PATH");
+         if(status&&strlen(status)<sizeof(reader->scaling_status_path))strcpy(reader->scaling_status_path,status);}
+#else
+        strcpy(reader->scaling_status_path,"/tmp/mibr-display-scaling.status");
+#endif
+#ifdef ALT111_SETTINGS_TEST
+        if(getenv("MIBR_V3_HOST_SCALING_PATH")){
+            scaling_store.path=reader->scaling_path;
+            reader->scaling_set=host_scaling_set;reader->scaling_context=&scaling_store;
+        }
+#endif
+    }
+    {
+        char err[80]={0};const char *path;
+#ifdef ALT111_SETTINGS_TEST
+        path=getenv("MIBR_V3_HOST_MENU_LANGUAGE_PATH");
+        if(!path||!*path)path="/tmp/mibr-menu-language-readonly.conf";
+#else
+        path="/mnt/app/root/altscreen-u2/config/mibr-menu-language.conf";
+#endif
+        if(strlen(path)<sizeof(reader->menu_language_path)){
+            strcpy(reader->menu_language_path,path);
+            if(!mibr_menu_language_load(path,&reader->menu_language,err,sizeof(err)))
+                reader->menu_language_ready=1;
+            else fprintf(stderr,"MIBR menu language disabled: %s\n",err);
+        }
+#ifdef ALT111_SETTINGS_TEST
+        if(getenv("MIBR_V3_HOST_MENU_LANGUAGE_PATH")&&reader->menu_language_ready){
+            menu_store.path=reader->menu_language_path;
+            reader->menu_language_set=host_menu_set;
+            reader->menu_language_context=&menu_store;
+        }
+#endif
+    }
+    {
+        unsigned n;
+        for(n=0;n<MIBR_SWITCH_COUNT;n++){
+            const struct mibr_switch_def *def=&mibr_switch_defs[n];
+            struct mibr_v3_switch_slot *slot=&reader->switches[n];
+            char err[80]={0};const char *path;
+#ifdef ALT111_SETTINGS_TEST
+            path=getenv(def->host_env);
+            if(!path||!*path)path=def->host_readonly;
+#else
+            path=def->path;
+#endif
+            if(strlen(path)<sizeof(slot->path)){
+                strcpy(slot->path,path);
+                if(!mibr_switch_load(def,path,&slot->state,err,sizeof(err)))slot->ready=1;
+                else fprintf(stderr,"MIBR switch %s disabled: %s\n",def->capability,err);
+            }
+#ifdef ALT111_SETTINGS_TEST
+            if(getenv(def->host_env)&&slot->ready){
+                switch_stores[n].path=slot->path;
+                slot->set=host_switch_set;
+                slot->context=&switch_stores[n];
+            }
+#endif
+        }
+    }
+    /* Existing authenticated loopback broker -> existing original-DIO owner.
+     * No GPS output from this service. No active claim without owner reply. */
+    reader->gps_demo_op=mibr_gps_demo_ipc;reader->gps_demo_context=NULL;
     reader->presentation_request=request_show;
     reader->presentation_context=(void *)paths.temp;
     reader->live_apply=mibr_v3_live_apply;reader->live_revert=mibr_v3_live_revert;
@@ -451,12 +567,41 @@ int main(int argc,char **argv){
         }
         reader->durable_set=mibr_v3_qnx_set;reader->storage_context=&target_store;
     }
+    /* The two-key display-scaling subdomain shares the native service and
+     * verified /mnt/app mount guard; it is not stored in the Classic 48-key registry. */
+    if(reader->scaling_ready){
+        if(mibr_v3_qnx_scaling_preflight(&target_store,reader->scaling_path)){
+            reader->scaling_ready=0;
+            fprintf(stderr,"MIBR scaling writer disabled: target preflight failed\n");
+        }else{
+            reader->scaling_set=mibr_v3_qnx_scaling_set;reader->scaling_context=&target_store;
+        }
+    }
+    if(qualify_durable&&reader->menu_language_ready){
+        if(!mibr_v3_qnx_menu_language_preflight(&target_store,reader->menu_language_path)){
+            reader->menu_language_set=mibr_v3_qnx_menu_language_set;
+            reader->menu_language_context=&target_store;
+        }else fprintf(stderr,"MIBR menu language writer disabled: target preflight failed\n");
+    }
+    if(qualify_durable){
+        unsigned n;
+        for(n=0;n<MIBR_SWITCH_COUNT;n++){
+            struct mibr_v3_switch_slot *slot=&reader->switches[n];
+            if(!slot->ready)continue;
+            if(!mibr_v3_qnx_switch_preflight(&target_store,&mibr_switch_defs[n],slot->path)){
+                slot->set=mibr_v3_qnx_switch_set;
+                slot->context=&target_store;
+            }else fprintf(stderr,"MIBR switch %s writer disabled: target preflight failed\n",mibr_switch_defs[n].capability);
+        }
+    }
 #endif
     signal(SIGPIPE,SIG_IGN);signal(SIGTERM,stop_service);signal(SIGINT,stop_service);
     server=socket(AF_INET,SOCK_STREAM,0);if(server<0)goto fail;
     (void)setsockopt(server,SOL_SOCKET,SO_REUSEADDR,&one,sizeof(one));
     memset(&local,0,sizeof(local));local.sin_family=AF_INET;
     local.sin_addr.s_addr=htonl(INADDR_LOOPBACK);local.sin_port=htons((unsigned short)port);
+    /* Child shells (engine/view ops, mount) must not inherit the listening socket. */
+    (void)fcntl(server,F_SETFD,FD_CLOEXEC);
     if(bind(server,(struct sockaddr*)&local,sizeof(local))||listen(server,4))goto fail;
     tv.tv_sec=1;tv.tv_usec=0;
     (void)setsockopt(server,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv));
@@ -471,9 +616,13 @@ int main(int argc,char **argv){
             fd_set rs;struct timeval wait;int ready;
             FD_ZERO(&rs);FD_SET(server,&rs);wait.tv_sec=1;wait.tv_usec=0;
             ready=select(server+1,&rs,NULL,NULL,&wait);
+#if defined(__QNXNTO__) && defined(MIBR_V3_TARGET_STORAGE_QUALIFIED)
+            {static unsigned heal_tick;if(++heal_tick%10==0)(void)mibr_v3_qnx_heal(&target_store);}
+#endif
             if(ready<=0){(void)mibr_v3_flush_due(reader,0);continue;}
         }
         peerlen=sizeof(peer);fd=accept(server,(struct sockaddr*)&peer,&peerlen);
+        if(fd>=0)(void)fcntl(fd,F_SETFD,FD_CLOEXEC);
         if(fd<0){
             if(errno==EINTR||errno==EAGAIN||errno==EWOULDBLOCK){(void)mibr_v3_flush_due(reader,0);continue;}
             break;

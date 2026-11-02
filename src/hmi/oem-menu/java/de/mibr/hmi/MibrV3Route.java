@@ -42,7 +42,7 @@ final class MibrV3Route {
     int state(){return state;}
     /** STOCK110, DIRECT111 or UNKNOWN as last freshly observed; never inferred from a receipt. */
     String visible(){return visible;}
-    String note(){return note;}
+    String note(){return MibrI18n.localize(note);}
     boolean canSwitch(){return attached&&state==READY;}
     private String id(){return prefix+"_"+(++sequence);}
     private void set(int s,String text){state=s;note=text;if(attached)changed.run();}

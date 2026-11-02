@@ -2,10 +2,10 @@
 static const struct alt111_setting_descriptor registry[] = {
     {"preset.id", "mibr-carplay111-compat-profile", "", "enum", "classic_single_view|mibr_dual_view|mibr_legacy|mibr", "classic_single_view", "mibr_dual_view", "mibr_legacy", "reconnect", "advanced", 0, 0, 0, 0},
     {"carplay.enabled", "mibr-carplay111-enabled", "", "integer", "", "1", "1", "1", "session", "normal", 0, 1, 1, 0},
-    {"maxFPS", "mibr-carplay111-fps", "", "enum", "20|25|30|40", "40", "40", "30", "reconnect", "advanced", 0, 0, 2, 0},
+    {"maxFPS", "mibr-carplay111-fps", "", "enum", "20|25|30|40|60", "40", "40", "30", "unit_reboot", "advanced", 0, 0, 2, 0},
     {"sourceVersion", "mibr-carplay111-sourceversion", "", "version", "", "950.7.1", "950.7.1", "1005.8.1", "reconnect", "advanced", 0, 0, 3, 0},
-    {"keyframe.mode", "mibr-carplay111-keyframes.conf", "mode", "enum", "source_frames|source_time|event_only|off", "source_frames", "source_frames", "source_frames", "live", "advanced", 0, 0, 4, 0},
-    {"keyframe.interval_frames", "mibr-carplay111-keyframes.conf", "interval_frames", "integer", "", "20", "20", "20", "live", "advanced", 1, 1000, 4, 0},
+    {"keyframe.mode", "mibr-carplay111-keyframes.conf", "mode", "enum", "source_frames|source_time|event_only|off", "source_frames", "source_frames", "source_frames", "unit_reboot", "advanced", 0, 0, 4, 0},
+    {"keyframe.interval_frames", "mibr-carplay111-keyframes.conf", "interval_frames", "integer", "", "20", "20", "20", "unit_reboot", "advanced", 1, 1000, 4, 0},
     {"keyframe.interval_ms", "mibr-carplay111-keyframes.conf", "interval_ms", "integer", "", "2000", "2000", "2000", "live", "advanced", 100, 60000, 4, 0},
     {"keyframe.showui", "mibr-carplay111-keyframes.conf", "showui", "integer", "", "1", "1", "1", "live", "advanced", 0, 1, 4, 0},
     {"keyframe.gap_recovery", "mibr-carplay111-keyframes.conf", "gap_recovery", "integer", "", "1", "1", "1", "live", "developer", 0, 1, 4, 0},

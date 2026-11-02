@@ -38,6 +38,9 @@ static pthread_mutex_t fd_lifecycle_lock=PTHREAD_MUTEX_INITIALIZER;
 static unsigned char tracked[GATE_FD_CAP];
 static uint64_t inflight,dropped,tracked_count,request_token;
 static unsigned suppression,unsupported;
+/* The OEM side asked for a control operation while the custom writer owned the queue and was refused: this round is
+ * lost, the next one may try again. A broken fd tracking (unsupported) stays until the process ends. */
+static unsigned control_refused,control_command,control_logged;
 
 static void create_resolving_key(void){resolving_key_valid=pthread_key_create(&resolving_key,NULL)==0;}
 static void resolve_symbols(void)
@@ -84,6 +87,14 @@ static uint64_t now_ms(void)
 {
     struct timespec ts;if(clock_gettime(CLOCK_MONOTONIC,&ts))return 0;
     return (uint64_t)ts.tv_sec*1000u+(uint64_t)ts.tv_nsec/1000000u;
+}
+static void gate_note_command(unsigned command)
+{
+    char text[48];
+    int fd=open("/tmp/mibr-alt111-gate-refused.log",O_WRONLY|O_CREAT|O_APPEND,0644);
+    if(fd<0)return;
+    (void)write(fd,text,(size_t)snprintf(text,sizeof(text),"%llu devctl=0x%08x\n",(unsigned long long)now_ms(),command));
+    (void)close(fd);
 }
 static void track_fd_locked(int fd,unsigned value)
 {
@@ -150,11 +161,17 @@ static void *gate_worker(void *unused)
         unsigned exists;uint64_t token=read_request(&exists);
         pthread_mutex_lock(&gate_lock);
         suppression=exists;request_token=token;
+        if(!exists)control_refused=0u;
         snapshot.token=token;snapshot.process=(uint64_t)getpid();snapshot.tracked=tracked_count;
         snapshot.inflight=inflight;snapshot.dropped=dropped;snapshot.heartbeat=now_ms();
-        snapshot.state=!suppression ? 0u : unsupported ? 3u :
+        snapshot.state=!suppression ? 0u : (unsupported||control_refused) ? 3u :
             inflight || !tracked_count || !request_token ? 1u : 2u;
-        pthread_mutex_unlock(&gate_lock);
+        {
+            unsigned logged=control_logged,command=control_command;
+            control_logged=command;
+            pthread_mutex_unlock(&gate_lock);
+            if(command!=logged)gate_note_command(command);
+        }
         /* The downstream frozen gate may call our write hook while updating
          * its own counters. No real libc/interposer I/O runs under gate_lock. */
         publish_status(&snapshot);
@@ -264,7 +281,7 @@ int devctl(int fd,int command,void *data,size_t size,int *info)
         /* Queries are read-only. Never let native flush/start/control mutate
          * the queue while the custom writer owns it. */
         if(command!=0x4004050c && command!=0x4004050d && command!=0x40040510){
-            pthread_mutex_lock(&gate_lock);unsupported=1u;pthread_mutex_unlock(&gate_lock);
+            pthread_mutex_lock(&gate_lock);control_refused=1u;control_command=(unsigned)command;pthread_mutex_unlock(&gate_lock);
             return EBUSY;
         }
     }

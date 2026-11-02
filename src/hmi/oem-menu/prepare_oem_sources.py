@@ -28,6 +28,12 @@ def patch_activator(text):
     )
     text = replace_once(
         text,
+        "import org.osgi.framework.BundleContext;",
+        "import org.osgi.framework.BundleContext;\nimport org.osgi.framework.InvalidSyntaxException;",
+        "ACTIVATOR_INVALID_SYNTAX_IMPORT",
+    )
+    text = replace_once(
+        text,
         "public void stop(BundleContext bundleContext) {\n    }",
         "public void stop(BundleContext bundleContext) {\n"
         "        de.mibr.hmi.MibrHomeCio.deactivate();\n"
@@ -54,6 +60,19 @@ def patch_activator(text):
         "this.factory.setScriptWidgetService(this.scriptWidgetCioService);\n"
         "        de.mibr.hmi.MibrHomeCio.activate(this.cioVisualizationService);",
         "ACTIVATOR_ACTIVATE",
+    )
+    text = replace_once(
+        text,
+        "this.bundleContext.addServiceListener(this, string);\n"
+        "        ServiceReference[] serviceReferenceArray = this.bundleContext.getServiceReferences(null, string);",
+        "ServiceReference[] serviceReferenceArray;\n"
+        "        try {\n"
+        "            this.bundleContext.addServiceListener(this, string);\n"
+        "            serviceReferenceArray = this.bundleContext.getServiceReferences(null, string);\n"
+        "        } catch (InvalidSyntaxException invalidSyntaxException) {\n"
+        "            throw new IllegalArgumentException(\"Invalid CIO service filter: \" + invalidSyntaxException.toString());\n"
+        "        }",
+        "ACTIVATOR_SERVICE_FILTER_CHECKED_EXCEPTION",
     )
     return replace_once(
         text,

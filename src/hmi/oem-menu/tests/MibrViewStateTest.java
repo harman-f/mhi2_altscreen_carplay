@@ -8,7 +8,7 @@ public final class MibrViewStateTest {
         check(!MibrViewState.known() && MibrViewState.value(0) == null, "nothing known before the first answer");
         check("0".equals(MibrViewState.options(0)[0]) && MibrViewState.options(0).length == 2, "follow: off/on");
         check(MibrViewState.options(1).length == 5, "five views while the sport option is unknown");
-        // Protocol order: follow, sport, m0, m1, m4, resync view, current position.
+        // protocol order: follow, sport, m0, m1, m4, pos
         MibrViewState.confirmed(new String[] {"1", "1", "1", "0", "2", "4", "3"});
         check(MibrViewState.known() && "1".equals(MibrViewState.value(0)) && "3".equals(MibrViewState.value(1))
               && "4".equals(MibrViewState.value(2)) && "1".equals(MibrViewState.value(3)) && "0".equals(MibrViewState.value(4))

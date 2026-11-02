@@ -7,6 +7,8 @@
 >
 > Use is at your own risk and subject to the applicable licenses; this notice does not add restrictions to the [GPL-3.0-or-later](LICENSE). The project is **independent of Volkswagen AG and other named manufacturers**. Its license does not grant rights to OEM firmware, binaries, trademarks or third-party components. See [rights and attribution](THIRD_PARTY_NOTICES.md), [security and vehicle-test guidance](SECURITY.md), [compatibility](docs/testing/COMPATIBILITY_MATRIX.md) and the [current developer release scope](release/CURRENT.md).
 
+[Menu, controller and Route Guidance source build](docs/build/MU1440_MENU_RGI_SOURCE.md) · [Menu editor](src/hmi/oem-menu/menu-editor/mibr-menu-editor.html)
+
 **Real CarPlay secondary navigation in the original Volkswagen Group MHI2 Virtual Cockpit — direct video, guarded native-navigation fallback and an OEM-style control architecture.**
 
 The project has advanced beyond the first moving-map proof of concept. On the exact Škoda MU1440/AID10 reference unit, **Apple Maps, Google Maps and Waze** have appeared as moving auxiliary video. Subsequent development sessions exercised long-running protected direct/parity transport, navigation composition, SafeArea/ViewArea, an OEM-native menu, zoom and an experimental stock/CarPlay route controller. This is a working vehicle-reference engineering project, **not** a universal product or a claim that all the newer features are already in the downloadable public ZIP.

@@ -27,7 +27,7 @@ public final class MibrV3BindingTest {
           .append(";connected=UNKNOWN;session=NONE;session_generation=UNKNOWN;pending=UNKNOWN")
           .append(";phase=NATIVE_PROFILE_GUARDED");
         int j=0;
-        // Native scope=ui wire order (Issue #103), written out literally: the r8
+        // Native scope=ui wire order, written out literally: the r8
         // HMI hides navigation.url but the native service still sends 11 rows.
         String[] section={"carplay.enabled","viewarea.selected","navigation.surface",
             "navigation.ETA","navigation.speedLimit","navigation.compass","navigation.maneuver",
@@ -74,12 +74,18 @@ public final class MibrV3BindingTest {
             else if("SNAPSHOT".equals(verb)){reads++;response=snapshot(rid,revision,fps);}
             else if("SET".equals(verb)){
                 sets++;check(writable,"SET without durable capability");
-                check("navigation.maneuver".equals(values[0])&&"top".equals(values[1]),"gesture payload");
+                if("navigation.maneuver".equals(values[0])){
+                    check("top".equals(values[1]),"maneuver gesture payload");maneuver="top";
+                }else{
+                    check("maxFPS".equals(values[0])&&"60".equals(values[1]),"FPS unit-reboot payload");fps=values[1];
+                }
                 check(revision.equals(values[2])&&"AUTO".equals(values[3])&&rid.equals(values[4]),"CAS/request id");
-                maneuver="top";revision="24";
+                revision=sets==1?"24":"25";
                 if(dropSet){cb.onReply(null,"TRANSPORT_OR_PROTOCOL_UNCONFIRMED");return true;}
+                String apply="maxFPS".equals(values[0])?"UNIT_REBOOT":"PRESENTATION";
+                String stored="maxFPS".equals(values[0])?"PENDING_PERSIST":"VERIFIED";
                 response=reply(rid,new String[]{"stored","apply","active","activation","revision","materialized"},
-                    new String[]{"VERIFIED","PENDING","UNKNOWN","PRESENTATION",revision,"1"});
+                    new String[]{stored,"PENDING","UNKNOWN",apply,revision,"1"});
             }else if("REQUEST_STATUS".equals(verb)){
                 requests++;response="MIBR/3 "+rid+" ERR UNKNOWN_COMMIT\n";
             } else if ("ENGINE_GET".equals(verb) || "ENGINE_SET".equals(verb)) response = MibrV3BindingTest.reply(rid, new String[]{"engine", "announced", "pending"}, new String[]{"gas", "gas", "0"}); else if ("VIEW_GET".equals(verb) || "VIEW_SET".equals(verb)) response = MibrV3BindingTest.reply(rid, new String[]{"follow", "sport", "m0", "m1", "m4", "rs", "pos"}, new String[]{"0", "1", "1", "0", "2", "0", "0"}); else throw new AssertionError(verb);
@@ -115,14 +121,14 @@ public final class MibrV3BindingTest {
         check(s.keys.length==11 && "maxFPS".equals(s.keys[9])&&"20".equals(s.values[9]),"atomic native snapshot");
         check("UNKNOWN".equals(MibrV3Protocol.parse(snapshot("s","23","20"),"s").get("row.9.active")),"no false active");
         MibrV3Protocol.Frame c=MibrV3Protocol.parse(reply("set",new String[]{"stored","apply","active","activation","revision","materialized"},
-            new String[]{"VERIFIED","PENDING","UNKNOWN","RECONNECT","24","1"}),"set");
+            new String[]{"VERIFIED","PENDING","UNKNOWN","UNIT_REBOOT","24","1"}),"set");
         check("24".equals(MibrV3Protocol.commit(c,"maxFPS","25").revision),"verified receipt");
         rejects("false-stored",new Runnable(){public void run(){
             MibrV3Protocol.commit(MibrV3Protocol.parse(reply("set",new String[]{"stored","apply","active","activation","revision","materialized"},
-                new String[]{"UNCONFIRMED","PENDING","UNKNOWN","RECONNECT","24","1"}),"set"),"maxFPS","25");}});
+                new String[]{"UNCONFIRMED","PENDING","UNKNOWN","UNIT_REBOOT","24","1"}),"set"),"maxFPS","25");}});
     }
     static void lifecycle(){
-        // r10: only the navigation presentation keys are saved (+ applied live).
+        // Owner-approved settings include reboot-applied maxFPS.
         final int M=idx("navigation.maneuver"),F=idx("maxFPS");
         maneuver="left";
         MibrPopupEditorModel model=new MibrPopupEditorModel();model.setAvailable(true);
@@ -136,7 +142,8 @@ public final class MibrV3BindingTest {
         model.toggle(1);s.commit(1);
         model.toggle(0);s.commit(0);
         check(model.open(F)&&model.choose(1));s.commit(F);
-        check(fake.sets==1,"runtime actions and maxFPS must not be SET in r10");
+        check(fake.sets==2&&"60".equals(fake.fps)&&"60".equals(model.current(F))&&model.draft(F)==null,
+              "maxFPS is saved and read back; apply waits for Unit reboot");
         s.detach();
         maneuver="left";
         Fake readOnly=new Fake(false);MibrPopupEditorModel local=new MibrPopupEditorModel();
@@ -238,6 +245,110 @@ public final class MibrV3BindingTest {
         check(model.open(V),"view dropdown open");model.cancel();
         s.detach();
     }
+    /**
+     * Physical Scaling increases background reads, but a slow ENGINE_GET must
+     * never invalidate core SNAPSHOT/SET or make navigation.ETA/Map unwritable.
+     * Hold one admitted request beyond the old 3-second per-request spin limit.
+     * The next view GET and a real navigation SET are queued, not retried in
+     * parallel; a failing background reply is local to that feature.
+     */
+    static class SlowBackground extends Fake {
+        MibrV3Client.Listener waiting;
+        String waitingId;
+        String waitingVerb;
+        int collided;
+        final boolean holdView;
+        SlowBackground(){this(false);}
+        SlowBackground(boolean holdView){super(true);this.holdView=holdView;}
+        public synchronized boolean send(String rid,String verb,String[] names,String[] values,Listener cb){
+            if(waiting!=null){collided++;return false;}
+            if("ENGINE_GET".equals(verb)||holdView&&"VIEW_GET".equals(verb)){
+                waiting=cb;waitingId=rid;waitingVerb=verb;return true;
+            }
+            return super.send(rid,verb,names,values,cb);
+        }
+        void finishWithError(){
+            Listener callback=waiting;
+            if(callback==null)throw new AssertionError("NO_DELAYED_BACKGROUND_GET");
+            waiting=null;waitingId=null;waitingVerb=null;
+            callback.onReply(null,"TRANSPORT_OR_PROTOCOL_UNCONFIRMED");
+        }
+    }
+    static void slowBackgroundMustNotDisableMenu(){
+        final int M=idx("navigation.maneuver");
+        maneuver="left";
+        MibrPopupEditorModel model=new MibrPopupEditorModel();model.setAvailable(true);
+        SlowBackground fake=new SlowBackground();
+        MibrV3Session controller=session(fake,model);
+        controller.open();
+        check(controller.canWrite()&&fake.waiting!=null,"core snapshot ready before auxiliary GET");
+        check(model.open(M)&&model.choose(3),"navigation choice accepted while engine reply is delayed");
+        controller.commit(M);
+        check(fake.sets==0&&fake.collided==0,"SET queued, no competing socket send");
+        try{Thread.sleep(3400L);}catch(InterruptedException interrupted){
+            throw new AssertionError("SLOW_BACKGROUND_TEST_INTERRUPTED");
+        }
+        check(fake.collided==0,"background contention must never start parallel requests");
+        fake.finishWithError();
+        check(fake.sets==1 && fake.reads==2 && controller.canWrite(),
+              "failed background GET does not revoke durable core settings");
+        check(model.draft(M)==null&&"top".equals(model.current(M)),
+              "queued navigation SET completed with matching postcommit snapshot");
+        controller.detach();
+    }
+    static void delayedViewAndDetachEpoch(){
+        final int M=idx("navigation.maneuver");maneuver="left";
+        MibrPopupEditorModel model=new MibrPopupEditorModel();model.setAvailable(true);
+        SlowBackground fake=new SlowBackground(true);MibrV3Session s=session(fake,model);s.open();
+        // Drain the engine request first, then hold the subsequent VIEW_GET.
+        fake.finishWithError();
+        check("VIEW_GET".equals(fake.waitingVerb)&&s.canWrite(),"view GET admitted after engine completion");
+        check(model.open(M)&&model.choose(3),"edit while view GET is pending");s.commit(M);
+        check(fake.sets==0,"view GET serializes the queued core SET");
+        s.detach();fake.finishWithError();
+        check(fake.sets==0&&!s.canWrite(),"detached epoch drops late VIEW_GET completion and queued SET");
+    }
+    static class RefusingEngine extends Fake {
+        int refusals;
+        RefusingEngine(){super(true);}
+        public synchronized boolean send(String rid,String verb,String[] names,String[] values,Listener cb){
+            if("ENGINE_GET".equals(verb)){refusals++;return false;}
+            return super.send(rid,verb,names,values,cb);
+        }
+    }
+    static void refusalExhaustionIsLocal(){
+        RefusingEngine fake=new RefusingEngine();MibrPopupEditorModel model=new MibrPopupEditorModel();
+        model.setAvailable(true);MibrV3Session s=session(fake,model);s.open();
+        long end=System.currentTimeMillis()+12000L;
+        while(fake.refusals<40&&System.currentTimeMillis()<end){try{Thread.sleep(50L);}catch(InterruptedException e){throw new AssertionError(e);}}
+        check(fake.refusals==40,"bounded local start refusal retries");
+        check(s.canWrite(),"auxiliary refusal exhaustion does not disable core menu");
+        s.detach();
+    }
+    static class FailedScale extends Fake {
+        int failedGets;
+        FailedScale(){super(true);}
+        public synchronized boolean send(String rid,String verb,String[] names,String[] values,Listener cb){
+            if("CAPABILITIES".equals(verb)){
+                String response=reply(rid,new String[]{"snapshot","durable_set","test_override",
+                    "presentation_refresh","reconnect","session_control","phase","scaling"},
+                    new String[]{"1","1","0","0","0","0","NATIVE_PROFILE_GUARDED","1"});
+                cb.onReply(MibrV3Protocol.parse(response,rid),null);return true;
+            }
+            if("SCALE_GET".equals(verb)){failedGets++;cb.onReply(null,"SCALE_TIMEOUT");return true;}
+            return super.send(rid,verb,names,values,cb);
+        }
+    }
+    static void failedScaleReadIsLocal(){
+        final int M=idx("navigation.maneuver");maneuver="left";
+        MibrPopupEditorModel model=new MibrPopupEditorModel();model.setAvailable(true);
+        FailedScale fake=new FailedScale();MibrV3Session s=session(fake,model);s.scaleRefresh();s.open();
+        check(fake.failedGets==4,"each scale row failure is consumed without wedging FIFO");
+        check(s.canWrite(),"failed SCALE_GET leaves core settings writable");
+        check(model.open(M)&&model.choose(3),"core edit remains available after scale failure");s.commit(M);
+        check(fake.sets==1&&s.canWrite(),"core SET still completes after scale GET failures");
+        s.detach();
+    }
     static void check(boolean b){check(b,"precondition");}
-    public static void main(String[] args){wire();lifecycle();queue();System.out.println("MIBR_V3_JAVA_BINDING_HOST_PASS");}
+    public static void main(String[] args){wire();lifecycle();queue();slowBackgroundMustNotDisableMenu();delayedViewAndDetachEpoch();refusalExhaustionIsLocal();failedScaleReadIsLocal();System.out.println("MIBR_V3_JAVA_BINDING_HOST_PASS");}
 }

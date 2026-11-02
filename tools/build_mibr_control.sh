@@ -10,12 +10,13 @@ MODE=${1:-host}
 CC=${CC:-cc}
 QNX_IMAGE=${MIBR_QNX_IMAGE:-mibr-qnx65-temp:4.9}
 QNX_CC=arm-unknown-nto-qnx6.5.0eabi-gcc
-INC="-I$ALT_ROOT/altscreen111-gen2/include -I$ALT_ROOT/alt111-settings/include"
+INC="-I$ALT_ROOT/altscreen111-gen2/include -I$ALT_ROOT/alt111-settings/include -I$ALT_ROOT/display-scaling"
 CORE=(
   "$ALT_ROOT/alt111-settings/settings_core.c"
   "$ALT_ROOT/alt111-settings/settings_posix.c"
   "$ALT_ROOT/altscreen111-gen2/src/alt111_policy.c"
   "$ALT_ROOT/sha256sum-compat/sha256sum_compat.c"
+  "$ALT_ROOT/display-scaling/mibr_display_scaling.c"
 )
 SERVICE=(
   "$SRC/mibr_v3_readonly.c"
@@ -28,6 +29,11 @@ SERVICE=(
   "$SRC/mibr_v3_input_bridge.c"
   "$SRC/mibr_v3_route_gateway.c"
   "$SRC/mibr_v3_owner_lifecycle.c"
+  "$SRC/mibr_app_rw_lease.c"
+  "$SRC/mibr_durable_switch.c"
+  "$SRC/mibr_menu_language.c"
+  "$SRC/mibr_gps_demo_mode.c"
+  "$SRC/mibr_gps_demo_ipc.c"
 )
 HOST_SERVICE=(
   "$SRC/mibr_v3_readonly.c"
@@ -39,6 +45,24 @@ HOST_SERVICE=(
   "$SRC/mibr_v3_input_bridge.c"
   "$SRC/mibr_v3_route_gateway.c"
   "$SRC/mibr_v3_owner_lifecycle.c"
+  "$SRC/mibr_durable_switch.c"
+  "$SRC/mibr_menu_language.c"
+  "$SRC/mibr_gps_demo_mode.c"
+  "$SRC/mibr_gps_demo_ipc.c"
+)
+HOST_HARNESS_SERVICE=(
+  "$SRC/mibr_v3_readonly.c"
+  "$SRC/mibr_v3_profile_store.c"
+  "$SRC/mibr_v3_recovery_gate.c"
+  "$SRC/mibr_v3_runtime_observer.c"
+  "$SRC/mibr_v3_key40.c"
+  "$SRC/mibr_v3_input_bridge.c"
+  "$SRC/mibr_v3_route_gateway.c"
+  "$SRC/mibr_v3_owner_lifecycle.c"
+  "$SRC/mibr_durable_switch.c"
+  "$SRC/mibr_menu_language.c"
+  "$SRC/mibr_gps_demo_mode.c"
+  "$SRC/mibr_gps_demo_ipc.c"
 )
 
 mkdir -p "$OUT"
@@ -55,6 +79,10 @@ case "$MODE" in
       "$SRC/mibr_v3_client.c" -o "$OUT/mibrctl-v3-host"
     "$CC" -O2 -g -std=gnu99 -Wall -Wextra -Werror \
       "$SRC/mibr_v3_genkey.c" -o "$OUT/mibr-v3-genkey-host"
+    "$CC" -O2 -g -std=gnu99 -Wall -Wextra -Werror \
+      -DALT111_SETTINGS_TEST -DMIBR_SHA256_LIBRARY_ONLY \
+      $INC "${HOST_HARNESS_SERVICE[@]}" "${CORE[@]}" \
+      "$SRC/mibr_v3_host_harness.c" -o "$OUT/mibr-v3-host-harness"
     echo "HOST_BUILD=PASS output=$OUT"
     ;;
   qnx)
@@ -74,7 +102,7 @@ case "$MODE" in
         R=/repo; S=$R/src/native/mibr-control; A=$R/src/native; T=/tmp/mibr-control-out
         mkdir -p "$T"
         C=arm-unknown-nto-qnx6.5.0eabi-gcc
-        I="-I$A/altscreen111-gen2/include -I$A/alt111-settings/include"
+        I="-I$A/altscreen111-gen2/include -I$A/alt111-settings/include -I$A/display-scaling"
         F="-include stddef.h -D_QNX_SOURCE -DMIBR_SHA256_LIBRARY_ONLY -DMIBR_V3_TARGET_STORAGE_QUALIFIED -O2 -std=gnu99 -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16"
         $C $F $I \
           "$S/mibr_v3_readonly.c" "$S/mibr_v3_profile_store.c" \
@@ -82,9 +110,12 @@ case "$MODE" in
           "$S/mibr_v3_qnx_mount.c" "$S/mibr_v3_service.c" \
           "$S/mibr_v3_key40.c" "$S/mibr_v3_input_bridge.c" \
           "$S/mibr_v3_route_gateway.c" "$S/mibr_v3_owner_lifecycle.c" \
+          "$S/mibr_app_rw_lease.c" "$S/mibr_durable_switch.c" "$S/mibr_menu_language.c" \
+          "$S/mibr_gps_demo_mode.c" "$S/mibr_gps_demo_ipc.c" \
           "$A/alt111-settings/settings_core.c" "$A/alt111-settings/settings_posix.c" \
           "$A/altscreen111-gen2/src/alt111_policy.c" \
           "$A/sha256sum-compat/sha256sum_compat.c" \
+          "$A/display-scaling/mibr_display_scaling.c" \
           -lsocket -lc -o "$T/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY"
         $C -include stddef.h -D_QNX_SOURCE -O2 -std=gnu99 -march=armv7-a \
           -mfloat-abi=softfp -mfpu=vfpv3-d16 "$S/mibr_v3_client.c" \
@@ -114,8 +145,9 @@ case "$MODE" in
       -DMIBR_V3_TARGET_STORAGE_QUALIFIED -O2 -std=gnu99 -march=armv7-a
       -mfloat-abi=softfp -mfpu=vfpv3-d16)
     "$QNX_CC" "${F[@]}" -I"$ALT_ROOT/altscreen111-gen2/include" \
-      -I"$ALT_ROOT/alt111-settings/include" \
-      "${SERVICE[@]}" "${CORE[@]}" -lsocket -lc \
+      -I"$ALT_ROOT/alt111-settings/include" -I"$ALT_ROOT/display-scaling" \
+      "${SERVICE[@]}" "${CORE[@]}" \
+      -lsocket -lc \
       -o "$T/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY"
     "$QNX_CC" -include stddef.h -D_QNX_SOURCE -O2 -std=gnu99 -march=armv7-a \
       -mfloat-abi=softfp -mfpu=vfpv3-d16 "$SRC/mibr_v3_client.c" \

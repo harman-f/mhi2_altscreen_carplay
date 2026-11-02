@@ -1,7 +1,7 @@
 package de.mibr.hmi;
 
 /** A cockpit-confirmation poll that briefly holds the one-request client must not lock the menu:
- *  a tap during the poll is retried and saved (owner report 2026-10-21, menu dead after Center). */
+ *  a tap during the poll is retried and saved. */
 public final class MibrV3BusyTest {
     static void check(boolean b, String m) { if (!b) throw new AssertionError(m); }
 
@@ -64,11 +64,11 @@ public final class MibrV3BusyTest {
         end = System.currentTimeMillis() + 5000;
         while (!MibrV3BindingTest.OVERRIDE.containsKey("navigation.ETA") && System.currentTimeMillis() < end) Thread.sleep(20);
         check(MibrV3BindingTest.OVERRIDE.containsKey("navigation.ETA"), "ETA saved after the poll, status=" + s.status());
-        check(fake.refused >= 1, "the busy client was hit at least once");
+        check(fake.refused == 0, "serialized queue does not call the client while busy");
         check(s.status().indexOf("beschäftigt") < 0, "menu not locked: " + s.status());
         Thread.sleep(300);
         check(s.canWrite(), "menu writable again, status=" + s.status());
         s.detach();
-        System.out.println("MIBR_V3_BUSY_RETRY_TEST_PASS refused=" + fake.refused + " polls=" + fake.showCalls);
+        System.out.println("MIBR_V3_SERIAL_QUEUE_TEST_PASS concurrent_refusals=" + fake.refused + " polls=" + fake.showCalls);
     }
 }

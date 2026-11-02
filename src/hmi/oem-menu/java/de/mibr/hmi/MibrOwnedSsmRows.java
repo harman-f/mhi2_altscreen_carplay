@@ -35,6 +35,8 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     private ListItem[] masters=new ListItem[0];
     private boolean attached=true;
     private boolean detached;
+    private boolean scalingPageVisible;
+    private boolean advancedPageVisible;
     private int epoch;
     private int lastScreen=-1;
     private int lastGroup=-2,lastPage=-1,lastSelected=-2;
@@ -42,12 +44,6 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     private String[] labels=new String[0];
 
     private static final int PLAIN=0,VALUE=1,CHECK=2;
-    private static final int DIAGNOSTICS_GROUP=group("diagnostics");
-    private static int group(String id){
-        for(int i=0;i<MibrMenuDefinition.GROUP_IDS.length;i++)
-            if(id.equals(MibrMenuDefinition.GROUP_IDS[i]))return i;
-        return -1;
-    }
     private final OutEventAdapter back=new OutEventAdapter(){
         public void outHMIEventFired(String event){if("released".equals(event))queueBack();}
     };
@@ -94,7 +90,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         Thread t=new Thread(new Runnable(){public void run(){
             while(attached){
                 try{Thread.sleep(2000L);}catch(InterruptedException e){return;}
-                if(attached && menu.screen()==MibrCarPlayMenuModel.ITEMS && menu.group()==DIAGNOSTICS_GROUP)changed();
+                if(attached && menu.onDiagnostics())changed();
             }
         }},"MibrDiagRefresh");
         t.setDaemon(true);t.start();
@@ -108,11 +104,26 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     public void committed(int index){
         // Native option completion, never focus/pressed.
         if(attached && v3!=null){
-            if(index==MibrPopupEditorModel.ENGINE){
+            if(index==MibrPopupEditorModel.EXPERT_MODE){
+                String wish=drafts.draft(index);drafts.discardDraft(index);
+                v3.expertSet(wish);
+            }else if(index==MibrPopupEditorModel.ENGINE){
                 // r47: the engine type is not a registry key: ask the broker (ENGINE_SET) and drop the local wish.
                 String wish=drafts.draft(index);drafts.discardDraft(index);
                 if(wish!=null)v3.engineSet(wish);
-            }else if(index>MibrPopupEditorModel.ENGINE&&MibrPopupEditorModel.isVirtual(index)){
+            }else if(index==MibrPopupEditorModel.MENU_LANGUAGE){
+                String wish=drafts.draft(index);drafts.discardDraft(index);
+                if(wish!=null)v3.menuLanguageSet(wish);
+            }else if(MibrPopupEditorModel.durable(index)!=null){
+                String wish=drafts.draft(index);drafts.discardDraft(index);
+                if(wish!=null)v3.durableSet(index,wish);
+            }else if(index==MibrPopupEditorModel.GPS_DEMO){
+                String wish=drafts.draft(index);drafts.discardDraft(index);
+                if(wish!=null)v3.gpsDemoSet(wish);
+            }else if(MibrPopupEditorModel.isScaling(index)){
+                String wish=drafts.draft(index);drafts.discardDraft(index);
+                if(wish!=null)v3.scaleSet(index,wish);
+            }else if(index>MibrPopupEditorModel.ENGINE&&index<MibrPopupEditorModel.SCALE_MAIN&&MibrPopupEditorModel.isVirtual(index)){
                 // r55: the view rows are broker settings of the helper script, not registry keys.
                 String wish=drafts.draft(index);drafts.discardDraft(index);
                 if(wish!=null)v3.viewSet(MibrViewState.NAMES[index-MibrPopupEditorModel.VIEW_FOLLOW],wish);
@@ -134,16 +145,33 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     }});}
     public void show(int screen,String title,String[] rows,String detail){
         if(!attached)return;
+        boolean onScalingPage=screen==MibrCarPlayMenuModel.ITEMS&&menu.scalingPageOpen();
+        boolean enteredScalingPage=onScalingPage&&!scalingPageVisible;
+        scalingPageVisible=onScalingPage;
+        if(enteredScalingPage&&v3!=null)v3.scaleRefresh();
+        boolean inAdvanced=screen==MibrCarPlayMenuModel.ITEMS && menu.pageHas(MibrPopupEditorModel.GPS_DEMO);
+        boolean enteredAdvanced=inAdvanced&&!advancedPageVisible;
+        advancedPageVisible=inAdvanced;
+        if(enteredAdvanced&&v3!=null)v3.gpsDemoRefresh();
         // A DETAIL state must render actual native stock ListItems, not merely a title.
         // The independent long-text/Scrollbar OEM adapter is a later visual gate.
         if(screen==MibrCarPlayMenuModel.DETAIL)rows=MibrElementDetailRows.lines(detail);
         // Diagnostics has no settings keys: one read-only line with the
         // configuration service state. No write action is offered here.
-        if(screen==MibrCarPlayMenuModel.ITEMS && menu.group()==DIAGNOSTICS_GROUP){
+        if(menu.onDiagnostics()){
             String[] withStatus=new String[rows.length+1];
             System.arraycopy(rows,0,withStatus,0,rows.length);
             withStatus[rows.length]=v3==null?control.status():v3.status();
             rows=withStatus;
+            // R2: one read-only line for the CarPlay-Navigation (route guidance in the cockpit).
+            String[] withNav=new String[rows.length+1];
+            System.arraycopy(rows,0,withNav,0,rows.length);
+            withNav[rows.length]=MibrRgiCockpit.statusLine();
+            rows=withNav;
+            String[] withHealth=new String[rows.length+1];
+            System.arraycopy(rows,0,withHealth,0,rows.length);
+            withHealth[rows.length]=MibrServiceHealth.statusLine();
+            rows=withHealth;
         }
         int count=0;for(int i=0;i<rows.length;i++)if(rows[i]!=null)count++;
         // Readback, broker status or local draft must not tear down a native
@@ -187,7 +215,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         }
         // Bind the stock scrollbar only after count, selection, focus and viewport settled.
         MibrOemSsmTemplate.syncScrollbar(stock,true);
-        if(count==0 && detail!=null && detail.length()>0)stock.title.set_text(title+": keine Live-Werte");
+        if(count==0 && detail!=null && detail.length()>0)stock.title.set_text(title+MibrI18n.pick(": keine Live-Werte",": no live values"));
     }
     private static boolean sameRows(String[] a,String[] b){
         if(a.length!=b.length)return false;
@@ -218,14 +246,31 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     }
     private void apply(ListItemModel item,int rank){
         int key=menu.keyForRow(rank),kind=kind(item);
-        if(key==MibrPopupEditorModel.ENGINE)drafts.readback(key,MibrEngineState.engine());
-        else if(key>MibrPopupEditorModel.ENGINE&&MibrPopupEditorModel.isVirtual(key))
+        boolean scalingNotice=menu.noteRow(rank);
+        if(key==MibrPopupEditorModel.EXPERT_MODE)drafts.readback(key,MibrExpert.choice());
+        else if(key==MibrPopupEditorModel.ENGINE)drafts.readback(key,MibrEngineState.engine());
+        else if(key==MibrPopupEditorModel.MENU_LANGUAGE)drafts.readback(key,MibrI18n.menuOverride());
+        else if(key==MibrPopupEditorModel.GPS_DEMO)drafts.readback(key,MibrGpsDemoState.choice());
+        else if(key==MibrPopupEditorModel.CARPLAY_NAV)drafts.readback(key,MibrDurableSwitch.CARPLAY_NAV.revision()!=null?
+            MibrDurableSwitch.CARPLAY_NAV.value():MibrDurableSwitch.CARPLAY_NAV.persistedOn()?"on":"off");
+        else if(key==MibrPopupEditorModel.NAV_DEMO)drafts.readback(key,MibrRgiCockpit.demoRequested()?"on":"off");
+        else if(key==MibrPopupEditorModel.CALIB_IMAGE)drafts.readback(key,MibrCalibration.on()?"on":"off");
+        else if(MibrPopupEditorModel.durable(key)!=null){
+            MibrDurableSwitch sw=MibrPopupEditorModel.durable(key);
+            String stored=sw.revision()!=null?sw.value():sw.persistedValue();
+            drafts.readback(key,MibrPopupEditorModel.isSafe(key)?
+                MibrSafeArea.field(stored,sw.defaultValue(),MibrPopupEditorModel.safeField(key)):stored);
+        }
+        else if(key>MibrPopupEditorModel.ENGINE&&key<MibrPopupEditorModel.SCALE_MAIN&&MibrPopupEditorModel.isVirtual(key))
             drafts.readback(key,MibrViewState.value(key-MibrPopupEditorModel.VIEW_FOLLOW));
-        MibrElementSpec spec=key<0||key>=MibrSettingsCatalog.KEYS.length?null:MibrCanonicalElementMenu.describeVisible(MibrSettingsCatalog.KEYS[key]);
         TextArea text=(TextArea)MibrOemSsmTemplate.target((WidgetModel)item,
             kind==VALUE?MibrOemSsmTemplate.VALUE_LABEL_TARGET_ID:
             kind==CHECK?MibrOemSsmTemplate.CHECK_TEXT_TARGET_ID:MibrOemSsmTemplate.PLAIN_TEXT_TARGET_ID,TextArea.class);
-        text.set_text(spec!=null?spec.label:labels[rank]);
+        text.set_text(labels[rank]);
+        if(scalingNotice){
+            text.set_shorten(false);
+            text.set_lineBreakMode(TextAreaModel.LINEBREAKMODE_CHARACTER);
+        }
         if(menu.screen()==MibrCarPlayMenuModel.DETAIL){
             text.set_shorten(false);
             text.set_lineBreakMode(TextAreaModel.LINEBREAKMODE_CHARACTER);
@@ -244,10 +289,20 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         if(kind==VALUE){
             TextArea value=(TextArea)MibrOemSsmTemplate.target((WidgetModel)item,
                 MibrOemSsmTemplate.VALUE_TEXT_TARGET_ID,TextArea.class);
-            value.set_text(current==null?"":drafts.label(key,current));
+            String uiMessage=MibrPopupEditorModel.isScaling(key)?MibrScalingState.uiMessage(key):
+                key==MibrPopupEditorModel.MENU_LANGUAGE?MibrI18n.menuMessage():
+                MibrPopupEditorModel.durable(key)!=null?MibrPopupEditorModel.durable(key).message():
+                key==MibrPopupEditorModel.GPS_DEMO?MibrGpsDemoState.message():null;
+            value.set_text(uiMessage!=null?uiMessage:(current==null?"":drafts.label(key,current)));
             value.set_shorten(true);
         }
         item.set_visible(true);
+        if(scalingNotice){
+            // Plain stock text row. Disabled and listener-free: not focusable,
+            // not an editor, not a SCALE_SET source.
+            item.set_enabled(false);button.set_enabled(false);
+            return;
+        }
         // carplay.enabled (CHECK) and viewarea.selected (dropdown) are runtime
         // actions, NOT ordinary preferences; native V3 advertises no qualified
         // session/VIEW action owner yet. The view dropdown has no owner at all.
@@ -282,8 +337,34 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
                 if(!attached || version!=epoch)return;
                 try{
                     int key=menu.keyForRow(rank);
-                    if(menu.screen()==MibrCarPlayMenuModel.ITEMS && menu.group()==DIAGNOSTICS_GROUP)return;
-                    if(key>=0 && drafts.directToggle(key)){
+                    if(menu.onDiagnostics()||menu.onVersion())return;
+                    if(menu.loadRow(rank)){
+                        if(v3!=null)v3.menuLoad();
+                        return;
+                    }
+                    if(key==MibrPopupEditorModel.CALIB_IMAGE){
+                        if(drafts.toggle(key)){
+                            String wish=drafts.draft(key);drafts.discardDraft(key);
+                            MibrCalibration.set("on".equals(wish));
+                            menu.refresh();
+                        }
+                    }
+                    else if(key==MibrPopupEditorModel.NAV_DEMO){
+                        if(drafts.toggle(key)){
+                            String wish=drafts.draft(key);drafts.discardDraft(key);
+                            MibrRgiCockpit.requestDemo("on".equals(wish));
+                            menu.refresh();
+                        }
+                    }
+                    else if(MibrPopupEditorModel.durableCheck(key)){
+                        // broker-owned switch; the wish is sent, the row shows the readback.
+                        if(!drafts.liveViewGated(key)&&drafts.toggle(key)){
+                            String wish=drafts.draft(key);drafts.discardDraft(key);
+                            if(v3!=null&&wish!=null)v3.durableSet(key,wish);
+                            menu.refresh();
+                        }
+                    }
+                    else if(key>=0 && drafts.directToggle(key)){
                         if(drafts.toggle(key)){
                             if(v3!=null)v3.commit(key);
                             menu.refresh();
@@ -304,6 +385,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     void detach(){
         if(detached)return;
         attached=false;epoch++;control.detach();if(v3!=null)v3.detach();
+        MibrCalibration.set(false);
         Throwable failure=null;
         boolean cleanupFailed=false;
         try{editor.detach();}catch(Throwable t){failure=t;}

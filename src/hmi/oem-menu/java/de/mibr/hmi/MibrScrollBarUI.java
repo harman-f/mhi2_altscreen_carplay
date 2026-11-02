@@ -20,14 +20,16 @@ import org.dsi.ifc.global.ResourceLocator;
 
 /**
  * One PNG, decoded once, drawn stretched to the CURRENT widget size on every paint,
- * so the thumb can change height without recreating anything. A failed load is
- * retried a bounded number of times, then the bar simply stays invisible.
+ * so the thumb can change height without recreating anything. R2b: the PNG comes from the
+ * stock skin cache first (Resources/skin0/Images, like the menu icon), synchronously; the old
+ * asynchronous load stays as fallback and is retried a bounded number of times.
  */
 public final class MibrScrollBarUI extends CommonImageUI {
     private static final int MAX_FAILURES = 6;
     private static final long RETRY_MS = 1500L;
     private String path;
     private BufferImage image;
+    private boolean fromSkin; /* skin-cache images belong to the cache: never disposed here */
     private ImageDrawable drawable;
     private boolean pending;
     private int failures;
@@ -42,6 +44,14 @@ public final class MibrScrollBarUI extends CommonImageUI {
             release();
             path = wanted;
             failures = 0;
+        }
+        if (image == null || fromSkin) {
+            BufferImage cached = MibrFourStateIconUI.skinImage(path);
+            if (cached != null) {
+                if (cached != image) { releaseDrawable(); image = cached; fromSkin = true; }
+            } else if (fromSkin) {
+                release();
+            }
         }
         if (image == null) {
             request();
@@ -92,10 +102,11 @@ public final class MibrScrollBarUI extends CommonImageUI {
 
     private void release() {
         releaseDrawable();
-        if (image != null) {
+        if (image != null && !fromSkin) {
             try { image.dispose(); } catch (Throwable ignored) { }
-            image = null;
         }
+        image = null;
+        fromSkin = false;
     }
 
     public void deInit() {
@@ -110,6 +121,7 @@ public final class MibrScrollBarUI extends CommonImageUI {
             failedAt = System.currentTimeMillis();
             return;
         }
+        if (fromSkin) { if (value != null) try { value.dispose(); } catch (Throwable ignored) { } return; }
         release();
         image = value;
         try {

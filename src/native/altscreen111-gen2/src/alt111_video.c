@@ -234,7 +234,7 @@ int alt111_video_submit_timed_at(struct alt111_video *v, uint64_t stream,
         if (type == 5) idr = 1;
         else if (type == 1) dependent = 1;
         else if (type == 7 || type == 8 || type == 13) {
-            if (!known_parameter(v, p + pos, len)) return invalid_au(v);
+            if (!v->foreign_parameters && !known_parameter(v, p + pos, len)) return invalid_au(v);
         } else if (type != 6 && type != 9 && type != 10 && type != 11 && type != 12)
             return invalid_au(v); /* unsupported partition/extension NAL */
         if (len > ALT111_AU_LIMIT - bytes || ALT111_AU_LIMIT - bytes - len < 4)

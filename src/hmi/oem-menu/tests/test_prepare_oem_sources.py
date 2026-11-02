@@ -6,7 +6,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import prepare_oem_sources
 
 
-ACTIVATOR = '''public void start(BundleContext bundleContext) {
+ACTIVATOR = '''import org.osgi.framework.BundleContext;
+public void start(BundleContext bundleContext) {
         this.bundleContext = bundleContext;
     }
     public void stop(BundleContext bundleContext) {
@@ -14,6 +15,8 @@ ACTIVATOR = '''public void start(BundleContext bundleContext) {
     throw new NoClassDefFoundError().initCause(classNotFoundException);
     this.factory = new Factory(this.logger, configurationManager, this.dictionary, this.idService);
     this.factory.setScriptWidgetService(this.scriptWidgetCioService);
+    this.bundleContext.addServiceListener(this, string);
+        ServiceReference[] serviceReferenceArray = this.bundleContext.getServiceReferences(null, string);
     this.cioVisualizationService = (CioVisualizationService)object;
 '''
 WIDGET_FACTORY = '''import de.vw.mib.view.internal.treebuilder.WidgetFactory;
@@ -32,6 +35,8 @@ class PrepareOemSourcesTest(unittest.TestCase):
         self.assertIn("MibrHomeCio.activatorStarted()", patched_a)
         self.assertIn("MibrHomeCio.deactivate()", patched_a)
         self.assertIn("new de.mibr.hmi.MibrVisualizationService", patched_a)
+        self.assertIn("catch (InvalidSyntaxException invalidSyntaxException)", patched_a)
+        self.assertIn("Invalid CIO service filter:", patched_a)
         self.assertIn("import de.mibr.hmi.MibrHomeList;", patched_w)
         self.assertIn("return new MibrHomeList();", patched_w)
         self.assertNotIn("return new WidgetList();", patched_w)
@@ -42,6 +47,10 @@ class PrepareOemSourcesTest(unittest.TestCase):
         patched = prepare_oem_sources.patch_widget_factory(WIDGET_FACTORY)
         with self.assertRaisesRegex(ValueError, "WIDGET_FACTORY_ALREADY_PATCHED"):
             prepare_oem_sources.patch_widget_factory(patched)
+        with self.assertRaisesRegex(ValueError, "ACTIVATOR_SERVICE_FILTER_CHECKED_EXCEPTION_ANCHOR_COUNT=0"):
+            prepare_oem_sources.patch_activator(ACTIVATOR.replace(
+                "    this.bundleContext.addServiceListener(this, string);\n"
+                "        ServiceReference[] serviceReferenceArray = this.bundleContext.getServiceReferences(null, string);\n", ""))
 
 
 if __name__ == "__main__":

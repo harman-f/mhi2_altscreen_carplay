@@ -218,3 +218,11 @@ The published `MIBR-Most20FPS.jar` is a deterministic one-class split of the ups
 
 Upstream repository license: MIT. The exact provenance, deterministic split rule, artifact hash and
 vehicle validation are documented under `THIRD_PARTY/Most20FPS/`.
+
+## Route Guidance TLV parser
+
+The source subset under `src/native/carplay-rgi/third_party/luka-rgd` comes from
+[luka-dev/mib2q-carplay-rgi](https://github.com/luka-dev/mib2q-carplay-rgi), commit
+`df73e061a29c4d996550716987f42a9243daa09a`. Its GPL-3.0 license and exact file
+provenance are included in that directory. Firmware libraries required for local
+linking are external inputs and are not redistributed by this source publication.

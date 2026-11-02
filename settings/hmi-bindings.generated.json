@@ -56,7 +56,7 @@
         "mibr_dual_view": "40",
         "mibr_legacy": "30"
       },
-      "apply": "reconnect",
+      "apply": "unit_reboot",
       "hmi": "advanced",
       "read_only": false,
       "reference_override": "deviation_visible",
@@ -64,7 +64,8 @@
         "20",
         "25",
         "30",
-        "40"
+        "40",
+        "60"
       ]
     },
     {
@@ -92,7 +93,7 @@
         "mibr_dual_view": "source_frames",
         "mibr_legacy": "source_frames"
       },
-      "apply": "live",
+      "apply": "unit_reboot",
       "hmi": "advanced",
       "read_only": false,
       "reference_override": "deviation_visible",
@@ -113,7 +114,7 @@
         "mibr_dual_view": "20",
         "mibr_legacy": "20"
       },
-      "apply": "live",
+      "apply": "unit_reboot",
       "hmi": "advanced",
       "read_only": false,
       "reference_override": "deviation_visible",

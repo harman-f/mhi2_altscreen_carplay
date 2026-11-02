@@ -74,4 +74,11 @@ public final class MibrIconState {
         if (normal >= 0) return path.substring(0, normal) + "_active_" + path.substring(normal + 8);
         return null;
     }
+
+    /** A delayed pressed image may use normal art; normal art must never
+     * fall back to pressed art and show a green bar without a press. */
+    public static String fallbackPath(String wanted) {
+        if (wanted == null || wanted.indexOf("_active_") < 0) return null;
+        return counterpart(wanted);
+    }
 }

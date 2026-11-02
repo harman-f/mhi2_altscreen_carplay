@@ -77,6 +77,14 @@ Original R50 unconditionally sent CONT after a failed gate-grace wait. R52 queue
 
 The corrected QNX owner built at `/src` has SHA-256 `87b7ece6be005b9ad821a2c899c5a503cbeea7b27504300337676a5590d26b36`.
 
+The workflow keeps the installed-output SHA-256 assertions for the exact source
+inputs at baseline commit `960d808f4e80622808c4b57b777723fbddb81839`.
+When build inputs differ from that immutable baseline, CI instead checks the
+expected output inventory, QNX ARM ELF identity, and generated `SHA256SUMS`,
+then reports the hashes for that source revision. Those development hashes
+identify build outputs; they do not inherit the installed or released identity
+of the frozen baseline.
+
 The public engine-type helper also has a bounded filesystem fix: remount writable before creating its same-directory staging file, then restore read-only after success or failure. Its corrected script SHA-256 is `e4533241733f6e3afea3402fa58e131b065665734e0c053b25442d68ddbfd127`; it intentionally differs from the reference vehicle helper. Eight Linux host tests and the target-shell static gate cover this correction; no new vehicle test is claimed.
 
 ## Remaining source and reproduction limits

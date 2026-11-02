@@ -18,6 +18,7 @@ CLI=${MIBR_VIEW_CLI:-/mnt/app/root/altscreen-u2/bin/alt111-settings}
 POS=${MIBR_VIEW_POS:-/tmp/mibr-view.pos}
 GEN=${MIBR_VIEW_GEN:-/tmp/mibr-view.gen}
 LOCK=${MIBR_VIEW_LOCK:-/tmp/mibr-view.lock}
+APPLOCK=${MIBR_APP_RW_LOCK:-/tmp/mibr-app-rw.lock}
 AREA=${MIBR_VIEW_AREA:-/tmp/mibr-carplay111-viewarea-selected}
 LOG=${MIBR_VIEW_LOG:-/tmp/mibr-view.log}
 DEBOUNCE=${MIBR_VIEW_DEBOUNCE:-20}
@@ -48,8 +49,30 @@ valid(){
     esac
     return 1
 }
-rw(){ [ "$NOMOUNT" = 1 ] || mount -uw "$MNT" 2>/dev/null; }
-ro(){ [ "$NOMOUNT" = 1 ] || { sync; mount -ur "$MNT" 2>/dev/null; }; }
+# Shared write window on /mnt/app with the broker (mibr_app_rw_lease.c): neither side remounts during the
+# other's save. A dead owner's file is taken over; a busy one fails this write after about 3 s.
+lease_get(){
+    lease_try=0
+    while :; do
+        if ( set -C; echo $$ > "$APPLOCK" ) 2>/dev/null; then return 0; fi
+        lease_pid=; read lease_pid < "$APPLOCK" 2>/dev/null
+        if [ -n "$lease_pid" ] && ! kill -0 "$lease_pid" 2>/dev/null; then rm -f "$APPLOCK"; continue; fi
+        lease_try=$((lease_try+1))
+        [ "$lease_try" -lt 30 ] || return 1
+        sleep 0.1
+    done
+}
+rw(){
+    [ "$NOMOUNT" = 1 ] && return 0
+    lease_get || return 1
+    mount -uw "$MNT" 2>/dev/null || { rm -f "$APPLOCK"; return 1; }
+}
+ro(){
+    [ "$NOMOUNT" = 1 ] && return 0
+    sync; mount -ur "$MNT" 2>/dev/null; rc=$?
+    rm -f "$APPLOCK"
+    return $rc
+}
 # write one file under $DIR atomically (temp + mv on the same filesystem); $1 = name, stdin-free: content in $2
 putfile(){
     rw || return 1

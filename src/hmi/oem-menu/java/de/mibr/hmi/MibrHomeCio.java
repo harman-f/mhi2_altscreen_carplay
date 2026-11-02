@@ -85,6 +85,9 @@ public final class MibrHomeCio {
         // Vehicle-data speed source (default off; reads vdata.mode). Must never affect HMI startup.
         try { MibrVdataBridge.start(); } catch (Throwable ignored) { }
         try { MibrVstatusSource.start(); } catch (Throwable ignored) { }
+        // R2 CarPlay-Navigation: phone route guidance as the stock cockpit arrows (switch default off).
+        try { MibrRgiCockpit.start(); } catch (Throwable ignored) { }
+        MibrServiceHealth.markHmiUp();
     }
 
     public static synchronized void bind(AppFrameworkCioFactory f, CioDictionary d,

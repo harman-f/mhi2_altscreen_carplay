@@ -6,11 +6,17 @@
 # the change is live and persistent. If the durable preflight fails (marker,
 # mount, recovery or profile parity), the same binary starts read-only.
 # Never blocks the HMI boot. RAM-only credential, new per boot.
+# R2: also starts mibr-watch.ksh, which runs this script again with --from-watch to restart a dead
+# broker or key daemon. Both starts below are idempotent.
 B=/mnt/app/root/mibr-v3
 S=/tmp/mibr-v3-hmi.secret
 P=/tmp/mibr-v3-service.pid
 L=/tmp/mibr-v3-service.log
 MARK=/mnt/app/root/altscreen-u2/config/mibr-v3-single-writer.enabled
+W=$B/mibr-watch.ksh
+if [ "$1" != --from-watch ] && [ -r "$W" ]; then
+    /bin/ksh "$W" </dev/null >/dev/null 2>&1 &
+fi
 # r21: KEY40 long-press route toggle daemon (passive DebugSPI receiver), independent of the broker state.
 K40=$B/bin/mibr-key40d
 if [ -x "$K40" ]; then

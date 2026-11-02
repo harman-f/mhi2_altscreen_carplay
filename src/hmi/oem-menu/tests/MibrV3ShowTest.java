@@ -60,6 +60,7 @@ public final class MibrV3ShowTest {
     }
 
     public static void main(String[] args) throws Exception {
+        MibrI18n.forced = "de_DE";
         run(new String[]{"PENDING", "PENDING", "SHOWN"}, "Im Cockpit bestätigt", true);
         run(new String[]{"PENDING", "NO_SESSION"}, "nächsten CarPlay-Verbindung", true);
         run(new String[]{"PENDING", "FAILED"}, "nicht bestätigt", true);
