@@ -235,3 +235,36 @@ jobs:
         with:
           name: mu1440-source-qnx-build
           path: build/mu1440-source/**
+
+  publish-development-build:
+    name: Preserve development binaries for this commit
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [host, qnx]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mu1440-source-qnx-build
+          path: build/mu1440-source
+      - name: Publish immutable development build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          tag="mu1440-build-${GITHUB_SHA}"
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && exit 1
+          {
+            echo "source_commit=$GITHUB_SHA"
+            echo "toolchain_commit=56a66557245af14077678cd28a83ce3a337d9e2d"
+            echo "scope=QNX native build outputs; no J9 menu JAR, RGI binary or installer"
+            echo "qualification=development build; not vehicle-qualified"
+          } > build/mu1440-source/BUILD-MANIFEST.txt
+          tar -C build -czf mu1440-qnx-source-build.tar.gz mu1440-source
+          sha256sum mu1440-qnx-source-build.tar.gz > mu1440-qnx-source-build.tar.gz.sha256
+          gh release create "$tag" mu1440-qnx-source-build.tar.gz mu1440-qnx-source-build.tar.gz.sha256 \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "MU1440 development binaries $GITHUB_SHA" \
+            --notes "QNX source-build outputs for commit $GITHUB_SHA. Build artifacts only; no installer, J9 menu JAR or RGI binary is included. Not vehicle-qualified."
