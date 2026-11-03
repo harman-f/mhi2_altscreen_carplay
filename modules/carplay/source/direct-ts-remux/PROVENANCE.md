@@ -4,7 +4,7 @@ This source is the vehicle-tested remuxer used by the MU1440 direct Virtual Cock
 
 ## Public source authority
 
-- Public source path: `src/native/direct-ts-remux/direct_ts_remux.c`
+- Public source path: `modules/carplay/source/direct-ts-remux/direct_ts_remux.c`
 - Reference target: `MHI2_ER_SKG13_P4526_MU1440`
 - Canonical developer binary SHA-256:
   `672275fc0e840e604cef68b6bd7b1e9e2059342471997d9bd859e32c34a0f02b`
