@@ -10,4 +10,4 @@ The pinned QNX reconstruction first reproduced predecessor `c16965ec11caec738141
 
 Run `bash tools/test_parity_host.sh` on a Linux workstation. The lifecycle suite covers token-bound stop, concurrent start rejection, parent/watchdog death, uncertain foreign identity, in-flight gate drain, stale proof, grace recovery, proof loss, partial release and restore failure. The native gate integration test exercises real blocked host `writev` and descriptor aliases.
 
-No installer or vehicle acceptance is supplied by this source publication. See [source build and coverage](../../../docs/build/MU1440_R50_SOURCE.md).
+No installer or vehicle acceptance is supplied by this source publication. See [source build and coverage](../../../../docs/build/MU1440_R50_SOURCE.md).

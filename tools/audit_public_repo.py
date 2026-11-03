@@ -44,7 +44,7 @@ REQUIRED = [
     "modules/carplay/source/direct-ts-parity/direct_ts_parity.c",
     "modules/broker/source/mibr-control/mibr_v3_service.c",
     "modules/menu/source/java/de/mibr/hmi/MibrControlClient.java",
-    "runtime/parity/parity_drive_supervisor.sh",
+    "modules/carplay/runtime/parity/parity_drive_supervisor.sh",
     "tools/build_mu1440_source.sh",
 ]
 
