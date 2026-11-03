@@ -285,3 +285,33 @@ All selected local source checks may PASS with **unresolved installed/legacy
 readers, format conflicts, backup/upgrade/uninstall and rollback**. The tool
 deliberately leaves target paths unset and the migration completion gate
 closed; A2.3.2b and B2 are not done from this host audit alone.
+
+## A2/A3 proposed destination names and source owner separation (host-only)
+
+Run `python3 tools/release/storage_destination_plan.py --self-test --json-out storage-destination-plan.json`.
+The planner consumes the existing 63-candidate `storage_access_graph.py` output:
+13 grouped CarPlay registry files, 13 native broker CAS/revision files and
+37 separately classified additional path candidates. It supplies collision-
+checked **candidate** target names under `/mnt/app/root/altscreen-u2/`,
+including separate namespaces for CarPlay registry values, navigation,
+menu, cockpit, feature intent, receipts and exact stock backups.
+
+The output preserves the difference between revisioned broker files,
+CRC menu layout, shell navigation's old per-file grammar, file-presence
+boot switches, scalar values and ownership/version receipts. It holds
+legacy navigation aliases, opposite bit26 force flags, backup directories,
+unproven test artifacts and the early-boot two-byte single-writer gate
+rather than fabricating a safe conversion. Critically,
+`mibr-carplay-autodirect` (registry value) and
+`mibr-carplay-autodirect.enabled` (legacy boot-presence flag) have
+**different** candidate identities. Changing existing native content
+formats requires a dedicated parser/converter and all consumers together.
+
+This is a naming and source-provenance **proposal**, not implemented MMX
+paths. All `verified_destination_path` fields remain null, and
+`migration_authorized=false`. Negative tests reject path traversal, unknown
+legacy stores, duplicate destinations, premature source approval and
+silent alias merging. `--require-migration-ready` is deliberately
+fail-closed. Firmware-specific installed readers, generated boot hooks,
+backup/restore, RW/RO mounts, upgrade and unattended power-loss recovery
+must still be proven before a coordinated installer cutover.
