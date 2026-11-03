@@ -21,6 +21,18 @@ from check_mu1440_target_shell import scan, self_test as shell_self_test  # noqa
 SCRIPT_SUFFIX = {".sh", ".ksh"}
 SHARED_TARGET_DIRS = ("deployment/mu1440", "runtime/diagnostics", "runtime/deployment")
 
+# Audited exceptions for two non-executing strings only. No new commands are
+# permitted: changes to these exact lines or paths lose the exception.
+NON_EXECUTING_LINES = {
+    "auto-direct/common.sh": '    runtime_emit "ERROR bundled tee helper missing/not executable: $TEE"',
+    "diagnostics/gen2_prereq.sh": "  command -v sha256sum 2>/dev/null && return 0",
+}
+
+
+def non_executing_exception(path: Path, source_line: str) -> bool:
+    return any(path.as_posix().endswith("/" + suffix) and source_line == exact
+               for suffix, exact in NON_EXECUTING_LINES.items())
+
 
 def scripts_below(root: Path, directories: list[Path]) -> list[Path]:
     found: set[Path] = set()
@@ -58,7 +70,13 @@ def audit(paths: list[Path]) -> None:
         if script.is_symlink() or not script.is_file():
             problems.append("missing/symlinked QNX script: " + str(script))
             continue
-        problems.extend(scan(script))
+        lines = script.read_text(encoding="utf-8").splitlines()
+        for finding in scan(script):
+            # The base scanner also catches command-looking words in quoted
+            # diagnostic text and an optional command -v capability probe.
+            number = int(finding.rsplit(":", 2)[1])
+            if not non_executing_exception(script, lines[number - 1]):
+                problems.append(finding)
         # Bash syntax is only a HOST smoke check; on-unit shell command inventory
         # and MMX/RCC distinction still require exact hardware evidence.
         if script.suffix == ".sh":
@@ -89,6 +107,25 @@ def self_test() -> None:
         else:
             raise AssertionError("forbidden command incorrectly passed")
         (stage / "install.sh").unlink()
+        (stage / "runtime/auto-direct").mkdir(parents=True)
+        (stage / "runtime/auto-direct/common.sh").write_text(
+            '#!/bin/ksh\n' + NON_EXECUTING_LINES["auto-direct/common.sh"] + "\n"
+        )
+        (stage / "runtime/diagnostics").mkdir(parents=True)
+        (stage / "runtime/diagnostics/gen2_prereq.sh").write_text(
+            '#!/bin/ksh\n' + NON_EXECUTING_LINES["diagnostics/gen2_prereq.sh"] + "\n"
+        )
+        audit(package_scripts(stage))
+        (stage / "runtime/auto-direct/common.sh").write_text('#!/bin/ksh\ntee output.log\n')
+        try:
+            audit(package_scripts(stage))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("real unbundled tee unexpectedly passed")
+        for path in (stage / "runtime/auto-direct/common.sh",
+                     stage / "runtime/diagnostics/gen2_prereq.sh"):
+            path.unlink()
         try:
             package_scripts(stage)
         except ValueError:
