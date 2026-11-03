@@ -42,7 +42,7 @@ python3 tools/emit_module_build_lineage.py \
   --verify build/mu1440-source/MODULE_BUILD_LINEAGE.json
 ```
 
-The QNX source-build workflow currently has a separate artifact receipt and SHA256SUMS. Integrating this new receipt into its actual CI output must happen **after** current parallel module path migrations are reconciled; do not overwrite a different agent's in-progress workflow edits. The generated manifest can then accompany the existing source-build artifacts. A packager must consume only verified receipts and still perform full R3 ZIP path, profile and payload-hash validation.
+The MU1440 QNX source-build workflow now emits and verifies `build/mu1440-source/MODULE_BUILD_LINEAGE.json` after its actual source-build and SHA-256/ARM-ELF gates. Its first receipt covers the built CarPlay GEN2 library, CarPlay settings CLI, and Broker V3 service; all other binaries remain outside this specific receipt unless separately inventoried and verified. The JSON is uploaded alongside existing source-build artifacts. This receipt explicitly records `vehicle_qualified: false` and `bit_reproducible_verified: false`. A future R3 packager must consume only verified receipts, establish the independent distribution source inventory, and pass final ZIP, profile and payload-hash validation before publication.
 
 ## Deliberate limitations
 
