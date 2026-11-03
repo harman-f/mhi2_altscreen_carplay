@@ -10,6 +10,7 @@ The canonical project-owned media source and runtime inputs are physically co-lo
 - [Direct-TS parity source](source/direct-ts-parity/)
 - [MOST transport writer](source/most-ts-writer/)
 - [Optional vehicle-data/iAP2 adapter sources](source/vehicle-data/) (shared GEN2 build; host-tested source, no new Unit qualification)
+- [Shared display-scaling parser and guarded CAS source](source/display-scaling/) (broker reuses this canonical implementation; only broker controls settings writes)
 - [Automatic direct runtime](runtime/auto-direct/)
 - [Exclusive native display gate](source/isotx2-gate/)
 - [Vehicle-tested artifact inventory](../../artifacts/mu1440/)
