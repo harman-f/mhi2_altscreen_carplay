@@ -19,6 +19,7 @@ from check_module_index import impact, validate  # noqa: E402
 
 ALWAYS_REVIEW = (
     "modules/module-index.json", "modules/profiles/", "settings/",
+    "runtime/diagnostics/", "runtime/deployment/",
     "tools/release/", "tools/prepare_mu1440_sd.sh",
     "tools/validate_modular_package.py", "tools/check_mu1440_target_shell.py",
     "deployment/", "artifacts/mu1440/", "release/",
@@ -48,9 +49,10 @@ def classify(index: dict, changed: list[str], all_inputs: bool = False) -> dict:
         # The module index itself is global metadata, not an unowned module.
         unowned.discard("modules/module-index.json")
     for p in changed:
-        if p.startswith("settings/"):
-            # The registry and its generated outputs are intentionally shared,
-            # checked by the existing settings generation/source gates.
+        if p.startswith(("settings/", "runtime/diagnostics/", "runtime/deployment/")):
+            # Registry-generated files, diagnosis and deployment scripts are
+            # deliberate shared inputs outside any functional module. Unknown
+            # paths in an actual modules/ owner remain hard failures.
             unowned.discard(p)
         if p.startswith("modules/profiles/"):
             unowned.discard(p)  # profile layout metadata, not a ready profile build
@@ -84,6 +86,8 @@ def self_test(index: dict) -> None:
     x = classify(index, ["settings/registry.json", "settings/hmi-bindings.generated.json",
                          "settings/runtime-basenames.generated.sh"])
     assert x["affected_modules"] == sorted(index["modules"]) and not x["unknown_owner_paths"], x
+    x = classify(index, ["runtime/deployment/session.sh", "runtime/diagnostics/gen2_status.sh"])
+    assert x["run_release_checks"] and not x["unknown_owner_paths"], x
     x = classify(index, ["README.md"])
     assert not x["run_release_checks"], x
     print("RELEASE_MODULE_PLAN_SELF_TEST=PASS")
