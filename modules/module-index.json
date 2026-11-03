@@ -18,7 +18,7 @@
         "src/native/parity-session",
         "src/native/sha256sum-compat",
         "src/native/tee-compat",
-        "src/native/vehicle-data"
+        "modules/carplay/source/vehicle-data"
       ],
       "runtime": [
         "runtime/auto-direct",
