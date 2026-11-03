@@ -191,10 +191,10 @@ def self_test():
     with tempfile.TemporaryDirectory(prefix="mibr-triage-") as temp:
         root = Path(temp)
         (root / "sample.c").write_text(
-            '#define MIBR_CFG_PERSIST_ROOT "/mnt/app/root"\\n'
-            '/* example: /mnt/app/root */\\n'
-            'ROOT=/mnt/app/root\\n'
-            'TMP=/mnt/app/root/lsd.tmp.$\\n', encoding="utf-8"
+            '#define MIBR_CFG_PERSIST_ROOT "/mnt/app/root"\n'
+            '/* example: /mnt/app/root */\n'
+            'ROOT=/mnt/app/root\n'
+            'TMP=/mnt/app/root/lsd.tmp.$$\n', encoding="utf-8"
         )
         expected = ("macro-persistent-root", "comment-or-documentation",
                     "composed-persistent-root", "persistent-staging-path")
