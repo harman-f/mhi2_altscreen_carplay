@@ -18,6 +18,7 @@
         "modules/carplay/source/parity-session",
         "modules/carplay/source/sha256sum-compat",
         "modules/carplay/source/tee-compat",
+        "modules/carplay/source/display-scaling",
         "modules/carplay/source/vehicle-data"
       ],
       "runtime": [
@@ -53,8 +54,7 @@
       "source": [
         "modules/broker/source/mibr-control",
         "modules/broker/source/keypanel",
-        "modules/broker/source/display-scaling",
-        "settings/registry.json"
+                "settings/registry.json"
       ],
       "runtime": [
         "modules/broker/runtime/mibr-control"

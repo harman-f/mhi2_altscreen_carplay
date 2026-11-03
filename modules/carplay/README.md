@@ -9,6 +9,7 @@ This module owns the canonical CarPlay/video source and development runtime. The
 - [Direct-TS remux source](source/direct-ts-remux/)
 - [Direct-TS parity source](source/direct-ts-parity/)
 - [MOST transport writer](source/most-ts-writer/)
+- [Shared display-scaling parser and guarded CAS source](source/display-scaling/) (broker reuses the canonical implementation; broker alone owns settings writes)
 - [Optional vehicle-data/iAP2 adapter sources](source/vehicle-data/) (shared GEN2 build; host-tested source, no new Unit qualification)
 - [Automatic direct runtime](runtime/auto-direct/)
 - [Exclusive native display gate](source/isotx2-gate/)
