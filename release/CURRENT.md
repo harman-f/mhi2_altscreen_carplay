@@ -4,31 +4,38 @@ This is the currently pinned **MU1440-specific developer prerelease**, not the n
 
 The effective 29 September Most20/D2 update at the end of this file is incorporated into the consolidated statements below; later release-tag decisions require their own verification.
 
-## Release-build and publication gates (2026-11-03)
+## Release readiness after module migration (2026-11-03)
 
-The workflow [`release-mu1440-aid10.yml`](../.github/workflows/release-mu1440-aid10.yml)
-now **builds and validates the developer ZIP as a CI artifact** when relevant release,
-deployment, runtime-module or pinned binary inputs change on a PR or on `main`.
-It checks the canonical module paths, shell-safety scans, exact vehicle-pinned media
-hashes, the checked-in SHA-256 receipts for the separately **build-confirmed**
-`sha256sum`/`tee` tools, the final seven-file payload inventory and the archive's
-checksums. The resulting ZIP and its `.sha256` file are downloadable from the Actions run.
+The [release-readiness workflow](../.github/workflows/release-mu1440-aid10.yml)
+is now a **fail-closed CI audit**, not an automatic GitHub release publisher.
+It reads [canonical module ownership](../modules/module-index.json), calculates
+affected modules including declared reverse dependencies, and reports changes
+that have no canonical owner. For actual QNX builds, the existing source-build
+workflows remain the authority; this impact report is **not a newly built binary
+receipt**.
 
-**This is packaging of pinned prebuilt binaries, not a recompilation of the latest
-GEN2/Broker source**. QNX source-build jobs and their outputs remain separate; a green
-release-packaging workflow does not promote them into this vehicle-tested bundle,
-prove reproducibility or qualify a new car/firmware. It does not create the future
-multi-profile R3 ZIP.
+The release audit checks the canonical runtime module inputs **and every
+on-unit shell script actually staged into the frozen MU1440 SD-root bundle**.
+It runs the [vehicle-derived QNX command preflight](../docs/testing/MU1440_QNX_SHELL_COMPATIBILITY.md)
+and host syntax checks, verifies exact pinned vehicle-media hashes and separately
+build-confirmed SHA/tee helpers, then re-opens the assembled ZIP to verify
+the complete file and payload manifest. These static host checks cannot prove
+that a dynamically composed command is available on MMX or RCC; the actual
+target command/option inventory and vehicle test still govern acceptance.
 
-GitHub publication is **never automatic on a source or documentation push**.
-To publish a reviewed package, run the workflow manually on `main`, setting
-`publish=true`. The workflow first validates the exact checked-out revision,
-then creates a prerelease under the immutable tag
-`mu1440-aid10-dev-<12-character-commit-sha>`. It will not move an existing tag,
-overwrite an existing release or delete older releases and their provenance.
-Do not use this gate to assert vehicle qualification of the current assembly process.
+**No ZIP is uploaded as a distributable artifact and no GitHub release/tag is
+created or replaced by this workflow.** The old seven-payload SD-root archive
+is deliberately still generated *inside CI* for compatibility regression checks,
+but it does **not** satisfy the [R3 modular distribution contract](../docs/build/PACKAGE_LAYOUT.md).
+The R3 validator is run on the actual legacy archive to prove that it is
+rejected; its separate negative-fixture self-test is not treated as release
+approval. The missing shared/common, profile, exact-fingerprint and inventoried
+source layers must be implemented and the **actual completed R3 ZIP** passed
+to `tools/validate_modular_package.py` before any future publication job
+can be enabled. Existing historical releases and tags are not modified.
 
-
+See [release pipeline design](../tools/release/README.md) for module impact
+rules, source-build boundaries and the QNX-script inventory gates.
 
 ## Validated reference target
 
