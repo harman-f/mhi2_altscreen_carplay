@@ -48,11 +48,13 @@ def classify(index: dict, changed: list[str], all_inputs: bool = False) -> dict:
         # The module index itself is global metadata, not an unowned module.
         unowned.discard("modules/module-index.json")
     for p in changed:
+        if p.startswith("settings/"):
+            # The registry and its generated outputs are intentionally shared,
+            # checked by the existing settings generation/source gates.
+            unowned.discard(p)
         if p.startswith("modules/profiles/"):
             unowned.discard(p)  # profile layout metadata, not a ready profile build
-        if p.startswith("modules/") and not p.startswith("modules/profiles/") and p != "modules/module-index.json":
-            # Unknown module-owned source/runtime files must first be declared.
-            pass
+        # Any unowned file inside an actual module remains a hard failure.
     gate = bool(all_inputs or affected or any(
         p == x or p.startswith(x) for p in changed for x in ALWAYS_REVIEW
     ) or any(p in RELEASE_CONTRACT for p in changed))
@@ -78,6 +80,9 @@ def self_test(index: dict) -> None:
     x = classify(index, ["modules/carplay/source/new-not-declared/new.c"])
     assert x["unknown_owner_paths"], x
     x = classify(index, ["modules/module-index.json"])
+    assert x["affected_modules"] == sorted(index["modules"]) and not x["unknown_owner_paths"], x
+    x = classify(index, ["settings/registry.json", "settings/hmi-bindings.generated.json",
+                         "settings/runtime-basenames.generated.sh"])
     assert x["affected_modules"] == sorted(index["modules"]) and not x["unknown_owner_paths"], x
     x = classify(index, ["README.md"])
     assert not x["run_release_checks"], x
