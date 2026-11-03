@@ -10,7 +10,7 @@ import unittest
 import api_v3_contract as api
 
 SERVICE = os.environ.get("MIBR_V3_NATIVE_HOST_BIN")
-VIEW_SCRIPT = Path(__file__).resolve().parents[2] / "runtime" / "mibr-control" / "mibr-view.ksh"
+VIEW_SCRIPT = Path(__file__).resolve().parents[2] / "modules" / "broker" / "runtime" / "mibr-control" / "mibr-view.ksh"
 
 
 @unittest.skipUnless(SERVICE, "build the host service first with tools/build_mibr_control.sh host")
