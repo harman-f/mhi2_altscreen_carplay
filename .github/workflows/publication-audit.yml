@@ -50,6 +50,7 @@ jobs:
           python3 tools/release/storage_consumer_crosscheck.py --self-test --json-out "$RUNNER_TEMP/storage-consumer-crosscheck.json"
           python3 tools/release/legacy_marker_contract.py --self-test --json-out "$RUNNER_TEMP/legacy-marker-contract.json"
           python3 tools/release/storage_access_graph.py --self-test --json-out "$RUNNER_TEMP/storage-access-graph.json"
+          python3 tools/release/legacy_navigation_storage_contract.py --self-test --json-out "$RUNNER_TEMP/legacy-nav-storage.json"
 
       - name: Upload source-defined inventory (host evidence only)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -62,6 +63,7 @@ jobs:
             ${{ runner.temp }}/storage-consumer-crosscheck.json
             ${{ runner.temp }}/legacy-marker-contract.json
             ${{ runner.temp }}/storage-access-graph.json
+            ${{ runner.temp }}/legacy-nav-storage.json
           if-no-files-found: error
           retention-days: 3
 
