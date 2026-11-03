@@ -2,35 +2,76 @@ name: Release current MU1440 AID10 developer ZIP
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish an immutable MU1440 developer prerelease (main branch only)'
+        type: boolean
+        required: false
+        default: false
+  pull_request:
+    paths:
+      - '.github/workflows/release-mu1440-aid10.yml'
+      - '.github/workflows/publication-audit.yml'
+      - 'release/**'
+      - 'deployment/mu1440/**'
+      - 'modules/carplay/runtime/**'
+      - 'modules/navigation/runtime/**'
+      - 'runtime/diagnostics/**'
+      - 'runtime/deployment/**'
+      - 'tools/prepare_mu1440_sd.sh'
+      - 'tools/check_mu1440_target_shell.py'
+      - 'tools/check_module_index.py'
+      - 'artifacts/mu1440/**'
   push:
     branches: [ main ]
     paths:
-      - 'release/CURRENT.md'
+      - '.github/workflows/release-mu1440-aid10.yml'
+      - '.github/workflows/publication-audit.yml'
+      - 'release/**'
+      - 'deployment/mu1440/**'
+      - 'modules/carplay/runtime/**'
+      - 'modules/navigation/runtime/**'
+      - 'runtime/diagnostics/**'
+      - 'runtime/deployment/**'
+      - 'tools/prepare_mu1440_sd.sh'
+      - 'tools/check_mu1440_target_shell.py'
+      - 'tools/check_module_index.py'
+      - 'artifacts/mu1440/**'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: mu1440-aid10-current-release
+  group: mu1440-aid10-package-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 env:
-  TAG: mu1440-aid10-dev-current
+  TAG_PREFIX: mu1440-aid10-dev
   ZIP_NAME: MHI2_AltScreen_MU1440_AID10_DEV_CURRENT.zip
 
 jobs:
-  release:
+  build:
+    name: Assemble and verify pinned MU1440 developer package
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact release commit
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Final release audit
         shell: bash
         run: |
           set -euxo pipefail
+          # Release packages use pinned existing binaries; source builds have separate CI.
+          python3 tools/check_module_index.py --self-test
+          python3 tools/validate_modular_package.py --self-test
+          test -s modules/carplay/runtime/auto-direct/common.sh
+          test -s modules/carplay/runtime/isotx2-gate/install_preload.sh
+          test -s modules/carplay/runtime/parity/parity_session.sh
+          test -s modules/navigation/runtime/gen2_nav_config.sh
+          test -s runtime/deployment/session.sh
 
           test "$(sha256sum artifacts/mu1440/altscreen111/vehicle-tested-2026-09-27/libaltscreen111.so | awk '{print $1}')" = \
             "094e3f1abfbf949f8c11b27e048e8213e5fc71178e62efd3c56deed8ee3bf8d8"
@@ -42,10 +83,10 @@ jobs:
             "b065bab0e1c58f8439a3bdd73d2d4cb6060cbac1c943e5b425425eb453c94b34"
           test "$(sha256sum artifacts/mu1440/most20fps/vehicle-tested-2026-09-29/MIBR-Most20FPS.jar | awk '{print $1}')" = \
             "dbd45609fe4ba69948d39e9e649b224484f680f6aa7934b68c261a4d360ea5bb"
-          test "$(sha256sum artifacts/mu1440/sha256sum-compat/build-confirmed-current/sha256sum | awk '{print $1}')" = \
-            "5e8836b845005d942f155913e2398c7b1ed72582ade9ee4f56e56ce58f77d32f"
-          test "$(sha256sum artifacts/mu1440/tee-compat/build-confirmed-current/tee | awk '{print $1}')" = \
-            "522d7a7cb15e585d7978dbb885de57fec123e8fb3ce06979feb3986609ad54d4"
+          # These helpers are build-confirmed, not the historical vehicle-pinned media binaries.
+          # Verify their checked-in SHA manifests instead of stale constant digests.
+          (cd artifacts/mu1440/sha256sum-compat/build-confirmed-current && sha256sum -c sha256sum.sha256)
+          (cd artifacts/mu1440/tee-compat/build-confirmed-current && sha256sum -c tee.sha256)
 
           grep -Fq 'EXPECTED_GEN2=094e3f1abfbf949f8c11b27e048e8213e5fc71178e62efd3c56deed8ee3bf8d8' deployment/mu1440/install.sh
           grep -Fq 'EXPECTED_REMUX=b761a8741682e3cbc6e05f5fe1705475c34c4805d1cd1ce09333274a301e735e' deployment/mu1440/install.sh
@@ -203,8 +244,9 @@ jobs:
           EOF
 
           {
-            echo "release_tag=$TAG"
-            echo "source_commit=$GITHUB_SHA"
+            echo "release_candidate_tag=${TAG_PREFIX}-${GITHUB_SHA:0:12}"
+            echo "packaging_commit=$GITHUB_SHA"
+            echo "build_kind=pinned_artifact_package_not_fresh_source_build"
             echo "target=MHI2_ER_SKG13_P4526_MU1440"
             echo "cluster=AID10-class"
             echo "deployment_generation=current_self_contained"
@@ -213,8 +255,8 @@ jobs:
             echo "isotx2_gate_sha256=05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957"
             echo "navignore_sha256=b065bab0e1c58f8439a3bdd73d2d4cb6060cbac1c943e5b425425eb453c94b34"
             echo "most20_sha256=dbd45609fe4ba69948d39e9e649b224484f680f6aa7934b68c261a4d360ea5bb"
-            echo "sha256sum_helper_sha256=5e8836b845005d942f155913e2398c7b1ed72582ade9ee4f56e56ce58f77d32f"
-            echo "tee_helper_sha256=522d7a7cb15e585d7978dbb885de57fec123e8fb3ce06979feb3986609ad54d4"
+            echo "sha256sum_helper_sha256=$(sha256sum artifacts/mu1440/sha256sum-compat/build-confirmed-current/sha256sum | awk '{print $1}')"
+            echo "tee_helper_sha256=$(sha256sum artifacts/mu1440/tee-compat/build-confirmed-current/tee | awk '{print $1}')"
           } > "$PKG/RELEASE-MANIFEST.txt"
 
           (
@@ -225,41 +267,53 @@ jobs:
           unzip -t "$ZIP_NAME"
           sha256sum "$ZIP_NAME" > "$ZIP_NAME.sha256"
 
-      - name: Publish only the current prerelease
+      - name: Upload verified package as CI artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mu1440-aid10-verified-package
+          path: |
+            ${{ env.ZIP_NAME }}
+            ${{ env.ZIP_NAME }}.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish explicitly approved immutable developer prerelease
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish == true }}
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact release commit and notes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download build-verified ZIP and hash
+        uses: actions/download-artifact@v4
+        with:
+          name: mu1440-aid10-verified-package
+
+      - name: Verify and publish unique prerelease tag
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euxo pipefail
-          NOTES=release/CURRENT.md
+          TAG="${TAG_PREFIX}-${GITHUB_SHA:0:12}"
+          sha256sum -c "$ZIP_NAME.sha256"
+          test -s release/CURRENT.md
 
-          # Recreate the stable "current" tag at the exact audited commit.
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release delete "$TAG" --yes --cleanup-tag
-          else
-            git push origin ":refs/tags/$TAG" >/dev/null 2>&1 || true
+          # Fail closed on an existing tag. Never rewrite tags or delete previous releases.
+          if git ls-remote --exit-code --tags --refs origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Refusing to replace existing immutable release tag: $TAG" >&2
+            exit 1
           fi
 
           gh release create "$TAG" "$ZIP_NAME" "$ZIP_NAME.sha256" \
             --target "$GITHUB_SHA" \
-            --title "MU1440 / AID10 developer test — current" \
-            --notes-file "$NOTES" \
-            --prerelease
-
-          # Keep exactly one visible release. Remove older developer releases and tags
-          # only after the new current release has been created successfully.
-          gh release list --limit 100 --json tagName --jq '.[].tagName' | while IFS= read -r OLD; do
-            [ -n "$OLD" ] || continue
-            [ "$OLD" = "$TAG" ] && continue
-            gh release delete "$OLD" --yes --cleanup-tag
-          done
-
-          # A manually deleted release may have left its tag behind. Remove historical
-          # developer-release tags as well, preserving only the stable current tag.
-          git ls-remote --tags --refs origin 'refs/tags/mu1440-aid10-dev-*' |
-            awk '{sub("refs/tags/","",$2); print $2}' |
-            while IFS= read -r OLD; do
-              [ -n "$OLD" ] || continue
-              [ "$OLD" = "$TAG" ] && continue
-              git push origin ":refs/tags/$OLD"
-            done
+            --title "MU1440 / AID10 pinned developer test — ${GITHUB_SHA:0:12}" \
+            --notes-file release/CURRENT.md \
+            --prerelease \
+            --latest=false
