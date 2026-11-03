@@ -8,8 +8,8 @@ was applied on a unit.
 ## Source and dependency boundary
 
 The controller is built against the canonical schema-2 settings implementation
-in `../../../../src/native/alt111-settings/` and its policy/header dependencies in
-`../../../../src/native/altscreen111-gen2/` and `../../../../src/native/sha256sum-compat/`. The canonical registry and
+in `../../../carplay/source/alt111-settings/` and its policy/header dependencies in
+`../../../carplay/source/altscreen111-gen2/` and `../../../carplay/source/sha256sum-compat/`. The canonical registry and
 value validators remain owned by that settings implementation. This module
 does not copy or regenerate a second settings registry.
 
