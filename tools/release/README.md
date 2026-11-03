@@ -210,3 +210,31 @@ legacy/config stores. A reviewed source-path map must include exact
 writer/readback/CRC/CAS and on-vehicle rollback conditions before the later
 coordinated persistent migration. `migration_authorized=false` remains
 binding even when this host evidence gate passes.
+
+## A2.3.2 source-linked persistent access graph (incomplete by design)
+
+`python3 tools/release/storage_access_graph.py --self-test --json-out storage-access-graph.json`
+generates a **host-only** combined graph from the existing CarPlay registry,
+broker C/Java declarations, lexical path triage, targeted consumer contracts
+and six high-risk marker fixtures. Publication CI uploads it alongside the
+existing source inventories.
+
+The graph enumerates the 13 CarPlay grouped stores and 13 Broker CAS stores,
+then separately includes other source-visible persistent path candidates,
+including backup/version/receipt files. It additionally reconstructs shell
+`ROOT=/mnt/app/root` plus filename assignments in both legacy navigation
+helpers, which a literal absolute-path scanner cannot see. All code-generated
+boot hook boundaries for Auto-Direct and isoTX2 are kept as separate
+outside-project restore obligations. This graph is **not** a complete live
+on-unit snapshot. Even a literal hit may come from a test, template or log,
+and a constructed candidate may have a historical alternate consumer.
+
+Each candidate has an explicit missing reader/writer/format/destination/
+rollback qualification; destination filenames are deliberately unset.
+`--require-complete` fails until every relevant installed and generated
+reader, writer, firmware adapter, installer, upgrade, uninstall and recovery
+path has been reviewed and exercised. Negative fixtures reject unsafe
+absolute paths, unexpected source collisions and a premature completion
+claim. **Do not use the generated graph as an installation plan or migrate
+files based solely on its category.** The detailed review and upcoming
+per-file ownership decisions belong to the next A2.3/A3 source PRs.
