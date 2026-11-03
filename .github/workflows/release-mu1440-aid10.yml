@@ -1,36 +1,112 @@
-name: Release current MU1440 AID10 developer ZIP
+name: Release readiness - canonical modules and QNX shell safety
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
+  pull_request:
     paths:
-      - 'release/CURRENT.md'
+      - '.github/workflows/release-mu1440-aid10.yml'
+      - '.github/workflows/publication-audit.yml'
+      - 'release/**'
+      - 'deployment/mu1440/**'
+      - 'modules/**'
+      - 'settings/**'
+      - 'runtime/diagnostics/**'
+      - 'runtime/deployment/**'
+      - 'tools/release/**'
+      - 'tools/prepare_mu1440_sd.sh'
+      - 'tools/check_mu1440_target_shell.py'
+      - 'tools/check_module_index.py'
+      - 'tools/validate_modular_package.py'
+      - 'tools/build_*.sh'
+      - 'artifacts/mu1440/**'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '.github/workflows/release-mu1440-aid10.yml'
+      - '.github/workflows/publication-audit.yml'
+      - 'release/**'
+      - 'deployment/mu1440/**'
+      - 'modules/**'
+      - 'settings/**'
+      - 'runtime/diagnostics/**'
+      - 'runtime/deployment/**'
+      - 'tools/release/**'
+      - 'tools/prepare_mu1440_sd.sh'
+      - 'tools/check_mu1440_target_shell.py'
+      - 'tools/check_module_index.py'
+      - 'tools/validate_modular_package.py'
+      - 'tools/build_*.sh'
+      - 'artifacts/mu1440/**'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: mu1440-aid10-current-release
+  group: mu1440-aid10-package-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 env:
-  TAG: mu1440-aid10-dev-current
-  ZIP_NAME: MHI2_AltScreen_MU1440_AID10_DEV_CURRENT.zip
+  ZIP_NAME: MHI2_AltScreen_MU1440_AID10_LEGACY_CI_ONLY.zip
 
 jobs:
-  release:
+  plan:
+    name: Derive module impact and review release ownership
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Build owner/dependency plan (host only)
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          python3 tools/release/module_plan.py --self-test
+          python3 tools/check_module_index.py --self-test
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || -z "$BASE_SHA" || "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            python3 tools/release/module_plan.py --all --json-out release-module-plan.json
+          else
+            python3 tools/release/module_plan.py --base "$BASE_SHA" --head "$HEAD_SHA" --json-out release-module-plan.json
+          fi
+
+      - name: Upload release dependency plan (not a package)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mu1440-release-module-plan
+          path: release-module-plan.json
+          if-no-files-found: error
+          retention-days: 14
+
+  legacy:
+    name: Legacy MU1440 compatibility ZIP integrity (R3 publish blocked)
+    needs: plan
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact release commit
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Final release audit
         shell: bash
         run: |
           set -euxo pipefail
+          # Release packages use pinned existing binaries; source builds have separate CI.
+          python3 tools/check_module_index.py --self-test
+          python3 tools/validate_modular_package.py --self-test
+          python3 tools/release/qnx_scripts.py --self-test --canonical
+          python3 tools/release/audit_legacy.py --self-test
+          test -s modules/carplay/runtime/auto-direct/common.sh
+          test -s modules/carplay/runtime/isotx2-gate/install_preload.sh
+          test -s modules/carplay/runtime/parity/parity_session.sh
+          test -s modules/navigation/runtime/gen2_nav_config.sh
+          test -s runtime/deployment/session.sh
 
           test "$(sha256sum artifacts/mu1440/altscreen111/vehicle-tested-2026-09-27/libaltscreen111.so | awk '{print $1}')" = \
             "094e3f1abfbf949f8c11b27e048e8213e5fc71178e62efd3c56deed8ee3bf8d8"
@@ -42,10 +118,10 @@ jobs:
             "b065bab0e1c58f8439a3bdd73d2d4cb6060cbac1c943e5b425425eb453c94b34"
           test "$(sha256sum artifacts/mu1440/most20fps/vehicle-tested-2026-09-29/MIBR-Most20FPS.jar | awk '{print $1}')" = \
             "dbd45609fe4ba69948d39e9e649b224484f680f6aa7934b68c261a4d360ea5bb"
-          test "$(sha256sum artifacts/mu1440/sha256sum-compat/build-confirmed-current/sha256sum | awk '{print $1}')" = \
-            "5e8836b845005d942f155913e2398c7b1ed72582ade9ee4f56e56ce58f77d32f"
-          test "$(sha256sum artifacts/mu1440/tee-compat/build-confirmed-current/tee | awk '{print $1}')" = \
-            "522d7a7cb15e585d7978dbb885de57fec123e8fb3ce06979feb3986609ad54d4"
+          # These helpers are build-confirmed, not the historical vehicle-pinned media binaries.
+          # Verify their checked-in SHA manifests instead of stale constant digests.
+          (cd artifacts/mu1440/sha256sum-compat/build-confirmed-current && sha256sum -c sha256sum.sha256)
+          (cd artifacts/mu1440/tee-compat/build-confirmed-current && sha256sum -c tee.sha256)
 
           grep -Fq 'EXPECTED_GEN2=094e3f1abfbf949f8c11b27e048e8213e5fc71178e62efd3c56deed8ee3bf8d8' deployment/mu1440/install.sh
           grep -Fq 'EXPECTED_REMUX=b761a8741682e3cbc6e05f5fe1705475c34c4805d1cd1ce09333274a301e735e' deployment/mu1440/install.sh
@@ -88,6 +164,8 @@ jobs:
           PKG="$RUNNER_TEMP/pkg"
           mkdir -p "$PKG"
           tools/prepare_mu1440_sd.sh "$PKG"
+          # Validate exactly the shipped scripts, not only their source folders.
+          python3 tools/release/qnx_scripts.py --package-root "$PKG"
 
           test -x "$PKG/install.sh"
           test -x "$PKG/status.sh"
@@ -203,8 +281,9 @@ jobs:
           EOF
 
           {
-            echo "release_tag=$TAG"
-            echo "source_commit=$GITHUB_SHA"
+            echo "release_status=NOT_DISTRIBUTABLE_R3_PACKAGE_MISSING"
+            echo "packaging_commit=$GITHUB_SHA"
+            echo "build_kind=legacy_pinned_artifact_compatibility_audit"
             echo "target=MHI2_ER_SKG13_P4526_MU1440"
             echo "cluster=AID10-class"
             echo "deployment_generation=current_self_contained"
@@ -213,8 +292,8 @@ jobs:
             echo "isotx2_gate_sha256=05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957"
             echo "navignore_sha256=b065bab0e1c58f8439a3bdd73d2d4cb6060cbac1c943e5b425425eb453c94b34"
             echo "most20_sha256=dbd45609fe4ba69948d39e9e649b224484f680f6aa7934b68c261a4d360ea5bb"
-            echo "sha256sum_helper_sha256=5e8836b845005d942f155913e2398c7b1ed72582ade9ee4f56e56ce58f77d32f"
-            echo "tee_helper_sha256=522d7a7cb15e585d7978dbb885de57fec123e8fb3ce06979feb3986609ad54d4"
+            echo "sha256sum_helper_sha256=$(sha256sum artifacts/mu1440/sha256sum-compat/build-confirmed-current/sha256sum | awk '{print $1}')"
+            echo "tee_helper_sha256=$(sha256sum artifacts/mu1440/tee-compat/build-confirmed-current/tee | awk '{print $1}')"
           } > "$PKG/RELEASE-MANIFEST.txt"
 
           (
@@ -223,43 +302,22 @@ jobs:
             zip -9 -r "$GITHUB_WORKSPACE/$ZIP_NAME" .
           )
           unzip -t "$ZIP_NAME"
+          python3 tools/release/audit_legacy.py "$ZIP_NAME"
           sha256sum "$ZIP_NAME" > "$ZIP_NAME.sha256"
 
-      - name: Publish only the current prerelease
+      - name: Enforce modular release publication boundary
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euxo pipefail
-          NOTES=release/CURRENT.md
-
-          # Recreate the stable "current" tag at the exact audited commit.
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release delete "$TAG" --yes --cleanup-tag
-          else
-            git push origin ":refs/tags/$TAG" >/dev/null 2>&1 || true
+          # The frozen SD-root developer compatibility archive is NOT the R3
+          # common/profiles/source distribution. This check must not be reused
+          # as a positive release gate or as permission to upload a ZIP.
+          if python3 tools/validate_modular_package.py "$ZIP_NAME" 2> "$RUNNER_TEMP/r3-rejection.log"; then
+            echo "Unexpectedly accepted legacy flat package as modular R3" >&2
+            exit 1
           fi
-
-          gh release create "$TAG" "$ZIP_NAME" "$ZIP_NAME.sha256" \
-            --target "$GITHUB_SHA" \
-            --title "MU1440 / AID10 developer test — current" \
-            --notes-file "$NOTES" \
-            --prerelease
-
-          # Keep exactly one visible release. Remove older developer releases and tags
-          # only after the new current release has been created successfully.
-          gh release list --limit 100 --json tagName --jq '.[].tagName' | while IFS= read -r OLD; do
-            [ -n "$OLD" ] || continue
-            [ "$OLD" = "$TAG" ] && continue
-            gh release delete "$OLD" --yes --cleanup-tag
-          done
-
-          # A manually deleted release may have left its tag behind. Remove historical
-          # developer-release tags as well, preserving only the stable current tag.
-          git ls-remote --tags --refs origin 'refs/tags/mu1440-aid10-dev-*' |
-            awk '{sub("refs/tags/","",$2); print $2}' |
-            while IFS= read -r OLD; do
-              [ -n "$OLD" ] || continue
-              [ "$OLD" = "$TAG" ] && continue
-              git push origin ":refs/tags/$OLD"
-            done
+          grep -Fq 'unsafe archive path' "$RUNNER_TEMP/r3-rejection.log"
+          sha256sum -c "$ZIP_NAME.sha256"
+          echo "LEGACY_COMPATIBILITY_AUDIT=PASS"
+          echo "R3_MODULAR_RELEASE=BLOCKED"
+          echo "No ZIP artifact or GitHub Release is uploaded by this workflow."
