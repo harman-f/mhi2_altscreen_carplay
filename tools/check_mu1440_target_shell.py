@@ -19,6 +19,12 @@ import tempfile
 BLOCKED = re.compile(
     r"(?<![A-Za-z0-9_./-])(?:printf|sed|tr|sha256sum|tee)(?=\s|$|[;&|])"
 )
+# Absolute stock-tool assumptions can hide behind variables like SED=/bin/sed.
+# Only prohibit the three unavailable/unproven utilities here: an explicit,
+# verified package-owned sha256sum/tee helper is permitted elsewhere.
+ABSOLUTE_UNBUNDLED = re.compile(
+    r"/(?:[A-Za-z0-9_.+-]+/)*(?:sed|tr|printf)(?=$|[^A-Za-z0-9_.-])"
+)
 GREP_BRE_ALTERNATION = re.compile(r"\\\|")
 
 
@@ -28,7 +34,7 @@ def scan(path: Path) -> list[str]:
         stripped = line.lstrip()
         if not stripped or stripped.startswith("#"):
             continue
-        if BLOCKED.search(line):
+        if BLOCKED.search(line) or ABSOLUTE_UNBUNDLED.search(line):
             problems.append(f"{path}:{number}: forbidden/unbundled target command")
         if GREP_BRE_ALTERNATION.search(line):
             problems.append(f"{path}:{number}: non-portable grep BRE alternation")
@@ -44,6 +50,16 @@ def self_test() -> None:
         assert not scan(script), "simple echo was unexpectedly rejected"
         script.write_text("#!/bin/ksh\necho yes | tee log.txt\n", encoding="utf-8")
         assert scan(script), "unbundled tee was not rejected"
+        for source in (
+            "SED=/bin/sed",
+            "SED='/mnt/app/armle/usr/bin/sed'",
+            'SED="${SED:-/bin/sed}"',
+            "VALUE=${PATH_OVERRIDE:-/usr/bin/tr}",
+        ):
+            script.write_text("#!/bin/ksh\n" + source + "\n", encoding="utf-8")
+            assert scan(script), "unbundled absolute command path was accepted: " + source
+        script.write_text("#!/bin/ksh\nSED=$KIT/bin/qnx-helper\necho ready\n", encoding="utf-8")
+        assert not scan(script), "benign bundled helper assignment was rejected"
     print("QNX_SHELL_GATE_SELF_TEST=PASS")
 
 
