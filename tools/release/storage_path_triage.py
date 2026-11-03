@@ -38,7 +38,7 @@ def classify(fragment):
         if fragment.endswith(".enabled") or fragment.endswith(".disabled"):
             return "persistent-presence-marker", "migrate-format-aware"
         return "project-config", "map-reader-writer-format"
-    if (re.search(r"(?:[.-](?:enabled|disabled)|-disable|-force-(?:on|off))$", fragment)
+    if (re.search(r"(?:[.-](?:enabled|disabled)|-disable|[.-]force-(?:on|off))$", fragment)
             or fragment.endswith("/rgi.on")):
         return "persistent-presence-marker", "migrate-format-aware"
     if fragment.endswith("-owned"):
@@ -83,6 +83,8 @@ def dynamic_context(root, record):
         kind, action = "persistent-staging-path", "review-same-fs-staging-and-rollback"
     elif source_line.startswith("Changes are persistent under "):
         kind, action = "usage-documentation", "confirm-no-runtime-effect"
+    elif source_line.startswith("#define "):
+        kind, action = "compiled-path-macro", "trace-every-macro-consumer"
     elif (source_line.startswith("#") or source_line.startswith("/*")
           or source_line.startswith("*")):
         kind, action = "comment-or-documentation", "confirm-no-runtime-effect"
@@ -164,6 +166,8 @@ def self_test():
         "/tmp/mibr-parity-session.lock": "volatile-ipc-or-test",
         "/mnt/app/root/mibr-carplay-autodirect.enabled": "persistent-presence-marker",
         "/mnt/app/root/mibr-isotx2-gate-disable": "persistent-presence-marker",
+        "/mnt/app/root/mibr-carplay111-bit26.force-on": "persistent-presence-marker",
+        "/mnt/app/root/mibr-carplay111-bit26.force-off": "persistent-presence-marker",
         "/mnt/app/root/mibr-parity-status-enabled": "persistent-presence-marker",
         "/mnt/app/root/altscreen-u2/config/display-scaling.conf": "project-config",
         "/mnt/app/root/altscreen-u2/config/mibr-menu.conf": "project-config",
