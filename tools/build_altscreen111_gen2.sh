@@ -3,7 +3,7 @@ set -euo pipefail
 
 QCC="${QCC:-qcc}"
 SRC_ROOT="${SRC_ROOT:-src/native/altscreen111-gen2}"
-VDATA="${VDATA:-src/native/vehicle-data}"
+VDATA="${VDATA:-modules/carplay/source/vehicle-data}"
 OUT="${1:-build/libaltscreen111.so}"
 
 mkdir -p "$(dirname "$OUT")"
