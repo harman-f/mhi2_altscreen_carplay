@@ -159,3 +159,30 @@ and aliases, and every boot/upgrade/uninstall/rollback consumer. Until that
 work and negative recovery tests are complete, `migration_authorized=false`
 in all reports and the earlier `--require-migration-ready` hard stop remains
 in force. This report does not modify runtime or on-unit storage.
+
+## A2.2 consumer cross-check (C/Java/QNX source, selected only)
+
+Run `python3 tools/release/storage_consumer_crosscheck.py --self-test --json-out storage-consumer-crosscheck.json`.
+Publication-audit CI produces this as a fourth JSON next to the source
+inventory, the per-owner review worklist and the lexical path triage.
+
+The host gate uses exact current source files to verify that the broker's
+**13 declared durable paths, magic strings and operations match the Java
+MibrDurableSwitch reader**. It also compares the shared firmware defaults
+path across broker, Java and GEN2; the native menu loader path against
+MibrMenuLayout; and the old /tmp + /mnt/app/root CarPlay grouped-store
+roots across selected C consumers. It explicitly checks that CarPlay
+persistent mutations remain `POLICY_BLOCKED`. Negative fixtures reject
+C/Java pathname drift, menu loader/Java divergence and a removed persistent
+write hard stop.
+
+A substantive migration trap is already evident: the parity-drive toggle
+is named `mibr-parity-drive.enabled`, but the current enable and disable
+scripts **write the values `1` and `0`**. A suffix ending in
+`.enabled` is therefore not evidence that the file is an existence-only
+toggle. Audit actual readers before converting or renaming any marker.
+
+This is **selected** source-proven evidence, not an exhaustive owner matrix:
+other native scripts/Java/installer/boot readers remain to be enumerated.
+No file is moved, no value becomes writable, and a unit migration is not
+authorized by this CI PASS.
