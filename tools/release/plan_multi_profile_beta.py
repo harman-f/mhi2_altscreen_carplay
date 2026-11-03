@@ -93,7 +93,8 @@ def self_test():
     plan = build_plan()
     assert not plan["errors"], plan["errors"]
     assert plan["all_three_in_standard_beta_package"] and plan["release_channel"] == "beta"
-    assert plan["missing_exact_firmware_hashes"] == ["seat-mu1409-p4708"]
+    # An exact MU1409 hash may be added without changing this test or the release design.
+    assert set(plan["missing_exact_firmware_hashes"]) <= {"seat-mu1409-p4708"}
     skoda = json.loads((ROOT / "modules/profiles/skoda-mu1440-p4526/profile.json").read_text())
     for field, val, error in (("release_channel", "stable", "beta release"),
                                ("release_inclusion", "optional", "exclude profile")):
