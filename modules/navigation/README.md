@@ -4,10 +4,10 @@ This page indexes navigation composition, routing, and route-guidance code alrea
 
 ## Source and runtime
 
-- [Navigation runtime helpers](../../runtime/navigation/)
+- [Navigation runtime helpers](runtime/)
 - [Route Guidance source](../../modules/navigation/source/)
 - [Route Guidance source notes and build inputs](../../modules/navigation/source/README.md)
-- [Java navigation/menu adapters](../../src/hmi/oem-menu/java/de/mibr/hmi/)
+- [Java navigation/menu adapters](../menu/source/java/de/mibr/hmi/)
 - [Navigation composition and safe-area architecture](../../docs/architecture/NAVIGATION_COMPOSITION_AND_SAFEAREA.md)
 - [Navigation composition test matrix](../../docs/testing/NAV_COMPOSITION_MATRIX_2026-09-27.md)
 

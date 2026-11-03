@@ -43,7 +43,7 @@ REQUIRED = [
     "src/native/parity-session/parity_session.c",
     "src/native/direct-ts-parity/direct_ts_parity.c",
     "src/native/mibr-control/mibr_v3_service.c",
-    "src/hmi/oem-menu/java/de/mibr/hmi/MibrControlClient.java",
+    "modules/menu/source/java/de/mibr/hmi/MibrControlClient.java",
     "runtime/parity/parity_drive_supervisor.sh",
     "tools/build_mu1440_source.sh",
 ]
@@ -93,10 +93,10 @@ OWNED_ARTWORK = {
     # Existing authored reference illustrations; no general image exception.
     'docs/testing/assets/MU1440_COLUMBUS_MIB25_LEFT_DISPLAY_CONTROLS.webp': 'b523b4ebe13ae223e4c46c2f9850d91082f2c68806ff1e652b264019b914c5dc',
     'docs/testing/assets/MU1440_OCTAVIA_III_2016_STEERING_WHEEL_CONTROL_MAP.webp': '83fb2817b09b4336acd304fe9b0795b88a385f8588870d942c9204690e949d89',
-    "src/hmi/oem-menu/assets/scroll/mibr_scroll_thumb.png": "3f883283a5af35a789ce76c3f414a3b030250bbf5a3d8b76421120d80e39cbee",
-    "src/hmi/oem-menu/assets/scroll/mibr_scroll_thumb_v2.png": "6d34382b9744264121871e8b092f1ab025619ee028b1f5ca30ffc030fe62f8f4",
-    "src/hmi/oem-menu/assets/scroll/mibr_scroll_track.png": "f33c96eada17e1573a81032c5301dc9e0c9e5320ad37be3bc2dd97386f6b27d4",
-    "src/hmi/oem-menu/assets/scroll/mibr_scroll_track_v2.png": "8b2f0d77dd89432e3faa043d0b0e1566d939366d42a6d3b2f8964645cd13f93b",
+    "modules/menu/source/assets/scroll/mibr_scroll_thumb.png": "3f883283a5af35a789ce76c3f414a3b030250bbf5a3d8b76421120d80e39cbee",
+    "modules/menu/source/assets/scroll/mibr_scroll_thumb_v2.png": "6d34382b9744264121871e8b092f1ab025619ee028b1f5ca30ffc030fe62f8f4",
+    "modules/menu/source/assets/scroll/mibr_scroll_track.png": "f33c96eada17e1573a81032c5301dc9e0c9e5320ad37be3bc2dd97386f6b27d4",
+    "modules/menu/source/assets/scroll/mibr_scroll_track_v2.png": "8b2f0d77dd89432e3faa043d0b0e1566d939366d42a6d3b2f8964645cd13f93b",
 }
 
 

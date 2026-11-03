@@ -10,8 +10,8 @@
 | Owner / native arbitration | [R52 owner reference](../../src/native/parity-session/), [native guard](../../src/native/altscreen111-gen2/src/alt111_native_gate.c), [legacy gate](../../src/native/isotx2-gate/) | Original installed outputs reproduced; canonical owner includes a host-tested failed-grace safety correction not yet vehicle-qualified |
 | Supervisor / diagnostics | [Parity runtime](../../runtime/parity/) | R49 behavior, same-stream retry/backoff, status/statistics layers, one native owner; curated public comments |
 | Native MIBR/3 | [Controller and support source](../../src/native/mibr-control/) | R57 service and KEY40/KEY44/view helper source; unchanged client/genkey; see current build evidence; STORE/TEMP/APPLY/ACTIVE remain distinct |
-| OEM-native HOME/settings | [Real R57 Java adapter](../../src/hmi/oem-menu/) | Own adapter/catalog/build/tests published; exact J9 rebuild requires external SDK and OEM API inputs |
-| UI assets | [Four owned scroll images](../../src/hmi/oem-menu/assets/scroll/README.md) | Hash-checked first-party artwork; eight OEM tile images excluded |
+| OEM-native HOME/settings | [Real R57 Java adapter](../../modules/menu/source/) | Own adapter/catalog/build/tests published; exact J9 rebuild requires external SDK and OEM API inputs |
+| UI assets | [Four owned scroll images](../../modules/menu/source/assets/scroll/README.md) | Hash-checked first-party artwork; eight OEM tile images excluded |
 | Optional speed / status | [Vehicle-data source](../../modules/carplay/source/vehicle-data/) | Installed GEN2 includes these adapters; experimental sender/phone acceptance remains open |
 | Other public modules | [Legacy remux](../../src/native/direct-ts-remux/), [keypanel](../../src/native/keypanel/), [independent HMI model](../../src/experimental/hmi-model/), [MIBR/3 model](../../src/experimental/mibr3/) | Retained reference/tooling; models are not competing runtime services |
 | SEAT/CUPRA | [Collaboration](../porting/SEAT_CUPRA_MU1409_COLLABORATION.md) and [local setup](../porting/SEAT_CUPRA_MU1409_LOCAL_ENVIRONMENT.md) | Public source is available as a port starting point; no validated MU1409 installer |

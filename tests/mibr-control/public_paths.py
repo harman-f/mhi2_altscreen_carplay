@@ -7,7 +7,7 @@ ROOT = TESTS.parents[1]
 NATIVE = ROOT / "src/native/mibr-control"
 DISPLAY_SCALING = ROOT / "src/native/display-scaling"
 RUNTIME = ROOT / "runtime/mibr-control"
-OEM_MENU = ROOT / "src/hmi/oem-menu"
+OEM_MENU = ROOT / "modules/menu/source"
 
 
 def write_default_profile(path):

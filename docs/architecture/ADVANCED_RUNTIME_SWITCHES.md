@@ -97,8 +97,8 @@ the physical 1280x480 cluster panel as the coded video contract.
 Development helper:
 
 ```sh
-runtime/navigation/gen2_safearea.sh status
-runtime/navigation/gen2_safearea.sh full
+modules/navigation/runtime/gen2_safearea.sh status
+modules/navigation/runtime/gen2_safearea.sh full
 ```
 
 Custom SafeArea values remain layout/target specific until vehicle-calibrated.

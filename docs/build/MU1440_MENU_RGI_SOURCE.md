@@ -25,7 +25,7 @@ integration.
 - Native controller: `bash tools/build_mibr_control.sh host` for the host binary;
   `bash tools/build_mu1440_source.sh <output>` inside the pinned QNX toolchain for
   the common native stack. See [the source-build guide](MU1440_R57_SOURCE.md).
-- Menu host contracts: `bash src/hmi/oem-menu/tests/run_view_model_test.sh` with a
+- Menu host contracts: `bash modules/menu/source/tests/run_view_model_test.sh` with a
   host JDK. The IBM J9 production compiler additionally requires locally supplied
   firmware API classes; those bytes are not part of this repository.
 - Route Guidance: follow [its standalone build inputs](../../modules/navigation/source/README.md).
