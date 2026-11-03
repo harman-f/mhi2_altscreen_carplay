@@ -8,6 +8,7 @@ on:
       - '.github/workflows/build-altscreen111-gen2.yml'
       - 'settings/**'
       - 'src/native/**'
+      - 'modules/broker/source/**'
       - 'modules/navigation/source/**'
       - 'modules/carplay/source/**'
       - 'modules/menu/source/**'
@@ -19,7 +20,7 @@ on:
       - 'tools/test_*.sh'
       - 'tools/source-overlays/**'
       - 'runtime/parity/**'
-      - 'runtime/mibr-control/**'
+      - 'modules/broker/runtime/**'
       - 'deployment/mu1440-parity-drive-v1/**'
   push:
     branches: [ main ]
@@ -28,6 +29,7 @@ on:
       - '.github/workflows/build-altscreen111-gen2.yml'
       - 'settings/**'
       - 'src/native/**'
+      - 'modules/broker/source/**'
       - 'modules/navigation/source/**'
       - 'modules/carplay/source/**'
       - 'modules/menu/source/**'
@@ -39,7 +41,7 @@ on:
       - 'tools/test_*.sh'
       - 'tools/source-overlays/**'
       - 'runtime/parity/**'
-      - 'runtime/mibr-control/**'
+      - 'modules/broker/runtime/**'
       - 'deployment/mu1440-parity-drive-v1/**'
 
 permissions:
@@ -103,12 +105,12 @@ jobs:
             runtime/parity/parity_profile.sh \
             runtime/parity/parity_session.sh \
             runtime/parity/parity_status.sh \
-            runtime/mibr-control/mibr-engine.ksh \
-            runtime/mibr-control/mibr-menu.ksh \
-            runtime/mibr-control/mibr-view.ksh \
-            runtime/mibr-control/mibr-watch.ksh \
-            runtime/mibr-control/mibr-v3-boot.ksh \
-            runtime/mibr-control/parity_drive_supervisor_r53.sh \
+            modules/broker/runtime/mibr-control/mibr-engine.ksh \
+            modules/broker/runtime/mibr-control/mibr-menu.ksh \
+            modules/broker/runtime/mibr-control/mibr-view.ksh \
+            modules/broker/runtime/mibr-control/mibr-watch.ksh \
+            modules/broker/runtime/mibr-control/mibr-v3-boot.ksh \
+            modules/broker/runtime/mibr-control/parity_drive_supervisor_r53.sh \
             deployment/mu1440-parity-drive-v1/session-logging.sh
 
       - name: Build and test MIBR/3 host controller
