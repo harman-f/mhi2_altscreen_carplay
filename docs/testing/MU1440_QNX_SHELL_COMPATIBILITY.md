@@ -60,6 +60,36 @@ The guarded public developer package carries its own reproducibly built QNX ARMv
 
 ### `sed` / `tr`
 
+**2026-11-03 multi-profile POC regression:** on SEAT MU1447/P4709 the SSH/MMX
+`mibr-kit.ksh check` printed `/bin/sed: cannot execute - No such file or directory`
+and then misleading downstream Lua/Firewall `BLOCK` messages. Its older source
+contained `SED=/bin/sed` and `TEE=/usr/bin/tee`, despite the previous host
+QNX scanner only rejecting *bare* `sed`/`tee`. A host mock with Linux tools
+available cannot prove these paths are present on the Unit.
+
+**Provenance and helper strategy:** the M.I.B. Bash project already carries
+dedicated ARM/QNX utility files at `apps/sbin/sed`, `apps/sbin/tee` and
+`apps/sbin/sha256sum`; `config/BASICS` and `config/GLOBALS` define
+`SED`/`TEE` to refer to the actual SD-root helpers. An *independent*
+MIBR release must not depend on M.I.B.'s card. Either eliminate the extra
+command entirely (preferred for simple parsing), or include the license-
+reviewed, version/hash-pinned compatible helper in its **own ZIP**. Point
+the installer at the ZIP-local helper during preflight and at its verified
+installed copy for later status/uninstall, only if that helper must persist.
+
+**Hard release gates:** detect bare calls AND absolute stock-looking pins
+(`/bin/sed`, `/usr/bin/sed`, `/mnt/app/armle/usr/bin/sed`,
+`/usr/bin/tee`, etc.) in all project target scripts. Require the final
+staged **ZIP** to include the declared helper files, their manifest hashes,
+correct ARM/QNX ABI and executable bits; rerun the scan on the exact extracted
+archive. A variable such as `SED="$KIT/bin/sed"` is allowed syntactically,
+but only the package-level gate can prove the binary is actually present.
+Stock OEM startup variants may have their own firmware-specific command
+paths: treat those as separately evidenced/hashed firmware assets and do not
+assume an installed project helper exists during early boot. Do not replace
+OEM startup tools with a path into `/mnt/app/root` without establishing
+boot-time mount availability.
+
 Do not make either a vehicle runtime dependency. `sed` is missing on some older firmware trains, so the stable deployment removed its only required use in favor of stock `awk`. Earlier live-monitor work also had to remove `tr`.
 
 ### R17.2 direct-MMX live evidence: `date` is not executable (2026-10-12)
