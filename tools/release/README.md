@@ -8,7 +8,7 @@ multi-profile release generator.
 
 ## Mandatory three-profile beta release inputs
 
-`python3 tools/release/plan_multi_profile_beta.py --self-test --json-out beta-profile-plan.json` emits the *same* common beta inclusion for Škoda MU1440 and both SEAT firmware families. Java adapters are per-firmware repairable; code and registry remain shared. This is a real CI input for the future R3 packager, not yet an executable installation ZIP. Final vehicle acceptance is common beta testing, not an exclusion gate. Exact missing JXE hashes and compiled ABI-specific Java must still be present in the final installer. Never manufacture substitutes.
+`python3 tools/release/plan_multi_profile_beta.py --self-test --json-out beta-profile-plan.json` emits the *same* common beta inclusion for Škoda MU1440 and both SEAT firmware families. Java adapters are per-firmware repairable; code and registry remain shared. This is a real CI input for the future R3 packager, not yet an executable installation ZIP. Final vehicle acceptance is common beta testing, not an exclusion gate. The three original LSD JXE SHA-256 profile selectors are now present in source. Exact compiled ABI-specific Java, target integration and package/vehicle qualification are still required for the final installer; never manufacture substitutes.
 
 ## Independent stages
 
