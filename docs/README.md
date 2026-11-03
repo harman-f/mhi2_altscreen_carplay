@@ -11,6 +11,8 @@ The pages here describe the **current public product/source, exact reference-tar
 
 [Repository components](../modules/) connects each module to its source, runtime, build tools, binary artifacts and documentation.
 
+**[Three-profile beta handoff and decision register (3 Nov 2026)](build/THREE_PROFILE_BETA_HANDOFF_2026-11-03.md)** — agreed common build/release pipeline, effective defaults, installer README/configuration matrix, end-to-end versioning, MMX storage/naming consolidation, migration safeguards and remaining acceptance work. This is an implementation handoff, not a published beta.
+
 The [MU1440 R57 source/build baseline](build/MU1440_R57_SOURCE.md) is the current entrypoint for source availability, native reproduction, the real OEM-menu/controller modules, and explicit Java/support-source exclusions. Dated vehicle reports below retain their original acceptance scope.
 
 1. [Features and goals](../README.md)
