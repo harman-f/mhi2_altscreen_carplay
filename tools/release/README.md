@@ -95,3 +95,94 @@ The generator reads the **canonical** CarPlay registry, broker durable-switch C 
 A separate lexical scan records literal `/mnt/app/root/mibr*`, `/mnt/app/root/altscreen-u2*` and `/tmp/mibr*` references in project-owned C/Java/shell/Python source, with source file and line. It intentionally does **not** infer a reader, writer, safe migration mapping or comprehensive handling of dynamically concatenated paths. No file is moved and no unit state is touched.
 
 The three CarPlay compatibility **presets** are not the three firmware **profiles**. The tool does not select a CarPlay preset for an installer, resolve user-persistent/platform overrides or assert a live effective value. A future multi-profile packager must supply an explicit selected preset and verified per-firmware overrides and fail its own final-package gate if these remain unresolved. Host inventory PASS is not an install or vehicle test.
+
+## Persistent-storage migration review queue (host-only)
+
+After the canonical source inventory is checked, run:
+
+```bash
+python3 tools/release/storage_migration_review.py --self-test --json-out storage-migration-review.json
+```
+
+The resulting review JSON is uploaded next to the existing defaults/path inventory
+in the `source-defaults-unit-path-inventory` CI artifact. It enumerates the 13
+source-defined CarPlay file groups and 13 separately owned broker switch files,
+showing their actual source-declared identity, lexical reference locations and
+**unapproved** proposed destination directory. It keeps the existing broker
+magic/revision/CAS contract intact. New unknown broker keys and duplicate
+broker source paths fail the audit; the built-in negative tests exercise both.
+
+All entries deliberately start at `PENDING`, with no chosen destination
+filename, completed consumer set or verified migration/restore path. A
+CarPlay basename is **not** independent proof of where its runtime writer
+opens the file; both its persistent and /tmp pathname are labeled candidates.
+Unmatched lexical fragments and source lines requiring dynamic-path review
+are separately listed. Comments, constants and generated paths can all produce
+false inferences if treated as verified readers/writers.
+
+`--require-migration-ready` intentionally **fails** on the current source.
+The JSON is a worklist for reviewing actual C, Java, shell, generated and
+boot-time consumers, not an approval to move persistent data, change defaults,
+replace format-specific files or operate a vehicle. Before a migration release
+is implemented, review every writer/reader and exact format, agree target
+filenames and establish all update/uninstall/power-loss recovery gates in
+[the on-unit storage contract](../../docs/architecture/UNIT_STORAGE_AND_NAMING_CONTRACT.md).
+
+## A2.2 — categorize lexical paths without mistaking them for configuration files
+
+Run after the source inventory and review generator:
+
+```bash
+python3 tools/release/storage_path_triage.py --self-test \
+  --review-json storage-migration-review.json \
+  --json-out storage-path-triage.json
+```
+
+This report groups the repeated lexical locations by **distinct literal fragment**
+and category. It separates `/tmp/mibr-*` IPC/test-state references (retain
+the volatile namespace), persistent presence/activation markers, known but
+format-specific config, version receipts, runtime/bin/scripts, backups,
+ownership receipts, and incomplete strings such as `%s.conf` or brace
+fragments. It also expands nonliteral path-source leads into their exact
+checkout line and categorizes environment `PATH`, root-directory composition,
+comments, embedded runtime environment and remaining unknown contexts.
+
+**A category is only a triage lead**, not proof of a real runtime file, safe
+destination, actual reader/writer role, live activation or a completed migration.
+Even `/tmp` references can be operationally relevant to boot/recovery; they
+must not be renamed by the persistence cleanup. Source references from test
+and host utilities are not treated as installed paths without evidence.
+
+Review the actual CI JSON, then construct a source-linked ownership map of
+each true persistent store, its single writer, all readers, exact file grammar
+and aliases, and every boot/upgrade/uninstall/rollback consumer. Until that
+work and negative recovery tests are complete, `migration_authorized=false`
+in all reports and the earlier `--require-migration-ready` hard stop remains
+in force. This report does not modify runtime or on-unit storage.
+
+## A2.2 consumer cross-check (C/Java/QNX source, selected only)
+
+Run `python3 tools/release/storage_consumer_crosscheck.py --self-test --json-out storage-consumer-crosscheck.json`.
+Publication-audit CI produces this as a fourth JSON next to the source
+inventory, the per-owner review worklist and the lexical path triage.
+
+The host gate uses exact current source files to verify that the broker's
+**13 declared durable paths, magic strings and operations match the Java
+MibrDurableSwitch reader**. It also compares the shared firmware defaults
+path across broker, Java and GEN2; the native menu loader path against
+MibrMenuLayout; and the old /tmp + /mnt/app/root CarPlay grouped-store
+roots across selected C consumers. It explicitly checks that CarPlay
+persistent mutations remain `POLICY_BLOCKED`. Negative fixtures reject
+C/Java pathname drift, menu loader/Java divergence and a removed persistent
+write hard stop.
+
+A substantive migration trap is already evident: the parity-drive toggle
+is named `mibr-parity-drive.enabled`, but the current enable and disable
+scripts **write the values `1` and `0`**. A suffix ending in
+`.enabled` is therefore not evidence that the file is an existence-only
+toggle. Audit actual readers before converting or renaming any marker.
+
+This is **selected** source-proven evidence, not an exhaustive owner matrix:
+other native scripts/Java/installer/boot readers remain to be enumerated.
+No file is moved, no value becomes writable, and a unit migration is not
+authorized by this CI PASS.
