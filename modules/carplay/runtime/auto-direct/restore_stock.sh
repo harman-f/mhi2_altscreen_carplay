@@ -16,9 +16,26 @@ fi
 AUTO_ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
 AUTO_BEGIN="# MIBR AUTO-DIRECT BEGIN"
 AUTO_END="# MIBR AUTO-DIRECT END"
-# Stage beside our own files on /mnt/app, not in /tmp (RAM): the final mv is
-# then a same-filesystem rename and lsd.sh is never left half-copied.
-AUTO_TMP=/mnt/app/root/lsd.sh.mibr-autodirect-remove.$$
+# Stage in the lsd.sh directory itself, not in /tmp (RAM): the final mv is
+# then a same-filesystem rename whatever the mount layout under /mnt/app is.
+AUTO_TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-autodirect-remove.$$
+# Integrity gate for a rewritten lsd.sh before it replaces the original:
+# the J9 start-line count must be unchanged and BEGIN/END marker lines must
+# form exactly WANT ordered pairs (WANT=- skips the pair check).
+lsd_check(){
+  awk -v b="$2" -v e="$3" -v want="$4" -v orig="$5" '
+    b != "" && $0 == b { nb++; if (open) bad=1; open=1 }
+    e != "" && $0 == e { ne++; if (!open) bad=1; open=0 }
+    /^\$J9/ { nj++ }
+    END {
+      if (nj != orig || nj < 1) exit 1
+      if (want != "-" && (bad || open || nb != want || ne != want)) exit 1
+    }
+  ' "$1"
+}
+j9_count(){
+  awk '/^\$J9/ { n++ } END { print n+0 }' "$1"
+}
 
 if [ -x "$BASE/scripts/direct_ts_auto_stop.sh" ]; then
   "$BASE/scripts/direct_ts_auto_stop.sh" >/dev/null 2>&1 || {
@@ -40,8 +57,10 @@ if [ -e "$AUTO_ENABLED" ] || grep -Fq "$AUTO_BEGIN" /mnt/app/eso/hmi/lsd/lsd.sh 
         END { if (skip) exit 42 }
       ' /mnt/app/eso/hmi/lsd/lsd.sh > "$AUTO_TMP"
       ARC=$?
-      # Never install a stripped lsd.sh that lost its J9 start line.
-      if [ "$ARC" -eq 0 ] && ! grep '^\$J9' "$AUTO_TMP" >/dev/null 2>&1; then
+      # Never install a stripped lsd.sh that lost a J9 start line or still
+      # holds an Auto-Direct marker line.
+      if [ "$ARC" -eq 0 ] && ! lsd_check "$AUTO_TMP" "$AUTO_BEGIN" "$AUTO_END" 0 \
+          "$(j9_count /mnt/app/eso/hmi/lsd/lsd.sh)"; then
         ARC=43
       fi
       if [ "$ARC" -eq 0 ]; then
@@ -60,7 +79,10 @@ if [ -e "$AUTO_ENABLED" ] || grep -Fq "$AUTO_BEGIN" /mnt/app/eso/hmi/lsd/lsd.sh 
       fi
     fi
     sync
-    mount -ur /mnt/app 2>/dev/null || true
+    mount -ur /mnt/app 2>/dev/null || {
+      log "ERROR /mnt/app did not return to read-only"
+      FAIL=1
+    }
   else
     log "ERROR cannot mount /mnt/app rw to clear Auto-Direct persistence"
     FAIL=1
@@ -91,7 +113,10 @@ if [ -r "$BACKUP" ]; then
         rm -f "$TARGET.restore" 2>/dev/null || true
         FAIL=1
       fi
-      mount -ur /mnt/system 2>/dev/null || true
+      mount -ur /mnt/system 2>/dev/null || {
+        log "ERROR /mnt/system did not return to read-only"
+        FAIL=1
+      }
     else
       log "ERROR cannot mount /mnt/system rw for restore"
       FAIL=1
@@ -126,7 +151,10 @@ if [ "$C" = "$EXPECTED_SMARTPHONE" ] && [ -e /mnt/app/root/mibr-carplay111-viewa
   if mount -uw /mnt/app 2>/dev/null; then
     rm -f /mnt/app/root/mibr-carplay111-viewareas.enabled 2>/dev/null || true
     sync
-    mount -ur /mnt/app 2>/dev/null || true
+    mount -ur /mnt/app 2>/dev/null || {
+      log "ERROR /mnt/app did not return to read-only"
+      FAIL=1
+    }
     [ ! -e /mnt/app/root/mibr-carplay111-viewareas.enabled ] || {
       log "ERROR ViewArea fallback marker could not be removed"
       FAIL=1
@@ -141,7 +169,10 @@ if [ "$C" = "$EXPECTED_SMARTPHONE" ] && [ -e "$CARPLAY_HOOK" ]; then
   if mount -uw /mnt/app 2>/dev/null; then
     rm -f "$CARPLAY_HOOK" "$CARPLAY_HOOK".new.* 2>/dev/null || true
     sync
-    mount -ur /mnt/app 2>/dev/null || true
+    mount -ur /mnt/app 2>/dev/null || {
+      log "ERROR /mnt/app did not return to read-only"
+      FAIL=1
+    }
     if [ -e "$CARPLAY_HOOK" ]; then
       log "ERROR persistent CarPlay111 hook could not be removed"
       FAIL=1

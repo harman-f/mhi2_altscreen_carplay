@@ -67,6 +67,18 @@ public final class MibrDurableRevisionTest {
         check("offf".equals(MibrPlatformDefaults.get("nav_line")),"probe pd same size+mtime");
         pd0.delete();
 
+        /* Old fixed timestamps (no racy window involved): a same-size rewrite
+           that carries a different old mtime, e.g. a restore that keeps the
+           backup's mtime, is seen. A rewrite that keeps both size and the
+           exact old mtime is a documented limit of any mtime+size cache. */
+        long old1=System.currentTimeMillis()-60000L,old2=old1-60000L;
+        write(sw,"MIBR_NAV_LINE/1\nrevision=11\nvalue=off\n");
+        sw.setLastModified(old1);
+        check("off".equals(d.persistedValue()),"old stamp first");
+        write(sw,"MIBR_NAV_LINE/1\nrevision=4\nvalue=dist\n");
+        sw.setLastModified(old2);
+        check("dist".equals(d.persistedValue()),"older stamp same size seen");
+
         /* platform defaults: change, new length, delete */
         File pd=new File(dir,"pd.conf");
         MibrPlatformDefaults.path=pd.getPath();

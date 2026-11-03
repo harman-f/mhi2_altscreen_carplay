@@ -276,8 +276,11 @@ Java and native C now apply the same revision rule: canonical decimal, no
 leading zero (except `0`), at most `18446744073709551615`. The Java switch,
 menu-layout and platform-defaults readers cache by mtime/length, but do not
 trust an mtime younger than 2 s, and platform defaults are re-read when the
-file changes (broker C reopens them on every lookup). A file whose mtime lies
-ahead of the unit clock keeps the plain cache rule. The broker
+file changes (broker C reopens them on every lookup). An entry read while its
+mtime was inside that window is never trusted later. A file whose mtime lies
+ahead of the unit clock keeps the plain cache rule. Limit: a foreign rewrite
+that keeps both the size and the exact old mtime stays invisible to any
+mtime+size cache; writers must not restore an old mtime onto a changed file. The broker
 C's own guarded CAS/fsync/rename/readback/RO restoration does not protect
 the older independent navigation scripts or the menu shell's separate loader.
 

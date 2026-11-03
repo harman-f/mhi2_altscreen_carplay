@@ -6,13 +6,30 @@ runtime_init_durable || { echo "AUTO_DIRECT_ENABLE=FAIL_RUNTIME"; exit 3; }
 DSTBASE=/mnt/app/root/altscreen-u2
 ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
 LSD=/mnt/app/eso/hmi/lsd/lsd.sh
-# Stage beside our own files on /mnt/app, not in /tmp (RAM): the final mv is
-# then a same-filesystem rename and lsd.sh is never left half-copied.
-TMP=/mnt/app/root/lsd.sh.mibr-autodirect.$$
+# Stage in the lsd.sh directory itself, not in /tmp (RAM): the final mv is
+# then a same-filesystem rename whatever the mount layout under /mnt/app is.
+TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-autodirect.$$
 MARKER_BEGIN="# MIBR AUTO-DIRECT BEGIN"
 MARKER_END="# MIBR AUTO-DIRECT END"
 BOOTCMD='/bin/ksh /mnt/app/root/altscreen-u2/scripts/direct_ts_auto_start.sh >/tmp/mibr-direct-auto-boot.log 2>&1 || true'
 APP_RW=0
+# Integrity gate for a rewritten lsd.sh before it replaces the original:
+# the J9 start-line count must be unchanged and BEGIN/END marker lines must
+# form exactly WANT ordered pairs (WANT=- skips the pair check).
+lsd_check(){
+  awk -v b="$2" -v e="$3" -v want="$4" -v orig="$5" '
+    b != "" && $0 == b { nb++; if (open) bad=1; open=1 }
+    e != "" && $0 == e { ne++; if (!open) bad=1; open=0 }
+    /^\$J9/ { nj++ }
+    END {
+      if (nj != orig || nj < 1) exit 1
+      if (want != "-" && (bad || open || nb != want || ne != want)) exit 1
+    }
+  ' "$1"
+}
+j9_count(){
+  awk '/^\$J9/ { n++ } END { print n+0 }' "$1"
+}
 
 fail(){
   RC=$1
@@ -80,20 +97,28 @@ if ! grep -Fq "$MARKER_BEGIN" "$LSD" 2>/dev/null; then
     { print }
     END { if (!done) exit 42 }
   ' "$LSD" > "$TMP" || fail 30 "boot_patch"
+  lsd_check "$TMP" "$MARKER_BEGIN" "$MARKER_END" 1 "$(j9_count "$LSD")" || fail 34 "boot_patch_integrity"
   chmod 755 "$TMP" 2>/dev/null || true
   mv "$TMP" "$LSD" || fail 31 "boot_install"
 fi
 
-touch "$ENABLED" || fail 32 "enable_marker"
+# MIBR_KEEP_MARKER_STATE=1 (installer upgrade): refresh scripts and hook but
+# keep a user's earlier "off" (marker absent).
+if [ "${MIBR_KEEP_MARKER_STATE:-0}" = "1" ] && [ ! -e "$ENABLED" ]; then
+  MARKER_STATE=absent_preserved
+else
+  touch "$ENABLED" || fail 32 "enable_marker"
+  MARKER_STATE=present
+fi
 sync
-mount -ur /mnt/app 2>/dev/null || true
+mount -ur /mnt/app 2>/dev/null || { APP_RW=0; echo "AUTO_DIRECT_ENABLE=FAIL app_ro"; exit 33; }
 APP_RW=0
 
 if [ "${MIBR_PREPARE_ONLY:-0}" = "1" ]; then
   echo "AUTO_DIRECT_ENABLE=PREPARED"
   echo "runtime_start=SKIPPED_UNTIL_REBOOT"
   echo "boot_hook=present"
-  echo "enabled_marker=$ENABLED"
+  echo "enabled_marker=$ENABLED state=$MARKER_STATE"
   exit 0
 fi
 

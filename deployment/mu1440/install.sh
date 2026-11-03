@@ -60,12 +60,38 @@ app_rw(){
   return 0
 }
 
+RO_FAIL=0
+# A failed return to read-only is recorded and makes the run fail; APP_RW
+# stays 1 so the exit trap tries again.
 app_ro(){
   if [ "$APP_RW" -eq 1 ]; then
     sync 2>/dev/null || true
-    mount -ur /mnt/app 2>/dev/null || true
-    APP_RW=0
+    if mount -ur /mnt/app 2>/dev/null; then
+      APP_RW=0
+    else
+      RO_FAIL=1
+      echo "ERROR /mnt/app did not return to read-only"
+      return 1
+    fi
   fi
+  return 0
+}
+# Integrity gate for a rewritten lsd.sh before it replaces the original:
+# the J9 start-line count must be unchanged and BEGIN/END marker lines must
+# form exactly WANT ordered pairs (WANT=- skips the pair check).
+lsd_check(){
+  awk -v b="$2" -v e="$3" -v want="$4" -v orig="$5" '
+    b != "" && $0 == b { nb++; if (open) bad=1; open=1 }
+    e != "" && $0 == e { ne++; if (!open) bad=1; open=0 }
+    /^\$J9/ { nj++ }
+    END {
+      if (nj != orig || nj < 1) exit 1
+      if (want != "-" && (bad || open || nb != want || ne != want)) exit 1
+    }
+  ' "$1"
+}
+j9_count(){
+  awk '/^\$J9/ { n++ } END { print n+0 }' "$1"
 }
 
 cleanup(){
@@ -218,8 +244,9 @@ normalize_java_state(){
   JARDIR=/mnt/app/eso/hmi/lsd/jars
   NAVJAR=$JARDIR/MIBR-NavIgnore.jar
   MOSTJAR=$JARDIR/MIBR-Most20FPS.jar
-  # Same-filesystem stage (see uninstall.sh): atomic rename over lsd.sh.
-  TMP=/mnt/app/root/lsd.sh.mibr-deploy-normalize.$$
+  # Stage in the lsd.sh directory itself: the final mv is then a rename on
+  # the same filesystem whatever the mount layout under /mnt/app is.
+  TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-deploy-normalize.$$
   KEEP_NAV=0
   KEEP_MOST=0
 
@@ -260,6 +287,10 @@ normalize_java_state(){
     ' "$LSD" > "$TMP" || fail "java_normalize_lsd"
   fi
 
+  lsd_check "$TMP" "" "" - "$(j9_count "$LSD")" || {
+    rm -f "$TMP" 2>/dev/null || true
+    fail "java_normalized_lsd_integrity"
+  }
   chmod 755 "$TMP" 2>/dev/null || true
   mv "$TMP" "$LSD" || fail "java_install_normalized_lsd"
 
@@ -467,7 +498,7 @@ install_required_navignore(){
 
   JARDIR=/mnt/app/eso/hmi/lsd/jars
   JAR=$JARDIR/MIBR-NavIgnore.jar
-  TMP=/mnt/app/root/lsd.sh.mibr-deploy-navignore.$$
+  TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-deploy-navignore.$$
   MARKER='# MIBR NAVIGNORE'
   OWNED=/mnt/app/root/mibr-deploy-navignore-owned
 
@@ -495,6 +526,10 @@ install_required_navignore(){
     { print }
     END { if (!done) exit 42 }
   ' "$LSD" > "$TMP" || fail "navignore_patch_lsd"
+  lsd_check "$TMP" "" "" - "$(j9_count "$LSD")" || {
+    rm -f "$TMP" 2>/dev/null || true
+    fail "navignore_lsd_integrity"
+  }
   chmod 755 "$TMP" 2>/dev/null || true
   mv "$TMP" "$LSD" || fail "navignore_install_lsd"
   : > "$OWNED" || fail "navignore_owned_marker"
@@ -505,7 +540,7 @@ install_required_navignore(){
 install_required_most20(){
   JARDIR=/mnt/app/eso/hmi/lsd/jars
   JAR=$JARDIR/MIBR-Most20FPS.jar
-  TMP=/mnt/app/root/lsd.sh.mibr-deploy-most20.$$
+  TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-deploy-most20.$$
   MARKER='# MIBR MOST20FPS'
   OWNED=/mnt/app/root/mibr-deploy-most20-owned
 
@@ -533,6 +568,10 @@ install_required_most20(){
     { print }
     END { if (!done) exit 42 }
   ' "$LSD" > "$TMP" || fail "most20_patch_lsd"
+  lsd_check "$TMP" "" "" - "$(j9_count "$LSD")" || {
+    rm -f "$TMP" 2>/dev/null || true
+    fail "most20_lsd_integrity"
+  }
   chmod 755 "$TMP" 2>/dev/null || true
   mv "$TMP" "$LSD" || fail "most20_install_lsd"
   : > "$OWNED" || fail "most20_owned_marker"
@@ -556,11 +595,15 @@ apply(){
     exit "$PRC"
   fi
 
-  # A previous install already applied the defaults below; whatever the
-  # D2 marker and navigation files hold now is the user's choice and must
-  # survive an upgrade. MIBR_RESET_DEFAULTS=1 applies the defaults again.
+  # A previous successful apply leaves this receipt. Only then are the D2,
+  # navigation and Auto-Direct values the user's choice and kept on
+  # upgrade. Without it (first install, or an install older than the
+  # receipt) the defaults are applied once, as before. Uninstall removes it.
+  # MIBR_RESET_DEFAULTS=1 applies the defaults again.
+  RECEIPT=$DST/version/install-defaults.receipt
+  D2_OWNED=$DST/version/ownership/d2-marker.owned
   PRIOR_INSTALL=0
-  [ -r "$DST/scripts/gen2_nav_config.sh" ] && PRIOR_INSTALL=1
+  [ -r "$RECEIPT" ] && PRIOR_INSTALL=1
   [ "${MIBR_RESET_DEFAULTS:-0}" = "1" ] && PRIOR_INSTALL=0
 
   stage_runtime
@@ -585,8 +628,13 @@ apply(){
   else
     echo "=== enable persistent D2 keyframe recovery default ==="
     app_rw || fail "d2_persistent_mount_app_rw"
-    : > /mnt/app/root/mibr-alt111-keyframe-policy.enabled || fail "d2_persistent_marker"
-    app_ro
+    if [ ! -e /mnt/app/root/mibr-alt111-keyframe-policy.enabled ]; then
+      : > /mnt/app/root/mibr-alt111-keyframe-policy.enabled || fail "d2_persistent_marker"
+      # Only a marker this installer created is removed again by uninstall.
+      mkdir -p "$DST/version/ownership" || fail "d2_ownership_dir"
+      : > "$D2_OWNED" || fail "d2_ownership_marker"
+    fi
+    app_ro || fail "d2_persistent_app_ro"
     D2_RESULT=persistent_default
     echo "D2_KEYFRAMES=PERSISTENT_DEFAULT watchdog_ms=1000 min_gap_ms=1000"
 
@@ -595,14 +643,38 @@ apply(){
     NAV_RESULT=map-rich
   fi
 
+  # On upgrade a user who switched Auto-Direct off keeps it off: the scripts
+  # and boot hook are refreshed, the enable marker is not recreated.
+  AD_KEEP=0
+  AD_RESULT=enabled_default
+  if [ "$PRIOR_INSTALL" -eq 1 ] && [ ! -e /mnt/app/root/mibr-carplay-autodirect.enabled ]; then
+    AD_KEEP=1
+    AD_RESULT=preserved_off
+  elif [ "$PRIOR_INSTALL" -eq 1 ]; then
+    AD_RESULT=preserved_on
+  fi
   echo "=== enable Auto-Direct persistence without pre-reboot runtime takeover ==="
-  MIBR_PREPARE_ONLY=1 "$DST/scripts/direct_ts_auto_enable.sh" || fail "auto_direct_prepare_rc_$?"
+  MIBR_PREPARE_ONLY=1 MIBR_KEEP_MARKER_STATE=$AD_KEEP \
+    "$DST/scripts/direct_ts_auto_enable.sh" || fail "auto_direct_prepare_rc_$?"
+
+  app_rw || fail "receipt_mount_app_rw"
+  mkdir -p "$DST/version" || fail "receipt_dir"
+  {
+    echo "MIBR_INSTALL_DEFAULTS/1"
+    echo "d2=$D2_RESULT"
+    echo "navigation=$NAV_RESULT"
+    echo "auto_direct=$AD_RESULT"
+  } > "$RECEIPT.new" || fail "receipt_write"
+  mv "$RECEIPT.new" "$RECEIPT" || fail "receipt_install"
+  app_ro || fail "receipt_app_ro"
+  [ "$RO_FAIL" -eq 0 ] || fail "app_ro_restore_failed_earlier"
 
   echo
   echo "MIBR_INSTALL=PASS"
   echo "navigation_profile=$NAV_RESULT"
   echo "most20=enabled_by_default"
   echo "d2_keyframes=$D2_RESULT"
+  echo "auto_direct=$AD_RESULT"
   echo "d2_watchdog_ms=1000"
   echo "REBOOT_REQUIRED=YES"
   echo "After reboot: ./status.sh"

@@ -268,7 +268,7 @@ jobs:
           grep -Fq 'JAVA_USER_DECISION=ARCHIVE_AND_CONTINUE' deployment/mu1440/install.sh
           grep -Fq 'JAVA_USER_DECISION=ABORT' deployment/mu1440/install.sh
           grep -Fq 'Bundled exact NavIgnore payload verified before Java normalization.' deployment/mu1440/install.sh
-          grep -Fq 'TMP=/mnt/app/root/lsd.sh.mibr-deploy-normalize.$$' deployment/mu1440/install.sh
+          grep -Fq 'TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-deploy-normalize.$$' deployment/mu1440/install.sh
           grep -Fq 'VIN, FAZIT and device serial numbers are intentionally not collected.' runtime/deployment/session.sh
           grep -Fq 'mode=READ_ONLY_TARGET' deployment/mu1440/compatibility-report.sh
           grep -Fq 'writes=deployment_media_only' deployment/mu1440/compatibility-report.sh
