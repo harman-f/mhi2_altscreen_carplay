@@ -3,7 +3,7 @@ set -euo pipefail
 
 FFMPEG_VERSION="${FFMPEG_VERSION:-6.1.5}"
 FFMPEG_SHA256="${FFMPEG_SHA256:-b8c8e926b948c14df1264cd0beac1c773df9170ac9cac97bdf1275cd3d385902}"
-SRC="${1:-src/native/direct-ts-remux/direct_ts_remux.c}"
+SRC="${1:-modules/carplay/source/direct-ts-remux/direct_ts_remux.c}"
 OUT="${2:-build/direct-ts-remux}"
 WORK="${WORK:-build/ffmpeg-remux}"
 JOBS="${JOBS:-2}"

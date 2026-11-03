@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SRC="${1:-src/native/direct-ts-parity/direct_ts_parity.c}"
+SRC="${1:-modules/carplay/source/direct-ts-parity/direct_ts_parity.c}"
 OUT="${2:-build/direct-ts-parity}"
 CC="${CC:-arm-unknown-nto-qnx6.5.0eabi-gcc}"
 

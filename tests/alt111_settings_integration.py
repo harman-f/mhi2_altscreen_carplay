@@ -9,11 +9,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = [
-    'src/native/alt111-settings/settings_cli.c',
-    'src/native/alt111-settings/settings_core.c',
-    'src/native/alt111-settings/settings_posix.c',
-    'src/native/altscreen111-gen2/src/alt111_policy.c',
-    'src/native/sha256sum-compat/sha256sum_compat.c',
+    'modules/carplay/source/alt111-settings/settings_cli.c',
+    'modules/carplay/source/alt111-settings/settings_core.c',
+    'modules/carplay/source/alt111-settings/settings_posix.c',
+    'modules/carplay/source/altscreen111-gen2/src/alt111_policy.c',
+    'modules/carplay/source/sha256sum-compat/sha256sum_compat.c',
 ]
 
 with tempfile.TemporaryDirectory() as td:
@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory() as td:
     binary = root / 'alt111-settings'
     subprocess.run(['cc', '-O2', '-g', '-std=gnu99', '-Wall', '-Wextra', '-Werror',
                     '-DALT111_SETTINGS_TEST', '-DMIBR_SHA256_LIBRARY_ONLY',
-                    '-Isrc/native/altscreen111-gen2/include', '-Isrc/native/alt111-settings/include',
+                    '-Imodules/carplay/source/altscreen111-gen2/include', '-Imodules/carplay/source/alt111-settings/include',
                     *SOURCES, '-o', str(binary)], cwd=ROOT, check=True)
     env = {**os.environ, 'ALT111_SETTINGS_TEMP_ROOT': str(temp),
            'ALT111_SETTINGS_PERSISTENT_ROOT': str(persistent)}

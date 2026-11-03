@@ -1,5 +1,5 @@
 /* Three-view line: the patched settings core accepts up to three areas, nothing else changed. */
-#include "../src/native/alt111-settings/include/alt111_settings.h"
+#include "../modules/carplay/source/alt111-settings/include/alt111_settings.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>

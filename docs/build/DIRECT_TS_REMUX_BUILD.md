@@ -66,7 +66,7 @@ Conceptually:
 
 ```text
 tools/build_direct_ts_remux.sh \
-  src/native/direct-ts-remux/direct_ts_remux.c \
+  modules/carplay/source/direct-ts-remux/direct_ts_remux.c \
   build/direct-ts-remux
 ```
 

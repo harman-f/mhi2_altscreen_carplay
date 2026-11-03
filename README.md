@@ -76,7 +76,7 @@ Stock primary CarPlay type 110 stays separate from private auxiliary 111. An acc
 
 ## Published source and developer release
 
-The public repository already includes project-owned **GEN2 receiver C**, **Direct-TS remux C**, **MOST writer and exclusive gate C**, runtime/deployment and diagnostic code; start at [src/native](src/native/), [runtime](runtime/) and [full coverage table](docs/status/PUBLISHED_SOURCE_COVERAGE.md).
+The public repository already includes project-owned **GEN2 receiver C**, **Direct-TS remux C**, **MOST writer and exclusive gate C**, runtime/deployment and diagnostic code; start at [CarPlay module](modules/carplay/), [runtime](runtime/) and [full coverage table](docs/status/PUBLISHED_SOURCE_COVERAGE.md).
 
 **The latest integrated source for newer parity/supervisor, Java HMI, MIBR/3 controller and optional vehicle-data modules is not yet distributed here as a cohesive source or release.** Closing historical experimental PRs did not import them into main. Each new public source package needs dependency, license, build and appropriate vehicle-evidence review.
 

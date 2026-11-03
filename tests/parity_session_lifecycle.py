@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-source=(ROOT/"src/native/parity-session/parity_session.c").read_text()
+source=(ROOT/"modules/carplay/source/parity-session/parity_session.c").read_text()
 with tempfile.TemporaryDirectory() as td:
     root=Path(td)
     names=["DMDT","IPL_CONFIG","STATE_PATH","PID_PATH","BRIDGE_PID_PATH","LOCK_PATH",
@@ -30,15 +30,15 @@ with tempfile.TemporaryDirectory() as td:
         assert count==1,name
     source=source.replace("#define DMDT_TIMEOUT_MS 5000u","#define DMDT_TIMEOUT_MS 500u")
     (root/"session.c").write_text(source)
-    (root/"bound_process.h").write_text((ROOT/"src/native/parity-session/bound_process.h").read_text())
+    (root/"bound_process.h").write_text((ROOT/"modules/carplay/source/parity-session/bound_process.h").read_text())
     binary=root/"session";settings=root/"settings"
-    shared=["src/native/alt111-settings/settings_core.c","src/native/alt111-settings/settings_posix.c",
-            "src/native/altscreen111-gen2/src/alt111_policy.c",
-            "src/native/sha256sum-compat/sha256sum_compat.c"]
+    shared=["modules/carplay/source/alt111-settings/settings_core.c","modules/carplay/source/alt111-settings/settings_posix.c",
+            "modules/carplay/source/altscreen111-gen2/src/alt111_policy.c",
+            "modules/carplay/source/sha256sum-compat/sha256sum_compat.c"]
     common=["cc","-std=gnu99","-Wall","-Wextra","-Werror","-DMIBR_SHA256_LIBRARY_ONLY",
-            "-Isrc/native/altscreen111-gen2/include","-Isrc/native/alt111-settings/include"]
+            "-Imodules/carplay/source/altscreen111-gen2/include","-Imodules/carplay/source/alt111-settings/include"]
     subprocess.run(common+["-DALT111_SESSION_TEST",str(root/"session.c"),*shared,"-o",str(binary)],cwd=ROOT,check=True)
-    subprocess.run(common+["-DALT111_SETTINGS_TEST","src/native/alt111-settings/settings_cli.c",*shared,
+    subprocess.run(common+["-DALT111_SETTINGS_TEST","modules/carplay/source/alt111-settings/settings_cli.c",*shared,
                    "-o",str(settings)],cwd=ROOT,check=True)
     env={**os.environ,"ALT111_SETTINGS_TEMP_ROOT":str(root),"ALT111_SETTINGS_PERSISTENT_ROOT":str(root/"persistent")}
     def cfg(*args):

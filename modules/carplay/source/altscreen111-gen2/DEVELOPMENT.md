@@ -3,7 +3,7 @@
 This directory now carries the project-authored source overlay for the installed MU1440 R38
 `libaltscreen111.so` checkpoint. The implementation is based on the public source tree at
 `324b4f249883bb707e0d0a8995b2b6b5fe23be25`, with the source additions in this repository's
-`settings/`, `src/native/alt111-settings/`, `modules/carplay/source/vehicle-data/`, and the three-view changes in
+`settings/`, `modules/carplay/source/alt111-settings/`, `modules/carplay/source/vehicle-data/`, and the three-view changes in
 this directory.
 
 The installed binary recorded for this source is SHA-256
