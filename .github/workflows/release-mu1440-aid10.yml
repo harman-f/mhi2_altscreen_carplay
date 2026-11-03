@@ -253,6 +253,22 @@ jobs:
 
           No additional project payload needs to be downloaded before testing.
 
+          SOURCE-DEFINED CONFIGURATION DEFAULTS (MU1440 reference, not live readback):
+            CarPlay auxiliary video: enabled (carplay.enabled=1 in registry)
+            Phone route arrows: disabled by default (carplay_nav=off)
+            Arrow source: auto; display: side (preconfigured while arrows remain off)
+            Navigation composition after installer apply: map-rich
+            DisplayManager gate: STOCK fail-safe
+            Auto-Direct: persistent setup prepared; verify after reboot
+            D2 keyframe policy: persistent; 1000 ms watchdog and minimum request gap
+            Default menu definition in source: brand=skoda
+
+          The full 48-key registry and 13 broker-switch matrix, including apply timing,
+          is maintained in docs/configuration/DEFAULT_CONFIGURATION_MATRIX.md in the
+          source repository. The beta's future single-ZIP installer must include both
+          this detailed matrix and a profile-specific default/override summary.
+          This legacy CI package is not a complete multi-firmware beta release.
+
           EXISTING JAVA PATCHES:
           If a foreign/older Java or bootclasspath state is found, --check archives it on the
           SD card and reports PREFLIGHT=ATTENTION. During --apply you choose:

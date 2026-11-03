@@ -57,6 +57,15 @@ and [VEHICLE_TEST_PROTOCOL.md](testing/VEHICLE_TEST_PROTOCOL.md#4-verify-the-typ
 
 **Requirement for all future packages:** [persistent Type-111 firewall installer contract](installation/TYPE111_FIREWALL_INSTALLER_CONTRACT.md). The existing developer installer does **not yet** implement automatic PF mutation/restore. Its external firewall prerequisite remains a blocking check; any future automatic patch must discover all actual boot/network-selected profile variants, validate candidates without loading them, preserve exact backups, and prove the **effective** `carplay0` permit again after boot and relevant interface transitions. The SEAT/MU1409 contributor test package starts with a read-only/offline check, not a live hot-reload or blind overwrite.
 
+## Configuration defaults (source vs. installed state)
+
+See the complete [default-configuration matrix](configuration/DEFAULT_CONFIGURATION_MATRIX.md) for **all 48 CarPlay registry settings**, **13 broker-owned durable switches**, and the default-menu entries that are not separate setting keys. The matrix distinguishes the three CarPlay *presets* from the three firmware *profiles*; it lists values and their activation boundaries rather than implying vehicle qualification.
+
+- Source defaults enable the CarPlay auxiliary stream (`carplay.enabled=1`), while **phone-sourced navigation arrows default to off** (`carplay_nav=off`). Display choices for arrows do not activate that independent route-data feature.
+- The MU1440 developer installer uses navigation profile `map-rich`, sets the DisplayManager gate to STOCK fail-safe and prepares Auto-Direct persistence. It installs the exact NavIgnore and Most20 reference payloads. Its current script **enables persistent D2 keyframe recovery** with a 1,000 ms watchdog and 1,000 ms request-gap minimum.
+- `tools/menu-editor/standard-menu.txt` sets **menu layout and visibility**, not feature activation, and currently declares `brand=skoda`. A future single beta package must stage the appropriate menu and firmware overrides for all three profiles.
+- Saved values and `mibr-platform-defaults.conf` may change effective settings. The final package's installer README must document the **selected actual defaults and overrides** from the same inputs used in assembly; do not present this source inventory as proof that a beta installer already exists.
+
 ## Prepare
 
 From a workstation checkout:
@@ -118,8 +127,7 @@ The installer:
 
 ## Keyframe policy
 
-The vehicle-proven D2 keyframe policy is available, but the current 1 s watchdog is intentionally
-still under tuning. The installer therefore does not silently make that policy permanent.
+The current MU1440 developer installer intentionally enables persistent D2 keyframe recovery (1 s watchdog / 1 s minimum request gap) and documents the runtime opt-out. This is a target-specific development default; broader vehicle acceptance remains pending.
 
 ## SafeArea
 
