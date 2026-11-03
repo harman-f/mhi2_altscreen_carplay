@@ -46,3 +46,9 @@ own agent and tool documentation instead of transplanting target-shell constrain
 ## Modular repository architecture and release lineage
 
 For repository layout/migrations, module source ownership, build-to-binary traceability, and staged multi-target release assembly, follow [the development repository contract](docs/architecture/REPOSITORY_LAYOUT.md) together with the existing [R3 package layout](docs/build/PACKAGE_LAYOUT.md). These specify the migration target, not permission to publish private material or bypass platform/release qualification.
+
+## Canonical development branch after module consolidation (owner decision 2026-11-03)
+
+Develop new **independently publishable AltScreen product code** directly in this repository on short-lived branches targeting `develop`, following `modules/module-index.json` and [the module layout contract](docs/architecture/REPOSITORY_LAYOUT.md). Private Research remains the owner of source-restricted firmware/OEM material, raw vehicle tests, private analyses and internal agent coordination—not a second ongoing canonical product-code implementation. Publication and licensing restrictions apply just as strictly on `develop` as on `main`.
+
+A byte-identical development-source relocation does **not** require an extra manual binary build or an additional vehicle test. Update true source/build/test paths and preserve installed/distribution destinations; use the existing required CI and focused impacted tests. Reuse valid unchanged evidence and only repeat a check when a relevant input changed or an actual defect demands it. Future module moves must not silently introduce cyclic source dependencies. The same existing Unit operation and requirements gates remain mandatory for any target-facing change.
