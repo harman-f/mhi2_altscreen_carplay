@@ -8,7 +8,7 @@ import time
 import unittest
 
 from public_paths import NATIVE, ROOT
-BOUND_PROCESS_INCLUDE = ROOT / "src/native/parity-session"
+BOUND_PROCESS_INCLUDE = ROOT / "modules/carplay/source/parity-session"
 CC = shutil.which(os.environ.get("CC", "cc")) or shutil.which("gcc")
 SOURCE = NATIVE / "mibr_broker_quiesce.c"
 
