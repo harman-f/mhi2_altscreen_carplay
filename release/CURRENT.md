@@ -4,6 +4,32 @@ This is the currently pinned **MU1440-specific developer prerelease**, not the n
 
 The effective 29 September Most20/D2 update at the end of this file is incorporated into the consolidated statements below; later release-tag decisions require their own verification.
 
+## Release-build and publication gates (2026-11-03)
+
+The workflow [`release-mu1440-aid10.yml`](../.github/workflows/release-mu1440-aid10.yml)
+now **builds and validates the developer ZIP as a CI artifact** when relevant release,
+deployment, runtime-module or pinned binary inputs change on a PR or on `main`.
+It checks the canonical module paths, shell-safety scans, exact vehicle-pinned media
+hashes, the checked-in SHA-256 receipts for the separately **build-confirmed**
+`sha256sum`/`tee` tools, the final seven-file payload inventory and the archive's
+checksums. The resulting ZIP and its `.sha256` file are downloadable from the Actions run.
+
+**This is packaging of pinned prebuilt binaries, not a recompilation of the latest
+GEN2/Broker source**. QNX source-build jobs and their outputs remain separate; a green
+release-packaging workflow does not promote them into this vehicle-tested bundle,
+prove reproducibility or qualify a new car/firmware. It does not create the future
+multi-profile R3 ZIP.
+
+GitHub publication is **never automatic on a source or documentation push**.
+To publish a reviewed package, run the workflow manually on `main`, setting
+`publish=true`. The workflow first validates the exact checked-out revision,
+then creates a prerelease under the immutable tag
+`mu1440-aid10-dev-<12-character-commit-sha>`. It will not move an existing tag,
+overwrite an existing release or delete older releases and their provenance.
+Do not use this gate to assert vehicle qualification of the current assembly process.
+
+
+
 ## Validated reference target
 
 - MHI2 train: `MHI2_ER_SKG13_P4526_MU1440`
