@@ -21,6 +21,16 @@ BLOCKED = re.compile(
 )
 GREP_BRE_ALTERNATION = re.compile(r"\\\|")
 
+# A command pinned to a stock-looking absolute path is *not* bundled support.
+# In particular the legacy MIBR installer used SED=/bin/sed: the old bare-name
+# check missed it, then the real MU1447 MMX reported /bin/sed missing.
+# Use an audited, manifest-listed project helper or prove an exact target-specific
+# stock path in a separately reviewed OEM asset; never infer one across firmware.
+SYSTEM_TOOL_PIN = re.compile(
+    r"(?<![A-Za-z0-9_.-])/(?:bin|usr/bin|mnt/app/armle/usr/bin)/"
+    r"(?:sed|tr|sha256sum|tee)(?=$|[\s;|\"'])"
+)
+
 
 def scan(path: Path) -> list[str]:
     problems: list[str] = []
@@ -30,6 +40,8 @@ def scan(path: Path) -> list[str]:
             continue
         if BLOCKED.search(line):
             problems.append(f"{path}:{number}: forbidden/unbundled target command")
+        if SYSTEM_TOOL_PIN.search(line):
+            problems.append(f"{path}:{number}: unbundled absolute QNX utility path")
         if GREP_BRE_ALTERNATION.search(line):
             problems.append(f"{path}:{number}: non-portable grep BRE alternation")
     return problems
@@ -44,6 +56,14 @@ def self_test() -> None:
         assert not scan(script), "simple echo was unexpectedly rejected"
         script.write_text("#!/bin/ksh\necho yes | tee log.txt\n", encoding="utf-8")
         assert scan(script), "unbundled tee was not rejected"
+        for cmd in ("SED=/bin/sed", 'SED="/usr/bin/sed"',
+                    "echo x | /bin/sed s/x/y/",
+                    "TEE=/usr/bin/tee", "SED=/mnt/app/armle/usr/bin/sed",
+                    "SHA=/bin/sha256sum"):
+            script.write_text("#!/bin/ksh\n" + cmd + "\n", encoding="utf-8")
+            assert scan(script), "absolute unbundled helper was not rejected: " + cmd
+        script.write_text('#!/bin/ksh\nSED="$KIT/bin/sed"\n', encoding="utf-8")
+        assert not scan(script), "explicit package-owned sed path was rejected"
     print("QNX_SHELL_GATE_SELF_TEST=PASS")
 
 
