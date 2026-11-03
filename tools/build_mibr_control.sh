@@ -4,13 +4,13 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 SRC="$ROOT/modules/broker/source/mibr-control"
-ALT_ROOT=${ALT111_SOURCE_ROOT:-"$ROOT/src/native"}
+ALT_ROOT=${ALT111_SOURCE_ROOT:-"$ROOT/modules/carplay/source"}
 OUT=${MIBR_CONTROL_OUT:-"$ROOT/build/mibr-control"}
 MODE=${1:-host}
 CC=${CC:-cc}
 QNX_IMAGE=${MIBR_QNX_IMAGE:-mibr-qnx65-temp:4.9}
 QNX_CC=arm-unknown-nto-qnx6.5.0eabi-gcc
-SCALING_ROOT="$ROOT/modules/broker/source/display-scaling"
+SCALING_ROOT="$ROOT/modules/carplay/source/display-scaling"
 INC="-I$ALT_ROOT/altscreen111-gen2/include -I$ALT_ROOT/alt111-settings/include -I$SCALING_ROOT"
 CORE=(
   "$ALT_ROOT/alt111-settings/settings_core.c"
@@ -100,7 +100,7 @@ case "$MODE" in
     MSYS_NO_PATHCONV=1 docker run --rm --platform=linux/amd64 \
       -v "$DOCKER_ROOT:/repo:ro" -v "$DOCKER_OUT:/out" \
       --entrypoint /bin/bash "$QNX_IMAGE" -ec '
-        R=/repo; S=$R/modules/broker/source/mibr-control; A=$R/src/native; B=$R/modules/broker/source/display-scaling; T=/tmp/mibr-control-out
+        R=/repo; S=$R/modules/broker/source/mibr-control; A=$R/modules/carplay/source; B=$R/modules/carplay/source/display-scaling; T=/tmp/mibr-control-out
         mkdir -p "$T"
         C=arm-unknown-nto-qnx6.5.0eabi-gcc
         I="-I$A/altscreen111-gen2/include -I$A/alt111-settings/include -I$B"
