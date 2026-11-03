@@ -186,3 +186,27 @@ This is **selected** source-proven evidence, not an exhaustive owner matrix:
 other native scripts/Java/installer/boot readers remain to be enumerated.
 No file is moved, no value becomes writable, and a unit migration is not
 authorized by this CI PASS.
+
+## A2.3 legacy marker semantics and boot/source evidence
+
+Run `python3 tools/release/legacy_marker_contract.py --self-test --json-out legacy-marker-contract.json`.
+The publication audit uploads the resulting source-pinned, machine-readable
+review together with the earlier storage-path and consumer evidence.
+
+It distinguishes six risky current file contracts: file-presence Auto-Direct
+(including the generated OEM launcher hook); D2 persistent→volatile presence
+bridge for retained older binaries; parity drive's actual `1`/`0` **content**
+in a filename ending `.enabled`; inverse-polarity isoTX2 disable marker
+embedded into DisplayManager startup; the broker's strict two-byte `1\n`
+single-writer admission gate; and parity diagnostic `temp > persistent >
+default` value-file precedence. Per role, the script checks the exact
+current source token and records that source's SHA-256. Negative fixtures
+reject missing/changed evidence. This does not authorize a replacement
+format, rename, boot-hook modification, or unit write.
+
+**Next:** separately enumerate additional readers, code-generated boot
+content, restore paths, file ownership collisions and the remaining
+legacy/config stores. A reviewed source-path map must include exact
+writer/readback/CRC/CAS and on-vehicle rollback conditions before the later
+coordinated persistent migration. `migration_authorized=false` remains
+binding even when this host evidence gate passes.
