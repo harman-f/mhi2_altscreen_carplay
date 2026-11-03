@@ -1,0 +1,41 @@
+name: Develop source promotion gate
+
+# This job supplies the existing protected develop branch's required
+# "PR source gate" context; it must execute real source and publication checks.
+on:
+  pull_request:
+    branches: [ develop ]
+  push:
+    branches: [ develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    name: PR source gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Publication and portable source verification
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -s docs/architecture/REPOSITORY_LAYOUT.md
+          test -s docs/build/PACKAGE_LAYOUT.md
+          python3 tools/audit_public_repo.py
+          python3 tools/validate_modular_package.py --self-test
+          python3 -B tests/test_public_mibr3.py
+          python3 tools/check_mu1440_target_shell.py --self-test --check \
+            runtime/diagnostics/keypanel_trace_discovery.sh
+          # The module index arrives with the independently tested physical
+          # migration. Once present, it becomes a mandatory source gate.
+          if test -e modules/module-index.json; then
+            python3 tools/check_module_index.py --self-test
+          fi
