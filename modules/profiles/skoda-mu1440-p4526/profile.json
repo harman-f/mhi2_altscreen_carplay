@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "profile_id": "skoda-mu1440-p4526",
+  "brand": "skoda",
+  "firmware": "MHI2_ER_SKG13_P4526_MU1440",
+  "release_channel": "beta",
+  "release_inclusion": "required",
+  "structure_acceptance": "assumed",
+  "final_system_test": "pending",
+  "selector": {
+    "source": "/ifs/lsd.jxe",
+    "algorithm": "sha256",
+    "digest": "a55d9cfb69c5756f8202b7f7aa4079d4d5b637ae4c2fd0fe723f1d6816cbeea8"
+  },
+  "common_modules": [
+    "carplay",
+    "broker",
+    "menu",
+    "navigation"
+  ],
+  "java": {
+    "shared_source": "modules/menu/source",
+    "adapter_status": "r57-reference-java-source",
+    "firmware_specific_updates_supported": true
+  },
+  "groups": [
+    "hmi",
+    "icons",
+    "display",
+    "input",
+    "integration"
+  ]
+}
