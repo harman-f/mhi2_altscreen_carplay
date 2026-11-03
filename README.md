@@ -7,6 +7,8 @@
 >
 > Use is at your own risk and subject to the applicable licenses; this notice does not add restrictions to the [GPL-3.0-or-later](LICENSE). The project is **independent of Volkswagen AG and other named manufacturers**. Its license does not grant rights to OEM firmware, binaries, trademarks or third-party components. See [rights and attribution](THIRD_PARTY_NOTICES.md), [security and vehicle-test guidance](SECURITY.md), [compatibility](docs/testing/COMPATIBILITY_MATRIX.md) and the [current developer release scope](release/CURRENT.md).
 
+[Configuration defaults matrix](docs/configuration/DEFAULT_CONFIGURATION_MATRIX.md) · [Installer defaults and caveats](docs/INSTALLATION.md)
+
 [Menu, controller and Route Guidance source build](docs/build/MU1440_MENU_RGI_SOURCE.md) · [Menu editor](tools/menu-editor/mibr-menu-editor.html)
 
 **Find a component:** [CarPlay and video](modules/carplay/) · [Broker and input](modules/broker/) · [Menu](modules/menu/) · [Navigation](modules/navigation/) · [Platform profiles](modules/profiles/). Each component page connects its source, runtime, build tools, binary artifacts and documentation.
