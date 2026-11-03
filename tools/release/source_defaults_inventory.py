@@ -32,6 +32,9 @@ LITERAL_PATH = re.compile(
 )
 SCAN_ROOTS = ("modules", "runtime", "deployment", "src", "settings", "tools")
 SCAN_EXTS = {".c", ".h", ".java", ".sh", ".ksh", ".py"}
+# Audit generators contain documentation examples, not installed QNX paths.
+SELF_AUDIT_TOOLS = {"tools/release/storage_migration_review.py",
+                    "tools/release/storage_path_triage.py"}
 
 
 class InventoryError(ValueError):
@@ -197,6 +200,8 @@ def literal_path_inventory(root):
             if path.stat().st_size > 1_000_000:
                 raise InventoryError("source unexpectedly large: " + str(path))
             relative = path.relative_to(root).as_posix()
+            if relative in SELF_AUDIT_TOOLS:
+                continue
             for line_number, line in enumerate(
                 path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
             ):
@@ -286,6 +291,10 @@ def self_test(root=ROOT):
         rejects(lambda text=corrupted: broker_inventory(text, header))
     assert LITERAL_PATH.search("/mnt/app/root/mibr-carplay111-enabled") is not None
     assert LITERAL_PATH.search("/tmp/mibr-status") is not None
+    assert not any(r["source"] in SELF_AUDIT_TOOLS
+                   for r in valid["unit_path_evidence"]["references"])
+    assert not any(r["source"] in SELF_AUDIT_TOOLS
+                   for r in valid["unit_path_evidence"]["unresolved_source_lines"])
     print("SOURCE_DEFAULTS_INVENTORY_SELF_TEST=PASS")
 
 
