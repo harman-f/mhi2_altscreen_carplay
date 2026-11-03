@@ -128,6 +128,45 @@ def proposed(row, specs):
     return item["relative_target"], item["owner_role"], item["format_policy"]
 
 
+def lifecycle_policy(owner, format_policy):
+    """Design decisions only; the installer does not implement these yet."""
+    if format_policy.startswith("hold-"):
+        return {
+            "upgrade": "retain-legacy-original-unchanged-pending-ownership",
+            "uninstall": "do-not-delete-unproven-or-unowned-original",
+            "user_reset": "excluded-until-legacy-alias-resolved",
+        }
+    if owner in ("stock-boot-preimage",):
+        return {
+            "upgrade": "preserve-exact-original-bytes-and-provenance",
+            "uninstall": "restore-and-verify-stock-before-backup-disposal",
+            "user_reset": "never-delete-stock-preimage",
+        }
+    if owner in ("installer-ownership-receipt",):
+        return {
+            "upgrade": "carry-forward-actual-patch-ownership-evidence",
+            "uninstall": "clear-only-after-verified-owned-patch-rollback",
+            "user_reset": "not-a-user-preference",
+        }
+    if owner in ("product-version-receipt", "component-version-receipt"):
+        return {
+            "upgrade": "write-after-complete-verified-release-install",
+            "uninstall": "remove-only-after-successful-release-rollback",
+            "user_reset": "not-a-user-preference",
+        }
+    if owner == "platform-defaults":
+        return {
+            "upgrade": "firmware-fingerprint-bound-replacement-only",
+            "uninstall": "restore-original-if-owned-and-snapshotted",
+            "user_reset": "not-a-user-preference",
+        }
+    return {
+        "upgrade": "preserve-current-user-intent-or-fail-on-ambiguous-alias",
+        "uninstall": "preserve-user-preferences-unless-explicit-authorized-reset",
+        "user_reset": "remove-only-explicitly-selected-owned-preferences",
+    }
+
+
 def build(graph, specs=None):
     if specs is None:
         specs = source_spec()
@@ -172,6 +211,12 @@ def build(graph, specs=None):
             "owner_role": owner,
             "native_format_or_conversion_policy": policy,
             "candidate_destination_path": destination,
+            "source_certainty": original["source_certainty"],
+            "source_evidence": original["evidence"],
+            "selected_observed_reader_api": original.get("observed_reader_api"),
+            "selected_observed_writer_api": original.get("observed_writer_api"),
+            "selected_native_format_identity": original.get("observed_format_identity"),
+            "proposed_lifecycle": lifecycle_policy(owner, policy),
             "verified_destination_path": None,
             "requires_joint_reader_writer_cutover": destination is not None,
             "actual_writer_and_every_reader_qualified": False,
@@ -248,6 +293,12 @@ def self_test():
     assert rows[OLD + "altscreen-u2/config/mibr-v3-single-writer.enabled"][
         "candidate_destination_path"] is None
     assert all(r["verified_destination_path"] is None for r in plan["records"])
+    assert rows[OLD + "mibr-isotx2-gate-backup/startup.sh.stock"][
+        "proposed_lifecycle"]["user_reset"] == "never-delete-stock-preimage"
+    assert rows[OLD + "mibr-kit/components.manifest"][
+        "proposed_lifecycle"]["user_reset"] == "not-a-user-preference"
+    assert rows[OLD + "mibr-carplay111-viewareas.conf"][
+        "proposed_lifecycle"]["upgrade"].startswith("preserve-current-user-intent")
     assert not valid_target("config/carplay/../bad.conf")
     assert not valid_target("/tmp/mibr-danger.conf")
     assert not valid_target("config/carplay/unsafe.tmp")
