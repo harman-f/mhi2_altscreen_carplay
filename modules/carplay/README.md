@@ -1,17 +1,17 @@
 # CarPlay and media module
 
-This page maps the existing CarPlay/video implementation. The repository has not yet been moved into the package's proposed `common/carplay/` tree; the paths below remain canonical.
+The canonical project-owned media source and runtime inputs are physically co-located in this module. Source relocation does not change the package's installed paths or qualify any firmware/vehicle target.
 
 ## Source and runtime
 
-- [GEN2 / Type-111 source](../../src/native/altscreen111-gen2/)
+- [GEN2 / Type-111 source](source/altscreen111-gen2/)
 - [GEN2 source build and evidence](../../docs/build/INSTALLED_GEN2_SOURCE.md)
-- [Direct-TS remux source](../../src/native/direct-ts-remux/)
-- [Direct-TS parity source](../../src/native/direct-ts-parity/)
+- [Direct-TS remux source](source/direct-ts-remux/)
+- [Direct-TS parity source](source/direct-ts-parity/)
 - [MOST transport writer](source/most-ts-writer/)
 - [Optional vehicle-data/iAP2 adapter sources](source/vehicle-data/) (shared GEN2 build; host-tested source, no new Unit qualification)
-- [Automatic direct runtime](../../runtime/auto-direct/)
-- [Exclusive native display gate](../../src/native/isotx2-gate/)
+- [Automatic direct runtime](runtime/auto-direct/)
+- [Exclusive native display gate](source/isotx2-gate/)
 - [Vehicle-tested artifact inventory](../../artifacts/mu1440/)
 
 ## Build, support, and evidence
