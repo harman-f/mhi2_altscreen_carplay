@@ -30,6 +30,8 @@ def safe_rel(name):
 
 def regular_file(root, relative):
     path = root / safe_rel(relative)
+    if not path.resolve().is_relative_to(root.resolve()):
+        raise ValueError("reference escapes source root: " + relative)
     if path.is_symlink() or not path.is_file():
         raise ValueError("missing/non-regular file: " + relative)
     return path
@@ -66,7 +68,7 @@ def collect_inputs(root, index, modules):
 
 
 def parse_artifacts(root, index, specs):
-    found, seen = [], set()
+    found, seen, seen_paths = [], set(), set()
     for spec in specs:
         pair, sep, filename = spec.partition("=")
         module, colon, logical = pair.partition(":")
@@ -80,6 +82,9 @@ def parse_artifacts(root, index, specs):
         rel = safe_rel(filename)
         if not rel.startswith("build/"):
             raise ValueError("build output must be under build/: " + rel)
+        if rel in seen_paths:
+            raise ValueError("one binary cannot have multiple declared output names: " + rel)
+        seen_paths.add(rel)
         source = regular_file(root, rel)
         found.append({"module": module, "logical_name": logical, "path": rel,
                       "sha256": sha_file(source), "size": source.stat().st_size})
@@ -152,6 +157,13 @@ def verify(root, doc):
         raise ValueError("invalid recorded toolchain revision")
     if not HEX64.fullmatch(doc.get("module_index_sha256", "")):
         raise ValueError("invalid module index receipt")
+    if not HEX64.fullmatch(doc.get("toolchain_dockerfile_sha256", "")):
+        raise ValueError("invalid recorded Dockerfile digest")
+    if root == ROOT and INDEX.is_file():
+        actual_index = json.loads(INDEX.read_text(encoding="utf-8"))
+        canonical = json.dumps(actual_index, sort_keys=True, separators=(",", ":")).encode()
+        if hashlib.sha256(canonical).hexdigest() != doc["module_index_sha256"]:
+            raise ValueError("module owner/dependency index changed since build")
     checksum = hashlib.sha256()
     for row in sorted(doc["inputs"], key=lambda z: z["path"]):
         checksum.update((row["path"] + "\0" + row["sha256"] + "\n").encode())
