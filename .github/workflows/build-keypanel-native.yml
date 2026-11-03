@@ -6,7 +6,7 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/build-keypanel-native.yml'
-      - 'src/native/keypanel/**'
+      - 'modules/broker/source/keypanel/**'
       - 'runtime/diagnostics/keypanel_*_native.sh'
       - 'tools/build_keypanel_native.sh'
       - 'tests/keypanel-native/**'
@@ -39,7 +39,7 @@ jobs:
           set -euxo pipefail
           mkdir -p build/keypanel-host
           gcc -O2 -std=gnu99 -Wall -Wextra -Werror \
-            src/native/keypanel/mibr_keypanel_native.c \
+            modules/broker/source/keypanel/mibr_keypanel_native.c \
             -o build/keypanel-host/mibr-keypanel-host
           build/keypanel-host/mibr-keypanel-host --self-test
           python3 tests/keypanel-native/integration.py build/keypanel-host/mibr-keypanel-host
