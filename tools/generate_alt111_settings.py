@@ -42,8 +42,8 @@ def outputs():
     hmi = {'schema': schema['schema'], 'authority': 'settings/registry.json',
            'layer_order': schema['layer_order'], 'settings': keys}
     return {
-        ROOT / 'src/native/alt111-settings/include/registry_generated.h': header,
-        ROOT / 'src/native/alt111-settings/include/registry_table_generated.h': table,
+        ROOT / 'modules/carplay/source/alt111-settings/include/registry_generated.h': header,
+        ROOT / 'modules/carplay/source/alt111-settings/include/registry_table_generated.h': table,
         ROOT / 'settings/hmi-bindings.generated.json': json.dumps(hmi, indent=2) + '\n',
         ROOT / 'settings/runtime-basenames.generated.sh':
             "# Generated from settings/registry.json. Do not edit.\n" +
