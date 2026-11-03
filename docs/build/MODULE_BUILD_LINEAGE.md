@@ -42,7 +42,7 @@ python3 tools/emit_module_build_lineage.py \
   --verify build/mu1440-source/MODULE_BUILD_LINEAGE.json
 ```
 
-The QNX source-build workflow currently has a separate artifact receipt and SHA256SUMS. Integrating this new receipt into its actual CI output must happen **after** current parallel module path migrations are reconciled; do not overwrite a different agent's in-progress workflow edits. The generated manifest can then accompany the existing source-build artifacts. A packager must consume only verified receipts and still perform full R3 ZIP path, profile and payload-hash validation.
+The actual `.github/workflows/build-mu1440-source.yml` QNX job now emits and immediately verifies `build/mu1440-source/MODULE_BUILD_LINEAGE.json` **after** its compiled ELF and `SHA256SUMS` checks and **before** uploading the same build directory. It records all ten outputs built in that job (six CarPlay and four Broker binaries, including the explicitly non-install-ready controller programs). The independent direct-TS-remux workflow is not falsely attributed to this QNX job. This is build provenance, not an installer or vehicle qualification. A packager must consume only verified receipts and still perform full R3 ZIP path, profile and payload-hash validation.
 
 ## Deliberate limitations
 
