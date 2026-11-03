@@ -56,6 +56,10 @@ def classify(index: dict, changed: list[str], all_inputs: bool = False) -> dict:
             unowned.discard(p)
         if p.startswith("modules/profiles/"):
             unowned.discard(p)  # profile layout metadata, not a ready profile build
+        if p == "modules/README.md" or any(
+            p == f"modules/{name}/README.md" for name in index["modules"]
+        ):
+            unowned.discard(p)  # module owner metadata, not a source input
         # Any unowned file inside an actual module remains a hard failure.
     gate = bool(all_inputs or affected or any(
         p == x or p.startswith(x) for p in changed for x in ALWAYS_REVIEW
@@ -88,6 +92,10 @@ def self_test(index: dict) -> None:
     assert x["affected_modules"] == sorted(index["modules"]) and not x["unknown_owner_paths"], x
     x = classify(index, ["runtime/deployment/session.sh", "runtime/diagnostics/gen2_status.sh"])
     assert x["run_release_checks"] and not x["unknown_owner_paths"], x
+    x = classify(index, ["modules/README.md", "modules/carplay/README.md"])
+    assert not x["unknown_owner_paths"], x
+    x = classify(index, ["modules/carplay/unlisted/new.c"])
+    assert x["unknown_owner_paths"] == ["modules/carplay/unlisted/new.c"], x
     x = classify(index, ["README.md"])
     assert not x["run_release_checks"], x
     print("RELEASE_MODULE_PLAN_SELF_TEST=PASS")
