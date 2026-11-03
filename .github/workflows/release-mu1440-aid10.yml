@@ -74,12 +74,12 @@ jobs:
           grep -Fq 'payload/MIBR-Most20FPS.jar' tools/prepare_mu1440_sd.sh
           grep -Fq 'vehicle-tested-2026-09-27/libmibr_isotx2_gate.so' tools/prepare_mu1440_sd.sh
 
-          ! grep -R -n -F '/apps/sbin' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate
-          ! grep -R -n -F 'config/BASICS' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate
-          ! grep -R -n -F 'apps/mounts' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate
-          ! grep -R -n -E '(^|[^A-Za-z0-9_])sed([[:space:]]|$)' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate modules/navigation/runtime
+          ! grep -R -n -F '/apps/sbin' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate modules/carplay/runtime/parity
+          ! grep -R -n -F 'config/BASICS' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate modules/carplay/runtime/parity
+          ! grep -R -n -F 'apps/mounts' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate modules/carplay/runtime/parity
+          ! grep -R -n -E '(^|[^A-Za-z0-9_])sed([[:space:]]|$)' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate modules/carplay/runtime/parity modules/navigation/runtime
           ! grep -R -n -E '(^|[;&|[:space:]])printf[[:space:]]' modules/navigation/runtime
-          ! grep -R -n -E '(^|[;&|[:space:]])printf[[:space:]]' deployment/mu1440 runtime
+          ! grep -R -n -E '(^|[;&|[:space:]])printf[[:space:]]' deployment/mu1440 runtime modules/carplay/runtime
 
       - name: Assemble self-contained SD-root package
         shell: bash
