@@ -127,3 +127,35 @@ replace format-specific files or operate a vehicle. Before a migration release
 is implemented, review every writer/reader and exact format, agree target
 filenames and establish all update/uninstall/power-loss recovery gates in
 [the on-unit storage contract](../../docs/architecture/UNIT_STORAGE_AND_NAMING_CONTRACT.md).
+
+## A2.2 — categorize lexical paths without mistaking them for configuration files
+
+Run after the source inventory and review generator:
+
+```bash
+python3 tools/release/storage_path_triage.py --self-test \
+  --review-json storage-migration-review.json \
+  --json-out storage-path-triage.json
+```
+
+This report groups the repeated lexical locations by **distinct literal fragment**
+and category. It separates `/tmp/mibr-*` IPC/test-state references (retain
+the volatile namespace), persistent presence/activation markers, known but
+format-specific config, version receipts, runtime/bin/scripts, backups,
+ownership receipts, and incomplete strings such as `%s.conf` or brace
+fragments. It also expands nonliteral path-source leads into their exact
+checkout line and categorizes environment `PATH`, root-directory composition,
+comments, embedded runtime environment and remaining unknown contexts.
+
+**A category is only a triage lead**, not proof of a real runtime file, safe
+destination, actual reader/writer role, live activation or a completed migration.
+Even `/tmp` references can be operationally relevant to boot/recovery; they
+must not be renamed by the persistence cleanup. Source references from test
+and host utilities are not treated as installed paths without evidence.
+
+Review the actual CI JSON, then construct a source-linked ownership map of
+each true persistent store, its single writer, all readers, exact file grammar
+and aliases, and every boot/upgrade/uninstall/rollback consumer. Until that
+work and negative recovery tests are complete, `migration_authorized=false`
+in all reports and the earlier `--require-migration-ready` hard stop remains
+in force. This report does not modify runtime or on-unit storage.
