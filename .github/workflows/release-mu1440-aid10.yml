@@ -59,6 +59,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Plan all three normal beta profiles (host only)
+        shell: bash
+        run: python3 tools/release/plan_multi_profile_beta.py --self-test --json-out beta-profiles.json
+
       - name: Build owner/dependency plan (host only)
         shell: bash
         env:
@@ -77,8 +81,10 @@ jobs:
       - name: Upload release dependency plan (not a package)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: mu1440-release-module-plan
-          path: release-module-plan.json
+          name: multi-profile-beta-release-plan
+          path: |
+            release-module-plan.json
+            beta-profiles.json
           if-no-files-found: error
           retention-days: 14
 

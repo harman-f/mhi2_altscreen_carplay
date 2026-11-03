@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "profile_id": "seat-mu1447-p4709",
+  "brand": "seat",
+  "firmware": "MHI2_ER_SEG11_P4709_MU1447",
+  "release_channel": "beta",
+  "release_inclusion": "required",
+  "structure_acceptance": "assumed",
+  "final_system_test": "pending",
+  "selector": {
+    "source": "/ifs/lsd.jxe",
+    "algorithm": "sha256",
+    "digest": "945586fbede2fe53b5b41d7c10490641ff71fcc9581fb237cf40328f450cb22e"
+  },
+  "common_modules": [
+    "carplay",
+    "broker",
+    "menu",
+    "navigation"
+  ],
+  "java": {
+    "shared_source": "modules/menu/source",
+    "adapter_status": "java-adapter-improvements-expected",
+    "firmware_specific_updates_supported": true
+  },
+  "groups": [
+    "hmi",
+    "icons",
+    "display",
+    "input",
+    "integration"
+  ]
+}

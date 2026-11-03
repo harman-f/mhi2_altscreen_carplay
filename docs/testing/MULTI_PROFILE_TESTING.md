@@ -1,3 +1,5 @@
+**Beta policy (2026-11-03):** All three profiles are part of the same normal beta installer and release; no special SEAT vehicle approval is required before including software in beta tests. Final combined system/vehicle testing remains open. Existing software/static tests are the current baseline. Missing exact MU1409 identity and genuine compiled Java adapters remain concrete build/installer inputs, not a reason to exclude SEAT from the release graph.
+
 # Multi-profile research and tester reports
 
 The distribution contract separates common CarPlay/video, broker/input, menu,
@@ -44,7 +46,7 @@ and project source/build inputs in the same ZIP with a separate source inventory
 RGI route-guidance source is already published under `modules/navigation/source`;
 album-art is not part of this candidate.
 
-This documentation does not publish a complete three-platform installer or
+This documentation does not yet publish a complete three-platform installer or
 OEM-derived files. A distributable package requires provenance-cleared contents,
 accurate per-component source/build coverage and its own checks. Retained helper
 JARs or binaries without a closed build chain must remain identified as gaps.
