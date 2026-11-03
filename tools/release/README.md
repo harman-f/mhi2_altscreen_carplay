@@ -238,3 +238,25 @@ absolute paths, unexpected source collisions and a premature completion
 claim. **Do not use the generated graph as an installation plan or migrate
 files based solely on its category.** The detailed review and upcoming
 per-file ownership decisions belong to the next A2.3/A3 source PRs.
+
+## A2.3.2b navigation file formats and selected source IO (host-only)
+
+`python3 tools/release/legacy_navigation_storage_contract.py --self-test --json-out legacy-nav-storage.json`
+checks the 8 shell-composed persistent navigation paths and selected local
+read/write semantics from `gen2_nav_config.sh` and `gen2_safearea.sh`, then
+matches each path against the earlier 63-candidate access graph. The
+publication audit uploads the report and runs negative fixtures for renamed
+paths, missing reader/writer operations, altered format, and previously unseen
+persistent filenames. The generator is excluded from the target-path source
+inventory, which would otherwise count illustrative fixtures as runtime files.
+
+These are **local script contracts**, not an exhaustive firmware or installed
+binary consumer audit. They distinguish the nav query *presence* marker, legacy
+map fallback *presence* marker with only local unlink observed, single-line
+surface/tristate/maneuver settings, and four-key `x/y/w/h` SafeArea rectangle.
+They also expose the existing nontransactional 5-file profile change,
+independent remounts without a proven cross-component RW lease, missing
+exact-byte backup/readback/RO verification, and temporary URL override
+precedence. No added target writes, no rename and no permission to migrate
+persistent state. All global writer, binary reader, recovery and final
+destination gates remain false.
