@@ -10,7 +10,7 @@
 - `direct-ts-parity` SHA-256: `10350fb7dc715ec9b99c6b2acadb2a1b3e2ac7342c9281ca57e889fd7d3a4e31`.
 - `parity-session` SHA-256: `232cc5f76feb105230712afd902d0c053339a94051ed8c6910a4e79c388b90ec`.
 - Preserve these native bytes. Experimental `pollwait-v2` observed POLLOUT/EAGAIN incompatibility on this target; **legacy EAGAIN wait / original v1 restored**. No PCR, cadence, packet writer, H.264, native owner or boot changes are proposed by this checkpoint.
-- Original source and operational scripts remain in `runtime/parity/`, `runtime/master/`, `deployment/mu1440-parity-drive-v1/` and GEN2 source under `src/native/altscreen111-gen2/` at the pinned commit. The separately staged SD Final Drive v1.2–v1.4 additions must not be confused with the original CI artifact or claimed as vehicle-tested binaries.
+- Original source and operational scripts remain in `modules/carplay/runtime/parity/`, `runtime/master/`, `deployment/mu1440-parity-drive-v1/` and GEN2 source under `modules/carplay/source/altscreen111-gen2/` at the pinned commit. The separately staged SD Final Drive v1.2–v1.4 additions must not be confused with the original CI artifact or claimed as vehicle-tested binaries.
 
 ## What was actually observed
 
