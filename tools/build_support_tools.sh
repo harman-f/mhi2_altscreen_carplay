@@ -10,7 +10,7 @@ mkdir -p "$OUTDIR"
 
 "$QCC"   -mfloat-abi=softfp   -O2 -g -std=gnu99 -Wall -Wextra   src/native/isotx2-gate/gate_selftest.c   -o "$OUTDIR/gate_selftest_qnx"
 
-"$QCC"   -mfloat-abi=softfp   -O2 -g -std=gnu99 -Wall -Wextra   src/native/most-ts-writer/most_ts_writer.c   -o "$OUTDIR/most-ts-writer"
+"$QCC"   -mfloat-abi=softfp   -O2 -g -std=gnu99 -Wall -Wextra   modules/carplay/source/most-ts-writer/most_ts_writer.c   -o "$OUTDIR/most-ts-writer"
 
 # Developer artifacts are intentionally not stripped.
 

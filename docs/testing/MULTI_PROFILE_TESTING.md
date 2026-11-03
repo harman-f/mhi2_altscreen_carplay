@@ -41,7 +41,7 @@ SEAT preview. Static widget geometry is not an authenticated visual skin.
 The [package layout contract](../build/PACKAGE_LAYOUT.md) requires one shared
 menu and editor, platform-owned JARs/icons/display/input/integration information,
 and project source/build inputs in the same ZIP with a separate source inventory.
-RGI route-guidance source is already published under `src/native/carplay-rgi`;
+RGI route-guidance source is already published under `modules/navigation/source`;
 album-art is not part of this candidate.
 
 This documentation does not publish a complete three-platform installer or

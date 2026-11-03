@@ -7,7 +7,9 @@
 >
 > Use is at your own risk and subject to the applicable licenses; this notice does not add restrictions to the [GPL-3.0-or-later](LICENSE). The project is **independent of Volkswagen AG and other named manufacturers**. Its license does not grant rights to OEM firmware, binaries, trademarks or third-party components. See [rights and attribution](THIRD_PARTY_NOTICES.md), [security and vehicle-test guidance](SECURITY.md), [compatibility](docs/testing/COMPATIBILITY_MATRIX.md) and the [current developer release scope](release/CURRENT.md).
 
-[Menu, controller and Route Guidance source build](docs/build/MU1440_MENU_RGI_SOURCE.md) · [Menu editor](src/hmi/oem-menu/menu-editor/mibr-menu-editor.html)
+[Menu, controller and Route Guidance source build](docs/build/MU1440_MENU_RGI_SOURCE.md) · [Menu editor](tools/menu-editor/mibr-menu-editor.html)
+
+**Find a component:** [CarPlay and video](modules/carplay/) · [Broker and input](modules/broker/) · [Menu](modules/menu/) · [Navigation](modules/navigation/) · [Platform profiles](modules/profiles/). Each component page connects its source, runtime, build tools, binary artifacts and documentation.
 
 **Research testers wanted — Škoda MU1440 and SEAT MU1409/MU1447.** The modular package design uses one shared CarPlay/video, broker, menu and navigation stack with exact firmware profiles. The SEAT profiles have host-build/static integration evidence; their native menu, icon presentation, input behavior and end-to-end vehicle output still need independent vehicle tests. This is experimental research, not general vehicle support. See [profile status and tester reports](docs/testing/MULTI_PROFILE_TESTING.md) and the [binding package layout](docs/build/PACKAGE_LAYOUT.md). This update does not publish a complete three-platform installer download.
 

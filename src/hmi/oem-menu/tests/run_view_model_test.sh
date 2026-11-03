@@ -48,7 +48,7 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/tests/MibrV3ShowTest.java"
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrViewStateTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrCanonicalElementMenuTest
-"$JAVA" -Dmibr.menu.standard="$MODULE/menu-editor/standard-menu.txt" \
+"$JAVA" -Dmibr.menu.standard="$(cd "$MODULE/../../.." && pwd)/tools/menu-editor/standard-menu.txt" \
   -cp "$OUT/classes" de.mibr.hmi.MibrCarPlayMenuModelTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3BindingTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3BusyTest

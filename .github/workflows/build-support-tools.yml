@@ -6,7 +6,7 @@ on:
     paths:
       - '.github/workflows/build-support-tools.yml'
       - 'src/native/isotx2-gate/**'
-      - 'src/native/most-ts-writer/**'
+      - 'modules/carplay/source/most-ts-writer/**'
       - 'src/native/sha256sum-compat/**'
       - 'src/native/tee-compat/**'
       - 'tools/build_support_tools.sh'
@@ -15,7 +15,7 @@ on:
     paths:
       - '.github/workflows/build-support-tools.yml'
       - 'src/native/isotx2-gate/**'
-      - 'src/native/most-ts-writer/**'
+      - 'modules/carplay/source/most-ts-writer/**'
       - 'src/native/sha256sum-compat/**'
       - 'src/native/tee-compat/**'
       - 'tools/build_support_tools.sh'
@@ -212,11 +212,11 @@ jobs:
             grep -Fq '/dev/mlb/isoTX2'
 
           grep -Eq '^#define[[:space:]]+TS_SIZE[[:space:]]+188$' \
-            src/native/most-ts-writer/most_ts_writer.c
+            modules/carplay/source/most-ts-writer/most_ts_writer.c
           grep -Eq '^#define[[:space:]]+STRICT_BLOCK_PACKETS[[:space:]]+64$' \
-            src/native/most-ts-writer/most_ts_writer.c
+            modules/carplay/source/most-ts-writer/most_ts_writer.c
           grep -Fq '#define STRICT_BLOCK_BYTES (STRICT_BLOCK_PACKETS * TS_SIZE)' \
-            src/native/most-ts-writer/most_ts_writer.c
+            modules/carplay/source/most-ts-writer/most_ts_writer.c
           strings build/support-tools/most-ts-writer |
             grep -Fq 'write_size=%u'
 

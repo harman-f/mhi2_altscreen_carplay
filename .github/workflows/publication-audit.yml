@@ -28,6 +28,12 @@ jobs:
           test -s docs/architecture/ADVANCED_RUNTIME_SWITCHES.md
           grep -Fq 'ADVANCED_RUNTIME_SWITCHES.md' README.md
 
+      - name: Canonical module ownership and dependency gate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 tools/check_module_index.py --self-test
+
       - name: Modular distribution contract regression gate
         shell: bash
         run: |

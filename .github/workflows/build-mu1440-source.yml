@@ -8,7 +8,9 @@ on:
       - '.github/workflows/build-altscreen111-gen2.yml'
       - 'settings/**'
       - 'src/native/**'
+      - 'modules/navigation/source/**'
       - 'src/hmi/oem-menu/**'
+      - 'tools/menu-editor/**'
       - 'tests/**'
       - 'tools/build_*.sh'
       - 'tools/check_mu1440_target_shell.py'
@@ -25,7 +27,9 @@ on:
       - '.github/workflows/build-altscreen111-gen2.yml'
       - 'settings/**'
       - 'src/native/**'
+      - 'modules/navigation/source/**'
       - 'src/hmi/oem-menu/**'
+      - 'tools/menu-editor/**'
       - 'tests/**'
       - 'tools/build_*.sh'
       - 'tools/check_mu1440_target_shell.py'
@@ -40,7 +44,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: public-mu1440-source-build
+  group: public-mu1440-source-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:

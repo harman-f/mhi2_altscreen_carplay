@@ -9,6 +9,8 @@ The pages here describe the **current public product/source, exact reference-tar
 
 ## Start here
 
+[Repository components](../modules/) connects each module to its source, runtime, build tools, binary artifacts and documentation.
+
 The [MU1440 R57 source/build baseline](build/MU1440_R57_SOURCE.md) is the current entrypoint for source availability, native reproduction, the real OEM-menu/controller modules, and explicit Java/support-source exclusions. Dated vehicle reports below retain their original acceptance scope.
 
 1. [Features and goals](../README.md)

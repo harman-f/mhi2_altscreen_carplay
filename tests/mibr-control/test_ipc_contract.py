@@ -51,7 +51,7 @@ def source_files():
     files.append(HERE / "control" / "runtime" / "mibr-v3-boot_r21.ksh")
     files += sorted((HERE / "java" / "de" / "mibr" / "hmi").glob("*.java"))
     files += sorted((HERE / "java" / "mib").rglob("*.java"))
-    rgi = IMPL / "carplay-rgi"
+    rgi = IMPL / "modules/navigation/source"
     files += sorted((rgi / "src").rglob("*.c")) + sorted((rgi / "src").rglob("*.h"))
     files.append(rgi / "kit" / "mm-ipod-rgi")
     files.append(rgi / "release" / "r2" / "parity_drive_supervisor.sh")

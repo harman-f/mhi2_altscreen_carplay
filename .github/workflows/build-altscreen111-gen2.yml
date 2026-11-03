@@ -38,7 +38,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: public-gen2-build
+  group: public-gen2-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:

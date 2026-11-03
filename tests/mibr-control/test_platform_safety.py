@@ -263,7 +263,7 @@ class UnitTools(Sandbox):
 
     def test_rgi_helper_does_not_rename_on_shmem(self):
         # rename() fails on /dev/shmem on the unit; the first R2 install never published guidance.
-        source = (IMPL / "src/native/carplay-rgi/src/helper/mibr_rgi.c").read_text()
+        source = (IMPL / "modules/navigation/source/src/helper/mibr_rgi.c").read_text()
         self.assertNotIn("rename(", source)
         self.assertIn("iap2_connect(IAP2_DEVICE, 0)", source)
 

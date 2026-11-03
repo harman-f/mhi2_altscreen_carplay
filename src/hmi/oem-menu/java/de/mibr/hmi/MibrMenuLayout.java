@@ -8,7 +8,7 @@ import java.util.Vector;
 /**
  * The menu structure, from the stored menu file or else from the basic menu built into the JAR. Functions stay in
  * the code under a fixed ID; the file only says where they sit, what they are called and who sees them.
- * Format: menu-editor/MENU_FILE_FORMAT.md.
+ * Format: tools/menu-editor/MENU_FILE_FORMAT.md.
  */
 final class MibrMenuLayout {
     static final String STORED="/mnt/app/root/altscreen-u2/config/mibr-menu.conf";

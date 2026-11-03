@@ -93,7 +93,11 @@ static void gate_note_command(unsigned command)
     char text[48];
     int fd=open("/tmp/mibr-alt111-gate-refused.log",O_WRONLY|O_CREAT|O_APPEND,0644);
     if(fd<0)return;
-    (void)write(fd,text,(size_t)snprintf(text,sizeof(text),"%llu devctl=0x%08x\n",(unsigned long long)now_ms(),command));
+    if(write(fd,text,(size_t)snprintf(text,sizeof(text),"%llu devctl=0x%08x\n",(unsigned long long)now_ms(),command))<0){
+        /* Best-effort diagnostic logging must not affect the gate. */
+        (void)close(fd);
+        return;
+    }
     (void)close(fd);
 }
 static void track_fd_locked(int fd,unsigned value)
