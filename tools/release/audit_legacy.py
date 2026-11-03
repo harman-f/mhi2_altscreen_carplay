@@ -39,6 +39,7 @@ def parse_sha_lines(raw: bytes) -> dict[str, str]:
         digest, separator, path = line.partition("  ")
         if separator != "  " or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
             raise ValueError("malformed SHA256 manifest entry")
+        path = path.removeprefix("./")  # zip -r . and find . emit ./relative names
         if path in rows:
             raise ValueError("duplicate SHA256 manifest path: " + path)
         rows[path] = digest
@@ -48,18 +49,18 @@ def parse_sha_lines(raw: bytes) -> dict[str, str]:
 def audit(path: Path) -> None:
     with zipfile.ZipFile(path) as z:
         members = [i for i in z.infolist() if not i.is_dir()]
-        names = [i.filename for i in members]
+        names = [i.filename.removeprefix("./") for i in members]
         if len(names) != len(set(names)):
             raise ValueError("duplicate ZIP file path")
-        for info in members:
-            p = PurePosixPath(info.filename)
-            if p.is_absolute() or not p.parts or any(part in ("", ".", "..") for part in info.filename.split("/")):
+        for name, info in zip(names, members):
+            p = PurePosixPath(name)
+            if p.is_absolute() or not p.parts or any(part in ("", ".", "..") for part in name.split("/")):
                 raise ValueError("unsafe legacy ZIP path: " + info.filename)
-            if info.filename.startswith(("MIBR-CarPlay/", "MHI2AltScreen/", "esd/")):
+            if name.startswith(("MIBR-CarPlay/", "MHI2AltScreen/", "esd/")):
                 raise ValueError("unexpected installer wrapper: " + info.filename)
             if (info.external_attr >> 16) & 0o170000 == 0o120000:
                 raise ValueError("symlink ZIP member prohibited: " + info.filename)
-        files = {name: z.read(name) for name in names}
+        files = {name: z.read(info) for name, info in zip(names, members)}
     if not REQUIRED.issubset(files):
         raise ValueError("missing required deployment or receipt file")
     payload = {n.removeprefix("payload/") for n in files if n.startswith("payload/")}
