@@ -47,6 +47,7 @@ jobs:
           python3 tools/release/source_defaults_inventory.py --self-test --json-out "$RUNNER_TEMP/source-defaults-inventory.json"
           python3 tools/release/storage_migration_review.py --self-test --json-out "$RUNNER_TEMP/storage-migration-review.json"
           python3 tools/release/storage_path_triage.py --self-test --review-json "$RUNNER_TEMP/storage-migration-review.json" --json-out "$RUNNER_TEMP/storage-path-triage.json"
+          python3 tools/release/storage_consumer_crosscheck.py --self-test --json-out "$RUNNER_TEMP/storage-consumer-crosscheck.json"
 
       - name: Upload source-defined inventory (host evidence only)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -56,6 +57,7 @@ jobs:
             ${{ runner.temp }}/source-defaults-inventory.json
             ${{ runner.temp }}/storage-migration-review.json
             ${{ runner.temp }}/storage-path-triage.json
+            ${{ runner.temp }}/storage-consumer-crosscheck.json
           if-no-files-found: error
           retention-days: 3
 
