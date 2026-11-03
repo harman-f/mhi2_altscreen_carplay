@@ -16,7 +16,9 @@ fi
 AUTO_ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
 AUTO_BEGIN="# MIBR AUTO-DIRECT BEGIN"
 AUTO_END="# MIBR AUTO-DIRECT END"
-AUTO_TMP=/tmp/lsd.sh.mibr-autodirect-remove.$$
+# Stage beside our own files on /mnt/app, not in /tmp (RAM): the final mv is
+# then a same-filesystem rename and lsd.sh is never left half-copied.
+AUTO_TMP=/mnt/app/root/lsd.sh.mibr-autodirect-remove.$$
 
 if [ -x "$BASE/scripts/direct_ts_auto_stop.sh" ]; then
   "$BASE/scripts/direct_ts_auto_stop.sh" >/dev/null 2>&1 || {
@@ -38,6 +40,10 @@ if [ -e "$AUTO_ENABLED" ] || grep -Fq "$AUTO_BEGIN" /mnt/app/eso/hmi/lsd/lsd.sh 
         END { if (skip) exit 42 }
       ' /mnt/app/eso/hmi/lsd/lsd.sh > "$AUTO_TMP"
       ARC=$?
+      # Never install a stripped lsd.sh that lost its J9 start line.
+      if [ "$ARC" -eq 0 ] && ! grep '^\$J9' "$AUTO_TMP" >/dev/null 2>&1; then
+        ARC=43
+      fi
       if [ "$ARC" -eq 0 ]; then
         chmod 755 "$AUTO_TMP" 2>/dev/null || true
         if mv "$AUTO_TMP" /mnt/app/eso/hmi/lsd/lsd.sh; then

@@ -218,7 +218,8 @@ normalize_java_state(){
   JARDIR=/mnt/app/eso/hmi/lsd/jars
   NAVJAR=$JARDIR/MIBR-NavIgnore.jar
   MOSTJAR=$JARDIR/MIBR-Most20FPS.jar
-  TMP=/tmp/lsd.sh.mibr-deploy-normalize.$$
+  # Same-filesystem stage (see uninstall.sh): atomic rename over lsd.sh.
+  TMP=/mnt/app/root/lsd.sh.mibr-deploy-normalize.$$
   KEEP_NAV=0
   KEEP_MOST=0
 
@@ -466,7 +467,7 @@ install_required_navignore(){
 
   JARDIR=/mnt/app/eso/hmi/lsd/jars
   JAR=$JARDIR/MIBR-NavIgnore.jar
-  TMP=/tmp/lsd.sh.mibr-deploy-navignore.$$
+  TMP=/mnt/app/root/lsd.sh.mibr-deploy-navignore.$$
   MARKER='# MIBR NAVIGNORE'
   OWNED=/mnt/app/root/mibr-deploy-navignore-owned
 
@@ -504,7 +505,7 @@ install_required_navignore(){
 install_required_most20(){
   JARDIR=/mnt/app/eso/hmi/lsd/jars
   JAR=$JARDIR/MIBR-Most20FPS.jar
-  TMP=/tmp/lsd.sh.mibr-deploy-most20.$$
+  TMP=/mnt/app/root/lsd.sh.mibr-deploy-most20.$$
   MARKER='# MIBR MOST20FPS'
   OWNED=/mnt/app/root/mibr-deploy-most20-owned
 
@@ -555,6 +556,13 @@ apply(){
     exit "$PRC"
   fi
 
+  # A previous install already applied the defaults below; whatever the
+  # D2 marker and navigation files hold now is the user's choice and must
+  # survive an upgrade. MIBR_RESET_DEFAULTS=1 applies the defaults again.
+  PRIOR_INSTALL=0
+  [ -r "$DST/scripts/gen2_nav_config.sh" ] && PRIOR_INSTALL=1
+  [ "${MIBR_RESET_DEFAULTS:-0}" = "1" ] && PRIOR_INSTALL=0
+
   stage_runtime
 
   echo "=== install DisplayManager isoTX2 gate preload ==="
@@ -567,23 +575,34 @@ apply(){
   install_required_navignore
   install_required_most20
 
-  echo "=== enable persistent D2 keyframe recovery default ==="
-  app_rw || fail "d2_persistent_mount_app_rw"
-  : > /mnt/app/root/mibr-alt111-keyframe-policy.enabled || fail "d2_persistent_marker"
-  app_ro
-  echo "D2_KEYFRAMES=PERSISTENT_DEFAULT watchdog_ms=1000 min_gap_ms=1000"
+  if [ "$PRIOR_INSTALL" -eq 1 ]; then
+    D2_RESULT=preserved_off
+    [ -e /mnt/app/root/mibr-alt111-keyframe-policy.enabled ] && D2_RESULT=preserved_on
+    NAV_RESULT=preserved
+    echo "=== upgrade: keeping existing D2 and navigation settings ==="
+    echo "D2_KEYFRAMES=PRESERVED state=$D2_RESULT"
+    echo "NAVIGATION_PROFILE=PRESERVED (MIBR_RESET_DEFAULTS=1 applies map-rich)"
+  else
+    echo "=== enable persistent D2 keyframe recovery default ==="
+    app_rw || fail "d2_persistent_mount_app_rw"
+    : > /mnt/app/root/mibr-alt111-keyframe-policy.enabled || fail "d2_persistent_marker"
+    app_ro
+    D2_RESULT=persistent_default
+    echo "D2_KEYFRAMES=PERSISTENT_DEFAULT watchdog_ms=1000 min_gap_ms=1000"
 
-  echo "=== set deployment navigation default ==="
-  "$DST/scripts/gen2_nav_config.sh" profile map-rich || fail "map_rich_profile"
+    echo "=== set deployment navigation default ==="
+    "$DST/scripts/gen2_nav_config.sh" profile map-rich || fail "map_rich_profile"
+    NAV_RESULT=map-rich
+  fi
 
   echo "=== enable Auto-Direct persistence without pre-reboot runtime takeover ==="
   MIBR_PREPARE_ONLY=1 "$DST/scripts/direct_ts_auto_enable.sh" || fail "auto_direct_prepare_rc_$?"
 
   echo
   echo "MIBR_INSTALL=PASS"
-  echo "navigation_profile=map-rich"
+  echo "navigation_profile=$NAV_RESULT"
   echo "most20=enabled_by_default"
-  echo "d2_keyframes=persistent_default"
+  echo "d2_keyframes=$D2_RESULT"
   echo "d2_watchdog_ms=1000"
   echo "REBOOT_REQUIRED=YES"
   echo "After reboot: ./status.sh"

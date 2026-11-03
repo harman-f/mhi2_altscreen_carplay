@@ -11,6 +11,12 @@ import json
 import re
 from pathlib import Path
 
+import sys
+
+# Sibling tools are imported by name; keep that working under `python3 -I`,
+# which drops the script directory from sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import storage_access_graph
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -70,7 +70,7 @@ final class MibrDurableSwitch {
     /* Session state of the menu's broker connection. */
     boolean available,asked,setInFlight;
 
-    private MibrDurableSwitch(String file,String magic,String verb,String capability,String[] values,String defaultValue){
+    MibrDurableSwitch(String file,String magic,String verb,String capability,String[] values,String defaultValue){
         this.file=file;this.magic=magic+"\nrevision=";this.verb=verb;this.capability=capability;
         this.values=values;compiledDefault=defaultValue;this.defaultValue=defaultValue;value=defaultValue;fileValue=defaultValue;
     }
@@ -95,8 +95,7 @@ final class MibrDurableSwitch {
     synchronized void saving(){writer=false;message=MibrI18n.pick("Speichern...","Saving...");}
     synchronized void readback(String v,String rev,boolean canWrite){
         if(!valid(v)||rev==null||rev.length()==0)throw new IllegalArgumentException(verb+"_READBACK_INVALID");
-        for(int i=0;i<rev.length();i++)
-            if(rev.charAt(i)<'0'||rev.charAt(i)>'9')throw new IllegalArgumentException(verb+"_REVISION_INVALID");
+        if(!canonicalRevision(rev,0,rev.length()))throw new IllegalArgumentException(verb+"_REVISION_INVALID");
         value=v;revision=rev;writer=canWrite;message=null;
         fileStamp=-1L; // readers of the file look again at once
     }
@@ -105,8 +104,13 @@ final class MibrDurableSwitch {
     synchronized String persistedValue(){
         File f=new File(file);
         long stamp=f.lastModified(),length=f.length();
-        if(stamp==fileStamp&&length==fileLength)return fileValue;
-        fileStamp=stamp;fileLength=length;fileValue=defaultValue();
+        /* Racy timestamp: a file changed within the last 2 s may change again with the same mtime and size. */
+        long age=System.currentTimeMillis()-stamp;
+        /* Only a recent past mtime is racy; a unit clock behind the file time keeps the old cache rule. */
+        boolean racy=stamp!=0L&&age>=0L&&age<2000L;
+        if(!racy&&stamp==fileStamp&&length==fileLength)return fileValue;
+        /* A value read while the mtime was racy is never trusted later: the same tick may hold a newer write. */
+        fileStamp=racy?-1L:stamp;fileLength=length;fileValue=defaultValue();
         if(stamp==0L||length<=0L||length>=96L)return fileValue;
         FileInputStream in=null;
         try{
@@ -130,11 +134,21 @@ final class MibrDurableSwitch {
         if(text==null||!text.startsWith(magic))return defaultValue;
         int end=text.indexOf('\n',magic.length());
         if(end<=magic.length())return defaultValue;
-        for(int i=magic.length();i<end;i++)if(text.charAt(i)<'0'||text.charAt(i)>'9')return defaultValue;
+        if(!canonicalRevision(text,magic.length(),end))return defaultValue;
         String rest=text.substring(end+1);
         if(!rest.startsWith("value=")||!rest.endsWith("\n"))return defaultValue;
         String v=rest.substring(6,rest.length()-1);
         return valid(v)?v:defaultValue;
+    }
+    /** Same rule as decimal() in mibr_durable_switch.c: non-empty, digits only, no leading zero except "0", at most UINT64_MAX. */
+    static boolean canonicalRevision(String s,int from,int to){
+        if(s==null||from<0||to>s.length()||to<=from)return false;
+        int n=to-from;
+        if(n>1&&s.charAt(from)=='0')return false;
+        if(n>20)return false;
+        for(int i=from;i<to;i++)if(s.charAt(i)<'0'||s.charAt(i)>'9')return false;
+        if(n<20)return true;
+        return s.substring(from,to).compareTo("18446744073709551615")<=0;
     }
     boolean parseOn(String text){return "on".equals(parseValue(text));}
 }

@@ -9,6 +9,12 @@ import hashlib
 import json
 from pathlib import Path
 
+import sys
+
+# Sibling tools are imported by name; keep that working under `python3 -I`,
+# which drops the script directory from sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import source_defaults_inventory as defaults
 import storage_access_graph as access
 import storage_consumer_crosscheck as crosscheck
@@ -37,13 +43,15 @@ CHECKS = {
     JAVA: (
         "new FileInputStream(f)", "persistedValue()",
         "this.magic=magic+", "revision=", "String parseValue(String text)",
-        "if(stamp==fileStamp&&length==fileLength)return fileValue;",
+        "if(!racy&&stamp==fileStamp&&length==fileLength)return fileValue;",
         "if(text==null||!text.startsWith(magic))return defaultValue;",
-        "for(int i=magic.length();i<end;i++)",
+        "if(!canonicalRevision(text,magic.length(),end))return defaultValue;",
+        "static boolean canonicalRevision(String s,int from,int to)",
         "if(!rest.startsWith(", "rest.endsWith(",
     ),
     PLATFORM_JAVA: (
-        "mibr-platform-defaults.conf", "if(text==null)text=read();",
+        "mibr-platform-defaults.conf",
+        "if(text==null||racy||!path.equals(textPath)||stamp!=textStamp||length!=textLength){",
         "String prefix=key+", "if(length<=0L||length>4096L)",
         "US-ASCII",
     ),
@@ -93,8 +101,9 @@ def build(sources, canonical, graph, checked):
     # to alter deployed readers without coordinated firmware tests.
     require("if(!n||(n>1&&*s=='0'))return -1;" in c,
             "C canonical revision policy drift")
-    require("for(int i=magic.length();i<end;i++)" in j,
-            "Java revision digit reader drift")
+    require("if(n>1&&s.charAt(from)=='0')return false;" in j and
+            'compareTo("18446744073709551615")<=0' in j,
+            "Java canonical revision policy drift")
     pairs = checked["broker_c_java_consistency"]
     require(len(pairs) == 13, "selected C/Java path/operation mismatch")
     by_path = {row["current_path"]: row for row in graph["records"]}
@@ -143,16 +152,16 @@ def build(sources, canonical, graph, checked):
         },
         "platform": {
             "path": pdefaults,
-            "local_readers": ["broker-C defaults", "Java one-shot MibrPlatformDefaults",
+            "local_readers": ["broker-C defaults", "Java MibrPlatformDefaults (re-read on change)",
                               "GEN2 native defaults"],
             "format": "capability=value per line with consumer-specific validation",
             "writer_or_platform_source_proven": False,
-            "Java_default_reloads_after_start": False,
+            "Java_default_reloads_after_start": True,
         },
         "findings": [
-            "native C rejects revision 01 while Java parseValue accepts digit-only revision prefix; exact malformed-file handling differs",
-            "Java persisted reader caches by file mtime+length, so same-tick same-size external updates can appear stale",
-            "Java platform defaults are cached on first get; broker C re-opens per default lookup",
+            "Java parseValue and readback apply the native canonical revision rule (no leading zero, at most UINT64_MAX)",
+            "Java persisted readers cache by file mtime+length but do not trust an mtime younger than 2 s, so same-size rewrites are seen",
+            "Java platform defaults are re-read when mtime or size changes; broker C re-opens per default lookup",
             "C broker writer has revision CAS, file/dir fsync, rename, guarded RW/RO and readback; this protection does not cover independent shell writers",
             "menu shell loader has app RW lock and stage+rename, while Java separately checks CRC; same-byte postwrite proof not shown by this source audit",
             "all installed/firmware readers, format migration, backup, recovery and target names remain unqualified",
@@ -177,9 +186,11 @@ def self_test():
     for file, old, new in (
         (BROKER, "sync_dir(path)", "sync_dir_missing(path)"),
         (BROKER, "same(&now,observed)", "same(&now,not_observed)"),
-        (JAVA, "if(stamp==fileStamp&&length==fileLength)return fileValue;",
-         "if(false)return fileValue;"),
-        (PLATFORM_JAVA, "if(text==null)text=read();", "text=read();"),
+        (JAVA, "if(!racy&&stamp==fileStamp&&length==fileLength)return fileValue;",
+         "if(stamp==fileStamp&&length==fileLength)return fileValue;"),
+        (JAVA, "if(n>1&&s.charAt(from)=='0')return false;", ""),
+        (PLATFORM_JAVA, "if(text==null||racy||!path.equals(textPath)||stamp!=textStamp||length!=textLength){",
+         "if(text==null){"),
         (MENU_JAVA, "crc32(file,at+1)", "crc32(file,0)"),
         (MENU_SH, 'STAGE="$DIR/mibr-menu.conf.new.$$"', 'STAGE="/tmp/stage"'),
     ):

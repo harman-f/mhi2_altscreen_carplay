@@ -31,7 +31,9 @@ mibr_vehicle_summary || echo "WARN vehicle_summary_failed"
 
 OWNED=/mnt/app/root/mibr-deploy-navignore-owned
 MOSTOWNED=/mnt/app/root/mibr-deploy-most20-owned
-TMP=/tmp/lsd.sh.mibr-deploy-java-remove.$
+# Stage beside our own files on /mnt/app, not in /tmp (RAM): the final mv is
+# then a same-filesystem rename and lsd.sh is never left half-copied.
+TMP=/mnt/app/root/lsd.sh.mibr-deploy-java-remove.$$
 
 FAIL=0
 
@@ -55,6 +57,7 @@ if [ -e "$OWNED" ]; then
       index($0, "-Xbootclasspath/p:$BASE_DIR/lsd/jars/MIBR-NavIgnore.jar") { next }
       { print }
     ' "$LSD" > "$TMP" &&
+    grep '^\$J9' "$TMP" >/dev/null 2>&1 &&
     chmod 755 "$TMP" 2>/dev/null &&
     mv "$TMP" "$LSD"
     RC=$?
@@ -81,6 +84,7 @@ if [ -e "$MOSTOWNED" ]; then
       index($0, "-Xbootclasspath/p:$BASE_DIR/lsd/jars/MIBR-Most20FPS.jar") { next }
       { print }
     ' "$LSD" > "$TMP" &&
+    grep '^\$J9' "$TMP" >/dev/null 2>&1 &&
     chmod 755 "$TMP" 2>/dev/null &&
     mv "$TMP" "$LSD"
     RC=$?
@@ -99,6 +103,46 @@ else
   echo "Most20FPS not owned by deployment; leaving it untouched."
 fi
 
+# Parity-drive keeps its boot hook on disable by design; uninstall removes
+# it, because the supervisor it starts stays under $DST after uninstall.
+PARITY_BEGIN="# MIBR PARITY-DRIVE BEGIN"
+PARITY_END="# MIBR PARITY-DRIVE END"
+if grep -F "$PARITY_BEGIN" "$LSD" >/dev/null 2>&1; then
+  echo "Removing parity-drive boot hook"
+  if [ -x "$DST/scripts/parity_drive_disable.sh" ]; then
+    "$DST/scripts/parity_drive_disable.sh" || FAIL=1
+  fi
+  if mount -uw /mnt/app 2>/dev/null; then
+    awk -v b="$PARITY_BEGIN" -v e="$PARITY_END" '
+      $0 == b { skip=1; next }
+      skip && $0 == e { skip=0; next }
+      !skip { print }
+      END { if (skip) exit 42 }
+    ' "$LSD" > "$TMP"
+    ARC=$?
+    if [ "$ARC" -eq 0 ] && grep '^\$J9' "$TMP" >/dev/null 2>&1; then
+      chmod 755 "$TMP" 2>/dev/null || true
+      if mv "$TMP" "$LSD"; then
+        echo 0 > /mnt/app/root/mibr-parity-drive.enabled 2>/dev/null || true
+        echo "Parity-drive boot hook removed"
+      else
+        rm -f "$TMP" 2>/dev/null || true
+        echo "ERROR parity-drive boot hook replacement failed"
+        FAIL=1
+      fi
+    else
+      rm -f "$TMP" 2>/dev/null || true
+      echo "ERROR malformed parity-drive boot hook; lsd.sh left unchanged"
+      FAIL=1
+    fi
+    sync
+    mount -ur /mnt/app 2>/dev/null || true
+  else
+    echo "ERROR cannot mount /mnt/app rw to remove the parity-drive boot hook"
+    FAIL=1
+  fi
+fi
+
 echo "Restoring DisplayManager startup"
 MIBR_SHA256="$SHA" "$ROOT/runtime/isotx2-gate/restore_preload.sh" || FAIL=1
 
@@ -112,7 +156,25 @@ else
   FAIL=1
 fi
 
-rm -f /tmp/mibr-alt111-keyframe-policy.enabled /mnt/app/root/mibr-alt111-keyframe-policy.enabled /tmp/mibr-alt111-resync.enabled /tmp/mibr-alt111-resync-arm 2>/dev/null || true
+rm -f /tmp/mibr-alt111-keyframe-policy.enabled /tmp/mibr-alt111-resync.enabled /tmp/mibr-alt111-resync-arm 2>/dev/null || true
+
+# The persistent D2 marker lives on /mnt/app, which every step above has
+# already returned to read-only. Remove it inside its own RW window and
+# report a marker that survives, instead of hiding the failure.
+D2_MARKER=/mnt/app/root/mibr-alt111-keyframe-policy.enabled
+if [ -e "$D2_MARKER" ]; then
+  if mount -uw /mnt/app 2>/dev/null; then
+    rm -f "$D2_MARKER" 2>/dev/null || true
+    sync
+    mount -ur /mnt/app 2>/dev/null || true
+  fi
+  if [ -e "$D2_MARKER" ]; then
+    echo "ERROR persistent D2 marker survived uninstall: $D2_MARKER"
+    FAIL=1
+  else
+    echo "Persistent D2 marker removed"
+  fi
+fi
 
 if [ "$FAIL" -ne 0 ]; then
   echo "MIBR_UNINSTALL=COMPLETED_WITH_ERRORS"

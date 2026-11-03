@@ -684,7 +684,7 @@ final class MibrV3Session {
                     menuDone(MibrI18n.pick("Speichern fehlgeschlagen","Save failed"),false);
                     return;
                 }
-                byte[] stored=MibrMenuLayout.read(MibrMenuLayout.STORED);
+                byte[] stored=MibrMenuLayout.read(MibrMenuLayout.storedPath);
                 boolean same=stored!=null&&stored.length==checked.length;
                 for(int i=0;same&&i<stored.length;i++)same=stored[i]==checked[i];
                 String done=menuSkipped>0?MibrI18n.pick("geladen, "+menuSkipped+" unbekannt übersprungen","loaded, "+menuSkipped+" unknown skipped"):MibrI18n.pick("geladen","loaded");

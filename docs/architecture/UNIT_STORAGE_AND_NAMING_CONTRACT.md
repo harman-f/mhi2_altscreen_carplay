@@ -75,6 +75,19 @@ The example target names are **logical desired names**, not existing parsers or 
 | `/mnt/app/root/mibr-kit/` | `version/` | Unified version manifest/receipt writer, HMI reader, upgrade/uninstall |
 | `/tmp/mibr-*` | **keep original volatile paths during first migration** | Each IPC producer and consumer must be migrated together later if needed |
 
+## A3 disposition of the 63 source candidates (proposal)
+
+`tools/release/storage_destination_plan.py` assigns each candidate exactly one disposition, with a reason and, for MIGRATE, exactly one source writer. It is a proposal: `final_destination_reviewed` and `migration_authorized` stay `false`.
+
+| Disposition | Count | Rows | Rule |
+|---|---|---|---|
+| MIGRATE | 18 | 12 broker CAS switches, display scaling, menu language, menu layout, platform defaults, two installer ownership receipts | One writer, all source readers known. Bytes are copied verbatim (magic, revision, CRC unchanged) in one cutover together with every reader. The receipts move only with the installer that replaces the current install/uninstall scripts. |
+| KEEP_AT_LEGACY | 40 | All 13 CarPlay registry groups; CPVC profile; vehicle data/status mode; boot markers (Auto-Direct, D2, isoTX2, parity); legacy navigation files; bit26 pair; three backup directories and the isoTX2 stock preimage; the single-writer gate | No destination. The registry is kept because the native settings layer refuses persistent writes (durability is the CPVC profile replay). The Auto-Direct registry value and the Auto-Direct boot marker therefore no longer share a target basename. |
+| EXCLUDE_NONCONFIG | 2 | Calibration clip, test-only rollback script | Payload or test reference, not state. |
+| BLOCKED_INPUT | 3 | SD-log switch, the two version receipts | A claimed reader or the writer is not in source. |
+
+Safe area keeps four stores but one user authority: the broker `safe-*` CAS files. The registry view-area group is a read path, platform defaults are an installer-written fallback, and the legacy `mibr-carplay111-safearea.conf` is rollback-only. `mibr-parity-statistics-enabled` and `mibr-parity-status-enabled` are value booleans whose absence means ON, never presence markers.
+
 ## Required rollout and CI gates
 
 1. **Inventory first.** Generate a machine-readable complete map of *all* writes, reads, boot hooks, scripts, C string paths, Java constants, generated settings, configs, SD/USB entrypoints, firmware integration, external tools and uninstall operations. Mark each item's lifetime, writer/reader, file schema, default, precedence, backup/recovery and planned destination. This table is representative only.

@@ -272,12 +272,12 @@ C↔Java inventory and 63-candidate storage graph, emits source SHA receipts,
 and adds negative mutations for CAS, CRC, Java cache, stage and default changes.
 The CI artifact is a source review receipt, **not** a firmware acceptance.
 
-Important cross-language asymmetry: native C requires canonical revision
-digits without a leading zero (except `0`), but Java's read-only parser checks
-only that each revision character is a digit. The Java file reader also
-caches by mtime/length, while its platform defaults are cached on first read.
-Broker C reopens platform defaults in its default lookup. Do not assume
-in-place migration/replay changes are immediately visible in Java. The broker
+Java and native C now apply the same revision rule: canonical decimal, no
+leading zero (except `0`), at most `18446744073709551615`. The Java switch,
+menu-layout and platform-defaults readers cache by mtime/length, but do not
+trust an mtime younger than 2 s, and platform defaults are re-read when the
+file changes (broker C reopens them on every lookup). A file whose mtime lies
+ahead of the unit clock keeps the plain cache rule. The broker
 C's own guarded CAS/fsync/rename/readback/RO restoration does not protect
 the older independent navigation scripts or the menu shell's separate loader.
 
@@ -306,6 +306,22 @@ rather than fabricating a safe conversion. Critically,
 `mibr-carplay-autodirect.enabled` (legacy boot-presence flag) have
 **different** candidate identities. Changing existing native content
 formats requires a dedicated parser/converter and all consumers together.
+
+Every row also carries an A3 disposition (`a3_disposition`, `a3_reason`,
+`a3_single_writer`): **18 MIGRATE** (12 broker CAS switches, display
+scaling, menu language, menu layout, platform defaults, two installer
+ownership receipts), **40 KEEP_AT_LEGACY** (all 13 CarPlay registry groups,
+because the native settings layer refuses persistent writes, plus boot
+markers, aliases, backups and the single-writer gate), **2
+EXCLUDE_NONCONFIG** (calibration clip, test-only script) and **3
+BLOCKED_INPUT** (SD-log switch, two version receipts whose writers are not in
+source). Only MIGRATE rows have a `candidate_destination_path`; every other
+row keeps its former proposal as `reserved_future_name`, so two kept stores
+can never collide in one target. Negative tests reject a held alias marked
+MIGRATE, a reserved-name collision, a value boolean (absent means ON)
+relabelled as presence, a stock backup split from its held directory, a
+second writable safe-area store and a MIGRATE row without exactly one
+writer.
 
 This is a naming and source-provenance **proposal**, not implemented MMX
 paths. All `verified_destination_path` fields remain null, and

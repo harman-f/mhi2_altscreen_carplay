@@ -5,10 +5,10 @@
 | Profile | Firmware | Original `lsd.jxe` SHA-256 | Java |
 | --- | --- | --- | --- |
 | `skoda-mu1440-p4526` | `MHI2_ER_SKG13_P4526_MU1440` | `a55d9cfb69c5756f8202b7f7aa4079d4d5b637ae4c2fd0fe723f1d6816cbeea8` | R57 reference source |
-| `seat-mu1409-p4708` | `MHI2_ER_SEG11_P4708_MU1409` | exact digest still missing; P4708_1 must be compared separately | OEM Java work can continue |
+| `seat-mu1409-p4708` | `MHI2_ER_SEG11_P4708_MU1409` | `25b9f1285445de0193c1d869a734230d7db95363957603598a6ede09af904403` (P4708_1 must be compared separately) | OEM Java work can continue |
 | `seat-mu1447-p4709` | `MHI2_ER_SEG11_P4709_MU1447` | `945586fbede2fe53b5b41d7c10490641ff71fcc9581fb237cf40328f450cb22e` | OEM Java work can continue |
 
-The P4709 digest is taken from the existing exact JXE corpus matrix. For the MU1409 contributor, the reported **55,712,590-byte** original JXE is *not* a hash. P4709 was 55,712,574 bytes. Do not fabricate a digest or treat these as the same file.
+The P4709 digest is taken from the existing exact JXE corpus matrix. The P4708 digest was measured on the original `/ifs/lsd.jxe` (55,712,590 bytes) extracted from the P4708 firmware archive; the 50 and 70 variants carry the identical file. P4709 is a different file (55,712,574 bytes). The firmware labelled `P4708_1` has not been hashed yet and must not be assumed equal. Do not fabricate a digest or treat these as the same file.
 
 Each of the three profile directories has exactly the same `hmi/`, `icons/`, `display/`, `input/` and `integration/` groups. Shared CarPlay, Broker, Menu and Navigation code is published once, with one settings registry and one broker. Java adapter repairs and optimization happen in their target profile without forking shared menu/business logic.
 

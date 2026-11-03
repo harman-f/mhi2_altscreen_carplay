@@ -6,7 +6,9 @@ runtime_init_durable || { echo "AUTO_DIRECT_ENABLE=FAIL_RUNTIME"; exit 3; }
 DSTBASE=/mnt/app/root/altscreen-u2
 ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
 LSD=/mnt/app/eso/hmi/lsd/lsd.sh
-TMP=/tmp/lsd.sh.mibr-autodirect.$$
+# Stage beside our own files on /mnt/app, not in /tmp (RAM): the final mv is
+# then a same-filesystem rename and lsd.sh is never left half-copied.
+TMP=/mnt/app/root/lsd.sh.mibr-autodirect.$$
 MARKER_BEGIN="# MIBR AUTO-DIRECT BEGIN"
 MARKER_END="# MIBR AUTO-DIRECT END"
 BOOTCMD='/bin/ksh /mnt/app/root/altscreen-u2/scripts/direct_ts_auto_start.sh >/tmp/mibr-direct-auto-boot.log 2>&1 || true'
