@@ -1,0 +1,41 @@
+name: Module binary lineage source gate
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/module-build-lineage.yml'
+      - 'tools/emit_module_build_lineage.py'
+      - 'modules/module-index.json'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '.github/workflows/module-build-lineage.yml'
+      - 'tools/emit_module_build_lineage.py'
+      - 'modules/module-index.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: module-lineage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Module lineage self-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate canonical ownership and graph
+        run: python3 tools/check_module_index.py --self-test
+      - name: Validate reproducible receipt calculation and tamper rejection
+        run: python3 tools/emit_module_build_lineage.py --self-test
+      - name: Verify build-lineage authority is documented
+        run: |
+          test -s docs/build/MODULE_BUILD_LINEAGE.md
+          test -s docs/architecture/REPOSITORY_LAYOUT.md
