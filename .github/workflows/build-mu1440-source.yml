@@ -16,6 +16,8 @@ on:
       - 'tools/build_*.sh'
       - 'tools/check_mu1440_target_shell.py'
       - 'tools/generate_alt111_settings.py'
+      - 'tools/emit_module_build_lineage.py'
+      - 'modules/module-index.json'
       - 'tools/test_*.sh'
       - 'tools/source-overlays/**'
       - 'modules/carplay/runtime/**'
@@ -36,6 +38,8 @@ on:
       - 'tools/build_*.sh'
       - 'tools/check_mu1440_target_shell.py'
       - 'tools/generate_alt111_settings.py'
+      - 'tools/emit_module_build_lineage.py'
+      - 'modules/module-index.json'
       - 'tools/test_*.sh'
       - 'tools/source-overlays/**'
       - 'modules/carplay/runtime/**'
@@ -236,6 +240,30 @@ jobs:
           (cd "$OUT" && sha256sum -c SHA256SUMS)
           echo 'Current artifact SHA-256 values (build identity only; no released/install identity claim):'
           (cd "$OUT" && sha256sum "${expected[@]}")
+
+      - name: Emit and verify lineage from actual QNX build outputs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -B tools/emit_module_build_lineage.py \
+            --commit "$(git rev-parse HEAD)" \
+            --target-profile skoda-mu1440-p4526 \
+            --toolchain-commit "$TOOLCHAIN_COMMIT" \
+            --toolchain-dockerfile-sha256 "$TOOLCHAIN_DOCKERFILE_SHA256" \
+            --artifact carplay:libaltscreen111.so=build/mu1440-source/libaltscreen111.so \
+            --artifact carplay:alt111-settings=build/mu1440-source/alt111-settings \
+            --artifact carplay:direct-ts-parity=build/mu1440-source/direct-ts-parity \
+            --artifact carplay:libmibr_isotx2_guard.so=build/mu1440-source/libmibr_isotx2_guard.so \
+            --artifact carplay:libmibr_isotx2_gate.so=build/mu1440-source/libmibr_isotx2_gate.so \
+            --artifact carplay:parity-session=build/mu1440-source/parity-session \
+            --artifact broker:mibr-v3-service=build/mu1440-source/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY \
+            --artifact broker:mibrctl-v3=build/mu1440-source/mibr-control/mibrctl-v3-QNX65-ARMv7-NOT-INSTALL-READY \
+            --artifact broker:mibr-v3-genkey=build/mu1440-source/mibr-control/mibr-v3-genkey-QNX65-ARMv7-NOT-INSTALL-READY \
+            --artifact broker:mibr-key40d=build/mu1440-source/mibr-control/mibr-key40d-QNX65-ARMv7-NOT-INSTALL-READY \
+            --out build/mu1440-source/MODULE_BUILD_LINEAGE.json
+          python3 -B tools/emit_module_build_lineage.py \
+            --verify build/mu1440-source/MODULE_BUILD_LINEAGE.json
+          test -s build/mu1440-source/MODULE_BUILD_LINEAGE.json
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
