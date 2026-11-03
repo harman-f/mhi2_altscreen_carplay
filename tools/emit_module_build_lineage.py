@@ -88,6 +88,22 @@ def parse_artifacts(root, index, specs):
     return sorted(found, key=lambda row: (row["module"], row["logical_name"]))
 
 
+def transitive_modules(index, selected):
+    """Include all declared build dependencies, with cycle protection."""
+    modules = index["modules"]
+    names = set()
+    pending = list(selected)
+    while pending:
+        name = pending.pop()
+        if name in names:
+            continue
+        if name not in modules:
+            raise ValueError("undeclared module dependency: " + name)
+        names.add(name)
+        pending.extend(modules[name]["depends_on"])
+    return sorted(names)
+
+
 def produce(root, index, commit, profile, toolchain, dockerfile_sha, specs):
     if not HEX40.fullmatch(commit) or not HEX40.fullmatch(toolchain):
         raise ValueError("exact 40-digit source/toolchain commits are required")
@@ -96,13 +112,15 @@ def produce(root, index, commit, profile, toolchain, dockerfile_sha, specs):
     if profile not in index["profiles"]:
         raise ValueError("unknown target profile: " + profile)
     artifacts = parse_artifacts(root, index, specs)
-    names = sorted({row["module"] for row in artifacts})
+    names = transitive_modules(index, {row["module"] for row in artifacts})
     inputs = collect_inputs(root, index, names)
     checksum = hashlib.sha256()
     for row in inputs:
         checksum.update((row["path"] + "\0" + row["sha256"] + "\n").encode())
+    index_canonical = json.dumps(index, sort_keys=True, separators=(",", ":")).encode()
     return {
         "schema_version": 1,
+        "module_index_sha256": hashlib.sha256(index_canonical).hexdigest(),
         "build_scope": "QNX_6.5_ARMv7_cross_build_only",
         "vehicle_qualified": False,
         "bit_reproducible_verified": False,
@@ -128,6 +146,12 @@ def verify(root, doc):
             path = regular_file(root, row["path"])
             if path.stat().st_size != row["size"] or sha_file(path) != row["sha256"]:
                 raise ValueError("lineage hash mismatch: " + row["path"])
+    if not HEX40.fullmatch(doc.get("source_commit", "")):
+        raise ValueError("invalid recorded source revision")
+    if not HEX40.fullmatch(doc.get("toolchain_commit", "")):
+        raise ValueError("invalid recorded toolchain revision")
+    if not HEX64.fullmatch(doc.get("module_index_sha256", "")):
+        raise ValueError("invalid module index receipt")
     checksum = hashlib.sha256()
     for row in sorted(doc["inputs"], key=lambda z: z["path"]):
         checksum.update((row["path"] + "\0" + row["sha256"] + "\n").encode())
@@ -153,6 +177,14 @@ def self_test():
         b = produce(root, index, "a" * 40, "synthetic", "b" * 40, "c" * 64, args)
         assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
         assert verify(root, a)
+        index["modules"]["example"]["depends_on"] = ["helper"]
+        index["modules"]["helper"] = {"depends_on": [], "source": ["tool.sh"],
+                                      "build_scripts": [], "outputs": [],
+                                      "build_coverage": "partial"}
+        graph = produce(root, index, "a" * 40, "synthetic", "b" * 40, "c" * 64, args)
+        assert "helper" in graph["module_dependencies"]
+        index["modules"]["example"]["depends_on"] = []
+        del index["modules"]["helper"]
         for invalid in (["example:bogus=build/example.bin"], args * 2,
                         ["example:example.bin=../outside.bin"]):
             try:
