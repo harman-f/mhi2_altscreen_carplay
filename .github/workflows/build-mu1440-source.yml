@@ -237,6 +237,24 @@ jobs:
           echo 'Current artifact SHA-256 values (build identity only; no released/install identity claim):'
           (cd "$OUT" && sha256sum "${expected[@]}")
 
+      - name: Bind actual QNX outputs to canonical module sources
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 tools/emit_module_build_lineage.py \
+            --commit "$(git rev-parse HEAD)" \
+            --target-profile skoda-mu1440-p4526 \
+            --toolchain-commit "$TOOLCHAIN_COMMIT" \
+            --toolchain-dockerfile-sha256 "$TOOLCHAIN_DOCKERFILE_SHA256" \
+            --artifact carplay:libaltscreen111.so=build/mu1440-source/libaltscreen111.so \
+            --artifact carplay:alt111-settings=build/mu1440-source/alt111-settings \
+            --artifact broker:mibr-v3-service=build/mu1440-source/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY \
+            --out build/mu1440-source/MODULE_BUILD_LINEAGE.json
+          python3 tools/emit_module_build_lineage.py \
+            --verify build/mu1440-source/MODULE_BUILD_LINEAGE.json
+          test -s build/mu1440-source/MODULE_BUILD_LINEAGE.json
+          # This receipt identifies source inputs and hashes, not vehicle readiness.
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mu1440-source-qnx-build
