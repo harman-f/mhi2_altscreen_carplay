@@ -37,7 +37,7 @@ The Škoda's right-wheel detents also preceded six `A wrong DDS Encoder was reco
 
 | Purpose | Exact public starting point |
 | --- | --- |
-| Passive RX-only logger source | [`src/native/keypanel/mibr_keypanel_native.c`](../../src/native/keypanel/mibr_keypanel_native.c) |
+| Passive RX-only logger source | [`modules/broker/source/keypanel/mibr_keypanel_native.c`](../../modules/broker/source/keypanel/mibr_keypanel_native.c) |
 | Host integration fixtures | [`tests/keypanel-native/integration.py`](../../tests/keypanel-native/integration.py) |
 | Reproducible QNX build and ELF validation | [`.github/workflows/build-keypanel-native.yml`](../../.github/workflows/build-keypanel-native.yml) and [`tools/build_keypanel_native.sh`](../../tools/build_keypanel_native.sh) |
 | SD-safe two-console wrappers (Škoda paths must be checked on SEAT) | [start](../../runtime/diagnostics/keypanel_start_native.sh), [notes](../../runtime/diagnostics/keypanel_note_native.sh) |
