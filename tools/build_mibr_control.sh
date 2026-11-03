@@ -3,20 +3,21 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-SRC="$ROOT/src/native/mibr-control"
-ALT_ROOT=${ALT111_SOURCE_ROOT:-"$ROOT/src/native"}
+SRC="$ROOT/modules/broker/source/mibr-control"
+ALT_ROOT=${ALT111_SOURCE_ROOT:-"$ROOT/modules/carplay/source"}
 OUT=${MIBR_CONTROL_OUT:-"$ROOT/build/mibr-control"}
 MODE=${1:-host}
 CC=${CC:-cc}
 QNX_IMAGE=${MIBR_QNX_IMAGE:-mibr-qnx65-temp:4.9}
 QNX_CC=arm-unknown-nto-qnx6.5.0eabi-gcc
-INC="-I$ALT_ROOT/altscreen111-gen2/include -I$ALT_ROOT/alt111-settings/include -I$ALT_ROOT/display-scaling"
+SCALING_ROOT="$ROOT/modules/broker/source/display-scaling"
+INC="-I$ALT_ROOT/altscreen111-gen2/include -I$ALT_ROOT/alt111-settings/include -I$SCALING_ROOT"
 CORE=(
   "$ALT_ROOT/alt111-settings/settings_core.c"
   "$ALT_ROOT/alt111-settings/settings_posix.c"
   "$ALT_ROOT/altscreen111-gen2/src/alt111_policy.c"
   "$ALT_ROOT/sha256sum-compat/sha256sum_compat.c"
-  "$ALT_ROOT/display-scaling/mibr_display_scaling.c"
+  "$SCALING_ROOT/mibr_display_scaling.c"
 )
 SERVICE=(
   "$SRC/mibr_v3_readonly.c"
@@ -99,10 +100,10 @@ case "$MODE" in
     MSYS_NO_PATHCONV=1 docker run --rm --platform=linux/amd64 \
       -v "$DOCKER_ROOT:/repo:ro" -v "$DOCKER_OUT:/out" \
       --entrypoint /bin/bash "$QNX_IMAGE" -ec '
-        R=/repo; S=$R/src/native/mibr-control; A=$R/src/native; T=/tmp/mibr-control-out
+        R=/repo; S=$R/modules/broker/source/mibr-control; A=$R/modules/carplay/source; B=$R/modules/broker/source/display-scaling; T=/tmp/mibr-control-out
         mkdir -p "$T"
         C=arm-unknown-nto-qnx6.5.0eabi-gcc
-        I="-I$A/altscreen111-gen2/include -I$A/alt111-settings/include -I$A/display-scaling"
+        I="-I$A/altscreen111-gen2/include -I$A/alt111-settings/include -I$B"
         F="-include stddef.h -D_QNX_SOURCE -DMIBR_SHA256_LIBRARY_ONLY -DMIBR_V3_TARGET_STORAGE_QUALIFIED -O2 -std=gnu99 -march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16"
         $C $F $I \
           "$S/mibr_v3_readonly.c" "$S/mibr_v3_profile_store.c" \
@@ -115,7 +116,7 @@ case "$MODE" in
           "$A/alt111-settings/settings_core.c" "$A/alt111-settings/settings_posix.c" \
           "$A/altscreen111-gen2/src/alt111_policy.c" \
           "$A/sha256sum-compat/sha256sum_compat.c" \
-          "$A/display-scaling/mibr_display_scaling.c" \
+          "$B/mibr_display_scaling.c" \
           -lsocket -lc -o "$T/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY"
         $C -include stddef.h -D_QNX_SOURCE -O2 -std=gnu99 -march=armv7-a \
           -mfloat-abi=softfp -mfpu=vfpv3-d16 "$S/mibr_v3_client.c" \
@@ -145,7 +146,7 @@ case "$MODE" in
       -DMIBR_V3_TARGET_STORAGE_QUALIFIED -O2 -std=gnu99 -march=armv7-a
       -mfloat-abi=softfp -mfpu=vfpv3-d16)
     "$QNX_CC" "${F[@]}" -I"$ALT_ROOT/altscreen111-gen2/include" \
-      -I"$ALT_ROOT/alt111-settings/include" -I"$ALT_ROOT/display-scaling" \
+      -I"$ALT_ROOT/alt111-settings/include" -I"$SCALING_ROOT" \
       "${SERVICE[@]}" "${CORE[@]}" \
       -lsocket -lc \
       -o "$T/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY"

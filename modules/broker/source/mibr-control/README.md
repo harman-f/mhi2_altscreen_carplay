@@ -8,8 +8,8 @@ was applied on a unit.
 ## Source and dependency boundary
 
 The controller is built against the canonical schema-2 settings implementation
-in `../alt111-settings/` and its policy/header dependencies in
-`../altscreen111-gen2/` and `../sha256sum-compat/`. The canonical registry and
+in `../../../../modules/carplay/source/alt111-settings/` and its policy/header dependencies in
+`../../../../modules/carplay/source/altscreen111-gen2/` and `../../../../modules/carplay/source/sha256sum-compat/`. The canonical registry and
 value validators remain owned by that settings implementation. This module
 does not copy or regenerate a second settings registry.
 
@@ -24,7 +24,7 @@ The corresponding installed R57 service SHA-256 was
 The source revision and dependency pin identify the input; a build reproduction
 is a separate result and must be recorded by the build step.
 
-The public `runtime/mibr-control/mibr-engine.ksh` helper also contains a
+The public `modules/broker/runtime/mibr-control/mibr-engine.ksh` helper also contains a
 review-driven write-safety correction: it remounts `/mnt/system` read-write
 before creating its same-filesystem staging file and requests a read-only
 remount after remount, staging, and replacement failures. It intentionally is
@@ -47,7 +47,7 @@ The source includes:
   view-after-long-press; KEY44 long press requests the existing route toggle.
   These source mappings preserve R57 behavior; they do not qualify a physical
   input port or route action on a vehicle.
-- `runtime/mibr-control/mibr-view.ksh`, the helper for the cockpit-view counter,
+- `modules/broker/runtime/mibr-control/mibr-view.ksh`, the helper for the cockpit-view counter,
   its configured resync view, and the existing `viewarea.selected` TEMP write.
   Its defaults are fixed-view mode OFF, Sporttacho present ON, and resync target
   Voll. The r57 long press advances the OEM view once and the helper records the
@@ -77,15 +77,15 @@ For an integrated build already running in the pinned QNX container, use
 `tools/build_mibr_control.sh qnx-container`; it writes the same outputs and
 uses the same target flags as the Docker convenience mode. Build the toolchain
 from the pinned recipe in
-[`docs/build/INSTALLED_GEN2_SOURCE.md`](../../../docs/build/INSTALLED_GEN2_SOURCE.md).
+[`docs/build/INSTALLED_GEN2_SOURCE.md`](../../../../docs/build/INSTALLED_GEN2_SOURCE.md).
 The build emits artifacts explicitly named `NOT-INSTALL-READY`. It compiles
 source only; it does not stage or write a target. See
-[`docs/architecture/mibr-control/BUILD_AND_EVIDENCE.md`](../../../docs/architecture/mibr-control/BUILD_AND_EVIDENCE.md)
+[`docs/architecture/mibr-control/BUILD_AND_EVIDENCE.md`](../../../../docs/architecture/mibr-control/BUILD_AND_EVIDENCE.md)
 for the toolchain pin, output interpretation and source/binary hash limits.
 
 ## Runtime limits
 
-The related scripts are in [`runtime/mibr-control/`](../../../runtime/mibr-control/).
+The related scripts are in [`modules/broker/runtime/mibr-control/`](../../runtime/mibr-control/).
 They include the corrected public engine helper described above, the boot
 helper, and the R57 view helper for source review. The engine helper
 intentionally differs from the installed R46 script; the boot helper is not a

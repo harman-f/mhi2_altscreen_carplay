@@ -11,10 +11,10 @@ with tempfile.TemporaryDirectory() as td:
     root = Path(td)
     guard = root / 'guard.so'
     subprocess.run(['cc', '-shared', '-fPIC', '-O2', '-std=gnu99', '-Wall', '-Wextra', '-Werror',
-                    '-DALT111_NATIVE_GATE_TEST', '-Isrc/native/altscreen111-gen2/include',
-                    'src/native/altscreen111-gen2/src/alt111_native_gate.c', '-ldl', '-pthread',
+                    '-DALT111_NATIVE_GATE_TEST', '-Imodules/carplay/source/altscreen111-gen2/include',
+                    'modules/carplay/source/altscreen111-gen2/src/alt111_native_gate.c', '-ldl', '-pthread',
                     '-o', str(guard)], cwd=ROOT, check=True)
-    old = (ROOT / 'src/native/isotx2-gate/isotx2_gate.c').read_text()
+    old = (ROOT / 'modules/carplay/source/isotx2-gate/isotx2_gate.c').read_text()
     for name, value in [('DIRECT_MARKER', root/'request'), ('RESET_MARKER', root/'reset'),
                         ('STATS_PATH', root/'old.stats'), ('LOG_PATH', root/'old.log')]:
         import re

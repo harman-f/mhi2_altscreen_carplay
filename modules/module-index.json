@@ -2,28 +2,28 @@
   "schema_version": 1,
   "contract": "docs/architecture/REPOSITORY_LAYOUT.md",
   "lifecycle": "migration-in-progress",
-  "notes": "Development source ownership only; distribution and target acceptance are governed independently. Existing source paths remain authoritative until tested moves.",
+  "notes": "CarPlay, Broker, Menu and Navigation source/runtime ownership moved into modules; shared settings and host orchestration remain centralized. Profiles and build/release qualification are tracked separately.",
   "modules": {
     "carplay": {
       "status": "indexed",
       "distribution": "common/carplay",
       "depends_on": [],
       "source": [
-        "src/native/altscreen111-gen2",
-        "src/native/alt111-settings",
-        "src/native/direct-ts-parity",
-        "src/native/direct-ts-remux",
+        "modules/carplay/source/altscreen111-gen2",
+        "modules/carplay/source/alt111-settings",
+        "modules/carplay/source/direct-ts-parity",
+        "modules/carplay/source/direct-ts-remux",
         "modules/carplay/source/most-ts-writer",
-        "src/native/isotx2-gate",
-        "src/native/parity-session",
-        "src/native/sha256sum-compat",
-        "src/native/tee-compat",
+        "modules/carplay/source/isotx2-gate",
+        "modules/carplay/source/parity-session",
+        "modules/carplay/source/sha256sum-compat",
+        "modules/carplay/source/tee-compat",
         "modules/carplay/source/vehicle-data"
       ],
       "runtime": [
-        "runtime/auto-direct",
-        "runtime/parity",
-        "runtime/isotx2-gate"
+        "modules/carplay/runtime/auto-direct",
+        "modules/carplay/runtime/parity",
+        "modules/carplay/runtime/isotx2-gate"
       ],
       "build_scripts": [
         "tools/build_alt111_settings.sh",
@@ -45,19 +45,19 @@
       "evidence": "docs/build/MU1440_R57_SOURCE.md"
     },
     "broker": {
-      "status": "indexed",
+      "status": "partially-migrated",
       "distribution": "common/broker",
       "depends_on": [
         "carplay"
       ],
       "source": [
-        "src/native/mibr-control",
-        "src/native/keypanel",
-        "src/native/display-scaling",
+        "modules/broker/source/mibr-control",
+        "modules/broker/source/keypanel",
+        "modules/broker/source/display-scaling",
         "settings/registry.json"
       ],
       "runtime": [
-        "runtime/mibr-control"
+        "modules/broker/runtime/mibr-control"
       ],
       "build_scripts": [
         "tools/build_mibr_control.sh",

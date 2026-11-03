@@ -300,7 +300,7 @@ class ServiceTest(unittest.TestCase):
         cfg=Path(self.temp.name)/"iap2.cfg"
         shutil.copyfile(ENGINE_CONFIG,cfg)
         self.p.terminate();self.p.wait(timeout=5);self.p.stdout.close();self.p.stderr.close()
-        self.env.update({"MIBR_ENGINE_SHELL":shutil.which("bash") or "/bin/sh","MIBR_ENGINE_SCRIPT":str(root/"runtime/mibr-control/mibr-engine.ksh"),
+        self.env.update({"MIBR_ENGINE_SHELL":shutil.which("bash") or "/bin/sh","MIBR_ENGINE_SCRIPT":str(root/"modules/broker/runtime/mibr-control/mibr-engine.ksh"),
                          "MIBR_ENGINE_CFG":str(cfg),"MIBR_ENGINE_BOOT":str(Path(self.temp.name)/"boot"),
                          "MIBR_ENGINE_LOCK":str(Path(self.temp.name)/"lock"),"MIBR_ENGINE_NOMOUNT":"1"})
         self.start_service()
@@ -327,7 +327,7 @@ class ServiceTest(unittest.TestCase):
         cli=t/"cli";cli.write_text("#!/bin/sh"+chr(10)+"exit 0"+chr(10))
         self.p.terminate();self.p.wait(timeout=5);self.p.stdout.close();self.p.stderr.close()
         sh=shutil.which("bash") or "/bin/sh"
-        self.env.update({"MIBR_VIEW_SHELL":sh,"MIBR_VIEW_SCRIPT":str(root/"runtime/mibr-control/mibr-view.ksh"),
+        self.env.update({"MIBR_VIEW_SHELL":sh,"MIBR_VIEW_SCRIPT":str(root/"modules/broker/runtime/mibr-control/mibr-view.ksh"),
                          "MIBR_VIEW_DIR":str(t/"vd"),"MIBR_VIEW_NOMOUNT":"1","MIBR_VIEW_CLI":str(cli),
                          "MIBR_VIEW_POS":str(t/"vpos"),"MIBR_VIEW_GEN":str(t/"vgen"),"MIBR_VIEW_LOCK":str(t/"vlock"),
                          "MIBR_VIEW_AREA":str(t/"varea"),"MIBR_VIEW_LOG":str(t/"vlog"),"MIBR_VIEW_DEBOUNCE":"1"})

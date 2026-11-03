@@ -8,7 +8,7 @@ CC=${CC:-cc}
 OUT=${PARITY_HOST_OUT:-build/parity-host}
 mkdir -p "$OUT"
 "$CC" -O2 -g -std=gnu99 -Wall -Wextra -Werror \
-  src/native/direct-ts-parity/direct_ts_parity.c -pthread -lm -o "$OUT/direct-ts-parity"
+  modules/carplay/source/direct-ts-parity/direct_ts_parity.c -pthread -lm -o "$OUT/direct-ts-parity"
 "$OUT/direct-ts-parity" --self-test
 for name in regressions clock_review; do
   "$CC" -O2 -g -std=gnu99 -Wall -Wextra -Werror \
@@ -22,10 +22,10 @@ python3 -B tests/parity_session_lifecycle.py
 python3 -B tests/alt111_native_gate_integration.py
 python3 -B tests/parity_session_logging.py
 python3 -B tools/check_mu1440_target_shell.py --self-test --check \
-  runtime/parity/parity_drive_supervisor.sh runtime/parity/parity_drive_enable.sh \
-  runtime/parity/parity_drive_disable.sh runtime/parity/parity_drive_status.sh \
-  runtime/parity/parity_status.sh runtime/parity/parity_profile.sh \
-  runtime/parity/parity_session.sh runtime/parity/master-script-basenames.sh \
+  modules/carplay/runtime/parity/parity_drive_supervisor.sh modules/carplay/runtime/parity/parity_drive_enable.sh \
+  modules/carplay/runtime/parity/parity_drive_disable.sh modules/carplay/runtime/parity/parity_drive_status.sh \
+  modules/carplay/runtime/parity/parity_status.sh modules/carplay/runtime/parity/parity_profile.sh \
+  modules/carplay/runtime/parity/parity_session.sh modules/carplay/runtime/parity/master-script-basenames.sh \
   deployment/mu1440-parity-drive-v1/session-logging.sh
 if command -v ffmpeg >/dev/null 2>&1; then
   python3 -B tests/direct_ts_parity_decode_integration.py "$OUT/direct-ts-parity" "$OUT/decode"

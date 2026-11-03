@@ -6,7 +6,7 @@ The installed R57 service source is identified by the source-file SHA-256
 below. Its settings implementation descends from
 `harman-f/mhi2_altscreen_carplay@324b4f249883bb707e0d0a8995b2b6b5fe23be25`.
 The public build links the canonical shared implementation in
-`src/native/alt111-settings/`, with the current single registry
+`modules/carplay/source/alt111-settings/`, with the current single registry
 `settings/registry.json` (SHA-256
 `818cfd7b635742c98e291c3a6eb4a4350bec873715245d2d888fcac360ccd098`).
 This is the three-view registry used by the integrated public source tree; it

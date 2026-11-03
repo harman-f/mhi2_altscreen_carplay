@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 CC="${CC:-cc}"
-SRC="src/native/altscreen111-gen2"
+SRC="modules/carplay/source/altscreen111-gen2"
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 "$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \

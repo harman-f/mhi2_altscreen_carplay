@@ -5,10 +5,10 @@ on:
   pull_request:
     paths:
       - '.github/workflows/build-altscreen111-gen2.yml'
-      - 'src/native/altscreen111-gen2/**'
-      - 'src/native/alt111-settings/**'
+      - 'modules/carplay/source/altscreen111-gen2/**'
+      - 'modules/carplay/source/alt111-settings/**'
       - 'modules/carplay/source/vehicle-data/**'
-      - 'src/native/sha256sum-compat/**'
+      - 'modules/carplay/source/sha256sum-compat/**'
       - 'settings/**'
       - 'tools/build_altscreen111_gen2.sh'
       - 'tools/build_alt111_settings.sh'
@@ -21,10 +21,10 @@ on:
     branches: [ main ]
     paths:
       - '.github/workflows/build-altscreen111-gen2.yml'
-      - 'src/native/altscreen111-gen2/**'
-      - 'src/native/alt111-settings/**'
+      - 'modules/carplay/source/altscreen111-gen2/**'
+      - 'modules/carplay/source/alt111-settings/**'
       - 'modules/carplay/source/vehicle-data/**'
-      - 'src/native/sha256sum-compat/**'
+      - 'modules/carplay/source/sha256sum-compat/**'
       - 'settings/**'
       - 'tools/build_altscreen111_gen2.sh'
       - 'tools/build_alt111_settings.sh'

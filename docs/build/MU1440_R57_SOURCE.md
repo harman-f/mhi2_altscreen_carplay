@@ -10,13 +10,13 @@ The R49 supervisor orchestrates sessions. The R57 MIBR/3 service owns one settin
 
 | Source | Reference version | Build evidence |
 | --- | --- | --- |
-| [GEN2 and vehicle data](../../src/native/altscreen111-gen2/) | R38 overlay | Exact installed QNX output reproduced |
-| [Canonical settings](../../src/native/alt111-settings/) and [registry](../../settings/registry.json) | Installed three-view overlay | Exact installed CLI reproduced |
-| [Media worker](../../src/native/direct-ts-parity/) | Installed source-time transport | Exact installed QNX output reproduced |
-| [Owner](../../src/native/parity-session/) | R52 reference plus publication safety correction | Original R50/R52 reproduced; corrected owner host/QNX checked, not installed |
-| [Native guard](../../src/native/altscreen111-gen2/src/alt111_native_gate.c) and [legacy gate](../../src/native/isotx2-gate/) | Installed interposers | Both installed QNX outputs reproduced |
-| [Supervisor and wrappers](../../runtime/parity/) | R49 | Installed behavior retained; public comments curated |
-| [Controller](../../src/native/mibr-control/) | R57 service/KEY40-KEY44 helper; unchanged client/genkey | QNX source build; artifact identities and limits in controller guide |
+| [GEN2 and vehicle data](../../modules/carplay/source/altscreen111-gen2/) | R38 overlay | Exact installed QNX output reproduced |
+| [Canonical settings](../../modules/carplay/source/alt111-settings/) and [registry](../../settings/registry.json) | Installed three-view overlay | Exact installed CLI reproduced |
+| [Media worker](../../modules/carplay/source/direct-ts-parity/) | Installed source-time transport | Exact installed QNX output reproduced |
+| [Owner](../../modules/carplay/source/parity-session/) | R52 reference plus publication safety correction | Original R50/R52 reproduced; corrected owner host/QNX checked, not installed |
+| [Native guard](../../modules/carplay/source/altscreen111-gen2/src/alt111_native_gate.c) and [legacy gate](../../modules/carplay/source/isotx2-gate/) | Installed interposers | Both installed QNX outputs reproduced |
+| [Supervisor and wrappers](../../modules/carplay/runtime/parity/) | R49 | Installed behavior retained; public comments curated |
+| [Controller](../../modules/broker/source/mibr-control/) | R57 service/KEY40-KEY44 helper; unchanged client/genkey | QNX source build; artifact identities and limits in controller guide |
 | [OEM menu](../../modules/menu/source/) | R57 | Own adapter/generator/tests published; exact J9 rebuild blocked by external compiler/API inputs |
 
 The installed three-view registry contains 48 keys and supports up to three configured areas; actual negotiation and availability must be established per session. This is a reference implementation snapshot; it does not establish that every control has independent live effect. Switchable lockout semantics remain unresolved and are **not** silently replaced by the pause marker. This publication makes no claim of a complete configuration/control surface. The reference input mappings are described below; they are target-specific and do not establish matching SEAT/VW signals.

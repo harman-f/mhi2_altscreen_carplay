@@ -6,4 +6,4 @@ The reference observer accepts receive-only framed loopback input and correlates
 
 Publishing this existing implementation does not approve a new physical gesture assignment or qualify exclusive input routing. OEM short-press, navigation, volume and unrelated controls retain their existing ownership. The source-level route policy is not a qualified OEM call-site interceptor.
 
-Run `bash tools/test_alt111_zoom_host.sh` for queue, tuple, correlation, segmentation, duplicate and timestamp-wrap regressions. Host parser/queue checks and a QNX build do not establish visible phone-map zoom, target input focus, or a safe vehicle installation. See the [source baseline](../../../docs/build/MU1440_R50_SOURCE.md).
+Run `bash tools/test_alt111_zoom_host.sh` for queue, tuple, correlation, segmentation, duplicate and timestamp-wrap regressions. Host parser/queue checks and a QNX build do not establish visible phone-map zoom, target input focus, or a safe vehicle installation. See the [source baseline](../../../../docs/build/MU1440_R50_SOURCE.md).

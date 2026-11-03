@@ -111,7 +111,7 @@ def impact(doc, files):
 def self_test(doc):
     assert not validate(doc), "current canonical module layout invalid"
     altered = copy.deepcopy(doc)
-    altered["modules"]["broker"]["source"].append("src/native/altscreen111-gen2")
+    altered["modules"]["broker"]["source"].append("modules/carplay/source/altscreen111-gen2")
     assert any("duplicate ownership" in e for e in validate(altered, check_files=False))
     altered = copy.deepcopy(doc)
     altered["modules"]["carplay"]["depends_on"].append("menu")
@@ -119,10 +119,10 @@ def self_test(doc):
     altered = copy.deepcopy(doc)
     altered["modules"]["carplay"]["source"].append("../unsafe")
     assert any("unsafe" in e for e in validate(altered, check_files=False))
-    affected, unowned = impact(doc, ["src/native/mibr-control/mibr_v3_service.c"])
+    affected, unowned = impact(doc, ["modules/broker/source/mibr-control/mibr_v3_service.c"])
     assert affected == ["broker", "menu", "navigation"] and not unowned
-    affected, unowned = impact(doc, ["src/native/unknown-core/new.c"])
-    assert not affected and unowned == ["src/native/unknown-core/new.c"]
+    affected, unowned = impact(doc, ["modules/carplay/source/unknown-core/new.c"])
+    assert not affected and unowned == ["modules/carplay/source/unknown-core/new.c"]
     print("MODULE_INDEX_SELF_TEST=PASS")
 
 

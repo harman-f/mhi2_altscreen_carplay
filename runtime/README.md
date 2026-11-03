@@ -1,61 +1,19 @@
-# Runtime reference
+# Shared runtime and diagnostics
 
-This directory contains project-owned **reference runtime logic and diagnostic helpers**.
+The shared `runtime/` directory keeps cross-module diagnostics, deployment helpers and clearly experimental scripts. It is not an installer or a second canonical CarPlay runtime tree.
 
-It is not itself a packaged installer. The guarded exact-target developer orchestration lives under
-`deployment/mu1440/`; it stages and invokes these lower-level runtime components.
+**CarPlay runtime now belongs exclusively to [`modules/carplay/runtime/`](../modules/carplay/runtime/):** `auto-direct/` contains the guarded Type-111 takeover/recovery scripts and ScreenAlt configuration; `parity/` contains native ownership/session supervision; `isotx2-gate/` contains DisplayManager gate operator controls. These unchanged files are staged into the **original** `runtime/<component>/` package/installation targets by `tools/prepare_mu1440_sd.sh` and related release tooling. Changing development paths must not alter target paths or behavior.
 
-## `auto-direct/`
-
-Vehicle-tested reference state-machine logic for automatic takeover/recovery:
-
-- common runtime helpers;
-- write-gate control;
-- supervisor;
-- independent watchdog;
-- start/stop/status;
-- enable/disable reference logic;
-- ScreenAlt configuration.
-
-Read first:
-
-- `docs/architecture/AUTO_DIRECT_RUNTIME.md`
-- `docs/architecture/RUNTIME_CONTRACT.md`
-
-Some scripts reflect the exact first MU1440 environment and are published so the real tested logic is
-visible. Treat target paths as compatibility evidence, not universal MHI2 APIs.
+The matching native sources are under `modules/carplay/source/`, including `isotx2-gate/`. Reference-vehicle observations remain configuration-specific and do not qualify new packages automatically.
 
 ## `diagnostics/`
 
-Generic SSH-oriented helpers:
-
-- `gen2_prereq.sh` — compatibility/hash preflight;
-- `gen2_status.sh` — current Type-111/control/runtime state;
-- `gen2_collect_logs.sh` — collect useful evidence without an SD layout;
-- `gen2_reacquire.sh` — bounded same-session reacquire request;
-- `gen2_resync.sh` — manual Candidate-D-style resync experiment.
-
-These are intended to make external vehicle reports comparable.
-
-## `isotx2-gate/`
-
-Reference operator controls for the DisplayManager `writev()` interposer.
-
-The project-owned native source lives at:
-
-```text
-src/native/isotx2-gate/
-```
+Shared SSH-oriented diagnostic and status helpers remain in `runtime/diagnostics/`. Their availability depends on the exact target; consult the QNX shell compatibility contract before using them on a Unit.
 
 ## `experimental/`
 
-Experimental controls such as ViewArea feature toggles. Presence here does not imply a promoted
-feature or a stable cross-platform interface.
+Experimental controls such as ViewArea toggles remain separate. Their presence does not imply an accepted installation or cross-platform feature.
 
 ## Developer deployment
 
-The project does not require SD deployment as its architecture or runtime interface. For convenience,
-`tools/prepare_mu1440_sd.sh` can assemble the exact-target developer payload into an SD directory.
-
-The project still assumes existing SSH/recovery access. This is not a general end-user installation
-promise or cross-firmware compatibility claim.
+`tools/prepare_mu1440_sd.sh` stages the exact-target developer payload for an SD directory. Deployment requires the approved target, verified backup/recovery and exact runtime qualification; this repository does not promise general end-user installation.
