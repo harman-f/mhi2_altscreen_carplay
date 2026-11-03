@@ -2,7 +2,7 @@
 #define ALT111_GEN2_HOST_TEST 1
 static char recovery_path[192];
 #define ALT111_RECOVERY_PATH recovery_path
-#include "../src/native/altscreen111-gen2/libaltscreen111_gen2.c"
+#include "../modules/carplay/source/altscreen111-gen2/libaltscreen111_gen2.c"
 #include <assert.h>
 static CFTypeRef test_retain(CFTypeRef object){return object;}
 static void test_release(CFTypeRef object){(void)object;}
