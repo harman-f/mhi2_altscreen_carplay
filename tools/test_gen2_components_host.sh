@@ -6,10 +6,10 @@ CC=${CC:-cc}
 OUT=${GEN2_HOST_OUT:-build/gen2-host}
 mkdir -p "$OUT"
 G=modules/carplay/source/altscreen111-gen2
-I=(-I"$G/include" -Imodules/carplay/source/alt111-settings/include -Imodules/carplay/source/vehicle-data -Imodules/broker/source/display-scaling)
+I=(-I"$G/include" -Imodules/carplay/source/alt111-settings/include -Imodules/carplay/source/vehicle-data -Imodules/carplay/source/display-scaling)
 F=(-O2 -g -std=gnu99 -Wall -Wextra -Werror -DALT111_SETTINGS_TEST -DMIBR_SHA256_LIBRARY_ONLY)
 CORE=(modules/carplay/source/alt111-settings/settings_core.c modules/carplay/source/alt111-settings/settings_posix.c
-      "$G/src/alt111_policy.c" modules/broker/source/display-scaling/mibr_display_scaling.c
+      "$G/src/alt111_policy.c" modules/carplay/source/display-scaling/mibr_display_scaling.c
       modules/carplay/source/sha256sum-compat/sha256sum_compat.c)
 PURE=("$G/src/alt111_profile.c" "$G/src/alt111_control.c" "$G/src/alt111_resync.c"
       "$G/src/alt111_video.c" "$G/src/alt111_zoom.c" "$G/src/alt111_zoom_debugspi.c")

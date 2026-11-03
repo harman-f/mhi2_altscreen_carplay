@@ -5,7 +5,7 @@ import json
 TESTS = Path(__file__).resolve().parent
 ROOT = TESTS.parents[1]
 NATIVE = ROOT / "modules/broker/source/mibr-control"
-DISPLAY_SCALING = ROOT / "modules/broker/source/display-scaling"
+DISPLAY_SCALING = ROOT / "modules/carplay/source/display-scaling"
 RUNTIME = ROOT / "modules/broker/runtime/mibr-control"
 OEM_MENU = ROOT / "modules/menu/source"
 
