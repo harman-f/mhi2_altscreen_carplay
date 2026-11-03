@@ -105,6 +105,19 @@ def registry_inventory(data):
     }
 
 
+def broker_rectangle_valid(value):
+    """Mirror mibr_durable_switch.c rect_valid() on the supported 1010x376 output."""
+    parts = value.split(",")
+    if len(parts) != 4:
+        return False
+    if any(re.fullmatch(r"(0|[1-9][0-9]*)", part) is None
+           or len(part) > 5 for part in parts):
+        return False
+    x, y, width, height = (int(part) for part in parts)
+    return (width >= 100 and height >= 60
+            and x + width <= 1010 and y + height <= 376)
+
+
 def broker_inventory(source, header):
     root = re.search(r'^#define CONFIG "([^"\n]+)"', source, re.M)
     count = re.search(r"^#define MIBR_SWITCH_COUNT (\d+)u$", header, re.M)
@@ -119,7 +132,7 @@ def broker_inventory(source, header):
         if values is not None:
             require(m["default"] in values, "invalid broker compiled default: " + m["id"])
         else:
-            require(re.fullmatch(r"\d+,\d+,\d+,\d+", m["default"]) is not None,
+            require(broker_rectangle_valid(m["default"]),
                     "invalid broker rectangle default: " + m["id"])
         require(m["id"] not in used, "duplicate broker capability: " + m["id"])
         require(re.fullmatch(r"[a-z0-9-]+\.conf", m["file"]) is not None,
@@ -264,6 +277,13 @@ def self_test(root=ROOT):
         broker.replace('"MIBR_CARPLAY_NAV/1","on|off","off"',
                        '"MIBR_CARPLAY_NAV/1","on|off","invalid"'), header
     ))
+    original = '"MIBR_SAFE_VOLL/1",NULL,"0,58,1010,248"'
+    for rejected_rect in ("0,58,1,1", "900,58,200,248", "00,58,100,248"):
+        corrupted = broker.replace(
+            original, '"MIBR_SAFE_VOLL/1",NULL,"' + rejected_rect + '"'
+        )
+        assert corrupted != broker
+        rejects(lambda text=corrupted: broker_inventory(text, header))
     assert LITERAL_PATH.search("/mnt/app/root/mibr-carplay111-enabled") is not None
     assert LITERAL_PATH.search("/tmp/mibr-status") is not None
     print("SOURCE_DEFAULTS_INVENTORY_SELF_TEST=PASS")
