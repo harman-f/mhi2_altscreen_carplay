@@ -260,3 +260,28 @@ exact-byte backup/readback/RO verification, and temporary URL override
 precedence. No added target writes, no rename and no permission to migrate
 persistent state. All global writer, binary reader, recovery and final
 destination gates remain false.
+
+## A2.3.2b broker, menu and platform source grammar (host-only)
+
+`python3 tools/release/broker_menu_storage_format.py --self-test --json-out broker-menu-storage-format.json`
+verifies the exact source layout and selected local access semantics for all
+13 revisioned broker-CAS files, the Java `MibrDurableSwitch` read path,
+the CRC32 menu layout loaded by `mibr-menu.ksh`, and the shared
+`mibr-platform-defaults.conf` override. It reuses the canonical
+C↔Java inventory and 63-candidate storage graph, emits source SHA receipts,
+and adds negative mutations for CAS, CRC, Java cache, stage and default changes.
+The CI artifact is a source review receipt, **not** a firmware acceptance.
+
+Important cross-language asymmetry: native C requires canonical revision
+digits without a leading zero (except `0`), but Java's read-only parser checks
+only that each revision character is a digit. The Java file reader also
+caches by mtime/length, while its platform defaults are cached on first read.
+Broker C reopens platform defaults in its default lookup. Do not assume
+in-place migration/replay changes are immediately visible in Java. The broker
+C's own guarded CAS/fsync/rename/readback/RO restoration does not protect
+the older independent navigation scripts or the menu shell's separate loader.
+
+All selected local source checks may PASS with **unresolved installed/legacy
+readers, format conflicts, backup/upgrade/uninstall and rollback**. The tool
+deliberately leaves target paths unset and the migration completion gate
+closed; A2.3.2b and B2 are not done from this host audit alone.
