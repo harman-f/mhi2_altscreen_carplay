@@ -1,6 +1,6 @@
 # Development repository layout and release lineage contract
 
-Status: agreed target architecture, 2026-11-02. **This is a migration contract, not a claim that every directory has already moved.** Read with [module boundaries and portability](MODULE_BOUNDARIES_AND_PORTABILITY.md), [the R3-derived distribution contract](../build/PACKAGE_LAYOUT.md), and [published source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md).
+Status: adopted 2026-11-02; active native/HMI module source and primary runtime consolidation reviewed as a staged migration through 2026-11-03. This describes physical source ownership, **not** a complete multi-profile package or vehicle qualification. Read with [module boundaries and portability](MODULE_BOUNDARIES_AND_PORTABILITY.md), [the R3-derived distribution contract](../build/PACKAGE_LAYOUT.md), and [published source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md).
 
 ## Scope and distinct layers
 
@@ -26,6 +26,17 @@ deployment/      installation, rollback and target interfaces, as applicable
 
 Each logical module owns only its independently developed source, relevant runtime input and validation. Shared code lives once; target-specific Java/HMI adapters, display geometry, input/KEY mapping, OEM integration and compiled target artifacts belong to the applicable profile or a clearly declared target adapter. A JSON profile value is **not** executable configuration if the binary does not consume it. Do not redistribute unlicensed OEM inputs or extracted firmware. Central integration tests, cross-module CI and host tools may remain shared where that is the better ownership boundary. Existing `src/`, `runtime/`, `tests/` or build paths are transitional until their dependency-complete migrations are verified.
 
+## Current module ownership and remaining exceptions (source migration checkpoint)
+
+- `modules/carplay/source/` and `modules/carplay/runtime/`: canonical GEN2/Stream111, direct TS/parity, exclusive writer/gate, shared scaling, vehicle-data and CarPlay runtime inputs. The scaling library is intentionally shared through the existing one-way Broker → CarPlay build dependency; there is no extra broker instance or second media owner.
+- `modules/broker/source/` and `modules/broker/runtime/`: canonical MIBR/3 controller, KEY helper and broker runtime.
+- `modules/menu/source/`: canonical owned Java/HMI and tests, menu metadata and generator.
+- `modules/navigation/{source,runtime}/`: canonical RGI source and navigation runtime.
+- `modules/profiles/` currently contains **candidate IDs and portability evidence**, NOT approved fully implemented SEAT/Skoda installation profiles. Exact LSD/JAR fingerprints, actual runtime consumers and vehicle acceptance remain separate work.
+- The shared schema/registry (`settings/`), cross-module build/test orchestration (`tools/`, `tests/`), generic diagnostics and deployment interfaces (`runtime/diagnostics/`, `runtime/deployment/`, `deployment/`), and deliberately isolated historical source-only models (`src/experimental/`) are **intentional distinct ownership boundaries**, not second canonical active module trees. Document any future move with its actual consumers and output staging contract.
+
+Installed unit and SD package paths are **not** renamed by these source moves. Project-owned QNX binaries are still built/verified against exact toolchains and target firmware separately; the R3 multi-profile release packager is not implemented merely because the source tree is organized.
+
 ## Build/release interface to be implemented
 
 For every buildable module, document or provide machine-readable equivalents for:
@@ -40,8 +51,8 @@ An automated release pipeline should derive the affected build graph from change
 ## Git integration and publication
 
 - `main` is the reviewed public source/release baseline; `develop` is the intended integration branch **for already publication-cleared code only**, not a public experimental dumping ground.
-- The existing `develop` branch must first be reconciled with `main` by a reviewed, non-destructive update; do not force-push or reset it without specific approval. No automatic promotion from private repositories.
-- Focused publication-ready changes may enter `develop` through reviewed PRs with source/provenance checks and relevant CI. Promotion from `develop` to `main` requires a separately reviewed and validated release/publication change. Until that workflow and branch protections are operational, use the existing established review route rather than treating the branch name as authorization.
+- Public `develop` is now the **canonical integration home for new independently publishable product work**, normally via short-lived PR branches based on it. The previously required bootstrap reconciliation has been completed. A distinct private Research code owner and automatic branch-by-branch promotion are no longer the normal development model.
+- Focused publication-ready changes enter `develop` through reviewable PRs with source/provenance gates and relevant CI; then `develop` promotes to `main` by approved fast-forward or ruleset-compliant review. Do not redo unchanged binary builds just because a source path moved; automatically required CI is separate from any extra manual builds.
 - Keep private research, internal coordination, proprietary/reference materials, experiments, raw captures and source-incomplete claims out of both **public** branches. A cross-repository integration is a curated path-by-path change, **not** an unconditional branch merge or directory copy.
 
 ## Migration gates
