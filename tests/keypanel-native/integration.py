@@ -1,7 +1,7 @@
 import pathlib, socket, subprocess, struct, tempfile, threading, time, sys
 exe=pathlib.Path(sys.argv[1]).resolve()
 # QNX /tmp is unsuitable on this vehicle. Current-session pointer lives on the SD, with no rename.
-source=pathlib.Path('src/native/keypanel/mibr_keypanel_native.c').read_text()
+source=pathlib.Path('modules/broker/source/keypanel/mibr_keypanel_native.c').read_text()
 assert 'rename(' not in source, 'QNX pointer must not use rename syscall'
 assert '#define POINTER "./mibr-keypanel-native-current"' in source
 sync=b'\x80MLP'

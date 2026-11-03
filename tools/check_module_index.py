@@ -119,7 +119,7 @@ def self_test(doc):
     altered = copy.deepcopy(doc)
     altered["modules"]["carplay"]["source"].append("../unsafe")
     assert any("unsafe" in e for e in validate(altered, check_files=False))
-    affected, unowned = impact(doc, ["src/native/mibr-control/mibr_v3_service.c"])
+    affected, unowned = impact(doc, ["modules/broker/source/mibr-control/mibr_v3_service.c"])
     assert affected == ["broker", "menu", "navigation"] and not unowned
     affected, unowned = impact(doc, ["src/native/unknown-core/new.c"])
     assert not affected and unowned == ["src/native/unknown-core/new.c"]

@@ -7,7 +7,7 @@ The menu module owns its Java adapter source, build scripts, tests, and owned sc
 - [OEM menu source, build scripts, and tests](../../modules/menu/source/)
 - [Menu editor](../../tools/menu-editor/mibr-menu-editor.html)
 - [Menu format and loader contract](../../tools/menu-editor/MENU_FILE_FORMAT.md)
-- [Shared runtime menu loader](../../runtime/mibr-control/mibr-menu.ksh)
+- [Shared runtime menu loader](../../modules/broker/runtime/mibr-control/mibr-menu.ksh)
 - [Menu, controller, and RGI build guide](../../docs/build/MU1440_MENU_RGI_SOURCE.md)
 - [Owned scrollbar asset provenance](../../modules/menu/source/assets/scroll/README.md)
 

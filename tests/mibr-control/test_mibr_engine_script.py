@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parents[2]
-SCRIPT = HERE / "runtime" / "mibr-control" / "mibr-engine.ksh"
+SCRIPT = HERE / "modules" / "broker" / "runtime" / "mibr-control" / "mibr-engine.ksh"
 CFG_TEXT = "[other]\nenable=yes\n[vehicle]\nenable=yes\nengine=gas\n[power]\nengine=gas\n"
 
 
