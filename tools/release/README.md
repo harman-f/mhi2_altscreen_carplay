@@ -95,3 +95,35 @@ The generator reads the **canonical** CarPlay registry, broker durable-switch C 
 A separate lexical scan records literal `/mnt/app/root/mibr*`, `/mnt/app/root/altscreen-u2*` and `/tmp/mibr*` references in project-owned C/Java/shell/Python source, with source file and line. It intentionally does **not** infer a reader, writer, safe migration mapping or comprehensive handling of dynamically concatenated paths. No file is moved and no unit state is touched.
 
 The three CarPlay compatibility **presets** are not the three firmware **profiles**. The tool does not select a CarPlay preset for an installer, resolve user-persistent/platform overrides or assert a live effective value. A future multi-profile packager must supply an explicit selected preset and verified per-firmware overrides and fail its own final-package gate if these remain unresolved. Host inventory PASS is not an install or vehicle test.
+
+## Persistent-storage migration review queue (host-only)
+
+After the canonical source inventory is checked, run:
+
+```bash
+python3 tools/release/storage_migration_review.py --self-test --json-out storage-migration-review.json
+```
+
+The resulting review JSON is uploaded next to the existing defaults/path inventory
+in the `source-defaults-unit-path-inventory` CI artifact. It enumerates the 13
+source-defined CarPlay file groups and 13 separately owned broker switch files,
+showing their actual source-declared identity, lexical reference locations and
+**unapproved** proposed destination directory. It keeps the existing broker
+magic/revision/CAS contract intact. New unknown broker keys and duplicate
+broker source paths fail the audit; the built-in negative tests exercise both.
+
+All entries deliberately start at `PENDING`, with no chosen destination
+filename, completed consumer set or verified migration/restore path. A
+CarPlay basename is **not** independent proof of where its runtime writer
+opens the file; both its persistent and /tmp pathname are labeled candidates.
+Unmatched lexical fragments and source lines requiring dynamic-path review
+are separately listed. Comments, constants and generated paths can all produce
+false inferences if treated as verified readers/writers.
+
+`--require-migration-ready` intentionally **fails** on the current source.
+The JSON is a worklist for reviewing actual C, Java, shell, generated and
+boot-time consumers, not an approval to move persistent data, change defaults,
+replace format-specific files or operate a vehicle. Before a migration release
+is implemented, review every writer/reader and exact format, agree target
+filenames and establish all update/uninstall/power-loss recovery gates in
+[the on-unit storage contract](../../docs/architecture/UNIT_STORAGE_AND_NAMING_CONTRACT.md).
