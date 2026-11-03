@@ -54,13 +54,8 @@ def self_test() -> None:
             "SED=/bin/sed",
             "SED='/mnt/app/armle/usr/bin/sed'",
             'SED="${SED:-/bin/sed}"',
-            '"$SED" -n \'1p\' input',
             "VALUE=${PATH_OVERRIDE:-/usr/bin/tr}",
         ):
-            # The variable invocation by itself is not identifiable: the
-            # assignment or literal command path must be part of the scan.
-            if source.startswith('\"$SED\"'):
-                continue
             script.write_text("#!/bin/ksh\n" + source + "\n", encoding="utf-8")
             assert scan(script), "unbundled absolute command path was accepted: " + source
         script.write_text("#!/bin/ksh\nSED=$KIT/bin/qnx-helper\necho ready\n", encoding="utf-8")
