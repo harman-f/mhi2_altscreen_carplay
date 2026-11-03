@@ -1,13 +1,7 @@
-name: Release current MU1440 AID10 developer ZIP
+name: Audit frozen MU1440 developer package (R3 publication blocked)
 
 on:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: 'Publish an immutable MU1440 developer prerelease (main branch only)'
-        type: boolean
-        required: false
-        default: false
   pull_request:
     paths:
       - '.github/workflows/release-mu1440-aid10.yml'
@@ -46,12 +40,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TAG_PREFIX: mu1440-aid10-dev
-  ZIP_NAME: MHI2_AltScreen_MU1440_AID10_DEV_CURRENT.zip
+  ZIP_NAME: MHI2_AltScreen_MU1440_AID10_LEGACY_CI_ONLY.zip
 
 jobs:
   build:
-    name: Assemble and verify pinned MU1440 developer package
+    name: Audit frozen MU1440 compatibility package (not a release)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact release commit
@@ -244,9 +237,9 @@ jobs:
           EOF
 
           {
-            echo "release_candidate_tag=${TAG_PREFIX}-${GITHUB_SHA:0:12}"
+            echo "release_status=NOT_DISTRIBUTABLE_R3_PACKAGE_MISSING"
             echo "packaging_commit=$GITHUB_SHA"
-            echo "build_kind=pinned_artifact_package_not_fresh_source_build"
+            echo "build_kind=legacy_pinned_artifact_compatibility_audit"
             echo "target=MHI2_ER_SKG13_P4526_MU1440"
             echo "cluster=AID10-class"
             echo "deployment_generation=current_self_contained"
@@ -267,53 +260,19 @@ jobs:
           unzip -t "$ZIP_NAME"
           sha256sum "$ZIP_NAME" > "$ZIP_NAME.sha256"
 
-      - name: Upload verified package as CI artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: mu1440-aid10-verified-package
-          path: |
-            ${{ env.ZIP_NAME }}
-            ${{ env.ZIP_NAME }}.sha256
-          if-no-files-found: error
-          retention-days: 14
-
-  publish:
-    name: Publish explicitly approved immutable developer prerelease
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish == true }}
-    needs: build
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout exact release commit and notes
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Download build-verified ZIP and hash
-        uses: actions/download-artifact@v4
-        with:
-          name: mu1440-aid10-verified-package
-
-      - name: Verify and publish unique prerelease tag
+      - name: Enforce modular release publication boundary
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euxo pipefail
-          TAG="${TAG_PREFIX}-${GITHUB_SHA:0:12}"
-          sha256sum -c "$ZIP_NAME.sha256"
-          test -s release/CURRENT.md
-
-          # Fail closed on an existing tag. Never rewrite tags or delete previous releases.
-          if git ls-remote --exit-code --tags --refs origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "Refusing to replace existing immutable release tag: $TAG" >&2
+          # The frozen SD-root developer compatibility archive is NOT the R3
+          # common/profiles/source distribution. This check must not be reused
+          # as a positive release gate or as permission to upload a ZIP.
+          if python3 tools/validate_modular_package.py "$ZIP_NAME" 2> "$RUNNER_TEMP/r3-rejection.log"; then
+            echo "Unexpectedly accepted legacy flat package as modular R3" >&2
             exit 1
           fi
-
-          gh release create "$TAG" "$ZIP_NAME" "$ZIP_NAME.sha256" \
-            --target "$GITHUB_SHA" \
-            --title "MU1440 / AID10 pinned developer test — ${GITHUB_SHA:0:12}" \
-            --notes-file release/CURRENT.md \
-            --prerelease \
-            --latest=false
+          grep -Fq 'unsafe archive path' "$RUNNER_TEMP/r3-rejection.log"
+          sha256sum -c "$ZIP_NAME.sha256"
+          echo "LEGACY_COMPATIBILITY_AUDIT=PASS"
+          echo "R3_MODULAR_RELEASE=BLOCKED"
+          echo "No ZIP artifact or GitHub Release is uploaded by this workflow."
