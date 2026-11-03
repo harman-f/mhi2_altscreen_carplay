@@ -1,13 +1,13 @@
 # Broker and input module
 
-This page maps the settings/action broker and input code that exists in the repository. It is a navigation index, not a claim that the proposed package's `common/broker/` directory or every described action is implemented.
+The broker's development source and runtime are now physically co-located in this module. The installed distribution layout and vehicle-qualification scope remain independent.
 
 ## Source and runtime
 
-- [Native MIBR controller source](../../src/native/mibr-control/)
-- [Controller runtime scripts](../../runtime/mibr-control/)
+- [Native MIBR controller source](source/mibr-control/)
+- [Controller runtime scripts](runtime/mibr-control/)
 - [Canonical settings registry](../../settings/registry.json)
-- [Native keypanel source](../../src/native/keypanel/)
+- [Native keypanel source](source/keypanel/)
 - [Parity owner/session source](../../src/native/parity-session/)
 - [Controller source/build guide](../../docs/build/MU1440_R57_SOURCE.md)
 
