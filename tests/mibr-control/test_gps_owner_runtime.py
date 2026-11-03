@@ -9,7 +9,7 @@ import threading
 import unittest
 
 from public_paths import NATIVE, ROOT
-VDATA = ROOT / "src/native/vehicle-data"
+VDATA = ROOT / "modules/carplay/source/vehicle-data"
 DIO_TAP = NATIVE / "mibr_gps_dio_tap_experimental.c"
 
 def nmea(body):
