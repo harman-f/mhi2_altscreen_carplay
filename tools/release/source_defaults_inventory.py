@@ -34,7 +34,8 @@ SCAN_ROOTS = ("modules", "runtime", "deployment", "src", "settings", "tools")
 SCAN_EXTS = {".c", ".h", ".java", ".sh", ".ksh", ".py"}
 # Audit generators contain documentation examples, not installed QNX paths.
 SELF_AUDIT_TOOLS = {"tools/release/storage_migration_review.py",
-                    "tools/release/storage_path_triage.py"}
+                    "tools/release/storage_path_triage.py",
+                    "tools/release/storage_consumer_crosscheck.py"}
 
 
 class InventoryError(ValueError):
