@@ -95,3 +95,11 @@ The generator reads the **canonical** CarPlay registry, broker durable-switch C 
 A separate lexical scan records literal `/mnt/app/root/mibr*`, `/mnt/app/root/altscreen-u2*` and `/tmp/mibr*` references in project-owned C/Java/shell/Python source, with source file and line. It intentionally does **not** infer a reader, writer, safe migration mapping or comprehensive handling of dynamically concatenated paths. No file is moved and no unit state is touched.
 
 The three CarPlay compatibility **presets** are not the three firmware **profiles**. The tool does not select a CarPlay preset for an installer, resolve user-persistent/platform overrides or assert a live effective value. A future multi-profile packager must supply an explicit selected preset and verified per-firmware overrides and fail its own final-package gate if these remain unresolved. Host inventory PASS is not an install or vehicle test.
+
+## Supplemental SD support file index
+
+[`sd/README.md`](../../sd/README.md) is the explicit **project-owned supplemental files** index, **not** a complete card image. The canonical binary and script bytes stay at their original source paths, while `sd/manifest.json` declares which of the approved helper binaries and entry scripts are copied to the legacy MU1440 SD stage. The inventory currently pins `sha256sum` and `tee` and maps the installer/status/uninstaller/compatibility collector and session helper.
+
+The release job fails closed if a declared binary hash drifts or a listed executable is missing, not executable, or differs from the exact source in the prepared stage. Run `python3 tools/release/sd_support.py --self-test --source-check` and then `python3 tools/release/sd_support.py --stage-root <assembled-sd-root>` before the existing full script scan and final ZIP audit. This is an additional source/stage integrity check, not an MMX runtime proof. A future bundled `sed` (or other helper) needs separately verified QNX architecture, actual command semantics and correct `PATH`/explicit-path behavior before the manifest or a release may depend on it.
+
+The staged legacy MU1440 package remains CI-only and does not automatically qualify a three-firmware beta.
