@@ -35,6 +35,8 @@ The [MU1440 R57 source/build baseline](build/MU1440_R57_SOURCE.md) is the curren
 
 ## System interfaces
 
+- **[On-unit MMX storage and naming contract](architecture/UNIT_STORAGE_AND_NAMING_CONTRACT.md)** — current path fragmentation, proposed single project root, naming rules, and fail-closed migration/rollback gates (design; not deployed)
+
 - **[Architecture module index and ownership guide](architecture/README.md)** — current authoritative page per subsystem, supporting historical references and release/source boundaries
 
 - [Direct VC video](architecture/DIRECT_VC_VIDEO_PATH.md) · [ScreenAlt control](architecture/SCREENALT_CONTROL_PLANE.md) · [Source/owner runtime](architecture/RUNTIME_CONTRACT.md)
