@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * Fast host regression for MU1440 soft overflow and incomplete-M1AU safety.
- * cc -std=c99 -Wall -Wextra -Werror -Isrc/native/altscreen111-gen2/include \
+ * cc -std=c99 -Wall -Wextra -Werror -Imodules/carplay/source/altscreen111-gen2/include \
  *   tests/alt111_video_queue_recovery_test.c \
- *   src/native/altscreen111-gen2/src/alt111_video.c -o /tmp/alt111_video_queue_recovery_test
+ *   modules/carplay/source/altscreen111-gen2/src/alt111_video.c -o /tmp/alt111_video_queue_recovery_test
  */
 #include "alt111.h"
 #include <assert.h>
