@@ -1,6 +1,6 @@
 /* Compile the actual implementation, with its CLI renamed, for boundary tests. */
 #define main parity_cli_main
-#include "../src/native/direct-ts-parity/direct_ts_parity.c"
+#include "../modules/carplay/source/direct-ts-parity/direct_ts_parity.c"
 #undef main
 #include <assert.h>
 
