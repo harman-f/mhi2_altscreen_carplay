@@ -16,13 +16,13 @@ SETTINGS_INC="-Isrc/native/alt111-settings/include -Isrc/native/altscreen111-gen
   -o "$TMP/test_three_views"
 "$TMP/test_three_views"
 
-"$CC" $COMMON -Isrc/native/vehicle-data \
-  tests/test_vdata.c src/native/vehicle-data/mibr_vdata.c src/native/vehicle-data/mvs_core.c \
+"$CC" $COMMON -Imodules/carplay/source/vehicle-data \
+  tests/test_vdata.c modules/carplay/source/vehicle-data/mibr_vdata.c modules/carplay/source/vehicle-data/mvs_core.c \
   -o "$TMP/test_vdata"
 "$TMP/test_vdata"
 
-"$CC" $COMMON -Isrc/native/vehicle-data \
-  tests/test_vstatus.c src/native/vehicle-data/mibr_vstatus.c \
+"$CC" $COMMON -Imodules/carplay/source/vehicle-data \
+  tests/test_vstatus.c modules/carplay/source/vehicle-data/mibr_vstatus.c \
   -o "$TMP/test_vstatus"
 "$TMP/test_vstatus"
 
