@@ -42,7 +42,7 @@ REQUIRED = [
     "settings/registry.json",
     "src/native/parity-session/parity_session.c",
     "src/native/direct-ts-parity/direct_ts_parity.c",
-    "src/native/mibr-control/mibr_v3_service.c",
+    "modules/broker/source/mibr-control/mibr_v3_service.c",
     "modules/menu/source/java/de/mibr/hmi/MibrControlClient.java",
     "runtime/parity/parity_drive_supervisor.sh",
     "tools/build_mu1440_source.sh",
