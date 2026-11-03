@@ -67,8 +67,8 @@ jobs:
           grep -Fq 'writes=deployment_media_only' deployment/mu1440/compatibility-report.sh
 
           grep -Fq 'TEST="$MEDIA_ROOT/.mibr-altscreen-write-test.$$"' deployment/mu1440/install.sh
-          grep -Fq 'TEST="$BACKUPFOLDER/.write-test-$$"' runtime/auto-direct/common.sh
-          grep -Fq 'mount -uw "$DEPLOY_MEDIA_ROOT"' runtime/auto-direct/common.sh
+          grep -Fq 'TEST="$BACKUPFOLDER/.write-test-$$"' modules/carplay/runtime/auto-direct/common.sh
+          grep -Fq 'mount -uw "$DEPLOY_MEDIA_ROOT"' modules/carplay/runtime/auto-direct/common.sh
           grep -Fq 'payload/tee' tools/prepare_mu1440_sd.sh
           grep -Fq 'payload/MIBR-NavIgnore.jar' tools/prepare_mu1440_sd.sh
           grep -Fq 'payload/MIBR-Most20FPS.jar' tools/prepare_mu1440_sd.sh
