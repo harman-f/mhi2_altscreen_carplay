@@ -118,7 +118,8 @@ def build(root=ROOT):
                 "source": consumers.C, "role": "verified-selected-broker-CAS-contract"
             })
         else:
-            require(path.startswith(BASE + "mibr-carplay111-"),
+            require(path.startswith(BASE + "mibr-carplay111-")
+                    or path == BASE + "mibr-carplay-autodirect",
                     "unapproved CarPlay file-group path")
             entry["corresponding_volatile_path"] = "/tmp/" + path[len(BASE):]
             entry["observed_reader_api"] = "alt111_settings_paths: group_name()"
