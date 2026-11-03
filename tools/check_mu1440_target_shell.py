@@ -19,17 +19,14 @@ import tempfile
 BLOCKED = re.compile(
     r"(?<![A-Za-z0-9_./-])(?:printf|sed|tr|sha256sum|tee)(?=\s|$|[;&|])"
 )
-GREP_BRE_ALTERNATION = re.compile(r"\\\|")
-
-# A command pinned to a stock-looking absolute path is *not* bundled support.
-# In particular the legacy MIBR installer used SED=/bin/sed: the old bare-name
-# check missed it, then the real MU1447 MMX reported /bin/sed missing.
-# Use an audited, manifest-listed project helper or prove an exact target-specific
-# stock path in a separately reviewed OEM asset; never infer one across firmware.
+# Match missing firmware stock-tool paths, including SED=/bin/sed and
+# TEE=/usr/bin/tee, without rejecting verified package-owned $KIT/bin/sed.
+# The package-level archive gate must separately verify bundled binary bytes.
 SYSTEM_TOOL_PIN = re.compile(
     r"(?<![A-Za-z0-9_.-])/(?:bin|usr/bin|mnt/app/armle/usr/bin)/"
-    r"(?:sed|tr|sha256sum|tee)(?=$|[\s;|\"'])"
+    r"(?:sed|tr|printf|sha256sum|tee)(?=$|[\s;|\"'])"
 )
+GREP_BRE_ALTERNATION = re.compile(r"\\\|")
 
 
 def scan(path: Path) -> list[str]:
@@ -38,10 +35,8 @@ def scan(path: Path) -> list[str]:
         stripped = line.lstrip()
         if not stripped or stripped.startswith("#"):
             continue
-        if BLOCKED.search(line):
+        if BLOCKED.search(line) or SYSTEM_TOOL_PIN.search(line):
             problems.append(f"{path}:{number}: forbidden/unbundled target command")
-        if SYSTEM_TOOL_PIN.search(line):
-            problems.append(f"{path}:{number}: unbundled absolute QNX utility path")
         if GREP_BRE_ALTERNATION.search(line):
             problems.append(f"{path}:{number}: non-portable grep BRE alternation")
     return problems
@@ -56,14 +51,22 @@ def self_test() -> None:
         assert not scan(script), "simple echo was unexpectedly rejected"
         script.write_text("#!/bin/ksh\necho yes | tee log.txt\n", encoding="utf-8")
         assert scan(script), "unbundled tee was not rejected"
-        for cmd in ("SED=/bin/sed", 'SED="/usr/bin/sed"',
-                    "echo x | /bin/sed s/x/y/",
-                    "TEE=/usr/bin/tee", "SED=/mnt/app/armle/usr/bin/sed",
-                    "SHA=/bin/sha256sum"):
-            script.write_text("#!/bin/ksh\n" + cmd + "\n", encoding="utf-8")
-            assert scan(script), "absolute unbundled helper was not rejected: " + cmd
-        script.write_text('#!/bin/ksh\nSED="$KIT/bin/sed"\n', encoding="utf-8")
-        assert not scan(script), "explicit package-owned sed path was rejected"
+        for source in (
+            "SED=/bin/sed",
+            "SED='/mnt/app/armle/usr/bin/sed'",
+            'SED="${SED:-/bin/sed}"',
+            "VALUE=${PATH_OVERRIDE:-/usr/bin/tr}",
+        ):
+            script.write_text("#!/bin/ksh\n" + source + "\n", encoding="utf-8")
+            assert scan(script), "unbundled absolute command path was accepted: " + source
+        script.write_text("#!/bin/ksh\nSED=$KIT/bin/qnx-helper\necho ready\n", encoding="utf-8")
+        assert not scan(script), "benign bundled helper assignment was rejected"
+        for src in ('TEE=/usr/bin/tee', 'SHA=/bin/sha256sum',
+                    'echo yes | /bin/sed s/yes/no/',
+                    'SED="$KIT/bin/sed"'):
+            script.write_text("#!/bin/ksh\n" + src + "\n", encoding="utf-8")
+            assert bool(scan(script)) == (not src.startswith('SED="$KIT/')), (
+                "unexpected stock/helper classification", src)
     print("QNX_SHELL_GATE_SELF_TEST=PASS")
 
 
