@@ -2,7 +2,7 @@
   "schema_version": 1,
   "contract": "docs/architecture/REPOSITORY_LAYOUT.md",
   "lifecycle": "migration-in-progress",
-  "notes": "Development source ownership only; distribution and target acceptance are governed independently. Existing source paths remain authoritative until tested moves.",
+  "notes": "Broker source and runtime have canonical module ownership. CarPlay and shared source/config migration continue independently.",
   "modules": {
     "carplay": {
       "status": "indexed",
@@ -45,19 +45,19 @@
       "evidence": "docs/build/MU1440_R57_SOURCE.md"
     },
     "broker": {
-      "status": "indexed",
+      "status": "partially-migrated",
       "distribution": "common/broker",
       "depends_on": [
         "carplay"
       ],
       "source": [
-        "src/native/mibr-control",
-        "src/native/keypanel",
-        "src/native/display-scaling",
+        "modules/broker/source/mibr-control",
+        "modules/broker/source/keypanel",
+        "modules/broker/source/display-scaling",
         "settings/registry.json"
       ],
       "runtime": [
-        "runtime/mibr-control"
+        "modules/broker/runtime/mibr-control"
       ],
       "build_scripts": [
         "tools/build_mibr_control.sh",
