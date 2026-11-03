@@ -38,7 +38,7 @@ export OEM_ACTIVATOR_SOURCE=/path/to/local/extracted/Activator.java
 export OEM_WIDGET_FACTORY_SOURCE=/path/to/local/extracted/WidgetFactoryImpl.java
 export OUT=/tmp/mu1440-oem-menu-build
 export REGISTRY_JSON="$PWD/settings/registry.json"
-bash src/hmi/oem-menu/build.sh
+bash modules/menu/source/build.sh
 ```
 
 The build regenerates UI metadata from the public canonical registry, applies the two guarded adapter edits to local target-source inputs, compiles with `-source 1.2 -target 1.2`, checks every JAR class file is major version 46, and writes the target-specific JAR under `OUT`. It does not fetch, copy or unpack OEM source material.
@@ -46,16 +46,16 @@ The build regenerates UI metadata from the public canonical registry, applies th
 ## Host checks
 
 ```sh
-python3 -m unittest discover -s src/hmi/oem-menu/tests -v
-python3 src/hmi/oem-menu/generate_catalog.py \
+python3 -m unittest discover -s modules/menu/source/tests -v
+python3 modules/menu/source/generate_catalog.py \
   --registry settings/registry.json \
-  --menu src/hmi/oem-menu/menu-definition.json \
+  --menu modules/menu/source/menu-definition.json \
   --out-dir /tmp/mu1440-oem-menu-catalog
-python3 src/hmi/oem-menu/generate_catalog.py --check \
+python3 modules/menu/source/generate_catalog.py --check \
   --registry settings/registry.json \
-  --menu src/hmi/oem-menu/menu-definition.json \
+  --menu modules/menu/source/menu-definition.json \
   --out-dir /tmp/mu1440-oem-menu-catalog
-bash src/hmi/oem-menu/tests/run_view_model_test.sh
+bash modules/menu/source/tests/run_view_model_test.sh
 ```
 
 Python host tests cover menu metadata generation and the guarded source transformations. The separate Java host test compiles and runs the R57 view-state/protocol model with a local JDK. These checks do not validate IBM J9 compilation, OEM widget rendering, installation, or runtime behavior. The generated catalog metadata differs from the reference R57 JAR because this source build uses the repository's canonical registry. The published build is not byte-identical proof for the reference JAR; its OEM toolchain inputs are intentionally not included here.

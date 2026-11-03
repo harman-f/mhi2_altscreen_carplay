@@ -10,7 +10,7 @@ on:
       - 'src/native/**'
       - 'modules/navigation/source/**'
       - 'modules/carplay/source/**'
-      - 'src/hmi/oem-menu/**'
+      - 'modules/menu/source/**'
       - 'tools/menu-editor/**'
       - 'tests/**'
       - 'tools/build_*.sh'
@@ -30,7 +30,7 @@ on:
       - 'src/native/**'
       - 'modules/navigation/source/**'
       - 'modules/carplay/source/**'
-      - 'src/hmi/oem-menu/**'
+      - 'modules/menu/source/**'
       - 'tools/menu-editor/**'
       - 'tests/**'
       - 'tools/build_*.sh'
@@ -144,21 +144,21 @@ jobs:
           # Portable source contracts. Optional OEM-reference/capture suites
           # remain available locally when their external fixtures are supplied.
           python3 -B -m unittest -v \
-            src.hmi.oem-menu.tests.test_generate_catalog \
-            src.hmi.oem-menu.tests.test_menu_generator \
-            src.hmi.oem-menu.tests.test_i18n \
-            src.hmi.oem-menu.tests.test_prepare_oem_sources \
-            src.hmi.oem-menu.tests.test_verify_class_major \
-            src.hmi.oem-menu.tests.test_v3_route \
-            src.hmi.oem-menu.tests.test_native_rows_callbacks
-          bash src/hmi/oem-menu/tests/run_view_model_test.sh
-          python3 -B src/hmi/oem-menu/generate_catalog.py \
+            modules.menu.source.tests.test_generate_catalog \
+            modules.menu.source.tests.test_menu_generator \
+            modules.menu.source.tests.test_i18n \
+            modules.menu.source.tests.test_prepare_oem_sources \
+            modules.menu.source.tests.test_verify_class_major \
+            modules.menu.source.tests.test_v3_route \
+            modules.menu.source.tests.test_native_rows_callbacks
+          bash modules/menu/source/tests/run_view_model_test.sh
+          python3 -B modules/menu/source/generate_catalog.py \
             --registry settings/registry.json \
-            --menu src/hmi/oem-menu/menu-definition.json \
+            --menu modules/menu/source/menu-definition.json \
             --out-dir build/oem-menu-generated
-          python3 -B src/hmi/oem-menu/generate_catalog.py --check \
+          python3 -B modules/menu/source/generate_catalog.py --check \
             --registry settings/registry.json \
-            --menu src/hmi/oem-menu/menu-definition.json \
+            --menu modules/menu/source/menu-definition.json \
             --out-dir build/oem-menu-generated
 
   qnx:

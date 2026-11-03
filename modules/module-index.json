@@ -78,7 +78,7 @@
         "broker"
       ],
       "source": [
-        "src/hmi/oem-menu"
+        "modules/menu/source"
       ],
       "runtime": [],
       "build_scripts": [],
@@ -100,7 +100,7 @@
         "modules/navigation/source"
       ],
       "runtime": [
-        "runtime/navigation"
+        "modules/navigation/runtime"
       ],
       "build_scripts": [
         "modules/navigation/source/build.sh"

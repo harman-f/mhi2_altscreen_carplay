@@ -1,11 +1,9 @@
-# Navigation / recovery runtime helpers
+# Navigation runtime helpers
 
-This directory contains the developer controls used by the current GEN2 line.
+This directory contains the GEN2 navigation surface and SafeArea controls.
 
 ## Vehicle-tested helpers
 
-- `gen2_keyframes.sh` — enables/disables the automatic D2 keyframe policy and reports counters.
-- `gen2_resync.sh` — manual same-session D1 recovery control.
 - `gen2_nav_config.sh` — live/persistent navigation surface and query controls.
 
 These paths were exercised during the 2026-09-27 MU1440 vehicle run.

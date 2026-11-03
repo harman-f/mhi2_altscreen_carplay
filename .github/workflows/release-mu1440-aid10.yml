@@ -77,7 +77,8 @@ jobs:
           ! grep -R -n -F '/apps/sbin' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate
           ! grep -R -n -F 'config/BASICS' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate
           ! grep -R -n -F 'apps/mounts' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate
-          ! grep -R -n -E '(^|[^A-Za-z0-9_])sed([[:space:]]|$)' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate runtime/navigation
+          ! grep -R -n -E '(^|[^A-Za-z0-9_])sed([[:space:]]|$)' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate modules/navigation/runtime
+          ! grep -R -n -E '(^|[;&|[:space:]])printf[[:space:]]' modules/navigation/runtime
           ! grep -R -n -E '(^|[;&|[:space:]])printf[[:space:]]' deployment/mu1440 runtime
 
       - name: Assemble self-contained SD-root package

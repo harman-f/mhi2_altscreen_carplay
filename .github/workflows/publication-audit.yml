@@ -122,8 +122,8 @@ jobs:
             runtime/diagnostics/keypanel_trace_discovery.sh \
             runtime/diagnostics/keypanel_capture.sh \
             runtime/diagnostics/keypanel_note.sh \
-            runtime/navigation/gen2_nav_config.sh \
-            runtime/navigation/gen2_safearea.sh
+            modules/navigation/runtime/gen2_nav_config.sh \
+            modules/navigation/runtime/gen2_safearea.sh
           do
             test -s "$f"
           done
@@ -246,7 +246,8 @@ jobs:
 
           # Fail before persistent mutation if the exact mandatory runtime command set is absent.
           grep -Fq 'require_cmds mount cp mv chmod sync mkdir rm touch sleep grep awk wc cat pidin on slay /bin/sh /bin/ksh /eso/bin/apps/dmdt' deployment/mu1440/install.sh
-          ! grep -R -n -E '(^|[^A-Za-z0-9_])sed([[:space:]]|$)' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate runtime/navigation
+          ! grep -R -n -E '(^|[^A-Za-z0-9_])sed([[:space:]]|$)' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate modules/navigation/runtime
+          ! grep -R -n -E '(^|[;&|[:space:]])printf[[:space:]]' modules/navigation/runtime
 
           # The EEPROM hex decoder used only for issue diagnostics must be deterministic.
           bash -c '

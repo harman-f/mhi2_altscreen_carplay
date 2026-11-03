@@ -1,15 +1,15 @@
 # Menu module
 
-The current menu source is kept at `src/hmi/oem-menu/`; this page links to it without copying it into the proposed package tree.
+The menu module owns its Java adapter source, build scripts, tests, and owned scroll assets under `source/`.
 
 ## Source, editor, and runtime
 
-- [OEM menu source, build scripts, and tests](../../src/hmi/oem-menu/)
+- [OEM menu source, build scripts, and tests](../../modules/menu/source/)
 - [Menu editor](../../tools/menu-editor/mibr-menu-editor.html)
 - [Menu format and loader contract](../../tools/menu-editor/MENU_FILE_FORMAT.md)
 - [Shared runtime menu loader](../../runtime/mibr-control/mibr-menu.ksh)
 - [Menu, controller, and RGI build guide](../../docs/build/MU1440_MENU_RGI_SOURCE.md)
-- [Owned scrollbar asset provenance](../../src/hmi/oem-menu/assets/scroll/README.md)
+- [Owned scrollbar asset provenance](../../modules/menu/source/assets/scroll/README.md)
 
 ## Status and limits
 
