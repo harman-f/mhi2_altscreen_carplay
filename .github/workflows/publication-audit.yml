@@ -52,6 +52,17 @@ jobs:
           # Source inventory, static-only. The release workflow separately
           # validates the actual staged scripts and the final ZIP after merge.
 
+      - name: Stage and inspect exact MU1440 on-unit shell inventory
+        shell: bash
+        run: |
+          set -euxo pipefail
+          staging="$(mktemp -d)"
+          trap 'rm -rf "$staging"' EXIT
+          bash tools/prepare_mu1440_sd.sh "$staging"
+          python3 tools/release/qnx_scripts.py --package-root "$staging"
+          (cd "$staging" && sha256sum -c PAYLOAD.sha256)
+          # This is a host-only source/package test, not a release.
+
       - name: Public standalone MIBR/3 source checks
         shell: bash
         run: |
