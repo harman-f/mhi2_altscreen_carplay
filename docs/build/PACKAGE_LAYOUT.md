@@ -1,6 +1,6 @@
 # Multi profile package layout
 
-This document describes the repository layout for a multi profile HMI distribution. The supported profile identifiers in this layout are `skoda-mu1440-p4526`, `seat-mu1409-p4708`, and `seat-mu1447-p4709`. The package layout does not change the installation paths used by the target system.
+This document specifies the single **three-target beta** distribution: all three firmware profiles are mandatory, with common software tests and final combined system testing pending. The supported profile identifiers in this layout are `skoda-mu1440-p4526`, `seat-mu1409-p4708`, and `seat-mu1447-p4709`. The package layout does not change the installation paths used by the target system. Per-firmware Java/J9 adapter fixes are expected during beta without changing common module ownership.
 
 ```text
 package/
