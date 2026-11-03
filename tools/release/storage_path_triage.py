@@ -8,6 +8,7 @@ import argparse
 import collections
 import json
 import re
+import tempfile
 from pathlib import Path
 
 import storage_migration_review as review_inventory
@@ -187,6 +188,19 @@ def self_test():
         ],
         "unresolved_dynamic_or_nonliteral_source_lines": [],
     }
+    with tempfile.TemporaryDirectory(prefix="mibr-triage-") as temp:
+        root = Path(temp)
+        (root / "sample.c").write_text(
+            '#define MIBR_CFG_PERSIST_ROOT "/mnt/app/root"\\n'
+            '/* example: /mnt/app/root */\\n'
+            'ROOT=/mnt/app/root\\n'
+            'TMP=/mnt/app/root/lsd.tmp.$\\n', encoding="utf-8"
+        )
+        expected = ("macro-persistent-root", "comment-or-documentation",
+                    "composed-persistent-root", "persistent-staging-path")
+        for line, category in enumerate(expected, 1):
+            result = dynamic_context(root, {"source": "sample.c", "line": line})
+            assert result["context_class"] == category, (line, result)
     s = build(fake)
     assert s["counts"]["raw_lexical_occurrences"] == 3
     assert s["counts"]["distinct_lexical_fragments"] == 2
