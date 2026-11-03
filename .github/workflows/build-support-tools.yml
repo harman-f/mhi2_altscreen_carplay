@@ -5,19 +5,19 @@ on:
   pull_request:
     paths:
       - '.github/workflows/build-support-tools.yml'
-      - 'src/native/isotx2-gate/**'
+      - 'modules/carplay/source/isotx2-gate/**'
       - 'modules/carplay/source/most-ts-writer/**'
-      - 'src/native/sha256sum-compat/**'
-      - 'src/native/tee-compat/**'
+      - 'modules/carplay/source/sha256sum-compat/**'
+      - 'modules/carplay/source/tee-compat/**'
       - 'tools/build_support_tools.sh'
   push:
     branches: [ main ]
     paths:
       - '.github/workflows/build-support-tools.yml'
-      - 'src/native/isotx2-gate/**'
+      - 'modules/carplay/source/isotx2-gate/**'
       - 'modules/carplay/source/most-ts-writer/**'
-      - 'src/native/sha256sum-compat/**'
-      - 'src/native/tee-compat/**'
+      - 'modules/carplay/source/sha256sum-compat/**'
+      - 'modules/carplay/source/tee-compat/**'
       - 'tools/build_support_tools.sh'
 
 permissions:
@@ -52,11 +52,11 @@ jobs:
           mkdir -p build/host-gate
 
           gcc -shared -fPIC -O2 -g -Wall -Wextra -pthread -ldl \
-            src/native/isotx2-gate/isotx2_gate.c \
+            modules/carplay/source/isotx2-gate/isotx2_gate.c \
             -o build/host-gate/libmibr_isotx2_gate.so
 
           gcc -O2 -g -Wall -Wextra \
-            src/native/isotx2-gate/gate_selftest.c \
+            modules/carplay/source/isotx2-gate/gate_selftest.c \
             -o build/host-gate/gate_selftest
 
           TARGET="$RUNNER_TEMP/isotx2-test-target"
@@ -87,7 +87,7 @@ jobs:
         run: |
           set -euxo pipefail
           gcc -O2 -g -std=gnu99 -Wall -Wextra \
-            src/native/sha256sum-compat/sha256sum_compat.c \
+            modules/carplay/source/sha256sum-compat/sha256sum_compat.c \
             -o "$RUNNER_TEMP/sha256sum-compat-host"
           printf abc > "$RUNNER_TEMP/sha256-abc"
           "$RUNNER_TEMP/sha256sum-compat-host" "$RUNNER_TEMP/sha256-abc" | \
@@ -98,7 +98,7 @@ jobs:
         run: |
           set -euxo pipefail
           gcc -O2 -g -std=gnu99 -Wall -Wextra \
-            src/native/tee-compat/tee_compat.c \
+            modules/carplay/source/tee-compat/tee_compat.c \
             -o "$RUNNER_TEMP/tee-compat-host"
           printf 'one\n' | "$RUNNER_TEMP/tee-compat-host" "$RUNNER_TEMP/tee-log" > "$RUNNER_TEMP/tee-stdout"
           printf 'two\n' | "$RUNNER_TEMP/tee-compat-host" -i -a "$RUNNER_TEMP/tee-log" >> "$RUNNER_TEMP/tee-stdout"
@@ -168,7 +168,7 @@ jobs:
             bash -c '
               set -euxo pipefail
               qcc -shared -fPIC -mfloat-abi=softfp -O2 -std=gnu99 -Wall -Wextra \
-                src/native/isotx2-gate/isotx2_gate.c \
+                modules/carplay/source/isotx2-gate/isotx2_gate.c \
                 -Wl,-soname,libmibr_isotx2_gate.so \
                 -o build/support-tools/libmibr_isotx2_gate_vehicle.so
               arm-unknown-nto-qnx6.5.0eabi-strip -s \
@@ -241,7 +241,7 @@ jobs:
           # Build-confirmed isoTX2 writev gate
 
           This binary is produced by the pinned public QNX 6.5 ARMv7 workflow from
-          `src/native/isotx2-gate/isotx2_gate.c`.
+          `modules/carplay/source/isotx2-gate/isotx2_gate.c`.
 
           The gate mechanism/source has been vehicle-proven on the MU1440 reference target.
           This particular public binary is labelled **build-confirmed** unless its exact SHA-256
@@ -250,7 +250,7 @@ jobs:
           The library defaults to STOCK/pass-through behavior. DIRECT suppression is only requested
           through the explicit runtime marker/control path.
 
-          See `docs/architecture/DIRECT_VC_VIDEO_PATH.md` and `runtime/isotx2-gate/`.
+          See `docs/architecture/DIRECT_VC_VIDEO_PATH.md` and `modules/carplay/runtime/isotx2-gate/`.
           EOF
           VEHICLEDEST=artifacts/mu1440/isotx2-gate/vehicle-tested-2026-09-27
           mkdir -p "$VEHICLEDEST"
@@ -277,7 +277,7 @@ jobs:
           # Build-confirmed QNX SHA-256 compatibility helper
 
           Minimal project-owned SHA-256 file utility used by the guarded MU1440 developer deployment.
-          It is built from `src/native/sha256sum-compat/sha256sum_compat.c` with the same pinned public
+          It is built from `modules/carplay/source/sha256sum-compat/sha256sum_compat.c` with the same pinned public
           QNX 6.5 ARMv7 toolchain as the other support tools.
 
           The deployment uses this helper so it has no hidden dependency on an existing M.I.B.
