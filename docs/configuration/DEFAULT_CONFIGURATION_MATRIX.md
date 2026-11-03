@@ -86,7 +86,7 @@ The compiled fallback values below are **shared source defaults**, not a claim t
 
 ## C. Menu entries without an independent default in A or B
 
-These entries exist in the checked-in standard menu but do **not** have a separate authoritative default in the 48-setting registry or 13-switch broker table. Most are pages, actions, transient view controls or OEM/platform-dependent widgets. Do not infer `on`/`off` from their presence. Review the relevant HMI/owner implementation before claiming a default for any such control.
+These entries exist in the checked-in standard menu but do **not** have a one-to-one identical ID in the 48-setting registry or 13-switch broker table. Some are aliases or subcontrols of those registered settings (for example `expert.mode` corresponds to the broker's `expert_mode` capability); others are pages, actions, transient view controls or OEM/platform-dependent widgets. Do not infer `on`/`off` from their presence. Review the relevant HMI/owner implementation before claiming a default for any such control.
 
 | Menu ID | Catalog type | Default status |
 | --- | --- | --- |
@@ -140,7 +140,7 @@ The menu catalog itself may also contain functions not in the checked-in default
 
 The current MU1440 developer `deployment/mu1440/install.sh` explicitly uses the `map-rich` navigation profile, prepares Auto-Direct persistence, and leaves the DisplayManager writer gate in STOCK as the fail-safe setting. The exact NavIgnore and Most20 JARs are supplied for this older reference path. This does not prove that the same startup behavior has already been bundled or exercised on either SEAT firmware.
 
-The current installation documents contain differing statements about whether the D2 keyframe policy is enabled persistently. **Treat the selected D2 behavior as requiring a direct installer/script audit before a consolidated beta default is declared.** This matrix deliberately does not resolve a runtime conflict by guessing.
+A direct source check of `deployment/mu1440/install.sh` confirms that the **current MU1440 developer installer enables the persistent D2 keyframe policy** (`/mnt/app/root/mibr-alt111-keyframe-policy.enabled`) with a **1,000 ms watchdog and 1,000 ms minimum request gap**. Older installation prose saying otherwise was stale. This is the MU1440 developer reference behavior, not evidence that the unfinished multi-profile beta ZIP already installs it on SEAT.
 
 ## E. Required release-documentation checks
 
