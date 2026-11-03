@@ -36,7 +36,8 @@ SCAN_EXTS = {".c", ".h", ".java", ".sh", ".ksh", ".py"}
 SELF_AUDIT_TOOLS = {"tools/release/storage_migration_review.py",
                     "tools/release/storage_path_triage.py",
                     "tools/release/storage_consumer_crosscheck.py",
-                    "tools/release/legacy_marker_contract.py"}
+                    "tools/release/legacy_marker_contract.py",
+                    "tools/release/storage_access_graph.py"}
 
 
 class InventoryError(ValueError):
