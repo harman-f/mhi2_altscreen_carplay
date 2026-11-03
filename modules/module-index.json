@@ -2,7 +2,7 @@
   "schema_version": 1,
   "contract": "docs/architecture/REPOSITORY_LAYOUT.md",
   "lifecycle": "migration-in-progress",
-  "notes": "CarPlay, Broker, Menu and Navigation source/runtime ownership moved into modules; shared settings and host orchestration remain centralized. Profiles and build/release qualification are tracked separately.",
+  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable.",
   "modules": {
     "carplay": {
       "status": "indexed",
@@ -54,7 +54,7 @@
       "source": [
         "modules/broker/source/mibr-control",
         "modules/broker/source/keypanel",
-                "settings/registry.json"
+        "settings/registry.json"
       ],
       "runtime": [
         "modules/broker/runtime/mibr-control"
@@ -115,10 +115,11 @@
     "seat-mu1409-p4708",
     "seat-mu1447-p4709"
   ],
-  "profile_status": "documentation-only: this is not a set of qualified installable profiles",
+  "profile_status": "All three beta profiles structurally present, common beta release-plan generated; target-specific compiled artifacts and assembled multi-target ZIP remain to be built.",
   "shared_orchestration": [
     "tools/build_mu1440_source.sh",
     "tools/validate_modular_package.py"
   ],
-  "artifact_policy": "Each produced binary needs exact source revision, toolchain/ABI, build recipe, SHA-256, target profile(s) and evidence classification. No implied build coverage."
+  "artifact_policy": "Each produced binary needs exact source revision, toolchain/ABI, build recipe, SHA-256, target profile(s) and evidence classification. No implied build coverage.",
+  "profile_plan": "tools/release/plan_multi_profile_beta.py"
 }

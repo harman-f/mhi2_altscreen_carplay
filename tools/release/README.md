@@ -6,6 +6,10 @@ The canonical source of truth for build ownership is
 uses this structure for **pre-publication readiness**, not as a vehicle-ready
 multi-profile release generator.
 
+## Mandatory three-profile beta release inputs
+
+`python3 tools/release/plan_multi_profile_beta.py --self-test --json-out beta-profile-plan.json` emits the *same* common beta inclusion for Škoda MU1440 and both SEAT firmware families. Java adapters are per-firmware repairable; code and registry remain shared. This is a real CI input for the future R3 packager, not yet an executable installation ZIP. Final vehicle acceptance is common beta testing, not an exclusion gate. Exact missing JXE hashes and compiled ABI-specific Java must still be present in the final installer. Never manufacture substitutes.
+
 ## Independent stages
 
 1. **Impact plan (host):** `module_plan.py` compares the exact base/head Git
