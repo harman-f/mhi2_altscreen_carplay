@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parents[2]
-SCRIPT = HERE / "runtime" / "mibr-control" / "mibr-menu.ksh"
+SCRIPT = HERE / "modules" / "broker" / "runtime" / "mibr-control" / "mibr-menu.ksh"
 
 
 class MenuScript(unittest.TestCase):
