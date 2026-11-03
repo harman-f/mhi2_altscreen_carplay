@@ -69,6 +69,14 @@ or executed on the QNX unit**.
   shell/environment is not a generic GNU/Linux environment.
 - Do not assume command/option behavior validated on MMX applies to RCC.
   Use verified absolute helper paths and documented mount/remount rules.
+- Old multi-profile kit scripts used `SED=/bin/sed` and `TEE=/usr/bin/tee`,
+  which escaped earlier bare-command scans and failed on SEAT MU1447 MMX.
+  The host checker now rejects stock-looking absolute pins too. For any
+  separately built ZIP, require an additional actual-archive gate verifying
+  its hash-pinned self-contained helper binaries, executable modes, script
+  paths, and any firmware-bound OEM startup exceptions. The checked-in
+  public MU1440 compatibility ZIP already carries its own `sha256sum`/`tee`;
+  this does not automatically fix a privately built multi-profile kit.
 - `awk` is not banned, but the exact scripted program must have evidence.
   `grep 'A\\|B'` alternation is not portable. Dynamic command evaluation,
   boot-time side effects and device nodes require manual/vehicle review.
