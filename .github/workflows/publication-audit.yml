@@ -157,11 +157,11 @@ jobs:
 
           # Exact vehicle evidence: external printf is absent in the direct MMX runtime.
           # Shell scripts deployed to the unit must not regress to it.
-          ! grep -R -n -E '(^|[;&|[:space:]])printf[[:space:]]' deployment/mu1440 runtime
+          ! grep -R -n -E '(^|[;&|[:space:]])printf[[:space:]]' deployment/mu1440 runtime modules/carplay/runtime
 
           # Exact vehicle evidence also showed that relying on grep A\|B alternation is unsafe.
           # Require separate fixed-string checks instead.
-          ! grep -R -n -F '\|' deployment/mu1440 runtime
+          ! grep -R -n -F '\|' deployment/mu1440 runtime modules/carplay/runtime
 
           # The prepared developer package must carry its own hash helper and must
           # not depend on the classic M.I.B. SD bootstrap/binary tree.
@@ -216,10 +216,10 @@ jobs:
           grep -Fq 'dio_manager.json' deployment/mu1440/compatibility-report.sh
           grep -Fq 'smartphone_integrator.json' deployment/mu1440/compatibility-report.sh
           ! grep -n -E 'mount[[:space:]]+-uw[[:space:]]+/(mnt|net/rcc)|app_rw|system_rw|(^|[;&|[:space:]])(rm|mv|chmod|slay|kill)[[:space:]]' deployment/mu1440/compatibility-report.sh
-          ! grep -R -n -F '/apps/sbin' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate
-          ! grep -R -n -F 'config/BASICS' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate
-          ! grep -R -n -F 'apps/mounts' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate
-          ! grep -R -n -F 'M.I.B.-style' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate
+          ! grep -R -n -F '/apps/sbin' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate modules/carplay/runtime/parity
+          ! grep -R -n -F 'config/BASICS' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate modules/carplay/runtime/parity
+          ! grep -R -n -F 'apps/mounts' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate modules/carplay/runtime/parity
+          ! grep -R -n -F 'M.I.B.-style' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate modules/carplay/runtime/parity
 
           # Reject accidental literal escape/newline or PID-temp regressions introduced by scripted edits.
           python3 - <<'PY'
@@ -246,7 +246,7 @@ jobs:
 
           # Fail before persistent mutation if the exact mandatory runtime command set is absent.
           grep -Fq 'require_cmds mount cp mv chmod sync mkdir rm touch sleep grep awk wc cat pidin on slay /bin/sh /bin/ksh /eso/bin/apps/dmdt' deployment/mu1440/install.sh
-          ! grep -R -n -E '(^|[^A-Za-z0-9_])sed([[:space:]]|$)' deployment/mu1440 runtime/auto-direct runtime/isotx2-gate modules/navigation/runtime
+          ! grep -R -n -E '(^|[^A-Za-z0-9_])sed([[:space:]]|$)' deployment/mu1440 modules/carplay/runtime/auto-direct modules/carplay/runtime/isotx2-gate modules/carplay/runtime/parity modules/navigation/runtime
           ! grep -R -n -E '(^|[;&|[:space:]])printf[[:space:]]' modules/navigation/runtime
 
           # The EEPROM hex decoder used only for issue diagnostics must be deterministic.
