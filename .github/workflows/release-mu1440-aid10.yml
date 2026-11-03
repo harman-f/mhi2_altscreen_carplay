@@ -23,7 +23,7 @@ on:
       - 'tools/check_module_index.py'
       - 'artifacts/mu1440/**'
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths:
       - '.github/workflows/release-mu1440-aid10.yml'
       - '.github/workflows/publication-audit.yml'
