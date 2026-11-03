@@ -85,3 +85,13 @@ source/build receipts. Only then connect a **separate publish job** requiring
 successful final ZIP validation, exact source commit and binary SHA-256
 provenance, relevant QNX regression and vehicle/profile authorization.
 Release tags must be immutable and unrelated historical release assets preserved.
+
+## Source-defined defaults and on-unit storage references (host-only)
+
+Run `python3 tools/release/source_defaults_inventory.py --self-test --json-out source-defaults-inventory.json` on a checkout. The publication audit also uploads a short-retention `source-defaults-unit-path-inventory` JSON artifact.
+
+The generator reads the **canonical** CarPlay registry, broker durable-switch C declarations/header, menu layout/catalog and required firmware-profile index. It validates unique settings/fields, per-preset default values and apply boundaries, broker switch count and source-defined defaults, and menu/catalog references. It records source-file SHA-256, the current 48 CarPlay settings in 13 file groups, 13 broker switches with their separate revision/CAS storage contract, and menu entries that have no directly matching registry key.
+
+A separate lexical scan records literal `/mnt/app/root/mibr*`, `/mnt/app/root/altscreen-u2*` and `/tmp/mibr*` references in project-owned C/Java/shell/Python source, with source file and line. It intentionally does **not** infer a reader, writer, safe migration mapping or comprehensive handling of dynamically concatenated paths. No file is moved and no unit state is touched.
+
+The three CarPlay compatibility **presets** are not the three firmware **profiles**. The tool does not select a CarPlay preset for an installer, resolve user-persistent/platform overrides or assert a live effective value. A future multi-profile packager must supply an explicit selected preset and verified per-firmware overrides and fail its own final-package gate if these remain unresolved. Host inventory PASS is not an install or vehicle test.
