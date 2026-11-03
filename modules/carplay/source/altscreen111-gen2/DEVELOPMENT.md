@@ -3,7 +3,7 @@
 This directory now carries the project-authored source overlay for the installed MU1440 R38
 `libaltscreen111.so` checkpoint. The implementation is based on the public source tree at
 `324b4f249883bb707e0d0a8995b2b6b5fe23be25`, with the source additions in this repository's
-`settings/`, `src/native/alt111-settings/`, `modules/carplay/source/vehicle-data/`, and the three-view changes in
+`settings/`, `modules/carplay/source/alt111-settings/`, `modules/carplay/source/vehicle-data/`, and the three-view changes in
 this directory.
 
 The installed binary recorded for this source is SHA-256
@@ -13,7 +13,7 @@ binary or that the current source has passed vehicle qualification. No OEM binar
 
 ## Source and build
 
-The single settings authority is [`settings/registry.json`](../../../settings/registry.json). Its
+The single settings authority is [`settings/registry.json`](../../../../settings/registry.json). Its
 generated C/HMI bindings are checked with:
 
 ```sh
@@ -27,7 +27,7 @@ bash tools/test_installed_gen2_host.sh
 ```
 
 Build the QNX ARMv7 shared library from the repository root, using the pinned QNX 6.5 toolchain
-image described in [`docs/build/INSTALLED_GEN2_SOURCE.md`](../../../docs/build/INSTALLED_GEN2_SOURCE.md):
+image described in [`docs/build/INSTALLED_GEN2_SOURCE.md`](../../../../docs/build/INSTALLED_GEN2_SOURCE.md):
 
 ```sh
 docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src mibr-qnx65-temp:4.9 \

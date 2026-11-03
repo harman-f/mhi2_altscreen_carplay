@@ -8,7 +8,7 @@ The broker's development source and runtime are now physically co-located in thi
 - [Controller runtime scripts](runtime/mibr-control/)
 - [Canonical settings registry](../../settings/registry.json)
 - [Native keypanel source](source/keypanel/)
-- [Parity owner/session source](../../src/native/parity-session/)
+- [Parity owner/session source](../carplay/source/parity-session/)
 - [Controller source/build guide](../../docs/build/MU1440_R57_SOURCE.md)
 
 ## Contracts and evidence

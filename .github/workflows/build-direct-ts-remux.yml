@@ -5,13 +5,13 @@ on:
   pull_request:
     paths:
       - '.github/workflows/build-direct-ts-remux.yml'
-      - 'src/native/direct-ts-remux/**'
+      - 'modules/carplay/source/direct-ts-remux/**'
       - 'tools/build_direct_ts_remux.sh'
   push:
     branches: [ main ]
     paths:
       - '.github/workflows/build-direct-ts-remux.yml'
-      - 'src/native/direct-ts-remux/**'
+      - 'modules/carplay/source/direct-ts-remux/**'
       - 'tools/build_direct_ts_remux.sh'
 
 permissions:
@@ -78,7 +78,7 @@ jobs:
           set -euxo pipefail
           rm -rf build/public-direct-ts-remux
           mkdir -p build/public-direct-ts-remux
-          docker run --rm --platform=linux/amd64             -v "$PWD:/src"             -w /src             "$IMAGE"             bash -c 'bash ./tools/build_direct_ts_remux.sh src/native/direct-ts-remux/direct_ts_remux.c build/public-direct-ts-remux/direct-ts-remux'
+          docker run --rm --platform=linux/amd64             -v "$PWD:/src"             -w /src             "$IMAGE"             bash -c 'bash ./tools/build_direct_ts_remux.sh modules/carplay/source/direct-ts-remux/direct_ts_remux.c build/public-direct-ts-remux/direct-ts-remux'
           sudo chown -R "$(id -u):$(id -g)" build/public-direct-ts-remux
 
       - name: Validate debug/symbol state and materialize reports
@@ -113,7 +113,7 @@ jobs:
           target=QNX_6.5_ARMv7_softfp
           target_firmware=$TARGET_FIRMWARE
           source_public_commit=$GITHUB_SHA
-          source_path=src/native/direct-ts-remux/direct_ts_remux.c
+          source_path=modules/carplay/source/direct-ts-remux/direct_ts_remux.c
           validation_scope=vehicle_tested_downstream_transport
           compiler=GCC_4.9.4_QNX_ARMv7
           optimization=-O2

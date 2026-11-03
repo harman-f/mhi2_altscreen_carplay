@@ -8,11 +8,11 @@ trap 'rm -rf "$TMP"' EXIT
 python3 tools/generate_alt111_settings.py --check
 
 COMMON="-std=gnu99 -Wall -Wextra -Werror -pedantic"
-SETTINGS_INC="-Isrc/native/alt111-settings/include -Isrc/native/altscreen111-gen2/include"
+SETTINGS_INC="-Imodules/carplay/source/alt111-settings/include -Imodules/carplay/source/altscreen111-gen2/include"
 
 "$CC" $COMMON $SETTINGS_INC \
-  tests/test_three_views.c src/native/alt111-settings/settings_core.c \
-  src/native/altscreen111-gen2/src/alt111_policy.c \
+  tests/test_three_views.c modules/carplay/source/alt111-settings/settings_core.c \
+  modules/carplay/source/altscreen111-gen2/src/alt111_policy.c \
   -o "$TMP/test_three_views"
 "$TMP/test_three_views"
 

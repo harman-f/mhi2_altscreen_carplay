@@ -1,5 +1,5 @@
 /* Host-side smoke test for the socket option used by GEN2 A/B mode.
- * cc -std=c99 -Wall -Wextra -Werror -Isrc/native/altscreen111-gen2/include \
+ * cc -std=c99 -Wall -Wextra -Werror -Imodules/carplay/source/altscreen111-gen2/include \
  *   tests/alt111_tcp_nodelay_test.c -o /tmp/alt111_tcp_nodelay_test
  * /tmp/alt111_tcp_nodelay_test
  */

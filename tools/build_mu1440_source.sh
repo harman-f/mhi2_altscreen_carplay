@@ -14,10 +14,10 @@ command -v "$QNX_CC" >/dev/null || { echo "Missing QNX compiler: $QNX_CC" >&2; e
 QCC="$QNX_CC" bash tools/build_altscreen111_gen2.sh "$OUT/libaltscreen111.so"
 CC="$QNX_CC" bash tools/build_alt111_settings.sh "$OUT/alt111-settings"
 CC="$QNX_CC" bash tools/build_direct_ts_parity.sh \
-  src/native/direct-ts-parity/direct_ts_parity.c "$OUT/direct-ts-parity"
+  modules/carplay/source/direct-ts-parity/direct_ts_parity.c "$OUT/direct-ts-parity"
 BRIDGE_IDENTITY_PATH="$OUT/direct-ts-parity" CC="$QNX_CC" \
   bash tools/build_parity_session.sh \
-  src/native/parity-session/parity_session.c "$OUT/parity-session"
+  modules/carplay/source/parity-session/parity_session.c "$OUT/parity-session"
 CC="$QNX_CC" bash tools/build_native_isotx2_guard.sh \
   "$OUT/libmibr_isotx2_guard.so"
 
@@ -27,14 +27,14 @@ CC="$QNX_CC" bash tools/build_native_isotx2_guard.sh \
 TMP_GATE="/tmp/mu1440-libmibr_isotx2_gate-$$.so"
 trap 'rm -f "$TMP_GATE"' EXIT
 "$QNX_CC" -shared -fPIC -mfloat-abi=softfp -O2 -std=gnu99 -Wall -Wextra \
-  src/native/isotx2-gate/isotx2_gate.c \
+  modules/carplay/source/isotx2-gate/isotx2_gate.c \
   -Wl,-soname,libmibr_isotx2_gate.so -o "$TMP_GATE"
 arm-unknown-nto-qnx6.5.0eabi-strip -s "$TMP_GATE"
 cp "$TMP_GATE" "$OUT/libmibr_isotx2_gate.so"
 rm -f "$TMP_GATE"
 
 MIBR_CONTROL_OUT="$OUT/mibr-control" \
-ALT111_SOURCE_ROOT="$ROOT/src/native" \
+ALT111_SOURCE_ROOT="$ROOT/modules/carplay/source" \
   bash tools/build_mibr_control.sh qnx-container
 
 (

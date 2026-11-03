@@ -6,7 +6,7 @@
 static ssize_t simulated_write(int fd, const void *p, size_t n);
 #define write simulated_write
 #define main parity_cli_main
-#include "../src/native/direct-ts-parity/direct_ts_parity.c"
+#include "../modules/carplay/source/direct-ts-parity/direct_ts_parity.c"
 #undef main
 #undef write
 static unsigned attempts, accepts;
