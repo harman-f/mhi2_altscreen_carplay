@@ -1,5 +1,5 @@
 /* Host test for the VehicleStatus core with a mocked libstrm/HARMAN API. */
-#include "../src/native/vehicle-data/mibr_vstatus.h"
+#include "../modules/carplay/source/vehicle-data/mibr_vstatus.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
