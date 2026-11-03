@@ -36,4 +36,4 @@ not establish that the target input path is qualified. The controller's boot
 lifecycle and persistent-storage gate must be reviewed as one exact-target
 integration before either script is used operationally.
 Current source status and evidence boundaries are documented in
-[`docs/architecture/mibr-control/BUILD_AND_EVIDENCE.md`](../../docs/architecture/mibr-control/BUILD_AND_EVIDENCE.md).
+[`docs/architecture/mibr-control/BUILD_AND_EVIDENCE.md`](../../../../docs/architecture/mibr-control/BUILD_AND_EVIDENCE.md).
