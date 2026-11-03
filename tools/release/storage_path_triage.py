@@ -74,6 +74,14 @@ def dynamic_context(root, record):
         kind, action = "host-tool-source", "exclude-from-on-unit-runtime-only-after-review"
     elif re.search(r"\bexport (?:PATH|LD_LIBRARY_PATH)=", source_line):
         kind, action = "runtime-search-path", "preserve-and-verify-target-env"
+    elif source_line.startswith("#define ") and '"/mnt/app/root"' in source_line:
+        kind, action = "macro-persistent-root", "enumerate-macro-consumers"
+    elif re.search(r'\blstat\("/mnt/app/root"', source_line):
+        kind, action = "mount-root-probe", "preserve-qnx-mount-preflight"
+    elif re.search(r'^\w*TMP=/mnt/app/root/', source_line):
+        kind, action = "persistent-staging-path", "review-same-fs-staging-and-rollback"
+    elif source_line.startswith("Changes are persistent under "):
+        kind, action = "usage-documentation", "confirm-no-runtime-effect"
     elif (source_line.startswith("#") or source_line.startswith("/*")
           or source_line.startswith("*")):
         kind, action = "comment-or-documentation", "confirm-no-runtime-effect"
@@ -163,6 +171,7 @@ def self_test():
         "/mnt/app/root/altscreen-u2/scripts/common.sh": "installed-runtime",
         "/mnt/app/root/altscreen-u2/config/%s.conf": "noncanonical-fragment",
         "/mnt/app/root/mibr-view}": "noncanonical-fragment",
+        "/mnt/app/root/mibr-parity-drive.enabled": "persistent-presence-marker",
     }
     for path, expected in samples.items():
         actual = classify(path)[0]
