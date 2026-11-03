@@ -139,7 +139,9 @@ def self_test(files, inventory):
     ):
         bad = dict(files)
         assert old in bad[file]
-        bad[file] = bad[file].replace(old, new, 1)
+        # For a repeated guard, remove every occurrence: a single surviving
+        # call must not mask a missing check on another persistent path.
+        bad[file] = bad[file].replace(old, new)
         try:
             inspect(bad, inventory)
         except ContractError:
