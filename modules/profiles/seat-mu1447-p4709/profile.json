@@ -20,8 +20,8 @@
     "status": "defined"
   },
   "hmi": {
-    "api_jar_sha256": null,
-    "api_jar_status": "to_confirm",
+    "api_jar_sha256": "203087feace6228dc6544f01d10552c369fff1bf2ea5782d324fa4db1ce39c88",
+    "api_jar_status": "confirmed",
     "adapter": null,
     "adapter_from": "seat-mu1409-p4708",
     "image_index_offset": 6

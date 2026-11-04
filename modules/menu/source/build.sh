@@ -17,6 +17,15 @@ done
 for input in "$LSD_JAR" "$OEM_ACTIVATOR_SOURCE" "$OEM_WIDGET_FACTORY_SOURCE" "$REGISTRY_JSON"; do
   test -s "$input" || { echo "BUILD_INPUT_MISSING=$input" >&2; exit 22; }
 done
+# The API lsd.jar is a build input pinned per firmware profile (profile.json hmi.api_jar_sha256).
+# A different reconstruction compiles but may not match the unit's runtime classes, so refuse it.
+EXPECTED_API_JAR=$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1])).get("hmi") or {}).get("api_jar_sha256") or "")' \
+  "$MODULE/../../profiles/$PROFILE/profile.json")
+[ -n "$EXPECTED_API_JAR" ] || { echo "ERROR: profile $PROFILE has no hmi.api_jar_sha256" >&2; exit 1; }
+ACTUAL_API_JAR=$(sha256sum "$LSD_JAR" | awk '{print $1}')
+[ "$ACTUAL_API_JAR" = "$EXPECTED_API_JAR" ] || {
+  echo "ERROR: LSD_JAR sha256 $ACTUAL_API_JAR does not match $PROFILE api_jar_sha256 $EXPECTED_API_JAR" >&2; exit 1; }
+echo "API_JAR=PASS profile=$PROFILE sha256=$ACTUAL_API_JAR"
 mkdir -p "$OUT"
 python3 "$MODULE/generate_catalog.py" --registry "$REGISTRY_JSON" --menu "$MODULE/menu-definition.json" --out-dir "$OUT/catalog"
 python3 "$MODULE/prepare_oem_sources.py" \
