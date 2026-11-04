@@ -29,9 +29,28 @@ TARBALL="$WORK/ffmpeg-${FFMPEG_VERSION}.tar.gz"
 FFDIR="$WORK/ffmpeg-${FFMPEG_VERSION}"
 
 if [ ! -f "$TARBALL" ]; then
-  curl -fL --retry 3     "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz"     -o "$TARBALL"
+  # TLS resets at ffmpeg.org caused CI failures: use bounded retries, and
+  # accept only the original, SHA-256-pinned release archive from any mirror.
+  URLS=(
+    "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz"
+    "https://www.ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz"
+    "https://www.mirrorservice.org/sites/ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz"
+  )
+  for URL in "${URLS[@]}"; do
+    rm -f "$TARBALL.partial"
+    if curl --fail --location --retry 5 --retry-all-errors \
+      --retry-delay 3 --connect-timeout 15 --max-time 240 \
+      "$URL" -o "$TARBALL.partial"; then
+      if printf '%s  %s\n' "$FFMPEG_SHA256" "$TARBALL.partial" | sha256sum -c -; then
+        mv "$TARBALL.partial" "$TARBALL"
+        break
+      fi
+    fi
+    rm -f "$TARBALL.partial"
+  done
 fi
-echo "${FFMPEG_SHA256}  $TARBALL" | sha256sum -c -
+[[ -s "$TARBALL" ]] || { echo "FFMPEG_SOURCE_FETCH=FAIL" >&2; exit 32; }
+printf '%s  %s\n' "$FFMPEG_SHA256" "$TARBALL" | sha256sum -c -
 
 if [ ! -f "$FFDIR/configure" ]; then
   rm -rf "$FFDIR"

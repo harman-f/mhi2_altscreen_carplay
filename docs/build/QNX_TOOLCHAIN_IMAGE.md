@@ -26,27 +26,43 @@ Known build-source provenance for that archived image:
 
 The archived toolchain image is a **compiler/build environment**, not an application firmware image or a distributable installer. GCC 4.9.4 source downloads are unnecessary when the verified archived image is being used. Project C/C++ sources still need recompiling after changes. The OEM Java/J9 path is separate and requires exact firmware-specific dependencies.
 
-## Current CI implementation (2026-11-04)
+## Current public compiler image (Harman-F)
 
-The five public native-build workflows (MU1440 source, GEN2, direct-TS remux, keypanel and support tools) now share `tools/ci_qnx65_image.sh`. The script has two **explicit** modes:
+The independent [project-owned archive workflow](../../.github/workflows/archive-qnx65-image.yml)
+published a GCC 4.9.4 / QNX 6.5 / ARMv7 image successfully in
+[run 41805123089](https://github.com/harman-f/mhi2_altscreen_carplay/actions/runs/41805123089).
+The registry-authoritative reference is:
 
-- **archived-pinned**: when the repository Actions variable `QNX65_VERIFIED_IMAGE` is present, it must be an immutable GHCR `image@sha256:64hex` reference. The runner pulls and checks that digest, validates the linux/amd64 platform and GCC 4.9 cross-compiler, then tags it locally for the existing build commands. Any failed pull or check **stops the job**; there is no automatic network/source fallback.
-- **legacy-rebuild**: until the registry alias/access has been configured, each workflow explicitly sets `QNX65_LEGACY_REBUILD_ALLOWED=1` and emits a visible warning before invoking the existing pinned source-build helper. This temporary bootstrap preserves build availability but **still downloads/rebuilds GCC** and is not the final performance improvement. Without that explicit flag and without an image reference, the selector fails closed.
+```text
+ghcr.io/harman-f/mhi2-qnx65-armv7@sha256:20d7d2bb16d6718d204afc7714b0e73227651935a9981a8bd2e2087cef48dd0d
+```
 
-To activate the archived image without publishing a separate development account name in source:
+All five native build workflows consume this **exact** image using
+[`tools/qnx65-image.lock`](../../tools/qnx65-image.lock) and the common
+[`tools/ci_qnx65_image.sh`](../../tools/ci_qnx65_image.sh) selector.
+The lockfile lives in the public repository with source/build recipes:
+there is no separate dependency on the private Research account or on
+a manually configured repository Actions variable.
 
-1. In the public repository, open **Settings → Secrets and variables → Actions → Variables** and create `QNX65_VERIFIED_IMAGE`. Supply an **approved, pullable, digest-qualified GHCR image reference** confirmed with the archive owner. Do not supply a mutable `:latest` or `:4.9` tag.
-2. Ensure that GitHub-hosted runners can pull it. The selector currently uses Docker's existing read access: a publicly readable image works without login, but a private package needs an independently configured and reviewed read-only authentication step. Do not add a credential to the repository.
-3. Verify that the MU1440, GEN2, remux, keypanel and support-tool CI jobs all report `QNX_IMAGE_READY=PASS mode=archived-pinned`; inspect each attached `QNX_TOOLCHAIN_PROVENANCE.txt`, output SHA-256, QNX ARM ELF identity and tests.
-4. After real archived-mode CI success, delete the temporary `QNX65_LEGACY_REBUILD_ALLOWED=1` allowance from the five jobs. Retain `tools/build_qnx65_image.sh` as a separately invoked recovery helper.
+CI authenticates to the **same repository's** GHCR package using a scoped
+`GITHUB_TOKEN` with `packages: read`. It checks the complete manifest
+digest, `linux/amd64` platform, GCC 4.9 compiler and QNX readelf/qcc tools.
+Missing access, a mismatching override, wrong image/digest or an absent
+compiler fails closed. A normal build does **not** rebuild or download GCC.
+`tools/build_qnx65_image.sh` remains an explicit, independent
+disaster-recovery/reprovisioning command.
 
-The archived compiler may differ from the more recent source-rebuilt image because the bootstrap Dockerfile and Debian snapshot differ. **No byte-for-byte reproducibility or vehicle compatibility is inferred.** Changes in output hashes require review before anything enters a release.
+Each native build uploads `QNX_TOOLCHAIN_PROVENANCE.txt` with the
+verified image reference and manifest digest, compiler version, image ID,
+source revision and explicit `vehicle_qualified=false`. A source build
+passing CI **does not authorize** replacing the vehicle-tested legacy
+binaries or publishing a modular release. Review ELF/ABI symbols and
+SHA-256 differences versus previous builds.
 
-Every native job now attaches a provenance text file recording the selected mode, actual local Docker image ID, compiler version, source revision and declared upstream toolchain recipe. Archived mode additionally records the checked manifest digest. This is supplemental evidence, not a replacement for the existing `MODULE_BUILD_LINEAGE.json` receipt, which still lacks a verified image-digest field. Only a later lineage-tool change may integrate the real Docker identity into a validated release receipt.
-
-### Reproducibility/compatibility gate — still required for archived mode
-
-The previously verified source-build path is not equivalent evidence for the archived image. Confirm the compiler/sysroot and required `qcc` and readelf tools, run full native build/host tests, compare ABI/ELF headers and output SHA-256 against the established baseline, and review any differences. Keep QNX compiler-verified binaries separate from frozen vehicle-tested artifacts until their own acceptance. The image-selection helper does not install on a unit, alter persistent storage, or qualify a new profile.
+The older Research image (`sha256:19b5fb...`) remains available for
+history; it is not byte-for-byte interchangeable with this separately
+rebuilt and published image. See the
+[Harman-F archive runbook](HARMAN_F_TOOLCHAIN_ARCHIVE.md).
 
 ## Release pipeline requirements
 

@@ -9,6 +9,7 @@ on:
       - 'runtime/diagnostics/keypanel_*_native.sh'
       - 'tools/build_keypanel_native.sh'
       - 'tools/ci_qnx65_image.sh'
+      - 'tools/qnx65-image.lock'
       - 'tests/keypanel-native/**'
   push:
     branches: [ main ]
@@ -18,10 +19,12 @@ on:
       - 'runtime/diagnostics/keypanel_*_native.sh'
       - 'tools/build_keypanel_native.sh'
       - 'tools/ci_qnx65_image.sh'
+      - 'tools/qnx65-image.lock'
       - 'tests/keypanel-native/**'
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: mu1440-keypanel-native-${{ github.ref }}
@@ -56,8 +59,7 @@ jobs:
       - name: Select verified QNX 6.5 ARMv7 image
         shell: bash
         env:
-          QNX65_VERIFIED_IMAGE: ${{ vars.QNX65_VERIFIED_IMAGE }}
-          QNX65_LEGACY_REBUILD_ALLOWED: '1' # transitional only; fail if configured image cannot be pulled
+          QNX65_GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           bash tools/ci_qnx65_image.sh

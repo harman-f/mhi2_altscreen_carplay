@@ -11,6 +11,7 @@ on:
       - 'modules/carplay/source/tee-compat/**'
       - 'tools/build_support_tools.sh'
       - 'tools/ci_qnx65_image.sh'
+      - 'tools/qnx65-image.lock'
   push:
     branches: [ main ]
     paths:
@@ -21,9 +22,11 @@ on:
       - 'modules/carplay/source/tee-compat/**'
       - 'tools/build_support_tools.sh'
       - 'tools/ci_qnx65_image.sh'
+      - 'tools/qnx65-image.lock'
 
 permissions:
   contents: write
+  packages: read
 
 concurrency:
   group: public-support-tools
@@ -110,8 +113,7 @@ jobs:
       - name: Select verified QNX 6.5 ARMv7 image
         shell: bash
         env:
-          QNX65_VERIFIED_IMAGE: ${{ vars.QNX65_VERIFIED_IMAGE }}
-          QNX65_LEGACY_REBUILD_ALLOWED: '1' # transitional only; fail if configured image cannot be pulled
+          QNX65_GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           bash tools/ci_qnx65_image.sh

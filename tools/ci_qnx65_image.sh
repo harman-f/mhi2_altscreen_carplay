@@ -4,8 +4,14 @@
 set -euo pipefail
 
 IMAGE=${IMAGE:-mhi2-qnx65-armv7-public:4.9}
-QNX65_VERIFIED_IMAGE=${QNX65_VERIFIED_IMAGE:-}
-QNX65_LEGACY_REBUILD_ALLOWED=${QNX65_LEGACY_REBUILD_ALLOWED:-0}
+# A checked-in, reviewed lockfile is the authority for the compiler identity.
+PIN_FILE=tools/qnx65-image.lock
+[[ -s "$PIN_FILE" ]] || { echo "QNX_IMAGE_PIN_MISSING=FAIL" >&2; exit 15; }
+PIN_REF=$(cat "$PIN_FILE")
+QNX65_VERIFIED_IMAGE=${QNX65_VERIFIED_IMAGE:-$PIN_REF}
+[[ "$QNX65_VERIFIED_IMAGE" == "$PIN_REF" ]] || {
+  echo "QNX_IMAGE_PIN_MISMATCH=FAIL update the source lockfile, not a CI variable" >&2; exit 17;
+}
 TOOLCHAIN_COMMIT=${TOOLCHAIN_COMMIT:-56a66557245af14077678cd28a83ce3a337d9e2d}
 TOOLCHAIN_DOCKERFILE_SHA256=${TOOLCHAIN_DOCKERFILE_SHA256:-9a867a7ae70f2c0222a241b80232856526ccec0db2cfe013f8991ca31c74bcb1}
 RUNNER_TEMP=${RUNNER_TEMP:-${TMPDIR:-/tmp}}
@@ -25,6 +31,13 @@ if [[ -n "$QNX65_VERIFIED_IMAGE" ]]; then
     echo "::add-mask::$QNX65_VERIFIED_IMAGE"
   fi
   echo "QNX_IMAGE_MODE=ARCHIVED_PULL"
+  # The compiler package belongs to this repository. Use its read-only token.
+  if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+    [[ -n "${QNX65_GHCR_TOKEN:-}" ]] || { echo "QNX_GHCR_TOKEN_MISSING=FAIL" >&2; exit 18; }
+    printf '%s' "$QNX65_GHCR_TOKEN" | docker login ghcr.io --username "${GITHUB_ACTOR:-harman-f}" --password-stdin >/dev/null || {
+      echo "QNX_GHCR_LOGIN=FAIL" >&2; exit 19;
+    }
+  fi
   if ! docker pull "$QNX65_VERIFIED_IMAGE" > "$RUNNER_TEMP/qnx65-image-pull.log" 2>&1; then
     echo "QNX_IMAGE_PULL=FAIL (registry access or digest mismatch; no automatic source fallback)" >&2
     exit 11
@@ -50,6 +63,7 @@ if [[ -n "$QNX65_VERIFIED_IMAGE" ]]; then
   docker image tag "$QNX65_VERIFIED_IMAGE" "$IMAGE"
   {
     echo "mode=archived-pinned"
+    echo "image_ref=$QNX65_VERIFIED_IMAGE"
     echo "image_manifest_digest=${QNX65_VERIFIED_IMAGE##*@}"
     echo "image_id=$(docker image inspect --format '{{.Id}}' "$IMAGE")"
     echo "compiler=$COMPILER"
@@ -63,32 +77,6 @@ if [[ -n "$QNX65_VERIFIED_IMAGE" ]]; then
   } > "$PROVENANCE"
   echo "QNX_IMAGE_PULL=PASS platform=linux/amd64 compiler=$compiler_ver digest-verified=true"
   mode=archived-pinned
-else
-  [[ "$QNX65_LEGACY_REBUILD_ALLOWED" == 1 ]] || {
-    echo "QNX_IMAGE_NOT_CONFIGURED=FAIL; supply QNX65_VERIFIED_IMAGE as a digest-qualified repository variable" >&2
-    exit 15
-  }
-  echo "::warning::QNX65_VERIFIED_IMAGE is not configured. Explicit transitional source-bootstrap path enabled; this rebuilds GCC and is not the archived-image migration."
-  echo "QNX_IMAGE_MODE=LEGACY_REBUILD"
-  QNX_BUILDX_GHA_CACHE=1 bash tools/build_qnx65_image.sh \
-    "$RUNNER_TEMP/qnx-toolchain-${GITHUB_RUN_ID:-manual}-${GITHUB_RUN_ATTEMPT:-1}" "$IMAGE"
-  compiler_ver=$(docker run --rm --platform=linux/amd64 "$IMAGE" "$COMPILER" -dumpversion)
-  [[ "$compiler_ver" == 4.9* ]] || {
-    echo "QNX_COMPILER=FAIL expected GCC 4.9, got $compiler_ver" >&2; exit 16;
-  }
-  {
-    echo "mode=legacy-rebuild"
-    echo "image_id=$(docker image inspect --format '{{.Id}}' "$IMAGE")"
-    echo "compiler=$COMPILER"
-    echo "compiler_version=$compiler_ver"
-    echo "target=QNX_6.5_ARMv7"
-    echo "upstream_toolchain_commit=$TOOLCHAIN_COMMIT"
-    echo "upstream_dockerfile_sha256=$TOOLCHAIN_DOCKERFILE_SHA256"
-    echo "source_revision=${GITHUB_SHA:-unknown}"
-    echo "vehicle_qualified=false"
-    echo "bit_reproducible_verified=false"
-  } > "$PROVENANCE"
-  mode=legacy-rebuild
 fi
 
 if [[ -n "${GITHUB_ENV:-}" ]]; then
