@@ -74,6 +74,23 @@ The default install also enables the persistent GEN2 D2 keyframe policy:
 
 No external Java payload is required for the validated MU1440/AID10 test path.
 
+## Default configuration of this MU1440 developer installer
+
+For a complete, source-traceable inventory, see the [configuration matrix](../../docs/configuration/DEFAULT_CONFIGURATION_MATRIX.md). Its 48 CarPlay registry entries are **per CarPlay preset**, not per firmware; the 13 broker switches have compiled fallbacks that may be overridden by a platform-default file or an existing stored value. The checked-in standard menu is branded `skoda` and describes layout only.
+
+| Item | Current MU1440 developer reference | Important qualification |
+| --- | --- | --- |
+| Stream 111 CarPlay setting | `carplay.enabled=1` (registry default) | Effective active state can differ on the unit |
+| Phone navigation arrows | `carplay_nav=off` (broker default) | Independent of CarPlay video enablement |
+| Arrow source / placement | `auto` / `side` (broker defaults) | Preconfigured even while phone arrows are disabled |
+| Navigation composition | `map-rich` | Explicit choice in `deployment/mu1440/install.sh` |
+| DisplayManager gate | `STOCK` | Fail-safe until intentionally switched |
+| Most20 / NavIgnore | Exact reference JARs included and installed as required | Specific to this older MU1440 development path |
+| Auto-Direct | Persistent configuration prepared | Actual session operation must be verified after reboot |
+| D2 keyframe recovery | Persistent; watchdog 1,000 ms, minimum gap 1,000 ms | Current install script; the beta-wide decision remains separate |
+
+These are **source-defined / installer-set reference values**, not a measurement of installed effective state. No finished three-firmware beta ZIP is claimed by this README.
+
 ## Compatibility helpers
 
 The prepared directory includes project-owned, reproducibly built QNX ARMv7 helpers rather than depending on a pre-existing M.I.B. `apps/sbin` tree:

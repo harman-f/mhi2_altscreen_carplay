@@ -35,7 +35,11 @@ to `tools/validate_modular_package.py` before any future publication job
 can be enabled. Existing historical releases and tags are not modified.
 
 See [release pipeline design](../tools/release/README.md) for module impact
-rules, source-build boundaries and the QNX-script inventory gates.
+rules, source-build boundaries and the QNX-script inventory gates. The
+[digest-pinned QNX toolchain image contract](../docs/build/QNX_TOOLCHAIN_IMAGE.md)
+describes the existing archived compiler environment and the **not yet
+implemented** CI/release-lineage transition away from rebuilding GCC on
+each job; it does not change or requalify this pinned developer prerelease.
 
 ## Validated reference target
 

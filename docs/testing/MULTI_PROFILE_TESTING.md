@@ -1,4 +1,4 @@
-**Beta policy (2026-11-03):** All three profiles are part of the same normal beta installer and release; no special SEAT vehicle approval is required before including software in beta tests. Final combined system/vehicle testing remains open. Existing software/static tests are the current baseline. Missing exact MU1409 identity and genuine compiled Java adapters remain concrete build/installer inputs, not a reason to exclude SEAT from the release graph.
+**Beta policy (2026-11-03):** All three profiles are part of the same normal beta installer and release; no special SEAT vehicle approval is required before including software in beta tests. Final combined system/vehicle testing remains open. Existing software/static tests are the current baseline. Exact original LSD JXE SHA-256 selectors are now declared for all three beta profiles, including MU1409. This is firmware identity evidence, not installed-binary or vehicle compatibility proof; target-specific Java adapters and final install validation remain open.
 
 # Multi-profile research and tester reports
 

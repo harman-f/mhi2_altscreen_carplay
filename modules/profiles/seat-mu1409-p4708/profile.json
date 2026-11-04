@@ -10,7 +10,7 @@
   "selector": {
     "source": "/ifs/lsd.jxe",
     "algorithm": "sha256",
-    "digest": null
+    "digest": "25b9f1285445de0193c1d869a734230d7db95363957603598a6ede09af904403"
   },
   "common_modules": [
     "carplay",

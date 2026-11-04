@@ -40,6 +40,40 @@ jobs:
           set -euxo pipefail
           python3 tools/release/plan_multi_profile_beta.py --self-test --json-out "$RUNNER_TEMP/beta-profiles.json"
 
+      - name: Source-defined configuration and unit storage inventory
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 tools/release/source_defaults_inventory.py --self-test --json-out "$RUNNER_TEMP/source-defaults-inventory.json"
+          python3 tools/release/storage_migration_review.py --self-test --json-out "$RUNNER_TEMP/storage-migration-review.json"
+          python3 tools/release/storage_path_triage.py --self-test --review-json "$RUNNER_TEMP/storage-migration-review.json" --json-out "$RUNNER_TEMP/storage-path-triage.json"
+          python3 tools/release/storage_consumer_crosscheck.py --self-test --json-out "$RUNNER_TEMP/storage-consumer-crosscheck.json"
+          python3 tools/release/legacy_marker_contract.py --self-test --json-out "$RUNNER_TEMP/legacy-marker-contract.json"
+          python3 tools/release/storage_access_graph.py --self-test --json-out "$RUNNER_TEMP/storage-access-graph.json"
+          python3 tools/release/legacy_navigation_storage_contract.py --self-test --json-out "$RUNNER_TEMP/legacy-nav-storage.json"
+          python3 tools/release/broker_menu_storage_format.py --self-test --json-out "$RUNNER_TEMP/broker-menu-storage-format.json"
+          python3 tools/release/storage_destination_plan.py --self-test --json-out "$RUNNER_TEMP/storage-destination-plan.json"
+          python3 -I -B tools/release/storage_destination_plan.py --self-test
+          python3 -B -m unittest discover -s tests/deployment -p 'test_*.py' -v
+          python3 -I -B tools/release/check_executable_modes.py --self-test
+
+      - name: Upload source-defined inventory (host evidence only)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: source-defaults-unit-path-inventory
+          path: |
+            ${{ runner.temp }}/source-defaults-inventory.json
+            ${{ runner.temp }}/storage-migration-review.json
+            ${{ runner.temp }}/storage-path-triage.json
+            ${{ runner.temp }}/storage-consumer-crosscheck.json
+            ${{ runner.temp }}/legacy-marker-contract.json
+            ${{ runner.temp }}/storage-access-graph.json
+            ${{ runner.temp }}/legacy-nav-storage.json
+            ${{ runner.temp }}/broker-menu-storage-format.json
+            ${{ runner.temp }}/storage-destination-plan.json
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Modular distribution contract regression gate
         shell: bash
         run: |
@@ -235,7 +269,7 @@ jobs:
           grep -Fq 'JAVA_USER_DECISION=ARCHIVE_AND_CONTINUE' deployment/mu1440/install.sh
           grep -Fq 'JAVA_USER_DECISION=ABORT' deployment/mu1440/install.sh
           grep -Fq 'Bundled exact NavIgnore payload verified before Java normalization.' deployment/mu1440/install.sh
-          grep -Fq 'TMP=/tmp/lsd.sh.mibr-deploy-normalize.$' deployment/mu1440/install.sh
+          grep -Fq 'TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-deploy-normalize.$$' deployment/mu1440/install.sh
           grep -Fq 'VIN, FAZIT and device serial numbers are intentionally not collected.' runtime/deployment/session.sh
           grep -Fq 'mode=READ_ONLY_TARGET' deployment/mu1440/compatibility-report.sh
           grep -Fq 'writes=deployment_media_only' deployment/mu1440/compatibility-report.sh

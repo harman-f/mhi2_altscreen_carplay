@@ -31,8 +31,8 @@ def validate_profile(pid, doc, root=ROOT):
     check(selector.get("source") == "/ifs/lsd.jxe" and selector.get("algorithm") == "sha256",
           "original LSD SHA-256 required")
     digest = selector.get("digest")
-    check(digest is None or (isinstance(digest, str) and SHA.fullmatch(digest) is not None),
-          "invalid fingerprint (never invent a placeholder)")
+    check(isinstance(digest, str) and SHA.fullmatch(digest) is not None,
+          "invalid fingerprint or missing mandatory beta fingerprint")
     java = doc.get("java", {})
     check(java.get("shared_source") == "modules/menu/source", "shared Java source duplicated")
     check(java.get("firmware_specific_updates_supported") is True, "Java adapter must remain replaceable")
@@ -93,8 +93,8 @@ def self_test():
     plan = build_plan()
     assert not plan["errors"], plan["errors"]
     assert plan["all_three_in_standard_beta_package"] and plan["release_channel"] == "beta"
-    # An exact MU1409 hash may be added without changing this test or the release design.
-    assert set(plan["missing_exact_firmware_hashes"]) <= {"seat-mu1409-p4708"}
+    # All three mandatory beta profiles now have exact original LSD fingerprints.
+    assert not plan["missing_exact_firmware_hashes"], "unresolved mandatory firmware selector"
     skoda = json.loads((ROOT / "modules/profiles/skoda-mu1440-p4526/profile.json").read_text())
     for field, val, error in (("release_channel", "stable", "beta release"),
                                ("release_inclusion", "optional", "exclude profile")):
@@ -104,6 +104,8 @@ def self_test():
     bad = copy.deepcopy(skoda)
     bad["selector"]["digest"] = "not-a-hash"
     assert any("invalid fingerprint" in x for x in validate_profile(skoda["profile_id"], bad))
+    bad["selector"]["digest"] = None
+    assert any("missing mandatory beta fingerprint" in x for x in validate_profile(skoda["profile_id"], bad))
     bad = copy.deepcopy(skoda)
     bad["java"]["shared_source"] = "modules/profiles/skoda-mu1440-p4526/hmi"
     assert any("duplicated" in x for x in validate_profile(skoda["profile_id"], bad))

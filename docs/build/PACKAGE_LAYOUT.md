@@ -25,7 +25,11 @@ package/
   source/
     hmi/                      Java HMI source, present once
     SOURCE_MANIFEST.json      independent source inventory and hashes
-  docs/                      build, use, and support documentation
+  INSTALLATION-README.md     concise defaults, selected profile, install/recovery instructions
+  docs/
+    configuration/DEFAULT_CONFIGURATION_MATRIX.md
+                              complete audited settings/defaults matrix
+    ...                       build, use, and support documentation
   package.json               runtime package manifest
   PACKAGE.sha256             runtime package hashes
 ```
@@ -33,6 +37,8 @@ package/
 There is one `profiles/` directory. Shared implementations have one canonical owner under `common/`; profile directories hold target-specific HMI, icons, display, input, and integration data or outputs. Runtime binaries live in each `common/<module>/bin/`, with module scripts and configuration under `scripts/` and `config/`. The deployed standard menu is `common/menu/config/mibr-menu.conf`, its loader is under `common/menu/scripts/`, and support JARs are under `common/menu/bin/`. The menu editor exists once under `tools/menu-editor/`, and Java HMI source exists once under `source/hmi/`. Skoda-specific icons live in the Skoda profile; `common/menu/icons/` holds brand-neutral scrollbar assets only. A profile may contain a compiled target artifact when requirements produce distinct outputs, tied to its shared source and build recipe. Album-art handling is not included in this package layout.
 
 Profile values describe differences that the implementation actually supports. A declarative mapping does not make hard-coded binary behavior configurable. Unsupported variation requires a profile-specific integration or build and must not be represented as a fictional runtime setting.
+
+The beta ZIP **must** ship `INSTALLATION-README.md` at its root and `docs/configuration/DEFAULT_CONFIGURATION_MATRIX.md`. The README must summarize the *effective packaged default* for CarPlay video, phone-route arrows, arrow source/placement, view/presentation, navigation composition, Auto-Direct, D2, diagnostics, and menu brand, including any per-firmware overrides or an explicit `not yet implemented` status. The full matrix inventories all 48 CarPlay registry settings, all 13 durable broker switches and menu-only entries. Release validation must compare these claims against the **actual staged** menu/config/installer artifacts and reject mismatches. Descriptions of defaults are not proof of an active unit state or completed vehicle tests. The current `release-mu1440-aid10.yml` ZIP is a CI-internal legacy compatibility audit, not a completed modular beta ZIP.
 
 Runtime and source contents ship in the same ZIP and have separate manifests. The runtime manifest lists the exact runtime files and hashes. `source/SOURCE_MANIFEST.json` independently lists and hashes source files; it is included in the ZIP, not a pointer to a separate mandatory download. The source inventory identifies project-owned inputs, documents excluded OEM, operating-system, JDK, or other third-party dependencies, and states source and build coverage gaps. Partial source coverage must not be described as full reproducibility.
 

@@ -246,8 +246,12 @@ final class MibrMenuLayout {
     static synchronized MibrMenuLayout current(){
         File f=new File(storedPath);
         long stamp=f.exists()?f.lastModified():-1L,length=f.length();
-        if(current!=null&&stamp==currentStamp&&length==currentLength)return current;
-        currentStamp=stamp;currentLength=length;
+        long age=System.currentTimeMillis()-stamp;
+        /* Only a recent past mtime is racy; a unit clock behind the file time keeps the old cache rule. */
+        boolean racy=stamp!=-1L&&age>=0L&&age<2000L;
+        if(!racy&&current!=null&&stamp==currentStamp&&length==currentLength)return current;
+        /* Parsed while racy: do not trust this entry once the window has passed (-2 never matches). */
+        currentStamp=racy?-2L:stamp;currentLength=length;
         problem=null;
         if(stamp==-1L){current=basic();return current;}
         try{
