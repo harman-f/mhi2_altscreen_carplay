@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "profile": "seat-mu1447-p4709",
+  "firmware": "MHI2_ER_SEG11_P4709_MU1447",
+  "original_lsd_jxe_sha256": "945586fbede2fe53b5b41d7c10490641ff71fcc9581fb237cf40328f450cb22e",
+  "target_cluster": "SEAT G11 790",
+  "source_branch": "feature/media-phone-staging-20261104",
+  "media": {
+    "status": "pending-exact-abi",
+    "auto_install": false,
+    "compiled_artifact": null,
+    "common_model": "modules/media/source/mibr_media_state.c",
+    "reference_only": "modules/media/reference/omonob",
+    "exact_api_checks": [
+      "Confirm stock iAP2/NowPlaying source and Transfer-ID semantics on this exact firmware",
+      "Identify real libiap2client.so.1 symbols, ABI and image retrieval method; do not guess from MU number",
+      "Verify HMI J9/ASL threading and media/BAP picture-manager class signatures against exact original lsd.jxe",
+      "Preserve every original radio/BT/USB picture provider; no global provider replacement",
+      "Compile separate target Java adapter from provenance-cleared sources, retain original classpath and rollback"
+    ],
+    "requires_original_firmware": true,
+    "no_mm_ipod_wrapper": true,
+    "no_dio_manager_wrapper": true,
+    "known_reference": "omonob MU1447 information build is a source clue only; not exact release baseline"
+  },
+  "phone": {
+    "status": "pending-exact-abi",
+    "auto_install": false,
+    "compiled_artifact": null,
+    "common_model": "modules/phone/source/mibr_phone_state.c",
+    "reference_only": "modules/phone/reference/k3346",
+    "exact_api_checks": [
+      "Confirm original CarPlay call-state source/PPS keys and corresponding iAP2 capabilities for this firmware",
+      "Trace factory HU to Kombi Phone BAP service, registration and lifetime without replacing it",
+      "Check cluster module 17 phone view and installed phone profile support; Audi BAP APIs cannot be assumed",
+      "Only delegate accept/hangup with explicit CarPlay ownership, current session and same call ID",
+      "Restore stock HFP and OEM phone input 1:1 when not CarPlay-owned; verify MFW and call controls",
+      "Build target-specific Java/J9 adapter with matching OEM SDK and reversible classpath changes"
+    ],
+    "requires_original_firmware": true,
+    "no_tel_key_redirection": true,
+    "no_hfp_disable": true,
+    "known_reference": "Audi AU37x / K3346 / MHI2Q only; not confirmed on this profile"
+  },
+  "notes": "P4709 JXE differs from P4708; SEAT render geometry requires own calibration"
+}
