@@ -80,6 +80,7 @@ vehicle acceptance. No automatic release publication is enabled.
 python3 tools/release/module_plan.py --self-test
 python3 tools/release/module_plan.py --all
 python3 tools/release/qnx_scripts.py --self-test --canonical
+python3 tools/release/build_mu1440_modular.py --self-test
 python3 tools/release/audit_legacy.py --self-test
 python3 -I -B tools/release/check_executable_modes.py --self-test
 tools/prepare_mu1440_sd.sh /tmp/mu1440-legacy-audit

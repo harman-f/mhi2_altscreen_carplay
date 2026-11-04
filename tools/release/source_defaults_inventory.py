@@ -40,7 +40,8 @@ SELF_AUDIT_TOOLS = {"tools/release/storage_migration_review.py",
                     "tools/release/storage_access_graph.py",
                     "tools/release/legacy_navigation_storage_contract.py",
                     "tools/release/broker_menu_storage_format.py",
-                    "tools/release/storage_destination_plan.py"}
+                    "tools/release/storage_destination_plan.py",
+                    "tools/release/build_mu1440_modular.py"}
 
 
 class InventoryError(ValueError):

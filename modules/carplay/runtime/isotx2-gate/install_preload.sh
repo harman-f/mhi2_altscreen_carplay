@@ -23,8 +23,12 @@ KSHLOG=/tmp/startup.sh.mibr-isotx2-ksh.$$
 EXPECTED_STOCK=869a64efbb3c0423951c2c31899743f4c635871b8c81236a459df36ee41793b8
 EXPECTED_SIZE=33908
 EXPECTED_LIB=05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957
+# SHA-256 of the exact guard:gate startup.sh produced from EXPECTED_STOCK by
+# the "guardgate" block variant (guard library preloaded before the gate).
+EXPECTED_GUARDGATE=1ef33f6fa14dd2f19b23dfd6249c07b4ae478c3f73d3f0151639ace5f22fcd22
 
 STOCK_LINE='    MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
+GUARD_GATE_LINE='        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_guard.so:/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
 GATE_LINE='        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &'
 DISABLE_IF='    if [ -f /mnt/app/root/mibr-isotx2-gate-disable ] || [ ! -r /mnt/app/eso/lib/libmibr_isotx2_gate.so ]; then'
 LEGACY_SD_IF='    if [ -f /fs/sda0/mibr-enable-isotx2-gate ] && [ -r /mnt/app/eso/lib/libmibr_isotx2_gate.so ]; then'
@@ -86,17 +90,57 @@ make_legacy_block()
 MIBR_EOF
 }
 
+make_guardgate_block()
+{
+    cat > "$BLOCK" <<'MIBR_EOF'
+    # MIBR ISOTX2 GATE BEGIN
+    # Preload is enabled by default. A persistent disable marker or a missing
+    # gate library forces the exact stock DisplayManager command.
+    if [ -f /mnt/app/root/mibr-isotx2-gate-disable ] || [ ! -r /mnt/app/eso/lib/libmibr_isotx2_gate.so ]; then
+    MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &
+    else
+        LD_PRELOAD=/mnt/app/eso/lib/libmibr_isotx2_guard.so:/mnt/app/eso/lib/libmibr_isotx2_gate.so MALLOC_ARENA_CACHE_MAXSZ=400000 on -p 15 /eso/bin/apps/displaymanager ${DM_EXTRA_OPTS} ${LVDS2} &
+    fi
+    # MIBR ISOTX2 GATE END
+MIBR_EOF
+}
+
+# Byte-exact reverse: replace the single marked block by the stock line.
+# Fails (exit 42) unless exactly one BEGIN/END pair is present and the stock
+# line is not already present outside the block.
+revert_to_stock()
+{
+    IN="$1"
+    OUT="$2"
+
+    awk -v stock="$STOCK_LINE" -v b="$BEGIN_LINE" -v e="$END_LINE" '
+    BEGIN { inb=0; nb=0; ne=0; ns=0 }
+    {
+        if (inb) {
+            if ($0 == e) { inb=0; ne++ }
+            next
+        }
+        if ($0 == b) { inb=1; nb++; print stock; next }
+        if ($0 == stock) ns++
+        print
+    }
+    END {
+        if (inb || nb != 1 || ne != 1 || ns != 0) exit 42
+    }
+    ' "$IN" > "$OUT"
+}
+
 generate_from_stock()
 {
     IN="$1"
     OUT="$2"
     MODE="$3"
 
-    if [ "$MODE" = "legacy" ]; then
-        make_legacy_block || return 1
-    else
-        make_block || return 1
-    fi
+    case "$MODE" in
+        legacy) make_legacy_block || return 1 ;;
+        guardgate) make_guardgate_block || return 1 ;;
+        *) make_block || return 1 ;;
+    esac
 
     awk -v stock="$STOCK_LINE" -v block="$BLOCK" '
     BEGIN {
@@ -205,6 +249,16 @@ classify_current()
         return 0
     fi
 
+    generate_from_stock "$BACKUP" "$CHECKTMP" guardgate || {
+        echo "UNKNOWN"
+        return 0
+    }
+    GH=$(hashf "$CHECKTMP")
+    if [ "$TH" = "$GH" ] && [ "$GH" = "$EXPECTED_GUARDGATE" ]; then
+        echo "GUARD_GATE"
+        return 0
+    fi
+
     echo "UNKNOWN"
 }
 
@@ -252,7 +306,7 @@ preflight()
             [ "$SC" = "1" ] || { echo "FAIL expected exactly one stock DisplayManager line"; return 29; }
             SOURCE="$TARGET"
             ;;
-        LEGACY_SD|NEW)
+        LEGACY_SD|NEW|GUARD_GATE)
             [ -r "$BACKUP" ] || { echo "FAIL exact stock backup missing"; return 30; }
             BH=$(hashf "$BACKUP")
             [ "$BH" = "$EXPECTED_STOCK" ] || { echo "FAIL stock backup hash mismatch: $BH"; return 31; }
@@ -277,10 +331,49 @@ preflight()
         STOCK) echo "INSTALL_STATE=STOCK_READY" ;;
         LEGACY_SD) echo "INSTALL_STATE=LEGACY_SD_PATCH_READY_FOR_MIGRATION" ;;
         NEW) echo "INSTALL_STATE=NEW_PATCH_READY" ;;
+        GUARD_GATE) echo "INSTALL_STATE=GUARD_GATE_PATCH_PRESENT" ;;
     esac
 
     return 0
 }
+
+# Pure startup.sh transforms (no unit checks, no writes outside the output
+# file). Used by the package installer and by host tests.
+#   --emit-guard-gate <stock-in> <out>   stock -> guard:gate block variant
+#   --emit-stock <patched-in> <out>      any marked variant -> stock (byte-exact)
+# A result is only pinned when the input is the pinned stock; then the
+# output must equal EXPECTED_GUARDGATE (exit 70 otherwise).
+case "${1:-}" in
+    --emit-guard-gate)
+        [ $# -eq 3 ] && [ -r "$2" ] || { echo "Usage: $0 --emit-guard-gate <stock-in> <out>"; exit 2; }
+        [ -x "$HASH" ] || { echo "FAIL missing executable hash helper: $HASH"; exit 20; }
+        [ "$(count_exact "$2" "$BEGIN_LINE")" = "0" ] || { echo "FAIL input already carries a MIBR ISOTX2 GATE marker"; exit 41; }
+        generate_from_stock "$2" "$3" guardgate || { echo "FAIL patch generation"; exit 40; }
+        RH=$(hashf "$3")
+        echo "result_sha256=$RH"
+        if [ "$(hashf "$2")" = "$EXPECTED_STOCK" ]; then
+            [ "$RH" = "$EXPECTED_GUARDGATE" ] || { echo "FAIL pinned guard:gate hash mismatch"; exit 70; }
+            echo "pinned_match=yes"
+        else
+            echo "pinned_match=n/a"
+        fi
+        exit 0
+        ;;
+    --emit-stock)
+        [ $# -eq 3 ] && [ -r "$2" ] || { echo "Usage: $0 --emit-stock <patched-in> <out>"; exit 2; }
+        [ -x "$HASH" ] || { echo "FAIL missing executable hash helper: $HASH"; exit 20; }
+        revert_to_stock "$2" "$3" || { echo "FAIL revert: need exactly one marker pair and no stock line outside it"; exit 42; }
+        RH=$(hashf "$3")
+        echo "result_sha256=$RH"
+        if [ "$(hashf "$2")" = "$EXPECTED_GUARDGATE" ]; then
+            [ "$RH" = "$EXPECTED_STOCK" ] || { echo "FAIL pinned stock hash mismatch"; exit 71; }
+            echo "pinned_match=yes"
+        else
+            echo "pinned_match=n/a"
+        fi
+        exit 0
+        ;;
+esac
 
 echo "=== MU1440 isoTX2 DisplayManager preload installer ==="
 echo "target=$TARGET"
@@ -315,6 +408,10 @@ STATE=$(classify_current "$TH")
 case "$STATE" in
     STOCK) SOURCE="$TARGET" ;;
     LEGACY_SD|NEW) SOURCE="$BACKUP" ;;
+    GUARD_GATE)
+        echo "FAIL guard:gate startup is present; refusing to downgrade to gate-only preload"
+        exit 35
+        ;;
     *) echo "FAIL refusing --apply from unrecognized startup state"; exit 34 ;;
 esac
 
