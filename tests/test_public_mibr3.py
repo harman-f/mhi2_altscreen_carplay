@@ -10,6 +10,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "experimental" / "mibr3"
 NATIVE = ROOT / "modules" / "broker" / "source" / "mibr-control"
+INCLUDE_DIRS = (
+    ROOT / "modules" / "carplay" / "source" / "altscreen111-gen2" / "include",
+    ROOT / "modules" / "carplay" / "source" / "alt111-settings" / "include",
+    ROOT / "modules" / "carplay" / "source" / "display-scaling",
+)
 CC = os.environ.get("CC", "cc")
 sys.path.insert(0, str(SRC))
 import api_v3_contract as api
@@ -42,15 +47,18 @@ class PublicProtocolTests(unittest.TestCase):
 
     def test_native_mailbox_and_owner_lifecycle_probes(self):
         with tempfile.TemporaryDirectory(prefix="mibr3-public-") as d:
+            includes = [f"-I{path}" for path in INCLUDE_DIRS]
             exe = str(Path(d) / "mailbox-probe")
-            subprocess.run([CC, "-std=c99", "-Wall", "-Wextra", "-Werror", "-O2",
+            subprocess.run([CC, "-std=gnu99", "-Wall", "-Wextra", "-Werror", "-O2",
+                            *includes,
                             str(NATIVE / "mibr_v3_parity_mailbox.c"),
                             str(NATIVE / "mibr_v3_parity_mailbox_probe.c"), "-o", exe],
                            check=True)
             output = subprocess.run([exe], check=True, capture_output=True, text=True)
             self.assertIn("PARITY_MAILBOX_ONE_COMMAND_AT_A_TIME_HOST_PASS", output.stdout)
             owner = str(Path(d) / "owner-probe")
-            subprocess.run([CC, "-std=c99", "-Wall", "-Wextra", "-Werror", "-O2",
+            subprocess.run([CC, "-std=gnu99", "-Wall", "-Wextra", "-Werror", "-O2",
+                            *includes,
                             str(NATIVE / "mibr_v3_owner_lifecycle.c"),
                             str(NATIVE / "mibr_v3_owner_lifecycle_probe.c"), "-o", owner],
                            check=True)
