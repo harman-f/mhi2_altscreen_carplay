@@ -42,5 +42,4 @@ Upstream:
 
 Do not claim `kamgurgul` is a verbatim repository fork: the GitHub
 repository is independent, but its VehicleDataModule source explicitly
-credits LuKa. Per-file git-blob comparison or history is needed to establish
-whether it is identical at any particular commit. Keep attribution.
+credits LuKa. **Exact blob comparison completed:** LuKa\'s `VehicleDataModule.java` at `df73e061a29c4d996550716987f42a9243daa09a` and kamgurgul\'s at `5c460600c9205cdafa2c4fecd7e2210b8606aedb` have the **identical Git blob** `2527ce6e166aacba4ea13f31497705d1cbeede32` (353 lines). That confirms byte-identical file content at these revisions, not that either entire repository was forked. Preserve LuKa attribution.
