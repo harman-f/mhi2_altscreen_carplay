@@ -6,6 +6,19 @@ The canonical source of truth for build ownership is
 uses this structure for **pre-publication readiness**, not as a vehicle-ready
 multi-profile release generator.
 
+## Canonical QNX compiler image (future release build gate)
+
+The archived GCC 4.9 / QNX 6.5 ARMv7 compiler image, its immutable GHCR
+digest, current public-CI rebuild behavior, and required verification before
+migration are specified in [the QNX toolchain image contract](../../docs/build/QNX_TOOLCHAIN_IMAGE.md).
+Current release readiness uses pinned existing binaries and **does not**
+replace or requalify them with freshly compiled artifacts.
+
+A future multi-profile packager must consume **verified native build lineage**
+(including the *actual* compiler image digest and output SHA-256), rather than
+silently rebuilding GCC in a packaging job or treating source-build PASS as
+vehicle acceptance. No automatic release publication is enabled.
+
 ## Mandatory three-profile beta release inputs
 
 `python3 tools/release/plan_multi_profile_beta.py --self-test --json-out beta-profile-plan.json` emits the *same* common beta inclusion for Škoda MU1440 and both SEAT firmware families. Java adapters are per-firmware repairable; code and registry remain shared. This is a real CI input for the future R3 packager, not yet an executable installation ZIP. Final vehicle acceptance is common beta testing, not an exclusion gate. The three original LSD JXE SHA-256 profile selectors are now present in source. Exact compiled ABI-specific Java, target integration and package/vehicle qualification are still required for the final installer; never manufacture substitutes.
