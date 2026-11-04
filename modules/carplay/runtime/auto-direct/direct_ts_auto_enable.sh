@@ -5,6 +5,10 @@ runtime_init_durable || { echo "AUTO_DIRECT_ENABLE=FAIL_RUNTIME"; exit 3; }
 
 DSTBASE=/mnt/app/root/altscreen-u2
 ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
+PARITY_ENABLED=/mnt/app/root/mibr-parity-drive.enabled
+PARITY_LOCK=/tmp/mibr-parity-session.lock
+PARITY_SUP_PID=/tmp/mibr-parity-drive-supervisor.pid
+PARITY_RUNNER=/mnt/app/root/altscreen-u2/bin/parity-session
 LSD=/mnt/app/eso/hmi/lsd/lsd.sh
 # Stage in the lsd.sh directory itself, not in /tmp (RAM): the final mv is
 # then a same-filesystem rename whatever the mount layout under /mnt/app is.
@@ -49,6 +53,33 @@ fail(){
 
 mount -uw /mnt/app 2>/dev/null || fail 23 "app_rw"
 APP_RW=1
+
+# Last explicitly enabled mode wins. An installer upgrade that deliberately
+# preserves Auto-Direct=off must NOT disturb a selected Parity mode.
+# A running Parity owner is not stopped by removing its persistent marker
+# alone: request its token-bound native stop, then wait for lock + supervisor
+# teardown. Do not start a competing Auto-Direct owner without that evidence.
+if [ "${MIBR_KEEP_MARKER_STATE:-0}" != "1" ] || [ -e "$ENABLED" ]; then
+  if [ -e "$PARITY_ENABLED" ] || [ -e "$PARITY_LOCK" ] || [ -e "$PARITY_SUP_PID" ]; then
+    # In an already inconsistent dual-enabled state, fail closed from now on.
+    rm -f "$ENABLED" 2>/dev/null || fail 35 "autodirect_marker_clear"
+    [ ! -e "$ENABLED" ] || fail 35 "autodirect_marker_still_present"
+    rm -f "$PARITY_ENABLED" 2>/dev/null || fail 36 "parity_marker_clear"
+    [ ! -e "$PARITY_ENABLED" ] || fail 36 "parity_marker_still_present"
+    if [ -e "$PARITY_LOCK" ]; then
+      [ -x "$PARITY_RUNNER" ] || fail 37 "parity_owner_missing"
+      "$PARITY_RUNNER" --stop || fail 38 "parity_owner_stop_unconfirmed"
+    fi
+    N=0
+    while [ -e "$PARITY_LOCK" ] || [ -e "$PARITY_SUP_PID" ]; do
+      [ "$N" -lt 20 ] || fail 39 "parity_owner_teardown_unconfirmed"
+      sleep 1
+      N=$((N+1))
+    done
+    echo "PARITY_OWNER=QUIESCED"
+  fi
+fi
+
 mkdir -p "$DSTBASE/bin" "$DSTBASE/scripts" "$DSTBASE/config" "$DSTBASE/logs" "$DSTBASE/backup" || fail 24 "dst_create"
 
 if [ "$BASE" != "$DSTBASE" ]; then

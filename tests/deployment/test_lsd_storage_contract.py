@@ -868,13 +868,128 @@ class ParityEnableExec(unittest.TestCase):
         self.assertNotIn("PARITY-DRIVE", self.lsd.read_text())
         self.assertIn("-ur " + str(self.app), self.log.read_text())
 
-    def test_autodirect_enable_after_parity_does_not_disable_parity(self):
-        # Documented behaviour: direct_ts_auto_enable.sh only touches its own marker
-        # and never clears mibr-parity-drive.enabled, so re-enabling Auto-Direct after
-        # parity re-creates the dual-owner state (guard is one-way, parity -> Auto-Direct).
+    def test_autodirect_enable_after_parity_quiesces_before_enabling(self):
         t = ENABLE.read_text()
-        self.assertNotIn("mibr-parity-drive", t)
-        self.assertIn('touch "$ENABLED" || fail 32 "enable_marker"', t)
+        self.assertIn('rm -f "$PARITY_ENABLED" 2>/dev/null || fail 36 "parity_marker_clear"', t)
+        self.assertIn('"$PARITY_RUNNER" --stop || fail 38 "parity_owner_stop_unconfirmed"', t)
+        self.assertIn('fail 39 "parity_owner_teardown_unconfirmed"', t)
+        self.assertLess(t.index('rm -f "$ENABLED"'), t.index('rm -f "$PARITY_ENABLED"'))
+        self.assertLess(t.index('PARITY_OWNER=QUIESCED'), t.index('touch "$ENABLED"'))
+
+
+@unittest.skipUnless(SHELL, "no POSIX shell on host")
+class AutoDirectAfterParityExec(unittest.TestCase):
+    """Execute Auto-Direct prepare on a simulated /mnt/app with an owner fixture."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory(prefix="mibr-ad-parity-")
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        self.app = self.root / "mnt/app"
+        self.base = self.app / "root/altscreen-u2"
+        self.bin = self.base / "bin"
+        self.scripts = self.base / "scripts"
+        self.bin.mkdir(parents=True)
+        self.scripts.mkdir()
+        (self.scripts / "common.sh").write_text(
+            "BASE=%s\nruntime_init_durable(){ return 0; }\n" % self.base
+        )
+        bridge = self.bin / "direct-ts-remux"
+        bridge.write_text("#!/bin/sh\nexit 0\n")
+        bridge.chmod(0o755)
+        self.lsd = self.app / "eso/hmi/lsd/lsd.sh"
+        self.lsd.parent.mkdir(parents=True)
+        self.lsd.write_text("#!/bin/sh\n$J9 start\n")
+        self.ad = self.app / "root/mibr-carplay-autodirect.enabled"
+        self.parity = self.app / "root/mibr-parity-drive.enabled"
+        self.lock = self.root / "tmp/mibr-parity-session.lock"
+        self.pid = self.root / "tmp/mibr-parity-drive-supervisor.pid"
+        self.lock.parent.mkdir()
+        self.runner = self.bin / "parity-session"
+        self.runner.write_text(
+            '#!/bin/sh\n'
+            '[ "$1" = "--stop" ] || exit 4\n'
+            '[ "${STOP_FAIL:-0}" != 1 ] || exit 7\n'
+            '[ "${STOP_LEAVE_LOCK:-0}" = 1 ] || rm -f "$PARITY_LOCK_TEST" "$PARITY_PID_TEST"\n'
+        )
+        self.runner.chmod(0o755)
+        self.tools = self.root / "tools"
+        self.tools.mkdir()
+        self.mount_log = self.root / "mount.log"
+        for name, script in (("mount", FAKE_MOUNT),
+                             ("sync", "#!/bin/sh\nexit 0\n"),
+                             ("sleep", "#!/bin/sh\nexit 0\n")):
+            f = self.tools / name
+            f.write_text(script)
+            f.chmod(0o755)
+
+    def run_enable(self, keep="0", **overrides):
+        script = ENABLE.read_text().replace("/mnt/app", str(self.app))
+        # The live owner lock lives under /tmp, isolate it in this fixture.
+        script = script.replace("/tmp/mibr-parity-session.lock", str(self.lock))
+        script = script.replace("/tmp/mibr-parity-drive-supervisor.pid", str(self.pid))
+        env = dict(os.environ, PATH=str(self.tools) + os.pathsep + os.environ["PATH"],
+                   MOUNT_LOG=str(self.mount_log), MIBR_PREPARE_ONLY="1",
+                   MIBR_KEEP_MARKER_STATE=keep, PARITY_LOCK_TEST=str(self.lock),
+                   PARITY_PID_TEST=str(self.pid))
+        env.update(overrides)
+        return subprocess.run([SHELL, "-c", script], env=env,
+                              capture_output=True, text=True, timeout=20)
+
+    def test_explicit_enable_removes_parity_marker(self):
+        self.parity.write_text("1\n")
+        r = self.run_enable()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(self.parity.exists())
+        self.assertTrue(self.ad.exists())
+        self.assertIn("PARITY_OWNER=QUIESCED", r.stdout)
+
+    def test_active_owner_receives_stop_and_teardown_confirmed(self):
+        self.parity.write_text("1\n")
+        self.lock.write_text("owned")
+        self.pid.write_text("123")
+        r = self.run_enable()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(self.lock.exists())
+        self.assertFalse(self.pid.exists())
+        self.assertFalse(self.parity.exists())
+        self.assertTrue(self.ad.exists())
+
+    def test_stop_failure_fails_closed(self):
+        self.parity.write_text("1\n")
+        self.lock.write_text("owned")
+        r = self.run_enable(STOP_FAIL="1")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("parity_owner_stop_unconfirmed", r.stdout)
+        self.assertFalse(self.parity.exists())
+        self.assertFalse(self.ad.exists())
+        self.assertTrue(self.lock.exists())
+
+    def test_missing_runner_fails_closed(self):
+        self.parity.write_text("1\n")
+        self.lock.write_text("owned")
+        self.runner.unlink()
+        r = self.run_enable()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("parity_owner_missing", r.stdout)
+        self.assertFalse(self.ad.exists())
+
+    def test_unconfirmed_teardown_fails_closed(self):
+        self.parity.write_text("1\n")
+        self.lock.write_text("owned")
+        r = self.run_enable(STOP_LEAVE_LOCK="1")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("parity_owner_teardown_unconfirmed", r.stdout)
+        self.assertFalse(self.ad.exists())
+        self.assertTrue(self.lock.exists())
+
+    def test_preserved_off_does_not_disable_parity(self):
+        self.parity.write_text("1\n")
+        r = self.run_enable(keep="1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue(self.parity.exists())
+        self.assertFalse(self.ad.exists())
+        self.assertNotIn("PARITY_OWNER=QUIESCED", r.stdout)
 
 
 if __name__ == "__main__":
