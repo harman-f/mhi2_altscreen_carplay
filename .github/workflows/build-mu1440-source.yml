@@ -257,8 +257,14 @@ jobs:
             --toolchain-dockerfile-sha256 "$TOOLCHAIN_DOCKERFILE_SHA256" \
             --artifact carplay:libaltscreen111.so=build/mu1440-source/libaltscreen111.so \
             --artifact carplay:alt111-settings=build/mu1440-source/alt111-settings \
+            --artifact carplay:direct-ts-parity=build/mu1440-source/direct-ts-parity \
+            --artifact carplay:libmibr_isotx2_guard.so=build/mu1440-source/libmibr_isotx2_guard.so \
+            --artifact carplay:libmibr_isotx2_gate.so=build/mu1440-source/libmibr_isotx2_gate.so \
+            --artifact carplay:parity-session=build/mu1440-source/parity-session \
             --artifact broker:mibr-v3-service=build/mu1440-source/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY \
             --artifact broker:mibrctl-v3=build/mu1440-source/mibr-control/mibrctl-v3-QNX65-ARMv7-NOT-INSTALL-READY \
+            --artifact broker:mibr-v3-genkey=build/mu1440-source/mibr-control/mibr-v3-genkey-QNX65-ARMv7-NOT-INSTALL-READY \
+            --artifact broker:mibr-key40d=build/mu1440-source/mibr-control/mibr-key40d-QNX65-ARMv7-NOT-INSTALL-READY \
             --out build/mu1440-source/MODULE_BUILD_LINEAGE.json
           python3 tools/emit_module_build_lineage.py \
             --verify build/mu1440-source/MODULE_BUILD_LINEAGE.json
