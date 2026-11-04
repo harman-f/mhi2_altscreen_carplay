@@ -58,7 +58,9 @@ jobs:
           test "$(git hash-object modules/audio/reference/k3346/nvidia_pcm_sink.h)" = 1de977ff93855b00b0ec0192294ad45c048e4b98
           echo P6_UPSTREAM_BLOBS=PASS
       - name: Validate public ownership and release-planner invariants
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
         run: |
-          python3 tools/check_module_index.py --self-test
-          python3 tools/release/module_plan.py --self-test
-          python3 tools/audit_public_repo.py
+          python3 -B tools/check_module_index.py --self-test
+          python3 -B tools/release/module_plan.py --self-test
+          python3 -B tools/audit_public_repo.py
