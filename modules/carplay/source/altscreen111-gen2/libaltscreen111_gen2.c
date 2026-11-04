@@ -1253,8 +1253,40 @@ static void viewareas_defaults(struct mibr_viewareas_config *cfg)
     cfg->view[2].adjacent=0;
 }
 
-/* Safe area chosen in the menu (broker-owned file "...\nrevision=N\nvalue=x,y,w,h\n"). A missing or
- * invalid file leaves the configured area untouched. */
+/* Host tests point these at a temporary directory. */
+#ifndef MIBR_GEN2_SAFE_PATH_FMT
+#define MIBR_GEN2_SAFE_PATH_FMT "/mnt/app/root/altscreen-u2/config/%s.conf"
+#endif
+#ifndef MIBR_GEN2_PLATFORM_DEFAULTS
+#define MIBR_GEN2_PLATFORM_DEFAULTS "/mnt/app/root/altscreen-u2/config/mibr-platform-defaults.conf"
+#endif
+
+/* 1 when a safe.* key of view i comes from a stored layer (persistent or
+ * temp), i.e. a user or migration set it; a platform default must then not
+ * shadow it. */
+static unsigned viewarea_safe_stored(int i)
+{
+    static const char *const field[4]={"x","y","w","h"};
+    struct gen2_settings_scope *scope=settings_scope();
+    const struct alt111_settings *snapshot;
+    char key[40];
+    unsigned stored=0u;
+    int k,id;
+    pthread_mutex_lock(&g_settings_lock);
+    snapshot=scope ? &scope->settings : g_settings_have ? &g_settings_desired : NULL;
+    for(k=0;snapshot&&k<4;++k){
+        snprintf(key,sizeof(key),"viewarea.%d.safe.%s",i,field[k]);
+        id=alt111_setting_find(key);
+        if(id>=0&&snapshot->layer[id]!=ALT111_PROFILE)stored=1u;
+    }
+    pthread_mutex_unlock(&g_settings_lock);
+    return stored;
+}
+
+/* Safe area precedence: the menu choice (broker-owned file
+ * "...\nrevision=N\nvalue=x,y,w,h\n") > a stored registry value > the
+ * platform default > the compiled profile. A present but invalid broker file
+ * leaves the configured area untouched. */
 static void apply_safe_override(struct mibr_viewareas_config *cfg,int i,const char *name)
 {
     char path[128],buf[96];
@@ -1262,7 +1294,7 @@ static void apply_safe_override(struct mibr_viewareas_config *cfg,int i,const ch
     int x,y,w,h,n=-1,fd;
     ssize_t got;
     if(i>=(int)cfg->count)return;
-    snprintf(path,sizeof(path),"/mnt/app/root/altscreen-u2/config/%s.conf",name);
+    snprintf(path,sizeof(path),MIBR_GEN2_SAFE_PATH_FMT,name);
     fd=open(path,O_RDONLY);
     got=fd<0?-1:read(fd,buf,sizeof(buf)-1);
     if(fd>=0)close(fd);
@@ -1271,10 +1303,15 @@ static void apply_safe_override(struct mibr_viewareas_config *cfg,int i,const ch
         v=strstr(buf,"\nvalue=");
         if(!v||sscanf(v+7,"%d,%d,%d,%d\n%n",&x,&y,&w,&h,&n)!=4||n<0||v[7+n])return;
     }else{
-        /* No choice in the menu yet: the platform default, if the file has one. */
+        /* No choice in the menu yet: a stored registry value stays; otherwise
+         * the platform default, if the file has one. */
         static char plat[1024];
         char key[32];
-        fd=open("/mnt/app/root/altscreen-u2/config/mibr-platform-defaults.conf",O_RDONLY);
+        if(viewarea_safe_stored(i)){
+            logf_u2("GEN2 ViewArea safe area=%d stored value kept; platform default not applied",i);
+            return;
+        }
+        fd=open(MIBR_GEN2_PLATFORM_DEFAULTS,O_RDONLY);
         if(fd<0)return;
         got=read(fd,plat,sizeof(plat)-1);
         close(fd);
