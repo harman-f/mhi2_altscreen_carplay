@@ -10,7 +10,7 @@ The project has an existing, prebuilt GCC 4.9 / QNX 6.5 / ARMv7 Docker image arc
 sha256:19b5fb1d4559264a844080b6e381837655d4dcca50151cce3ff0ac509e4f3393
 ```
 
-The original archive belongs to the separate development build infrastructure. The public project must first establish and verify an approved, accessible registry reference before CI can switch to it. Do not guess a registry path, treat this digest alone as a pullable image reference, or assume a mirrored image necessarily retains the same manifest digest. Use a fully qualified `registry/image@sha256:<verified-manifest>` value for actual builds; keep internal registry ownership details outside this public repository.
+The original image belongs to the separate historical Research build infrastructure. Its digest is retained for provenance, **not** used by the current public CI. The public, project-owned GHCR image and its verified registry digest are defined in the section below and the committed `tools/qnx65-image.lock`; the two images are not assumed byte-identical.
 
 Known build-source provenance for that archived image:
 

@@ -14,9 +14,9 @@ Do **not** commit a Docker `.tar` archive or expanded toolchain into Git.
 - Target: QNX 6.5 / ARMv7 / GCC 4.9.4, container platform `linux/amd64`.
 - Immutable provenance: the **registry-generated** `sha256:` digest recorded in the
   successful Actions run's `registry-ref.txt` and `archive-provenance.json`.
-- No container image has been proved published by merely adding the workflow.
-  The first eligible `main` push or an explicit workflow dispatch must complete
-  successfully before the GHCR reference can be used.
+- **Published and verified:** [archive run 41805123089](https://github.com/harman-f/mhi2_altscreen_carplay/actions/runs/41805123089)
+  completed successfully; exact immutable registry identity:
+  `ghcr.io/harman-f/mhi2-qnx65-armv7@sha256:20d7d2bb16d6718d204afc7714b0e73227651935a9981a8bd2e2087cef48dd0d`. See `tools/qnx65-image.lock` for the current public build pin.
 
 The previously archived Research-side image is a **different package with
 a recorded historic digest**. The new package is rebuilt independently from
@@ -26,10 +26,10 @@ recipe may differ. Treat output equivalence as **unproven** until validated.
 
 ## Publishing procedure
 
-1. Merge the archive workflow only after publication/security checks pass.
-   A new run starts automatically when the workflow first lands on `main`.
-   Repeat deliberately with GitHub Actions → *Archive QNX 6.5 ARMv7 toolchain
-   in harman-f GHCR* → *Run workflow*.
+1. The one-time publisher is already on `main` and its initial image build passed.
+   Re-run the archive workflow **only** to intentionally create a new image
+   identity; do not overwrite an existing version pin as part of ordinary
+   native source CI.
 2. The job constructs the toolchain once, checks GCC 4.9.4, qcc, ARM ELF and
    `linux/amd64`, attaches the public source-label, logs in using
    `GITHUB_TOKEN` with `packages: write` and pushes to **its own** namespace.
@@ -39,13 +39,17 @@ recipe may differ. Treat output equivalence as **unproven** until validated.
    repository's Actions. If the package must be publicly pullable, change its
    visibility to public using an authorized account; publishing from a public
    GitHub repository does not guarantee public package visibility.
-5. In the repository's **Settings → Secrets and variables → Actions → Variables**,
-   set `QNX65_VERIFIED_IMAGE` to the verified **harman-f GHCR digest-qualified
-   reference**, not an alias tag. A normal repository variable is sufficient for
-   an image name; do not store tokens in plaintext or commit registry credentials.
-6. Run the native-build PR and compare ARM ELF headers, dynamic symbols, tests
-   and binary hashes to the previous baseline. Only then disable the explicit
-   legacy compiler-rebuild transition toggle.
+5. The public `tools/qnx65-image.lock` is the **single checked-in source
+   of truth** for the exact `ghcr.io/harman-f/...@sha256:...` reference.
+   Updating it requires a reviewed source commit. No Actions image variable,
+   mutable Docker tag, private Research registry or plaintext token is needed.
+   The five native workflows request `packages: read` and use the owning
+   repository's scoped `GITHUB_TOKEN` to pull the package.
+6. [CI migration PR #126](https://github.com/harman-f/mhi2_altscreen_carplay/pull/126)
+   has been merged after all six source/audit/build checks passed using this
+   pinned image, without a legacy GCC rebuild. Future updates must repeat
+   compiler, QNX ARM ELF, symbol, artifact SHA and source/receipt review;
+   a successful compiler build is still not vehicle acceptance.
 
 If the package push or cross-compilation fails, do **not** silently repoint
 CI to a Research package, use a `:latest` alias, or publish a new application
