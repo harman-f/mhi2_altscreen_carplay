@@ -7,15 +7,20 @@ on:
       - '.github/workflows/build-direct-ts-remux.yml'
       - 'modules/carplay/source/direct-ts-remux/**'
       - 'tools/build_direct_ts_remux.sh'
+      - 'tools/ci_qnx65_image.sh'
+      - 'tools/qnx65-image.lock'
   push:
     branches: [ main ]
     paths:
       - '.github/workflows/build-direct-ts-remux.yml'
       - 'modules/carplay/source/direct-ts-remux/**'
       - 'tools/build_direct_ts_remux.sh'
+      - 'tools/ci_qnx65_image.sh'
+      - 'tools/qnx65-image.lock'
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: public-direct-ts-remux-${{ github.event.pull_request.number || github.ref }}
@@ -41,37 +46,13 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Build pinned QNX 6.5 ARMv7 toolchain image
+      - name: Select verified QNX 6.5 ARMv7 image
         shell: bash
+        env:
+          QNX65_GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euxo pipefail
-          git clone "$TOOLCHAIN_REPO" "$RUNNER_TEMP/qnx-toolchain"
-          git -C "$RUNNER_TEMP/qnx-toolchain" checkout "$TOOLCHAIN_COMMIT"
-          test "$(sha256sum "$RUNNER_TEMP/qnx-toolchain/Dockerfile" | awk '{print $1}')" = "$TOOLCHAIN_DOCKERFILE_SHA256"
-
-          # Debian 11 bullseye-security reached EOL on 2026-08-31 and its
-          # live repository is currently inconsistent. Patch only the bootstrap
-          # APT source to a complete final snapshot; toolchain source remains pinned.
-          python3 - "$RUNNER_TEMP/qnx-toolchain/Dockerfile" <<'PY'
-          from pathlib import Path
-          import sys
-          p=Path(sys.argv[1])
-          s=p.read_text()
-          needle="RUN dpkg --add-architecture i386 && apt-get update && \\\n"
-          replacement=(
-              "RUN sed -i 's#http://deb.debian.org/debian-security#"
-              "http://snapshot.debian.org/archive/debian-security/20260903T220410Z#g' "
-              "/etc/apt/sources.list && \\\n"
-              "    echo 'Acquire::Check-Valid-Until \"false\";' "
-              "> /etc/apt/apt.conf.d/99snapshot && \\\n"
-              "    dpkg --add-architecture i386 && apt-get update && \\\n"
-          )
-          if needle not in s:
-              raise SystemExit("qnx-sdp apt bootstrap anchor not found")
-          p.write_text(s.replace(needle,replacement,1))
-          PY
-          docker buildx build --platform=linux/amd64             --target base-env             --build-arg BASE=base-4.9             --cache-from type=gha             --cache-to type=gha,mode=max             --load             -t "$IMAGE"             "$RUNNER_TEMP/qnx-toolchain"
-
+          set -euo pipefail
+          bash tools/ci_qnx65_image.sh
       - name: Build exact vehicle-proven source without stripping
         shell: bash
         run: |
@@ -87,6 +68,8 @@ jobs:
           set -euxo pipefail
           BIN=build/public-direct-ts-remux/direct-ts-remux
           mkdir -p "$OUTDIR"
+          cp "$QNX_TOOLCHAIN_PROVENANCE" "$OUTDIR/QNX_TOOLCHAIN_PROVENANCE.txt"
+          cp build/ffmpeg-remux/FFMPEG_SOURCE_ARCHIVE.txt "$OUTDIR/FFMPEG_SOURCE_ARCHIVE.txt"
 
           docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" arm-unknown-nto-qnx6.5.0eabi-readelf -h "$BIN" > "$OUTDIR/ELF_HEADER.txt"
           docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" arm-unknown-nto-qnx6.5.0eabi-readelf -S "$BIN" > "$OUTDIR/SECTIONS.txt"
@@ -120,7 +103,8 @@ jobs:
           debug=-g
           stripped=no
           ffmpeg=6.1.5
-          ffmpeg_sha256=b8c8e926b948c14df1264cd0beac1c773df9170ac9cac97bdf1275cd3d385902
+          ffmpeg_sha256=05fbe9db1f5452a3605bb1d9bf91da9d4bb08162891692e4f172b58c49109412
+          ffmpeg_archive_format=tar.xz
           toolchain_repo=$TOOLCHAIN_REPO
           toolchain_commit=$TOOLCHAIN_COMMIT
           toolchain_dockerfile_sha256=$TOOLCHAIN_DOCKERFILE_SHA256
@@ -130,12 +114,14 @@ jobs:
           sed -i 's/^          //' "$OUTDIR/BUILDINFO.txt"
 
       - name: Upload CI artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: direct-ts-remux-MU1440-unstripped
           path: |
             ${{ env.OUTDIR }}/direct-ts-remux
             ${{ env.OUTDIR }}/direct-ts-remux.sha256
+            ${{ env.OUTDIR }}/QNX_TOOLCHAIN_PROVENANCE.txt
+            ${{ env.OUTDIR }}/FFMPEG_SOURCE_ARCHIVE.txt
             ${{ env.OUTDIR }}/BUILDINFO.txt
             ${{ env.OUTDIR }}/FILE.txt
             ${{ env.OUTDIR }}/ELF_HEADER.txt

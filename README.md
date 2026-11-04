@@ -13,6 +13,8 @@
 
 **Find a component:** [CarPlay and video](modules/carplay/) · [Broker and input](modules/broker/) · [Menu](modules/menu/) · [Navigation](modules/navigation/) · [Platform profiles](modules/profiles/). Each component page connects its source, runtime, build tools, binary artifacts and documentation.
 
+**Build and configuration entry points:** [SDK and external build inputs](sdk/) · [configuration source map](config/) · [vehicle profiles](config/vehicles/). These are indexes into canonical sources, not duplicate configuration trees.
+
 **Research testers wanted — Škoda MU1440 and SEAT MU1409/MU1447.** The modular package design uses one shared CarPlay/video, broker, menu and navigation stack with exact firmware profiles. The SEAT profiles have host-build/static integration evidence; their native menu, icon presentation, input behavior and end-to-end vehicle output still need independent vehicle tests. This is experimental research, not general vehicle support. See [profile status and tester reports](docs/testing/MULTI_PROFILE_TESTING.md) and the [binding package layout](docs/build/PACKAGE_LAYOUT.md). This update does not publish a complete three-platform installer download.
 
 **Real CarPlay secondary navigation in the original Volkswagen Group MHI2 Virtual Cockpit — direct video, guarded native-navigation fallback and an OEM-style control architecture.**

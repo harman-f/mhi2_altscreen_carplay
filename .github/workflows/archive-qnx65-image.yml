@@ -1,0 +1,151 @@
+name: Archive QNX 6.5 ARMv7 toolchain in harman-f GHCR
+
+# This is an intentional one-time archive build, not part of native CI or
+# an installable release. Future application builds PULL the resulting digest.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/archive-qnx65-image.yml'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: harman-f-qnx65-image-archive
+  cancel-in-progress: false
+
+env:
+  LOCAL_IMAGE: mhi2-qnx65-armv7-archive-candidate:4.9
+  REGISTRY_IMAGE: ghcr.io/harman-f/mhi2-qnx65-armv7
+  UPSTREAM_COMMIT: 56a66557245af14077678cd28a83ce3a337d9e2d
+  UPSTREAM_DOCKERFILE_SHA256: 9a867a7ae70f2c0222a241b80232856526ccec0db2cfe013f8991ca31c74bcb1
+
+jobs:
+  archive:
+    name: Publish verified compiler archive in project GHCR
+    if: github.repository == 'harman-f/mhi2_altscreen_carplay'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build compiler from pinned source (once, not on each source build)
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLCHAIN_COMMIT="$UPSTREAM_COMMIT" \
+          TOOLCHAIN_DOCKERFILE_SHA256="$UPSTREAM_DOCKERFILE_SHA256" \
+          QNX_BUILDX_GHA_CACHE=1 \
+            bash tools/build_qnx65_image.sh \
+              "$RUNNER_TEMP/qnx65-archive-source" "$LOCAL_IMAGE"
+
+      - name: Verify Linux host architecture and native QNX ARM smoke binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect --format '{{.Architecture}}' "$LOCAL_IMAGE")" = amd64
+          mkdir -p "$RUNNER_TEMP/qnx65-provenance"
+          docker run --rm --platform linux/amd64 \
+            --entrypoint /bin/bash "$LOCAL_IMAGE" -ec '
+              export PATH="/opt/qnx650/host/linux/x86/usr/bin:/opt/tools/qcc/bin:$PATH"
+              arm-unknown-nto-qnx6.5.0eabi-gcc --version | head -n 1 | grep -F "4.9.4"
+              command -v arm-unknown-nto-qnx6.5.0eabi-readelf
+              test -x /opt/tools/qcc/bin/qcc
+              printf "int main(void){return 0;}\n" > /tmp/qnx65-smoke.c
+              arm-unknown-nto-qnx6.5.0eabi-gcc -O2 /tmp/qnx65-smoke.c -o /tmp/qnx65-smoke
+              arm-unknown-nto-qnx6.5.0eabi-readelf -h /tmp/qnx65-smoke |
+                grep -Eq "Machine:.*ARM"
+              file /tmp/qnx65-smoke | grep -E "ELF 32-bit.*ARM"
+            '
+          docker run --rm --platform linux/amd64 \
+            --entrypoint /bin/bash "$LOCAL_IMAGE" -ec \
+            'arm-unknown-nto-qnx6.5.0eabi-gcc --version | head -n 1' \
+            | tee "$RUNNER_TEMP/qnx65-provenance/compiler-version.txt"
+
+      - name: Attach public repository source label (metadata-only layer)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/qnx65-label-context"
+          cat > "$RUNNER_TEMP/qnx65-label-context/Dockerfile" <<'DOCKERFILE'
+          FROM mhi2-qnx65-armv7-archive-candidate:4.9
+          LABEL org.opencontainers.image.source="https://github.com/harman-f/mhi2_altscreen_carplay"
+          LABEL org.opencontainers.image.title="QNX 6.5 ARMv7 GCC 4.9.4 cross-toolchain"
+          LABEL org.opencontainers.image.description="Host compiler image; not firmware or vehicle release"
+          DOCKERFILE
+          docker build --platform linux/amd64 \
+            --file "$RUNNER_TEMP/qnx65-label-context/Dockerfile" \
+            --tag "$REGISTRY_IMAGE:qnx65-gcc4.9.4-$GITHUB_SHA" \
+            "$RUNNER_TEMP/qnx65-label-context"
+          docker run --rm --platform linux/amd64 \
+            --entrypoint /bin/bash \
+            "$REGISTRY_IMAGE:qnx65-gcc4.9.4-$GITHUB_SHA" \
+            -ec 'arm-unknown-nto-qnx6.5.0eabi-gcc --version | grep -F "4.9.4"'
+
+      - name: Log in to own package namespace
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" |
+            docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Publish and verify repository-authoritative GHCR digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="$REGISTRY_IMAGE:qnx65-gcc4.9.4-$GITHUB_SHA"
+          docker push "$IMAGE"
+          docker image rm "$IMAGE"
+          docker pull "$IMAGE"
+          REF="$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE")"
+          case "$REF" in
+            "$REGISTRY_IMAGE"@sha256:*) ;;
+            *) echo "No registry-authoritative digest: $REF" >&2; exit 1 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/qnx65-provenance"
+          printf '%s\n' "$REF" > "$RUNNER_TEMP/qnx65-provenance/registry-ref.txt"
+          printf '%s\n' "${REF#*@}" > "$RUNNER_TEMP/qnx65-provenance/registry-digest.txt"
+          echo "Published host toolchain image: $REF" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record exact source and registry provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/qnx65-provenance" <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sys
+          root = Path(sys.argv[1])
+          record = {
+              "schema": "MIBR_QNX65_ARCHIVE_V1",
+              "published_image": (root / "registry-ref.txt").read_text().strip(),
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "repository_commit": os.environ["GITHUB_SHA"],
+              "compiler": (root / "compiler-version.txt").read_text().strip(),
+              "upstream_toolchain_commit": os.environ["UPSTREAM_COMMIT"],
+              "upstream_dockerfile_sha256": os.environ["UPSTREAM_DOCKERFILE_SHA256"],
+              "vehicle_qualified": False,
+              "existing_product_binaries_replaced": False,
+              "release_published": False,
+          }
+          (root / "archive-provenance.json").write_text(
+              json.dumps(record, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload host-only registry provenance
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: qnx65-ghcr-archive-${{ github.sha }}
+          path: ${{ runner.temp }}/qnx65-provenance/
+          if-no-files-found: error
+          retention-days: 90

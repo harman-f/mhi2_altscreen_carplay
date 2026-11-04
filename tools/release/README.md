@@ -6,13 +6,26 @@ The canonical source of truth for build ownership is
 uses this structure for **pre-publication readiness**, not as a vehicle-ready
 multi-profile release generator.
 
-## Canonical QNX compiler image (future release build gate)
+## Canonical QNX compiler image (build and release gate)
 
-The archived GCC 4.9 / QNX 6.5 ARMv7 compiler image, its immutable GHCR
-digest, current public-CI rebuild behavior, and required verification before
-migration are specified in [the QNX toolchain image contract](../../docs/build/QNX_TOOLCHAIN_IMAGE.md).
-Current release readiness uses pinned existing binaries and **does not**
-replace or requalify them with freshly compiled artifacts.
+The five native QNX CI workflows now call the shared selector
+[`tools/ci_qnx65_image.sh`](../ci_qnx65_image.sh). See the
+[digest-pinned image contract](../../docs/build/QNX_TOOLCHAIN_IMAGE.md)
+for the reviewed, immutable `tools/qnx65-image.lock` reference and GHCR
+access checks. Every normal native build pulls this project-owned digest;
+no repository variable or transitional GCC rebuild fallback is used.
+A failed image pull always stops the build. Each native build
+uploads `QNX_TOOLCHAIN_PROVENANCE.txt` with its selected mode and compiler
+identity; this is supplemental evidence, not yet a digest-attested
+`MODULE_BUILD_LINEAGE.json`.
+
+Current release readiness uses pinned historical binaries and **does not**
+replace or requalify them with freshly compiled artifacts. In particular,
+the support-tools workflow must not write candidate output back to
+`main` automatically: an existing legacy-mode artifact refresh now also
+requires the explicit `QNX65_ALLOW_ARTIFACT_AUTOCOMMIT=true` repository
+variable. Archived-image builds remain build-only, even if that variable
+is enabled.
 
 A future multi-profile packager must consume **verified native build lineage**
 (including the *actual* compiler image digest and output SHA-256), rather than
@@ -352,3 +365,11 @@ silent alias merging. `--require-migration-ready` is deliberately
 fail-closed. Firmware-specific installed readers, generated boot hooks,
 backup/restore, RW/RO mounts, upgrade and unattended power-loss recovery
 must still be proven before a coordinated installer cutover.
+
+## Supplemental SD support file index
+
+[`sd/README.md`](../../sd/README.md) is the explicit **project-owned supplemental files** index, **not** a complete card image. The canonical binary and script bytes stay at their original source paths, while `sd/manifest.json` declares which of the approved helper binaries and entry scripts are copied to the legacy MU1440 SD stage. The inventory currently pins `sha256sum` and `tee` and maps the installer/status/uninstaller/compatibility collector and session helper.
+
+The release job fails closed if a declared binary hash drifts or a listed executable is missing, not executable, or differs from the exact source in the prepared stage. Run `python3 tools/release/sd_support.py --self-test --source-check` and then `python3 tools/release/sd_support.py --stage-root <assembled-sd-root>` before the existing full script scan and final ZIP audit. This is an additional source/stage integrity check, not an MMX runtime proof. A future bundled `sed` (or other helper) needs separately verified QNX architecture, actual command semantics and correct `PATH`/explicit-path behavior before the manifest or a release may depend on it.
+
+The staged legacy MU1440 package remains CI-only and does not automatically qualify a three-firmware beta.

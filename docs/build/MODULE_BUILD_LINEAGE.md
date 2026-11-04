@@ -45,14 +45,21 @@ python3 tools/emit_module_build_lineage.py \
   --toolchain-dockerfile-sha256 9a867a7ae70f2c0222a241b80232856526ccec0db2cfe013f8991ca31c74bcb1 \
   --artifact carplay:libaltscreen111.so=build/mu1440-source/libaltscreen111.so \
   --artifact carplay:alt111-settings=build/mu1440-source/alt111-settings \
+  --artifact carplay:direct-ts-parity=build/mu1440-source/direct-ts-parity \
+  --artifact carplay:libmibr_isotx2_guard.so=build/mu1440-source/libmibr_isotx2_guard.so \
+  --artifact carplay:libmibr_isotx2_gate.so=build/mu1440-source/libmibr_isotx2_gate.so \
+  --artifact carplay:parity-session=build/mu1440-source/parity-session \
   --artifact broker:mibr-v3-service=build/mu1440-source/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY \
+  --artifact broker:mibrctl-v3=build/mu1440-source/mibr-control/mibrctl-v3-QNX65-ARMv7-NOT-INSTALL-READY \
+  --artifact broker:mibr-v3-genkey=build/mu1440-source/mibr-control/mibr-v3-genkey-QNX65-ARMv7-NOT-INSTALL-READY \
+  --artifact broker:mibr-key40d=build/mu1440-source/mibr-control/mibr-key40d-QNX65-ARMv7-NOT-INSTALL-READY \
   --out build/mu1440-source/MODULE_BUILD_LINEAGE.json
 
 python3 tools/emit_module_build_lineage.py \
   --verify build/mu1440-source/MODULE_BUILD_LINEAGE.json
 ```
 
-The MU1440 QNX source-build workflow now emits and verifies `build/mu1440-source/MODULE_BUILD_LINEAGE.json` after its actual source-build and SHA-256/ARM-ELF gates. Its first receipt covers the built CarPlay GEN2 library, CarPlay settings CLI, and Broker V3 service; all other binaries remain outside this specific receipt unless separately inventoried and verified. The JSON is uploaded alongside existing source-build artifacts. This receipt explicitly records `vehicle_qualified: false` and `bit_reproducible_verified: false`. A future R3 packager must consume only verified receipts, establish the independent distribution source inventory, and pass final ZIP, profile and payload-hash validation before publication.
+The MU1440 QNX source-build workflow now emits and verifies `build/mu1440-source/MODULE_BUILD_LINEAGE.json` after its actual source-build and SHA-256/ARM-ELF gates. Its receipt covers all ten outputs from the MU1440 source build; all other binaries remain outside this specific receipt unless separately inventoried and verified. The JSON is uploaded alongside existing source-build artifacts. This receipt explicitly records `vehicle_qualified: false` and `bit_reproducible_verified: false`. A future R3 packager must consume only verified receipts, establish the independent distribution source inventory, and pass final ZIP, profile and payload-hash validation before publication.
 
 ## Deliberate limitations
 
