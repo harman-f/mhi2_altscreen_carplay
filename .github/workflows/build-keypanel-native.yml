@@ -2,6 +2,14 @@ name: Build native MU1440 keypanel logger
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/build-keypanel-native.yml'
+      - 'modules/broker/source/keypanel/**'
+      - 'runtime/diagnostics/keypanel_*_native.sh'
+      - 'tools/build_keypanel_native.sh'
+      - 'tools/ci_qnx65_image.sh'
+      - 'tests/keypanel-native/**'
   push:
     branches: [ main ]
     paths:
