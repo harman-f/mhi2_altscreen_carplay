@@ -14,6 +14,8 @@ package/
       scripts/                shared menu loader
       icons/                  brand-neutral scrollbar assets only
     navigation/{bin,scripts,config}/
+    media/{bin,scripts,config}/    # reserved P1, NOT staged in current beta
+    phone/{bin,scripts,config}/    # reserved P2, NOT staged in current beta
     config/                  shared defaults and configuration
   profiles/
     skoda-mu1440-p4526/{hmi,icons,display,input,integration}/
@@ -34,7 +36,7 @@ package/
   PACKAGE.sha256             runtime package hashes
 ```
 
-There is one `profiles/` directory. Shared implementations have one canonical owner under `common/`; profile directories hold target-specific HMI, icons, display, input, and integration data or outputs. Runtime binaries live in each `common/<module>/bin/`, with module scripts and configuration under `scripts/` and `config/`. The deployed standard menu is `common/menu/config/mibr-menu.conf`, its loader is under `common/menu/scripts/`, and support JARs are under `common/menu/bin/`. The menu editor exists once under `tools/menu-editor/`, and Java HMI source exists once under `source/hmi/`. Skoda-specific icons live in the Skoda profile; `common/menu/icons/` holds brand-neutral scrollbar assets only. A profile may contain a compiled target artifact when requirements produce distinct outputs, tied to its shared source and build recipe. Album-art handling is not included in this package layout.
+There is one `profiles/` directory. Shared implementations have one canonical owner under `common/`; profile directories hold target-specific HMI, icons, display, input, and integration data or outputs. Runtime binaries live in each `common/<module>/bin/`, with module scripts and configuration under `scripts/` and `config/`. The deployed standard menu is `common/menu/config/mibr-menu.conf`, its loader is under `common/menu/scripts/`, and support JARs are under `common/menu/bin/`. The menu editor exists once under `tools/menu-editor/`, and Java HMI source exists once under `source/hmi/`. Skoda-specific icons live in the Skoda profile; `common/menu/icons/` holds brand-neutral scrollbar assets only. A profile may contain a compiled target artifact when requirements produce distinct outputs, tied to its shared source and build recipe. P1 Media/Now Playing and P2 Phone are reserved **optional modules**, not deployable contents of this beta ZIP. Source-only `modules/media/` and `modules/phone/` each contain a portable test model and non-active GPL reference sources. `common/media/` and `common/phone/` must NOT be populated merely because a directory is shown above. Three profile manifests each require `auto_install=false` and `compiled_artifact=null` until exact OEM ABI, target-built J9 adapters, tests, rollback and new checks are completed. No active album-art or phone-binder runtime is implied.
 
 Profile values describe differences that the implementation actually supports. A declarative mapping does not make hard-coded binary behavior configurable. Unsupported variation requires a profile-specific integration or build and must not be represented as a fictional runtime setting.
 
