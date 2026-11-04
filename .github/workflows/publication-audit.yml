@@ -28,6 +28,13 @@ jobs:
           test -s docs/architecture/ADVANCED_RUNTIME_SWITCHES.md
           grep -Fq 'ADVANCED_RUNTIME_SWITCHES.md' README.md
 
+      - name: Verify QNX image selector policy (host only)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -B tests/test_qnx65_image_selector.py
+          test -s docs/build/QNX_TOOLCHAIN_IMAGE.md
+
       - name: Canonical module ownership and dependency gate
         shell: bash
         run: |
