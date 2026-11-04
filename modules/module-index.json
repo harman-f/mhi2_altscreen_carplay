@@ -65,6 +65,7 @@
       ],
       "outputs": [
         "mibr-v3-service",
+        "mibrctl-v3",
         "mibr-v3-genkey",
         "mibr-key40d"
       ],

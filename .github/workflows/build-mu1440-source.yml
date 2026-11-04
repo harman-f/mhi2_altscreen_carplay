@@ -258,6 +258,7 @@ jobs:
             --artifact carplay:libaltscreen111.so=build/mu1440-source/libaltscreen111.so \
             --artifact carplay:alt111-settings=build/mu1440-source/alt111-settings \
             --artifact broker:mibr-v3-service=build/mu1440-source/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY \
+            --artifact broker:mibrctl-v3=build/mu1440-source/mibr-control/mibrctl-v3-QNX65-ARMv7-NOT-INSTALL-READY \
             --out build/mu1440-source/MODULE_BUILD_LINEAGE.json
           python3 tools/emit_module_build_lineage.py \
             --verify build/mu1440-source/MODULE_BUILD_LINEAGE.json
