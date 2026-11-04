@@ -365,3 +365,11 @@ silent alias merging. `--require-migration-ready` is deliberately
 fail-closed. Firmware-specific installed readers, generated boot hooks,
 backup/restore, RW/RO mounts, upgrade and unattended power-loss recovery
 must still be proven before a coordinated installer cutover.
+
+## Supplemental SD support file index
+
+[`sd/README.md`](../../sd/README.md) is the explicit **project-owned supplemental files** index, **not** a complete card image. The canonical binary and script bytes stay at their original source paths, while `sd/manifest.json` declares which of the approved helper binaries and entry scripts are copied to the legacy MU1440 SD stage. The inventory currently pins `sha256sum` and `tee` and maps the installer/status/uninstaller/compatibility collector and session helper.
+
+The release job fails closed if a declared binary hash drifts or a listed executable is missing, not executable, or differs from the exact source in the prepared stage. Run `python3 tools/release/sd_support.py --self-test --source-check` and then `python3 tools/release/sd_support.py --stage-root <assembled-sd-root>` before the existing full script scan and final ZIP audit. This is an additional source/stage integrity check, not an MMX runtime proof. A future bundled `sed` (or other helper) needs separately verified QNX architecture, actual command semantics and correct `PATH`/explicit-path behavior before the manifest or a release may depend on it.
+
+The staged legacy MU1440 package remains CI-only and does not automatically qualify a three-firmware beta.

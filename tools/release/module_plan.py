@@ -22,7 +22,7 @@ ALWAYS_REVIEW = (
     "runtime/diagnostics/", "runtime/deployment/",
     "tools/release/", "tools/prepare_mu1440_sd.sh",
     "tools/validate_modular_package.py", "tools/check_mu1440_target_shell.py",
-    "deployment/", "artifacts/mu1440/", "release/",
+    "deployment/", "artifacts/mu1440/", "release/", "sd/",
     ".github/workflows/release-mu1440-aid10.yml",
 )
 BUILD_ALL = ("modules/module-index.json", "settings/")
@@ -49,6 +49,13 @@ def classify(index: dict, changed: list[str], all_inputs: bool = False) -> dict:
         # The module index itself is global metadata, not an unowned module.
         unowned.discard("modules/module-index.json")
     for p in changed:
+        if p.startswith("src/experimental/mibr3/"):
+            # The standalone protocol model and its migrated probes exercise
+            # Broker behavior; they are not a second production source owner.
+            related, _ = impact(index, ["modules/broker/source/mibr-control"])
+            direct.add("broker")
+            affected.update(related)
+            unowned.discard(p)
         if p.startswith(("settings/", "runtime/diagnostics/", "runtime/deployment/")):
             # Registry-generated files, diagnosis and deployment scripts are
             # deliberate shared inputs outside any functional module. Unknown
@@ -96,6 +103,10 @@ def self_test(index: dict) -> None:
     assert not x["unknown_owner_paths"], x
     x = classify(index, ["modules/carplay/unlisted/new.c"])
     assert x["unknown_owner_paths"] == ["modules/carplay/unlisted/new.c"], x
+    x = classify(index, ["src/experimental/mibr3/mibr_v3_owner_lifecycle.c"])
+    assert x["direct_modules"] == ["broker"] and not x["unknown_owner_paths"] and x["run_release_checks"], x
+    x = classify(index, ["sd/manifest.json"])
+    assert x["run_release_checks"] and not x["unknown_owner_paths"], x
     x = classify(index, ["README.md"])
     assert not x["run_release_checks"], x
     print("RELEASE_MODULE_PLAN_SELF_TEST=PASS")

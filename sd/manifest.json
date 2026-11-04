@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "kind": "supplemental_sd_assets_not_full_card",
+  "package_scope": "legacy-mu1440-developer-stage",
+  "entries": [
+    {
+      "kind": "binary",
+      "source": "artifacts/mu1440/sha256sum-compat/build-confirmed-current/sha256sum",
+      "target": "payload/sha256sum",
+      "sha256": "c4b98cbfb80675dc9b4c731472110efbad3676392d20b1f38a1d27dfbbe65087"
+    },
+    {
+      "kind": "binary",
+      "source": "artifacts/mu1440/tee-compat/build-confirmed-current/tee",
+      "target": "payload/tee",
+      "sha256": "5676ef86fbe642028c65da9e9fe978266800304726943b878302e20597761935"
+    },
+    {
+      "kind": "script",
+      "source": "deployment/mu1440/install.sh",
+      "target": "install.sh"
+    },
+    {
+      "kind": "script",
+      "source": "deployment/mu1440/status.sh",
+      "target": "status.sh"
+    },
+    {
+      "kind": "script",
+      "source": "deployment/mu1440/uninstall.sh",
+      "target": "uninstall.sh"
+    },
+    {
+      "kind": "script",
+      "source": "deployment/mu1440/compatibility-report.sh",
+      "target": "compatibility-report.sh"
+    },
+    {
+      "kind": "script",
+      "source": "runtime/deployment/session.sh",
+      "target": "runtime/deployment/session.sh"
+    }
+  ]
+}
