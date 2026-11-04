@@ -14,7 +14,6 @@ class TestQnxImageSelector(unittest.TestCase):
         env = dict(os.environ)
         env.update({
             "QNX65_VERIFIED_IMAGE": image,
-            "QNX65_LEGACY_REBUILD_ALLOWED": "0",
         })
         result = subprocess.run(
             ["/bin/bash", str(SCRIPT)], env=env, cwd=ROOT,
@@ -41,11 +40,11 @@ class TestQnxImageSelector(unittest.TestCase):
 
     def test_mutable_tag_is_rejected(self):
         result = self.check_status("ghcr.io/example/toolchain:latest", 10)
-        self.assertIn("QNX_IMAGE_PIN_MISMATCH=FAIL", result.stderr)
+        self.assertIn("QNX_IMAGE_REF=FAIL", result.stderr)
 
     def test_malformed_digest_is_rejected(self):
         result = self.check_status("ghcr.io/example/toolchain@sha256:bad", 10)
-        self.assertIn("QNX_IMAGE_PIN_MISMATCH=FAIL", result.stderr)
+        self.assertIn("QNX_IMAGE_REF=FAIL", result.stderr)
 
 
 if __name__ == "__main__":

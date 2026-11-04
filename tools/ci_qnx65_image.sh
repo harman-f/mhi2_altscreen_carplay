@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CI runner only: consume a verified immutable QNX 6.5 ARMv7 compiler image.
-# The old source bootstrap remains an explicitly enabled transition/recovery path.
+# A separate rebuild helper exists for explicit disaster recovery; never fallback in CI.
 set -euo pipefail
 
 IMAGE=${IMAGE:-mhi2-qnx65-armv7-public:4.9}
@@ -9,9 +9,6 @@ PIN_FILE=tools/qnx65-image.lock
 [[ -s "$PIN_FILE" ]] || { echo "QNX_IMAGE_PIN_MISSING=FAIL" >&2; exit 15; }
 PIN_REF=$(cat "$PIN_FILE")
 QNX65_VERIFIED_IMAGE=${QNX65_VERIFIED_IMAGE:-$PIN_REF}
-[[ "$QNX65_VERIFIED_IMAGE" == "$PIN_REF" ]] || {
-  echo "QNX_IMAGE_PIN_MISMATCH=FAIL update the source lockfile, not a CI variable" >&2; exit 17;
-}
 TOOLCHAIN_COMMIT=${TOOLCHAIN_COMMIT:-56a66557245af14077678cd28a83ce3a337d9e2d}
 TOOLCHAIN_DOCKERFILE_SHA256=${TOOLCHAIN_DOCKERFILE_SHA256:-9a867a7ae70f2c0222a241b80232856526ccec0db2cfe013f8991ca31c74bcb1}
 RUNNER_TEMP=${RUNNER_TEMP:-${TMPDIR:-/tmp}}
@@ -26,6 +23,9 @@ if [[ -n "$QNX65_VERIFIED_IMAGE" ]]; then
     echo "QNX_IMAGE_REF=FAIL expected an approved ghcr.io/name@sha256:64hex reference" >&2
     exit 10
   fi
+  [[ "$QNX65_VERIFIED_IMAGE" == "$PIN_REF" ]] || {
+    echo "QNX_IMAGE_PIN_MISMATCH=FAIL update the source lockfile, not a CI variable" >&2; exit 17;
+  }
   # Suppress registry ownership and image path in public CI logs.
   if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
     echo "::add-mask::$QNX65_VERIFIED_IMAGE"
