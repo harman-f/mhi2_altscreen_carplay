@@ -14,6 +14,16 @@ The development repository's [module layout contract](../architecture/REPOSITORY
 
 A missing source path, unknown module/profile/output, duplicate output, unsafe file reference, changed build hash or mismatched exact Git HEAD fails closed. No target writes are performed. An existing binary with no verifiable module source link must remain a separately labeled prebuilt artifact, not be added under an invented ownership mapping.
 
+## Immutable toolchain image provenance (pending implementation)
+
+The [QNX toolchain image contract](QNX_TOOLCHAIN_IMAGE.md) identifies the
+existing digest-pinned GCC 4.9 / QNX 6.5 ARMv7 container and the necessary
+CI migration and qualification checks. The current receipt's declared
+toolchain commit/Dockerfile SHA-256 must **not** be mistaken for proof of which
+container was actually executed. A future build-lineage revision must capture
+and verify the actual container digest and compiler version before the release
+pipeline can rely on it for native-binary provenance.
+
 ## Host checks
 
 ```bash
