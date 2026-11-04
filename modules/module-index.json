@@ -2,7 +2,7 @@
   "schema_version": 1,
   "contract": "docs/architecture/REPOSITORY_LAYOUT.md",
   "lifecycle": "migration-in-progress",
-  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable.",
+  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable. P6 audio is source-only, disabled, with three exact profile ABI gates and no package outputs.",
   "modules": {
     "carplay": {
       "status": "indexed",
@@ -109,6 +109,28 @@
       "outputs": [],
       "build_coverage": "target-specific-incomplete",
       "evidence": "docs/build/MU1440_MENU_RGI_SOURCE.md"
+    },
+    "audio": {
+      "status": "indexed",
+      "distribution": "common/audio",
+      "depends_on": [
+        "carplay",
+        "broker"
+      ],
+      "source": [
+        "modules/audio/source",
+        "modules/audio/reference"
+      ],
+      "runtime": [],
+      "build_scripts": [
+        "modules/audio/tests/run_host.sh"
+      ],
+      "support_tools": [
+        "modules/audio/tests"
+      ],
+      "outputs": [],
+      "build_coverage": "host-capability-gate-only; DSP and per-profile QNX ABI unbuilt",
+      "evidence": "modules/audio/README.md"
     }
   },
   "profiles": [
