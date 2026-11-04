@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[2] / "runtime" / "cpvc_config_r23.sh"
+SCRIPT = Path(__file__).resolve().parents[2] / "modules/carplay/runtime/cpvc/cpvc_config.sh"
 GOOD = "preset.id=mibr_legacy" + chr(10) + "navigation.compass=yes" + chr(10)
 BAD = "preset.id=mibr_legacy" + chr(10) + "navigation.compass=JUNK" + chr(10)
 HELPER = """#!/bin/sh
@@ -24,8 +24,8 @@ class LastGoodFallback(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="cpvc-fb-")
         root = Path(self.tmp.name)
-        self.base = root / "altscreen-u2"
-        (self.base / "config").mkdir(parents=True)
+        self.base = root / "mibr"  # the single MIBR root, selected through MIBR_ROOT
+        (self.base / "config/cockpit").mkdir(parents=True)
         (self.base / "bin").mkdir()
         self.bin = root / "stubs"
         self.bin.mkdir()
@@ -40,22 +40,21 @@ class LastGoodFallback(unittest.TestCase):
         text = SCRIPT.read_text()
         text = text.replace("export PATH=/proc/boot:/bin:/usr/bin:/usr/sbin:/sbin:/mnt/app/armle/bin:/mnt/app/armle/usr/bin",
                             "export PATH=" + str(self.bin) + ":/usr/bin:/bin")
-        text = text.replace("BASE=/mnt/app/root/altscreen-u2", "BASE=" + str(self.base))
-        text = text.replace("ENABLED=/mnt/app/root/mibr-cpvc.enabled", "ENABLED=" + str(root / "enabled"))
+        text = text.replace("ENABLED=$MIBR_ROOT/config/features/mibr-cpvc.enabled", "ENABLED=" + str(root / "enabled"))
         text = text.replace("/tmp/mibr-cpvc-profile-ready", str(root / "ready"))
         text = text.replace("/tmp/mibr-alt111-settings.journal", str(root / "journal"))
         text = text.replace('ZOOM=/tmp/mibr-alt111-zoom-v1.enabled', 'ZOOM=' + str(root / "zoom"))
         self.script = root / "cpvc_config.sh"
         self.script.write_text(text)
         self.root = root
-        self.profile = self.base / "config" / "cpvc-r5.profile"
-        self.lastgood = self.base / "config" / "cpvc-r5.profile.lastgood"
+        self.profile = self.base / "config/cockpit" / "cpvc-r5.profile"
+        self.lastgood = self.base / "config/cockpit" / "cpvc-r5.profile.lastgood"
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def run_replay(self):
-        env = {"PATH": str(self.bin) + ":/usr/bin:/bin", "APPROOT": str(self.root)}
+        env = {"PATH": str(self.bin) + ":/usr/bin:/bin", "APPROOT": str(self.root), "MIBR_ROOT": str(self.base)}
         shell = shutil.which("ksh") or shutil.which("bash") or "sh"
         return subprocess.run([shell, str(self.script), "_boot-replay"], env=env, capture_output=True,
                               text=True, timeout=20)
@@ -77,7 +76,7 @@ class LastGoodFallback(unittest.TestCase):
         self.assertIn("CPVC_BOOT_PROFILE_FALLBACK=LASTGOOD_RESTORED", run.stdout)
         self.assertIn("CPVC_BOOT_PROFILE=PASS", run.stdout)
         self.assertEqual(self.profile.read_text(), GOOD)
-        self.assertEqual((self.base / "config" / "cpvc-r5.profile.corrupt").read_text(), BAD)
+        self.assertEqual((self.base / "config/cockpit" / "cpvc-r5.profile.corrupt").read_text(), BAD)
         self.assertTrue((self.root / "ready").exists())
 
     def test_missing_profile_uses_lastgood(self):

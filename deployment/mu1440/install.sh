@@ -1,4 +1,6 @@
 #!/bin/ksh
+# NOTE: frozen legacy release line, installs the pre-MIBR altscreen-u2 layout; superseded by the MIB Runtime installer.
+# Its hash-pinned payload binaries are vehicle-tested with compiled altscreen-u2 paths; do not switch these paths here.
 set -u
 
 SELF=$0

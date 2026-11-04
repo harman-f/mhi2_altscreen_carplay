@@ -13,7 +13,7 @@
 BEGIN {
     marker = "-- MIBR-RGI"
     stock = "return \"mm-ipod -d iap2,config=/etc/mm/iap2.cfg,"
-    wrapped = "if posix.stat(\"/mnt/app/root/mibr-rgi/rgi.on\") then return \"/mnt/app/root/mibr-rgi/mm-ipod-rgi "
+    wrapped = "if posix.stat(\"/mnt/app/root/mibr/config/features/rgi.on\") then return \"/mnt/app/root/mibr/bin/mm-ipod-rgi "
     cfgold = "config=/etc/mm/iap2.cfg"
     cfgnew = "config=/dev/shmem/mibr-rgi-iap2.cfg"
     nl = 0; hits = 0; seen = 0

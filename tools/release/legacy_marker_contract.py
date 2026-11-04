@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """A2.3 host-only evidence for legacy MMX activation and safety markers.
 
+"path" is the legacy unit location (what exists on units today, the migration source);
+the source tokens are the M1 consumer statements under the single root.
 Exact-source tokens demonstrate selected boot/reader/writer statements, NOT
 all possible readers, target qualification, or permission to migrate them.
 """
@@ -22,7 +24,7 @@ CASES = (
         "evidence": [
             (AUTO+"direct_ts_auto_enable.sh", "writer-create", 'touch "$ENABLED"'),
             (AUTO+"direct_ts_auto_enable.sh", "generated-boot-reader",
-             "if [ -e /mnt/app/root/mibr-carplay-autodirect.enabled ]; then"),
+             "if [ -e /mnt/app/root/mibr/config/features/mibr-carplay-autodirect.enabled ]; then"),
             (AUTO+"direct_ts_auto_disable.sh", "writer-remove", 'rm -f "$ENABLED"'),
             (AUTO+"direct_ts_auto_start.sh", "session-reader", '[ -e "$ENABLED" ]'),
         ],
@@ -90,15 +92,15 @@ CASES = (
         "migration_hazard": "writer-and-supervisor-must-preserve-priority",
         "evidence": [
             (PARITY+"parity_drive_status.sh", "root-declarations",
-             "STATUS_P=/mnt/app/root/mibr-parity-status-enabled"),
+             "STATUS_P=$MIBR_ROOT/config/features/mibr-parity-status-enabled"),
             (PARITY+"parity_drive_status.sh", "statistics-declaration",
-             "STATS_P=/mnt/app/root/mibr-parity-statistics-enabled"),
+             "STATS_P=$MIBR_ROOT/config/features/mibr-parity-statistics-enabled"),
             (PARITY+"parity_drive_status.sh", "temporary-precedence",
              'if [ -r "$T" ]; then V=$(cat "$T"'),
             (PARITY+"parity_drive_status.sh", "persistent-writer",
              'echo "$VALUE" > "$P"'),
             (PARITY+"parity_drive_supervisor.sh", "runtime-consumer",
-             'STATUS_CFG_PERSIST=/mnt/app/root/mibr-parity-status-enabled'),
+             'STATUS_CFG_PERSIST=$MIBR_ROOT/config/features/mibr-parity-status-enabled'),
         ],
     },
 )

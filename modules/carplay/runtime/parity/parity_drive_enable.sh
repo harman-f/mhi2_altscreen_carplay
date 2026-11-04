@@ -3,18 +3,19 @@
 # Install/enable the guarded parity-drive boot hook. Does not restart stock apps.
 
 set -u
-BASE=/mnt/app/root/altscreen-u2
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+BASE=$MIBR_ROOT
 SUP=$BASE/scripts/parity_drive_supervisor.sh
 RUNNER=$BASE/bin/parity-session
 BRIDGE=$BASE/bin/direct-ts-parity
 LSD=/mnt/app/eso/hmi/lsd/lsd.sh
-ENABLE=/mnt/app/root/mibr-parity-drive.enabled
-AUTODIRECT_ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
+ENABLE=$MIBR_ROOT/config/features/mibr-parity-drive.enabled
+AUTODIRECT_ENABLED=$MIBR_ROOT/config/features/mibr-carplay-autodirect.enabled
 # Staged beside lsd.sh so the final mv is a same-filesystem rename.
 TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-parity-drive.$$
 BEGIN="# MIBR PARITY-DRIVE BEGIN"
 END="# MIBR PARITY-DRIVE END"
-BOOTCMD='/bin/ksh /mnt/app/root/altscreen-u2/scripts/parity_drive_supervisor.sh >/tmp/mibr-parity-drive-boot.log 2>&1 &'
+BOOTCMD='/bin/ksh /mnt/app/root/mibr/scripts/parity_drive_supervisor.sh >/tmp/mibr-parity-drive-boot.log 2>&1 &'
 RW=0
 # Integrity gate for a rewritten lsd.sh before it replaces the original:
 # the J9 start-line count must be unchanged and BEGIN/END marker lines must

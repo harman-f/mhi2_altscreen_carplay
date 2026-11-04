@@ -24,6 +24,7 @@
       "runtime": [
         "modules/carplay/runtime/auto-direct",
         "modules/carplay/runtime/parity",
+        "modules/carplay/runtime/cpvc",
         "modules/carplay/runtime/isotx2-gate"
       ],
       "build_scripts": [

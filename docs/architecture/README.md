@@ -11,6 +11,7 @@
 | ViewArea/SafeArea and navigation presentation | [Navigation composition](NAVIGATION_COMPOSITION_AND_SAFEAREA.md) | [Native HMI/control](NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md) owns menu application/ACTIVE distinction; [NavIgnore](NAVIGNORE.md) owns separate native navigation arbitration |
 | Project HMI menu, Java/native settings and physical input | [Native HMI and single-authority controller](NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md) | The former detailed stock ViewHandler investigation is retained in the development archive, not a competing public architecture; [physical input mapping](../testing/MU1440_MFW_RAW_KEY_MAPPING.md) holds measured IDs |
 | Optional vehicle speed, GNSS and status | [Optional vehicle-data overview](OPTIONAL_VEHICLE_DATA_FEATURE_OVERVIEW.md) | Source/release and existing authenticated-session acceptance remain separately gated |
+| Firmware profiles, unified configuration and on-unit root `mibr/` | [Firmware profiles and configuration (contract v2)](FIRMWARE_PROFILES_AND_CONFIGURATION.md), [on-unit storage and naming contract](UNIT_STORAGE_AND_NAMING_CONTRACT.md) | Design contract with owner decisions E1–E6; not an implemented on-unit layout |
 | Build, target, recovery and release | [Public source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md), [compatibility matrix](../testing/COMPATIBILITY_MATRIX.md), [developer release](../../release/CURRENT.md) | [Installation](../INSTALLATION.md) applies to its exact reference build, not any research candidate |
 
 ## Evidence rules

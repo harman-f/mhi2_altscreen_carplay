@@ -175,7 +175,7 @@ class LuaRgiTests(unittest.TestCase):
         self.assertTrue(marked[0].endswith(" end " + MARKER))
         self.assertIn("config=/dev/shmem/mibr-rgi-iap2.cfg", marked[0])
         self.assertNotIn("/etc/mm/iap2.cfg", marked[0])
-        self.assertIn('/mnt/app/root/mibr-rgi/mm-ipod-rgi -d iap2,', marked[0])
+        self.assertIn('/mnt/app/root/mibr/bin/mm-ipod-rgi -d iap2,', marked[0])
         # additive: grep -v of the marker restores stock byte-exactly
         restored = "".join(l + "\n" for l in lines if MARKER not in l)
         self.assertEqual(sha(restored.encode()), sha(LUA_STOCK.encode()))

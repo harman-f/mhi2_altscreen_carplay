@@ -811,7 +811,9 @@ class ParityEnableExec(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
         self.app = self.root / "mnt/app"
-        base = self.app / "root/altscreen-u2"
+        base = self.app / "root/mibr"
+        (base / "config/features").mkdir(parents=True)
+        (base / "config/carplay").mkdir(parents=True)
         for rel in ("scripts/parity_drive_supervisor.sh", "bin/parity-session", "bin/direct-ts-parity"):
             f = base / rel
             f.parent.mkdir(parents=True, exist_ok=True)
@@ -820,8 +822,8 @@ class ParityEnableExec(unittest.TestCase):
         self.lsd = self.app / "eso/hmi/lsd/lsd.sh"
         self.lsd.parent.mkdir(parents=True)
         self.lsd.write_text("#!/bin/sh\necho stock\n$J9 start\n")
-        self.marker = self.app / "root/mibr-carplay-autodirect.enabled"
-        self.parity_marker = self.app / "root/mibr-parity-drive.enabled"
+        self.marker = base / "config/features/mibr-carplay-autodirect.enabled"
+        self.parity_marker = base / "config/features/mibr-parity-drive.enabled"
         self.tools = self.root / "tools"
         self.tools.mkdir()
         self.log = self.root / "mount.log"
@@ -854,7 +856,7 @@ class ParityEnableExec(unittest.TestCase):
 
     def test_does_not_write_legacy_value_file(self):
         self.run_enable()
-        self.assertFalse((self.app / "root/mibr-carplay-autodirect").exists())
+        self.assertFalse((self.app / "root/mibr/config/carplay/mibr-carplay-autodirect").exists())
 
     def test_marker_removal_failure_exits_29_without_success(self):
         # A non-empty directory at the marker path makes rm -f fail while -e stays true.
@@ -886,7 +888,9 @@ class AutoDirectAfterParityExec(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
         self.app = self.root / "mnt/app"
-        self.base = self.app / "root/altscreen-u2"
+        self.base = self.app / "root/mibr"
+        (self.base / "config/features").mkdir(parents=True)
+        (self.base / "config/carplay").mkdir(parents=True)
         self.bin = self.base / "bin"
         self.scripts = self.base / "scripts"
         self.bin.mkdir(parents=True)
@@ -900,8 +904,8 @@ class AutoDirectAfterParityExec(unittest.TestCase):
         self.lsd = self.app / "eso/hmi/lsd/lsd.sh"
         self.lsd.parent.mkdir(parents=True)
         self.lsd.write_text("#!/bin/sh\n$J9 start\n")
-        self.ad = self.app / "root/mibr-carplay-autodirect.enabled"
-        self.parity = self.app / "root/mibr-parity-drive.enabled"
+        self.ad = self.base / "config/features/mibr-carplay-autodirect.enabled"
+        self.parity = self.base / "config/features/mibr-parity-drive.enabled"
         self.lock = self.root / "tmp/mibr-parity-session.lock"
         self.pid = self.root / "tmp/mibr-parity-drive-supervisor.pid"
         self.lock.parent.mkdir()

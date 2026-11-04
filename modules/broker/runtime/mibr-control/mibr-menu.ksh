@@ -1,10 +1,11 @@
 #!/bin/ksh
 # mibr-menu.ksh load
-# Stores the menu file from the SD card: /mibr-menu/mibr-menu.txt -> config/mibr-menu.conf. The menu has checked the
+# Stores the menu file from the SD card: /mibr-menu/mibr-menu.txt -> config/menu/layout.conf. The menu has checked the
 # file before this and compares the stored bytes afterwards.
 # Last output line: result=<OK|NO_FILE|TOO_LARGE|BUSY|WRITE_FAILED|USAGE>.
 SRC=${MIBR_MENU_SRC:-/net/mmx/fs/sda0/mibr-menu/mibr-menu.txt}
-DIR=${MIBR_MENU_DIR:-/mnt/app/root/altscreen-u2/config}
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+DIR=${MIBR_MENU_DIR:-$MIBR_ROOT/config/menu}
 MNT=${MIBR_VIEW_MOUNT:-/mnt/app}
 NOMOUNT=${MIBR_VIEW_NOMOUNT:-0}
 APPLOCK=${MIBR_APP_RW_LOCK:-/tmp/mibr-app-rw.lock}
@@ -39,8 +40,8 @@ size=$(ls -l "$SRC" 2>/dev/null) || finish NO_FILE
 set -- $size
 { [ "$5" -gt 0 ] && [ "$5" -le "$MAX" ]; } 2>/dev/null || finish TOO_LARGE
 rw || finish BUSY
-STAGE="$DIR/mibr-menu.conf.new.$$"
-if cp "$SRC" "$STAGE" 2>/dev/null && chmod 644 "$STAGE" 2>/dev/null && mv "$STAGE" "$DIR/mibr-menu.conf" 2>/dev/null; then
+STAGE="$DIR/layout.conf.new.$$"
+if cp "$SRC" "$STAGE" 2>/dev/null && chmod 644 "$STAGE" 2>/dev/null && mv "$STAGE" "$DIR/layout.conf" 2>/dev/null; then
     ro; finish OK
 fi
 rm -f "$STAGE"; ro; finish WRITE_FAILED

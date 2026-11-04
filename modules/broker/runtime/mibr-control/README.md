@@ -15,11 +15,18 @@ not a supported installation package.
   broker and optional key-event daemon from the existing source. Its presence does not establish
   that a service process is authorized, a secret is correctly provisioned, or
   the persistent settings path is qualified on another unit.
+- `boot.ksh` is the single boot entry called once from the `lsd.sh` kit block right before the HMI starts: optional
+  Auto-Direct start, CPVC profile replay (`modules/carplay/runtime/cpvc/cpvc_config.sh _boot-replay`) followed by the
+  parity supervisor, then `mibr-v3-boot.ksh`. Every step is optional; it never blocks the HMI boot and exits early when
+  `/mnt/app/root/mibr/state/boot/disabled` exists.
+- `boot-guard.ksh check|clear` counts boots without a confirmed HMI start. After 4 in a row (`MIBR_GUARD_LIMIT`) it
+  writes the `disabled` kill switch so a faulty menu JAR cannot lock the unit out; `mibr-watch.ksh` calls `clear` once the
+  HMI has been up. Any failure of the guard itself means "load MIBR". Re-enable by deleting the `disabled` file.
 - `mibr-view.ksh` maintains the cockpit-view position and configured resync
   target, and optionally applies the existing `viewarea.selected` TEMP setting
   for the three map views. KEY40 long press records the view after the selected
   resync target because the OEM view advances once on that press. Its persistent
-  state defaults to `/mnt/app/root/mibr-view`; fixed-view mode defaults OFF,
+  state defaults to `/mnt/app/root/mibr/state/cockpit`; fixed-view mode defaults OFF,
   Sporttacho-present defaults ON, and the resync target defaults to Voll.
 
 The scripts do not make external `printf`, `sed`, or `tr` dependencies. Their

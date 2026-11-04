@@ -1,7 +1,8 @@
 #!/bin/ksh
 set -u
 
-ROOT=/mnt/app/root
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+ROOT=$MIBR_ROOT/config/navigation
 QUERY=$ROOT/mibr-carplay111-nav-query.enabled
 SURFACE=$ROOT/mibr-carplay111-nav.surface
 ETA=$ROOT/mibr-carplay111-nav.showETA
@@ -31,7 +32,7 @@ usage:
   gen2_nav_config.sh apply
   gen2_nav_config.sh paths
 
-Changes are persistent under /mnt/app/root. They do not rebuild Stream111.
+Changes are persistent under the MIBR root (config/navigation). They do not rebuild Stream111.
 'apply' requests the existing serialized GEN2 same-stream reacquire sequence
 (STOP -> SHOW with the new URL -> forceKeyFrame). 'use PROFILE' stores a profile
 and immediately performs that live apply, including the fresh keyframe request.

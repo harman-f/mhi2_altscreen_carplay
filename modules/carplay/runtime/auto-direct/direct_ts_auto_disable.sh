@@ -1,9 +1,10 @@
 #!/bin/ksh
 # SPDX-License-Identifier: GPL-3.0-or-later
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 runtime_init || { echo "AUTO_DIRECT_DISABLE=FAIL_RUNTIME"; exit 3; }
 
-ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
+ENABLED=$MIBR_ROOT/config/features/mibr-carplay-autodirect.enabled
 mount -uw /mnt/app 2>/dev/null || { echo "AUTO_DIRECT_DISABLE=FAIL_APP_RW"; exit 20; }
 rm -f "$ENABLED" 2>/dev/null || true
 sync

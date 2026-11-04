@@ -159,7 +159,7 @@ def snapshot_fields(snapshot, registry, visible, *, scope="ui", role="ui"):
     if scope not in ("ui", "all") or scope == "all" and role != "shell":
         raise FrameError("FORBIDDEN")
     rows = registry["settings"]
-    if registry.get("schema") != 2 or len(rows) != 48 or len({r["key"] for r in rows}) != 48:
+    if registry.get("schema") != 3 or len(rows) != 48 or len({r["key"] for r in rows}) != 48:
         raise FrameError("NOT_READY")
     keys = [r["key"] for r in rows]
     if (not isinstance(visible, (list, tuple)) or len(visible) != 11 or

@@ -32,8 +32,9 @@
 #include <unistd.h>
 
 #include "mibr_rgi_wire.h"
+#include "../../../../carplay/source/alt111-settings/include/mibr_paths.h"
 
-#define ENABLE_FILE "/mnt/app/root/mibr-rgi/rgi.on"
+#define ENABLE_FILE MIBR_CONFIG_DIR "/features/rgi.on"
 #define READY_FILE  "/dev/shmem/mibr-rgi-ready"
 #define GUARD_FILE  "/dev/shmem/mibr-rgi-ipod.guard"
 #define LOG_FILE    "/tmp/mibr-rgi-ipod.log"

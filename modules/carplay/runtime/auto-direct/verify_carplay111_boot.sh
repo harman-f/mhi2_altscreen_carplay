@@ -1,5 +1,6 @@
 #!/bin/ksh
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 runtime_init_durable || { echo "FAIL runtime/log bootstrap"; exit 3; }
 
 STATE=/tmp/mibr-carplay111.state
@@ -8,7 +9,7 @@ LOGFILE=/tmp/altscreen111.log
 echo "=== MU1440 CarPlay111 boot preload verification ==="
 echo "hook=$CARPLAY_HOOK"
 echo "config=$TARGET"
-[ -e /mnt/app/root/mibr-carplay111-viewareas.enabled ] &&
+[ -e $MIBR_ROOT/config/features/mibr-carplay111-viewareas.enabled ] &&
   echo "viewarea_fallback=ENABLED_THIS_BOOT" ||
   echo "viewarea_fallback=DISABLED_THIS_BOOT"
 

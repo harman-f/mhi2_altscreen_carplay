@@ -17,7 +17,7 @@ WATCH = RUNTIME / "mibr-watch.ksh"
 BOOT = RUNTIME / "mibr-v3-boot.ksh"
 VIEW = RUNTIME / "mibr-view.ksh"
 KIT = IMPL / "distribution/mibr-carplay-kit/kit"
-GUARD = KIT / "files/boot-guard.ksh"
+GUARD = RUNTIME / "boot-guard.ksh"
 R2 = IMPL / "carplay-rgi/release/r2"
 SHELL = os.environ.get("DELTA_SHELL", shutil.which("bash") or "/bin/sh")
 FAKE_MOUNT = '#!/bin/sh\necho "$*" >> "$MOUNT_LOG"\n[ "${MOUNT_FAIL:-0}" != 1 ]\n'
@@ -53,10 +53,13 @@ class BootGuard(Sandbox):
     def setUp(self):
         super().setUp()
         self.app = self.root / "app"
-        (self.app / "root/mibr-kit").mkdir(parents=True)
+        self.mibr = self.app / "root/mibr"
+        (self.mibr / "state/boot").mkdir(parents=True)
+        (self.mibr / "version").mkdir(parents=True)  # a migrated / installed structure
         self.env.update(MIBR_GUARD_APP=str(self.app), MIBR_APP_RW_LOCK=str(self.root / "lease"))
-        self.disabled = self.app / "root/mibr-kit/disabled"
-        self.count = self.app / "root/mibr-kit/boot-count"
+        self.disabled = self.mibr / "state/boot/disabled"
+        self.count = self.mibr / "state/boot/boot-count"
+        self.legacy = self.app / "root/mibr-kit"
 
     def run_guard(self, verb):
         return subprocess.run([SHELL, str(GUARD), verb], env=self.env, capture_output=True, text=True)
@@ -74,6 +77,67 @@ class BootGuard(Sandbox):
         self.disabled.unlink()
         self.assertEqual(self.run_guard("check").returncode, 0)
         self.assertEqual(self.count.read_text().strip(), "1")
+
+    def test_counter_and_auto_disable_use_only_the_new_paths(self):
+        for _ in range(4):
+            self.run_guard("check")
+        self.assertEqual(self.count.read_text().strip(), "4")
+        result = self.run_guard("check")
+        self.assertIn("AUTO_DISABLED", result.stdout)
+        self.assertEqual(self.count.read_text().strip(), "0")
+        self.assertTrue(self.disabled.read_text().startswith("auto: 4 boots"))
+        self.assertFalse(self.legacy.exists(), "nothing may be created at the legacy root")
+
+    def test_legacy_kill_switch_is_not_read(self):
+        # E4: no permanent second kill switch. Legacy disabled present + new absent -> MIBR loads.
+        self.legacy.mkdir(parents=True)
+        (self.legacy / "disabled").write_text("x\n")
+        (self.legacy / "boot-count").write_text("9\n")  # a legacy counter is not read either
+        result = self.run_guard("check")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("MIBR_BOOT_GUARD=LOAD count=1", result.stdout)
+        self.assertEqual((self.legacy / "boot-count").read_text(), "9\n")
+
+    def test_new_kill_switch_disables(self):
+        self.disabled.write_text("x\n")
+        result = self.run_guard("check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("MIBR_BOOT_GUARD=DISABLED", result.stdout)
+
+    def test_state_boot_not_a_directory_is_structure_invalid(self):
+        shutil.rmtree(self.mibr / "state/boot")
+        (self.mibr / "state/boot").write_text("not a directory\n")
+        result = self.run_guard("check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("MIBR_BOOT_GUARD=STRUCTURE_INVALID", result.stdout)
+        self.assertEqual(self.mounts(), [], "a broken structure must not be written to")
+
+    def test_missing_version_dir_is_structure_invalid(self):
+        shutil.rmtree(self.mibr / "version")
+        result = self.run_guard("check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("MIBR_BOOT_GUARD=STRUCTURE_INVALID", result.stdout)
+        self.assertFalse(self.count.exists())
+
+    def test_never_migrated_unit_is_structure_invalid(self):
+        shutil.rmtree(self.mibr)
+        self.legacy.mkdir(parents=True)
+        result = self.run_guard("check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("MIBR_BOOT_GUARD=STRUCTURE_INVALID", result.stdout)
+
+    def test_missing_state_boot_dir_is_created_not_invalid(self):
+        shutil.rmtree(self.mibr / "state")
+        result = self.run_guard("check")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(self.count.read_text().strip(), "1")
+
+    def test_counter_write_failure_stays_fail_open(self):
+        self.env["MOUNT_FAIL"] = "1"
+        result = self.run_guard("check")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("MIBR_BOOT_GUARD=COUNT_NOT_WRITTEN", result.stdout)
+        self.assertNotIn("STRUCTURE_INVALID", result.stdout)
 
     def test_clear_resets_and_returns_to_read_only(self):
         self.run_guard("check")
@@ -94,6 +158,7 @@ class BootGuard(Sandbox):
         self.count.write_text("garbage\n")
         self.assertEqual(self.run_guard("check").returncode, 0)
 
+    @unittest.skipUnless((KIT / "config/lsd-block.txt").is_file(), "research-only kit lsd.sh block is omitted from the public source tree")
     def test_lsd_block_gates_everything(self):
         lines = (KIT / "config/lsd-block.txt").read_text().splitlines()
         start = next(i for i, line in enumerate(lines) if line.startswith("if "))
@@ -103,10 +168,11 @@ class BootGuard(Sandbox):
             self.assertIn(needed, guarded)
         self.assertEqual("\n".join(lines).count("MIBR-CarPlay.jar"), 1)
 
+    @unittest.skipUnless((KIT / "config/lsd-block.txt").is_file(), "research-only kit lsd.sh block is omitted from the public source tree")
     def test_block_runs_without_mibr_when_disabled(self):
-        block = (KIT / "config/lsd-block.txt").read_text().replace("/mnt/app/root/mibr-kit", str(self.app / "root/mibr-kit"))
-        shutil.copy(GUARD, self.app / "root/mibr-kit/boot-guard.ksh")
-        self.script(self.app / "root/mibr-kit/boot.ksh", "#!/bin/sh\nexit 0\n")
+        block = (KIT / "config/lsd-block.txt").read_text().replace("/mnt/app/root/mibr/scripts", str(self.app / "root/mibr/scripts"))
+        shutil.copy(GUARD, self.app / "root/mibr/scripts/boot-guard.ksh")
+        self.script(self.app / "root/mibr/scripts/boot.ksh", "#!/bin/sh\nexit 0\n")
         probe = 'BOOTCLASSPATH=base; VMOPTIONS=; BASE_DIR=x\n' + block.replace("/bin/ksh ", SHELL + " ") + '\necho "CP=$BOOTCLASSPATH"\n'
         run = lambda: subprocess.run([SHELL, "-c", probe], env=self.env, capture_output=True, text=True).stdout
         self.assertIn("MIBR-CarPlay.jar", run())
@@ -120,14 +186,14 @@ class Watchdog(Sandbox):
         self.app = self.root / "app"
         self.tmp = self.root / "tmp"
         self.tmp.mkdir()
-        self.script(self.app / "root/mibr-v3/bin/mibr-v3-service", "#!/bin/sh\nexit 0\n")
-        self.script(self.app / "root/mibr-v3/bin/mibr-key40d", "#!/bin/sh\nexit 0\n")
+        self.script(self.app / "root/mibr/bin/mibr-v3-service", "#!/bin/sh\nexit 0\n")
+        self.script(self.app / "root/mibr/bin/mibr-key40d", "#!/bin/sh\nexit 0\n")
         self.env.update(MIBR_WATCH_APP=str(self.app), MIBR_WATCH_TMP=str(self.tmp), MIBR_WATCH_SHELL=SHELL,
                         MIBR_WATCH_TICK="1", MIBR_WATCH_INITIAL="0", MIBR_WATCH_MAX="2", MIBR_WATCH_HMI_STABLE="1",
                         RESTARTS=str(self.root / "restarts"), SUP_RUNS=str(self.root / "sup"))
         # The fake boot script records the call and does not bring the broker back.
-        self.script(self.app / "root/mibr-v3/mibr-v3-boot.ksh", '#!/bin/sh\necho "$1" >> "$RESTARTS"\n')
-        self.script(self.app / "root/altscreen-u2/scripts/parity_drive_supervisor.sh", '#!/bin/sh\necho run >> "$SUP_RUNS"\n')
+        self.script(self.app / "root/mibr/scripts/mibr-v3-boot.ksh", '#!/bin/sh\necho "$1" >> "$RESTARTS"\n')
+        self.script(self.app / "root/mibr/scripts/parity_drive_supervisor.sh", '#!/bin/sh\necho run >> "$SUP_RUNS"\n')
         self.sleeper = subprocess.Popen(["sleep", "120"])
         self.addCleanup(self.sleeper.kill)
         (self.tmp / "mibr-key40d.pid").write_text(f"{self.sleeper.pid}\n")
@@ -172,7 +238,8 @@ class Watchdog(Sandbox):
         self.start()
         self.wait_state("supervisor=off")
         self.assertFalse((self.root / "sup").exists())
-        (self.app / "root/mibr-parity-drive.enabled").write_text("1\n")
+        (self.app / "root/mibr/config/features").mkdir(parents=True, exist_ok=True)
+        (self.app / "root/mibr/config/features/mibr-parity-drive.enabled").write_text("1\n")
         (self.tmp / "mibr-cpvc-profile-ready").touch()
         self.wait_state("supervisor=gaveup:2")
         self.assertEqual(len((self.root / "sup").read_text().split()), 2)
@@ -187,7 +254,18 @@ class Watchdog(Sandbox):
 
     def test_clears_boot_guard_after_hmi_up(self):
         (self.tmp / "mibr-v3-service.pid").write_text(f"{self.sleeper.pid}\n")
-        self.script(self.app / "root/mibr-kit/boot-guard.ksh", '#!/bin/sh\necho "$1" >> "$RESTARTS"\n')
+        self.script(self.app / "root/mibr/scripts/boot-guard.ksh", '#!/bin/sh\necho "$1" >> "$RESTARTS"\n')
+        (self.tmp / "mibr-hmi-up").touch()
+        self.start()
+        end = time.time() + 10
+        while time.time() < end and not (self.root / "restarts").exists():
+            time.sleep(0.2)
+        self.assertEqual((self.root / "restarts").read_text().split(), ["clear"])
+
+    def test_clear_does_not_call_the_legacy_guard(self):
+        (self.tmp / "mibr-v3-service.pid").write_text(f"{self.sleeper.pid}\n")
+        self.script(self.app / "root/mibr-kit/boot-guard.ksh", '#!/bin/sh\necho LEGACY >> "$RESTARTS"\n')
+        self.script(self.app / "root/mibr/scripts/boot-guard.ksh", '#!/bin/sh\necho "$1" >> "$RESTARTS"\n')
         (self.tmp / "mibr-hmi-up").touch()
         self.start()
         end = time.time() + 10
