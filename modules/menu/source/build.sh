@@ -8,6 +8,7 @@ REPO="$(cd -- "$MODULE/../../.." && pwd)"
 : "${OEM_ACTIVATOR_SOURCE:?Set OEM_ACTIVATOR_SOURCE to a locally extracted source file}"
 : "${OEM_WIDGET_FACTORY_SOURCE:?Set OEM_WIDGET_FACTORY_SOURCE to a locally extracted source file}"
 : "${OUT:?Set OUT to a local build directory outside public Git}"
+PROFILE="${PROFILE:-skoda-mu1440-p4526}"
 REGISTRY_JSON="${REGISTRY_JSON:-$REPO/settings/registry.json}"
 
 for executable in "$J9_HOME/bin/javac" "$J9_HOME/bin/jar"; do
@@ -21,12 +22,17 @@ python3 "$MODULE/generate_catalog.py" --registry "$REGISTRY_JSON" --menu "$MODUL
 python3 "$MODULE/prepare_oem_sources.py" \
   --activator "$OEM_ACTIVATOR_SOURCE" \
   --widget-factory "$OEM_WIDGET_FACTORY_SOURCE" \
-  --out-dir "$OUT/oem-source"
+  --out-dir "$OUT/oem-source" \
+  --profile "$PROFILE"
 mkdir -p "$OUT/classes"
-mapfile -t SOURCES < <(find "$MODULE/java/de/mibr/hmi" "$MODULE/java/mib/mu1440/vehiclespeed" -type f -name '*.java' -print | sort)
+# One JAR per profile: the generated binding names the adapter; its source dirs join the build.
+python3 "$MODULE/generate_profile_binding.py" --profile "$PROFILE" --out-dir "$OUT/profile"
+mapfile -t ADAPTER_DIRS < <(python3 "$MODULE/generate_profile_binding.py" --profile "$PROFILE" --print-source-dirs)
+mapfile -t SOURCES < <(find "$MODULE/java/de/mibr/hmi" "$MODULE/java/mib/mu1440/vehiclespeed" ${ADAPTER_DIRS[@]+"${ADAPTER_DIRS[@]}"} -type f -name '*.java' -print | sort)
 "$J9_HOME/bin/javac" -encoding UTF-8 -source 1.2 -target 1.2 \
   -cp "$LSD_JAR" -d "$OUT/classes" \
   "${SOURCES[@]}" \
+  "$OUT/profile/de/mibr/hmi/MibrProfileBinding.java" \
   "$OUT/catalog/MibrSettingsCatalog.java" \
   "$OUT/catalog/MibrMenuDefinition.java" \
   "$OUT/oem-source/de/vw/mib/cio/internal/Activator.java" \

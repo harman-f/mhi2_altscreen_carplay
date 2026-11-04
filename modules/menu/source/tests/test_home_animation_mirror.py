@@ -11,6 +11,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import profile_stubs
+
 P = Path(__file__).resolve().parents[1]
 H = P / "java/de/mibr/hmi"
 SGM = (P.parents[2] / "reference/viewhandler-sgm-decoded/evidence-r2/cfr/Sgm/generated/de/vw/mib/"
@@ -91,7 +93,7 @@ class HomeAnimationMirror(unittest.TestCase):
         self.assertEqual(table.count("{") - 1, 73)
         root = Path(tempfile.mkdtemp(prefix="mibr-anim-mirror-"))
         sources = []
-        for rel, text in STUBS.items():
+        for rel, text in list(STUBS.items()) + list(profile_stubs.STUBS.items()):
             p = root / "src" / rel
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(text, encoding="utf-8")
@@ -99,7 +101,7 @@ class HomeAnimationMirror(unittest.TestCase):
         t = root / "src/de/mibr/hmi/MirrorTest.java"
         t.parent.mkdir(parents=True, exist_ok=True)
         t.write_text(TEST.replace("TABLE", "new int[][]" + table), encoding="utf-8")
-        sources += [str(t), str(H / "MibrHomeAnimationMirror.java")]
+        sources += [str(t), str(H / "MibrHomeAnimationMirror.java")] + [str(x) for x in profile_stubs.REAL_SOURCES]
         out = root / "classes"
         out.mkdir()
         run = subprocess.run([javac, "-encoding", "UTF-8", "-d", str(out)] + sources, capture_output=True, text=True)

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "profile_id": "seat-mu1409-p4708",
+  "adapter_class": "de.mibr.hmi.MibrSeatMu1409Profile",
+  "adapter_from": [],
+  "pass_label": "MU1409_OEM_SOURCE_PATCH",
+  "activator": {
+    "already_patched_markers": [
+      "de.mibr.hmi.MibrHomeCio",
+      "new de.mibr.hmi.MibrVisualizationService"
+    ],
+    "edits": [
+      {
+        "label": "ACTIVATOR_START",
+        "old": "public void start(BundleContext bundleContext) throws Exception {\n        this.bundleContext = bundleContext;",
+        "new": "public void start(BundleContext bundleContext) throws Exception {\n        de.mibr.hmi.MibrHomeCio.activatorStarted();\n        this.bundleContext = bundleContext;"
+      },
+      {
+        "label": "ACTIVATOR_STOP",
+        "old": "public void stop(BundleContext bundleContext) throws Exception {\n    }",
+        "new": "public void stop(BundleContext bundleContext) throws Exception {\n        de.mibr.hmi.MibrHomeCio.deactivate();\n    }"
+      },
+      {
+        "label": "ACTIVATOR_JAVA12_CAUSE",
+        "old": "throw new NoClassDefFoundError().initCause(classNotFoundException);",
+        "new": "NoClassDefFoundError err = new NoClassDefFoundError(); err.initCause(classNotFoundException); throw err;"
+      },
+      {
+        "label": "ACTIVATOR_BIND",
+        "old": "this.factory = new Factory(this.logger, configurationManager, this.dictionary, this.idService);",
+        "new": "this.factory = new Factory(this.logger, configurationManager, this.dictionary, this.idService);\n        de.mibr.hmi.MibrHomeCio.bind(this.factory, this.dictionary, dispatcher, this.idService);"
+      },
+      {
+        "label": "ACTIVATOR_ACTIVATE",
+        "old": "this.factory.setScriptWidgetService(this.scriptWidgetCioService);",
+        "new": "this.factory.setScriptWidgetService(this.scriptWidgetCioService);\n        de.mibr.hmi.MibrHomeCio.activate(this.cioVisualizationService);"
+      },
+      {
+        "label": "ACTIVATOR_VISUALIZATION",
+        "old": "this.cioVisualizationService = (CioVisualizationService)object;",
+        "new": "this.cioVisualizationService = new de.mibr.hmi.MibrVisualizationService((CioVisualizationService)object);"
+      }
+    ]
+  },
+  "widget_factory": {
+    "already_patched_markers": [
+      "import de.mibr.hmi.MibrHomeList;",
+      "return new MibrHomeList();"
+    ],
+    "edits": [
+      {
+        "label": "WIDGET_FACTORY_IMPORT",
+        "old": "import de.vw.mib.view.internal.treebuilder.WidgetFactory;",
+        "new": "import de.vw.mib.view.internal.treebuilder.WidgetFactory;\nimport de.mibr.hmi.MibrHomeList;"
+      },
+      {
+        "label": "WIDGET_FACTORY_SLOT_55",
+        "old": "case 55: {\n                return new WidgetList();\n            }",
+        "new": "case 55: {\n                return new MibrHomeList();\n            }"
+      }
+    ]
+  }
+}
