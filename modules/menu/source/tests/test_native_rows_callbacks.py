@@ -13,7 +13,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import profile_stubs
+if __package__:
+    from . import profile_stubs
+else:
+    import profile_stubs
 
 P = Path(__file__).resolve().parents[1]
 ROOT = P.parents[2]
