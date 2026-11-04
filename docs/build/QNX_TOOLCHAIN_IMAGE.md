@@ -26,35 +26,27 @@ Known build-source provenance for that archived image:
 
 The archived toolchain image is a **compiler/build environment**, not an application firmware image or a distributable installer. GCC 4.9.4 source downloads are unnecessary when the verified archived image is being used. Project C/C++ sources still need recompiling after changes. The OEM Java/J9 path is separate and requires exact firmware-specific dependencies.
 
-## Present CI implementation versus intended consumption
+## Current CI implementation (2026-11-04)
 
-As of 2026-11-04, the public workflows still invoke `tools/build_qnx65_image.sh` to clone the pinned upstream toolchain and build a **new** local image named `mhi2-qnx65-armv7-public:4.9`. In particular, `.github/workflows/build-mu1440-source.yml` and `.github/workflows/build-altscreen111-gen2.yml` do so. Other native workflows (`build-direct-ts-remux.yml`, `build-keypanel-native.yml`, `build-support-tools.yml`) also obtain/build the pinned toolchain separately. A recent download fallback made that legacy rebuild path more reliable; it did **not** switch CI to the archived registry image.
+The five public native-build workflows (MU1440 source, GEN2, direct-TS remux, keypanel and support tools) now share `tools/ci_qnx65_image.sh`. The script has two **explicit** modes:
 
-**Desired default for future CI changes:** pull the canonical digest once per relevant build job, verify that the exact image is available, then execute the existing native build in that image. Keep `tools/build_qnx65_image.sh` as an explicit disaster-recovery/reprovisioning command, not an automatic silent fallback. Do not delete or overwrite the archived image or its provenance.
+- **archived-pinned**: when the repository Actions variable `QNX65_VERIFIED_IMAGE` is present, it must be an immutable GHCR `image@sha256:64hex` reference. The runner pulls and checks that digest, validates the linux/amd64 platform and GCC 4.9 cross-compiler, then tags it locally for the existing build commands. Any failed pull or check **stops the job**; there is no automatic network/source fallback.
+- **legacy-rebuild**: until the registry alias/access has been configured, each workflow explicitly sets `QNX65_LEGACY_REBUILD_ALLOWED=1` and emits a visible warning before invoking the existing pinned source-build helper. This temporary bootstrap preserves build availability but **still downloads/rebuilds GCC** and is not the final performance improvement. Without that explicit flag and without an image reference, the selector fails closed.
 
-Example for a Linux GitHub runner or developer machine with Docker and read permission to the container package:
+To activate the archived image without publishing a separate development account name in source:
 
-```bash
-IMAGE="${QNX65_VERIFIED_IMAGE:?set the approved, digest-qualified image reference}"
-case "$IMAGE" in *@sha256:*) ;; *) echo 'Expected digest-qualified image' >&2; exit 2 ;; esac
-docker pull "$IMAGE"
-docker image inspect "$IMAGE" >/dev/null
-docker run --rm --platform linux/amd64 "$IMAGE" arm-unknown-nto-qnx6.5.0eabi-gcc --version
-```
+1. In the public repository, open **Settings → Secrets and variables → Actions → Variables** and create `QNX65_VERIFIED_IMAGE`. Supply an **approved, pullable, digest-qualified GHCR image reference** confirmed with the archive owner. Do not supply a mutable `:latest` or `:4.9` tag.
+2. Ensure that GitHub-hosted runners can pull it. The selector currently uses Docker's existing read access: a publicly readable image works without login, but a private package needs an independently configured and reviewed read-only authentication step. Do not add a credential to the repository.
+3. Verify that the MU1440, GEN2, remux, keypanel and support-tool CI jobs all report `QNX_IMAGE_READY=PASS mode=archived-pinned`; inspect each attached `QNX_TOOLCHAIN_PROVENANCE.txt`, output SHA-256, QNX ARM ELF identity and tests.
+4. After real archived-mode CI success, delete the temporary `QNX65_LEGACY_REBUILD_ALLOWED=1` allowance from the five jobs. Retain `tools/build_qnx65_image.sh` as a separately invoked recovery helper.
 
-If access to the registry is restricted, configure read-only GHCR authorization for CI; a pull failure is a **failed preflight**, not permission to replace the digest with `:latest`, build from an unverified network source, or skip the identity check. Do not put registry credentials in a source tree or release artifact.
+The archived compiler may differ from the more recent source-rebuilt image because the bootstrap Dockerfile and Debian snapshot differ. **No byte-for-byte reproducibility or vehicle compatibility is inferred.** Changes in output hashes require review before anything enters a release.
 
-### Migration/compatibility gate — not yet executed
+Every native job now attaches a provenance text file recording the selected mode, actual local Docker image ID, compiler version, source revision and declared upstream toolchain recipe. Archived mode additionally records the checked manifest digest. This is supplemental evidence, not a replacement for the existing `MODULE_BUILD_LINEAGE.json` receipt, which still lacks a verified image-digest field. Only a later lineage-tool change may integrate the real Docker identity into a validated release receipt.
 
-Although the archived image and currently rebuilt image share an upstream toolchain commit, their Dockerfile/preflight and Debian snapshot provenance differ. **Do not assume byte-identical toolchain contents or outputs.** Before switching a workflow, verify on the actual CI runner:
+### Reproducibility/compatibility gate — still required for archived mode
 
-1. The immutable digest resolves and the expected QNX ARMv7 cross-compiler runs; record `--version` and relevant tool locations.
-2. Compare compiler/linker flags, dependencies, ARM/QNX ELF headers and required symbols against the current job; run the existing host and native build tests.
-3. Compare output SHA-256 with the prior recipe when reproducibility is expected. Record and review legitimate differences rather than silently replacing frozen vehicle-evidenced binary identities.
-4. Keep the exact image digest and build source revision in the build metadata; verify the generated output inventory and module receipts.
-5. Check access and behavior for all affected jobs before retiring redundant toolchain-build steps.
-
-This document records the intended selection policy and work required; it is **not** evidence that a workflow was migrated, that outputs are bit-reproducible, or that the archived image was smoke-tested in the current PR.
+The previously verified source-build path is not equivalent evidence for the archived image. Confirm the compiler/sysroot and required `qcc` and readelf tools, run full native build/host tests, compare ABI/ELF headers and output SHA-256 against the established baseline, and review any differences. Keep QNX compiler-verified binaries separate from frozen vehicle-tested artifacts until their own acceptance. The image-selection helper does not install on a unit, alter persistent storage, or qualify a new profile.
 
 ## Release pipeline requirements
 
