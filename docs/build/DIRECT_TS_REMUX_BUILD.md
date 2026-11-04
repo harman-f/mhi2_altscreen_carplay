@@ -44,8 +44,14 @@ FFmpeg input:
 
 ```text
 FFmpeg 6.1.5
-SHA-256 b8c8e926b948c14df1264cd0beac1c773df9170ac9cac97bdf1275cd3d385902
+ffmpeg-6.1.5.tar.xz
+SHA-256 05fbe9db1f5452a3605bb1d9bf91da9d4bb08162891692e4f172b58c49109412
 ```
+
+This is the archive used by `tools/build_direct_ts_remux.sh` and CI. The
+historical vehicle-proven run143 artifact was built from `ffmpeg-6.1.5.tar.gz`
+(SHA-256 `b8c8e926b948c14df1264cd0beac1c773df9170ac9cac97bdf1275cd3d385902`,
+see its receipt under `artifacts/`); the receipt is not rewritten.
 
 The exact build logic is in:
 

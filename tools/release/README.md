@@ -22,10 +22,11 @@ identity; this is supplemental evidence, not yet a digest-attested
 Current release readiness uses pinned historical binaries and **does not**
 replace or requalify them with freshly compiled artifacts. In particular,
 the support-tools workflow must not write candidate output back to
-`main` automatically: an existing legacy-mode artifact refresh now also
-requires the explicit `QNX65_ALLOW_ARTIFACT_AUTOCOMMIT=true` repository
-variable. Archived-image builds remain build-only, even if that variable
-is enabled.
+`main` automatically. Its artifact auto-commit step is a disabled legacy
+mechanism: it would need `QNX_TOOLCHAIN_MODE=legacy-rebuild` (plus the
+`QNX65_ALLOW_ARTIFACT_AUTOCOMMIT=true` variable), and the image selector never
+sets that mode, so it cannot run. Archived-image builds are build-only; the
+step is scheduled for removal.
 
 A future multi-profile packager must consume **verified native build lineage**
 (including the *actual* compiler image digest and output SHA-256), rather than

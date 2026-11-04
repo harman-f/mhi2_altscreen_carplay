@@ -274,4 +274,5 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mu1440-source-qnx-build
+          retention-days: 30
           path: build/mu1440-source/**

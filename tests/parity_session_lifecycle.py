@@ -121,6 +121,15 @@ time.sleep(60)
         assert cp.returncode==0,cp.stderr
         assert started.exists() and not paths["LOCK_PATH"].exists();stock()
 
+        # A live legacy Auto-Direct supervisor pid file must refuse the start (rc 13)
+        # without any ownership mutation; a pid file for a dead process is ignored.
+        bridge_delay(.1)
+        paths["OLD_AUTO_PID"].write_text(str(os.getpid())+"\n")
+        cp=subprocess.run(command,capture_output=True,timeout=5)
+        assert cp.returncode==13 and b"legacy Auto-Direct" in cp.stderr,(cp.returncode,cp.stderr)
+        assert not started.exists() and not paths["LOCK_PATH"].exists();stock()
+        paths["OLD_AUTO_PID"].unlink()
+
         # Retain the initial backend across settings changes and native stop.
         bridge_delay(60)
         parent=subprocess.Popen(command,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
@@ -241,4 +250,4 @@ time.sleep(60)
             cp=subprocess.run([str(binary),"--restore-stock"],capture_output=True,timeout=4)
             assert cp.returncode==0,cp.stderr
     finally:halt.set();thread.join(timeout=2)
-print("PARITY_SESSION_LIFECYCLE=PASS gate_only dmdt_probe_no_writer frozen_backend typed_stop until_stop parallel parent_kill watchdog_kill foreign_pid inflight_barrier stale_proof proof_loss failed_grace_no_resume partial_release restore_failure timeout")
+print("PARITY_SESSION_LIFECYCLE=PASS gate_only dmdt_probe_no_writer frozen_backend legacy_auto_direct_refusal typed_stop until_stop parallel parent_kill watchdog_kill foreign_pid inflight_barrier stale_proof proof_loss failed_grace_no_resume partial_release restore_failure timeout")

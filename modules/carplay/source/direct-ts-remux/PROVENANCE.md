@@ -40,8 +40,10 @@ The developer build keeps symbol/debug information for inspection and fault anal
 
 The remuxer statically links the required subset of FFmpeg 6.1.5:
 
-- release tarball: `ffmpeg-6.1.5.tar.gz`
-- SHA-256: `b8c8e926b948c14df1264cd0beac1c773df9170ac9cac97bdf1275cd3d385902`
+- release tarball (current build script and CI): `ffmpeg-6.1.5.tar.xz`
+- SHA-256: `05fbe9db1f5452a3605bb1d9bf91da9d4bb08162891692e4f172b58c49109412`
+- historical run143 artifact: built from `ffmpeg-6.1.5.tar.gz`, SHA-256
+  `b8c8e926b948c14df1264cd0beac1c773df9170ac9cac97bdf1275cd3d385902` (see its receipt under `artifacts/`)
 - enabled components: H.264 demux/parser, MPEG-TS muxer, file and TCP protocols
 
 See `THIRD_PARTY_NOTICES.md` for third-party licensing/provenance.

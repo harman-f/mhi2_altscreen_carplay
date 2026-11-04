@@ -7,7 +7,7 @@
 - [`scripts/`](scripts/README.md) documents QNX installer scripts. Their maintained source remains under `deployment/` and `runtime/`; the release job copies exactly those bytes.
 - Remaining runtime scripts, firmware-specific modules, menu files and configuration are assembled by the release recipe and audited separately. Nothing in `sd/` implies that the generated package is complete or vehicle-qualified.
 
-**Pipeline contract:** `python3 tools/release/sd_support.py --source-check --self-test` validates inventory ownership and pinned helper hashes. After staging with `tools/prepare_mu1440_sd.sh`, `python3 tools/release/sd_support.py --stage-root <staged-root>` verifies every listed source/target pair byte for byte. The existing QNX shell scanner checks all delivered shell scripts, and the archive validator reopens the final ZIP.
+**Pipeline contract:** `python3 tools/release/sd_support.py --self-test --source-check` validates inventory ownership and pinned helper hashes. After staging with `tools/prepare_mu1440_sd.sh`, `python3 tools/release/sd_support.py --stage-root <staged-root>` verifies every listed source/target pair byte for byte. The existing QNX shell scanner checks all delivered shell scripts, and the archive validator reopens the final ZIP.
 
 Do not copy OEM firmware files, third-party M.I.B. SD content or unspecified utility binaries into this directory. Additional tools (for example `sed`) must first be proven compatible with the QNX target architecture and their options, be included with provenance/hash, and be resolved through a verified installation `PATH` or an explicit packaged path. The host's `PATH` is not evidence of availability on MMX/RCC.
 

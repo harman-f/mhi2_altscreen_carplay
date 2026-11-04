@@ -38,8 +38,22 @@ if [[ -n "$QNX65_VERIFIED_IMAGE" ]]; then
       echo "QNX_GHCR_LOGIN=FAIL" >&2; exit 19;
     }
   fi
-  if ! docker pull "$QNX65_VERIFIED_IMAGE" > "$RUNNER_TEMP/qnx65-image-pull.log" 2>&1; then
-    echo "QNX_IMAGE_PULL=FAIL (registry access or digest mismatch; no automatic source fallback)" >&2
+  # Bounded retry for transient registry errors only; the pull is by immutable
+  # digest, so a success is always the pinned image. Fail closed after the last try.
+  pull_ok=0
+  for attempt in 1 2 3; do
+    if docker pull "$QNX65_VERIFIED_IMAGE" > "$RUNNER_TEMP/qnx65-image-pull.log" 2>&1; then
+      pull_ok=1
+      break
+    fi
+    echo "QNX_IMAGE_PULL_ATTEMPT=$attempt/3 FAIL" >&2
+    case "$attempt" in
+      1) sleep 5 ;;
+      2) sleep 15 ;;
+    esac
+  done
+  if [[ "$pull_ok" -ne 1 ]]; then
+    echo "QNX_IMAGE_PULL=FAIL (registry access or digest mismatch after 3 attempts; no automatic source fallback)" >&2
     exit 11
   fi
   image_arch=$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$QNX65_VERIFIED_IMAGE")

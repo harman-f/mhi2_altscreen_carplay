@@ -1,6 +1,6 @@
 # MU1440 OEM menu adapter source
 
-This module contains project-authored Java/J9 adapter source for the MU1440 HOME and CarPlay settings menu, updated through the R57 menu implementation. It is a source publication, not an installer or a vehicle-qualified release. The separately published `src/experimental/hmi-model` remains an OEM-independent protocol/model example; this module adds the real OEM-widget integration without replacing that model.
+This module contains project-authored Java/J9 adapter source for the MU1440 HOME and CarPlay settings menu, updated through the R57 menu implementation. It is a source publication, not an installer or a vehicle-qualified release. `tests/PublicProtocolSmokeTest.java` is an OEM-independent host check of the protocol/model classes.
 
 The menu uses the repository's single canonical [settings registry](../../../settings/registry.json). The adjacent `menu-definition.json` only describes menu navigation, labels and visibility. It does not define values, defaults, storage or apply behavior. Generated `MibrSettingsCatalog.java` and `MibrMenuDefinition.java` are built from the registry and menu JSON. The R57 `Ansichten` submenu contains broker-backed virtual rows for cockpit-view following; those rows do not add keys to the 48-setting registry.
 

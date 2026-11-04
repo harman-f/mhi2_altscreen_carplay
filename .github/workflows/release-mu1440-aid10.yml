@@ -331,6 +331,33 @@ jobs:
           python3 tools/release/audit_legacy.py "$ZIP_NAME"
           sha256sum "$ZIP_NAME" > "$ZIP_NAME.sha256"
 
+      - name: Validate the extracted final archive
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # The staging dir was validated before zipping; repeat the validators on
+          # exactly what a user gets after extracting the final ZIP.
+          FINAL="$(mktemp -d "$RUNNER_TEMP/final-extract.XXXXXX")"
+          unzip -q "$ZIP_NAME" -d "$FINAL"
+          # qnx_scripts.py applies the MU1440 target-shell scan (with its audited
+          # non-executing-text exceptions) to every extracted *.sh.
+          python3 tools/release/qnx_scripts.py --package-root "$FINAL"
+          scripts=()
+          while IFS= read -r script; do scripts+=("$script"); done < <(find "$FINAL" -type f -name '*.sh' | sort)
+          test "${#scripts[@]}" -gt 0
+          for script in "${scripts[@]}"; do
+            test -x "$script"
+            bash -n "$script"
+          done
+          test -x "$FINAL/payload/tee"
+          test -x "$FINAL/payload/sha256sum"
+          (
+            cd "$FINAL"
+            sha256sum -c PAYLOAD.sha256
+            sha256sum -c RELEASE-SHA256SUMS.txt
+          )
+          rm -rf "$FINAL"
+
       - name: Enforce modular release publication boundary
         shell: bash
         run: |
