@@ -98,7 +98,7 @@ jobs:
           cp build/keypanel/ELF.txt build/keypanel/dist/
           cp build/keypanel/NEEDED.txt build/keypanel/dist/
       - name: Upload verified QNX binary and installer
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mibr-native-keypanel-MU1440-QNX65-ARMv7
           path: build/keypanel/dist/
