@@ -12,6 +12,7 @@ on:
       - 'settings/**'
       - 'runtime/diagnostics/**'
       - 'runtime/deployment/**'
+      - 'sd/**'
       - 'tools/release/**'
       - 'tools/prepare_mu1440_sd.sh'
       - 'tools/check_mu1440_target_shell.py'
@@ -30,6 +31,7 @@ on:
       - 'settings/**'
       - 'runtime/diagnostics/**'
       - 'runtime/deployment/**'
+      - 'sd/**'
       - 'tools/release/**'
       - 'tools/prepare_mu1440_sd.sh'
       - 'tools/check_mu1440_target_shell.py'
@@ -79,7 +81,7 @@ jobs:
           fi
 
       - name: Upload release dependency plan (not a package)
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: multi-profile-beta-release-plan
           path: |
@@ -107,6 +109,7 @@ jobs:
           python3 tools/check_module_index.py --self-test
           python3 tools/validate_modular_package.py --self-test
           python3 tools/release/qnx_scripts.py --self-test --canonical
+          python3 tools/release/sd_support.py --self-test --source-check
           python3 tools/release/audit_legacy.py --self-test
           test -s modules/carplay/runtime/auto-direct/common.sh
           test -s modules/carplay/runtime/isotx2-gate/install_preload.sh
@@ -170,6 +173,7 @@ jobs:
           PKG="$RUNNER_TEMP/pkg"
           mkdir -p "$PKG"
           tools/prepare_mu1440_sd.sh "$PKG"
+          python3 tools/release/sd_support.py --stage-root "$PKG"
           # Validate exactly the shipped scripts, not only their source folders.
           python3 tools/release/qnx_scripts.py --package-root "$PKG"
 

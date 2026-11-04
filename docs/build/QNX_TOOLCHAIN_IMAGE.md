@@ -10,7 +10,7 @@ The project has an existing, prebuilt GCC 4.9 / QNX 6.5 / ARMv7 Docker image arc
 sha256:19b5fb1d4559264a844080b6e381837655d4dcca50151cce3ff0ac509e4f3393
 ```
 
-The original archive belongs to the separate development build infrastructure. The public project must first establish and verify an approved, accessible registry reference before CI can switch to it. Do not guess a registry path, treat this digest alone as a pullable image reference, or assume a mirrored image necessarily retains the same manifest digest. Use a fully qualified `registry/image@sha256:<verified-manifest>` value for actual builds; keep internal registry ownership details outside this public repository.
+The original image belongs to the separate historical Research build infrastructure. Its digest is retained for provenance, **not** used by the current public CI. The public, project-owned GHCR image and its verified registry digest are defined in the section below and the committed `tools/qnx65-image.lock`; the two images are not assumed byte-identical.
 
 Known build-source provenance for that archived image:
 
@@ -26,35 +26,43 @@ Known build-source provenance for that archived image:
 
 The archived toolchain image is a **compiler/build environment**, not an application firmware image or a distributable installer. GCC 4.9.4 source downloads are unnecessary when the verified archived image is being used. Project C/C++ sources still need recompiling after changes. The OEM Java/J9 path is separate and requires exact firmware-specific dependencies.
 
-## Present CI implementation versus intended consumption
+## Current public compiler image (Harman-F)
 
-As of 2026-11-04, the public workflows still invoke `tools/build_qnx65_image.sh` to clone the pinned upstream toolchain and build a **new** local image named `mhi2-qnx65-armv7-public:4.9`. In particular, `.github/workflows/build-mu1440-source.yml` and `.github/workflows/build-altscreen111-gen2.yml` do so. Other native workflows (`build-direct-ts-remux.yml`, `build-keypanel-native.yml`, `build-support-tools.yml`) also obtain/build the pinned toolchain separately. A recent download fallback made that legacy rebuild path more reliable; it did **not** switch CI to the archived registry image.
+The independent [project-owned archive workflow](../../.github/workflows/archive-qnx65-image.yml)
+published a GCC 4.9.4 / QNX 6.5 / ARMv7 image successfully in
+[run 41805123089](https://github.com/harman-f/mhi2_altscreen_carplay/actions/runs/41805123089).
+The registry-authoritative reference is:
 
-**Desired default for future CI changes:** pull the canonical digest once per relevant build job, verify that the exact image is available, then execute the existing native build in that image. Keep `tools/build_qnx65_image.sh` as an explicit disaster-recovery/reprovisioning command, not an automatic silent fallback. Do not delete or overwrite the archived image or its provenance.
-
-Example for a Linux GitHub runner or developer machine with Docker and read permission to the container package:
-
-```bash
-IMAGE="${QNX65_VERIFIED_IMAGE:?set the approved, digest-qualified image reference}"
-case "$IMAGE" in *@sha256:*) ;; *) echo 'Expected digest-qualified image' >&2; exit 2 ;; esac
-docker pull "$IMAGE"
-docker image inspect "$IMAGE" >/dev/null
-docker run --rm --platform linux/amd64 "$IMAGE" arm-unknown-nto-qnx6.5.0eabi-gcc --version
+```text
+ghcr.io/harman-f/mhi2-qnx65-armv7@sha256:20d7d2bb16d6718d204afc7714b0e73227651935a9981a8bd2e2087cef48dd0d
 ```
 
-If access to the registry is restricted, configure read-only GHCR authorization for CI; a pull failure is a **failed preflight**, not permission to replace the digest with `:latest`, build from an unverified network source, or skip the identity check. Do not put registry credentials in a source tree or release artifact.
+All five native build workflows consume this **exact** image using
+[`tools/qnx65-image.lock`](../../tools/qnx65-image.lock) and the common
+[`tools/ci_qnx65_image.sh`](../../tools/ci_qnx65_image.sh) selector.
+The lockfile lives in the public repository with source/build recipes:
+there is no separate dependency on the private Research account or on
+a manually configured repository Actions variable.
 
-### Migration/compatibility gate — not yet executed
+CI authenticates to the **same repository's** GHCR package using a scoped
+`GITHUB_TOKEN` with `packages: read`. It checks the complete manifest
+digest, `linux/amd64` platform, GCC 4.9 compiler and QNX readelf/qcc tools.
+Missing access, a mismatching override, wrong image/digest or an absent
+compiler fails closed. A normal build does **not** rebuild or download GCC.
+`tools/build_qnx65_image.sh` remains an explicit, independent
+disaster-recovery/reprovisioning command.
 
-Although the archived image and currently rebuilt image share an upstream toolchain commit, their Dockerfile/preflight and Debian snapshot provenance differ. **Do not assume byte-identical toolchain contents or outputs.** Before switching a workflow, verify on the actual CI runner:
+Each native build uploads `QNX_TOOLCHAIN_PROVENANCE.txt` with the
+verified image reference and manifest digest, compiler version, image ID,
+source revision and explicit `vehicle_qualified=false`. A source build
+passing CI **does not authorize** replacing the vehicle-tested legacy
+binaries or publishing a modular release. Review ELF/ABI symbols and
+SHA-256 differences versus previous builds.
 
-1. The immutable digest resolves and the expected QNX ARMv7 cross-compiler runs; record `--version` and relevant tool locations.
-2. Compare compiler/linker flags, dependencies, ARM/QNX ELF headers and required symbols against the current job; run the existing host and native build tests.
-3. Compare output SHA-256 with the prior recipe when reproducibility is expected. Record and review legitimate differences rather than silently replacing frozen vehicle-evidenced binary identities.
-4. Keep the exact image digest and build source revision in the build metadata; verify the generated output inventory and module receipts.
-5. Check access and behavior for all affected jobs before retiring redundant toolchain-build steps.
-
-This document records the intended selection policy and work required; it is **not** evidence that a workflow was migrated, that outputs are bit-reproducible, or that the archived image was smoke-tested in the current PR.
+The older Research image (`sha256:19b5fb...`) remains available for
+history; it is not byte-for-byte interchangeable with this separately
+rebuilt and published image. See the
+[Harman-F archive runbook](HARMAN_F_TOOLCHAIN_ARCHIVE.md).
 
 ## Release pipeline requirements
 
