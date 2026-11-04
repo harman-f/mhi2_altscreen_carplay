@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "profile": "seat-mu1447-p4709",
+  "firmware": "MHI2_ER_SEG11_P4709_MU1447",
+  "original_lsd_jxe_sha256": "945586fbede2fe53b5b41d7c10490641ff71fcc9581fb237cf40328f450cb22e",
+  "audio": {
+    "status": "pending-exact-audio-abi",
+    "auto_install": false,
+    "compiled_artifact": null,
+    "spatial_audio_enabled": false,
+    "stereo_upmix_enabled": false,
+    "reference_upstream": [
+      "luka-dev/mib2q-carplay-rgi@df73e061a29c4d996550716987f42a9243daa09a",
+      "yety-ua/mhi2-k3346-carplay-audio-upmix@feb077310a10ce9aef357ebb6467c549eca972ee"
+    ],
+    "evidence_requirements": [
+      "Verify external amplifier ECU/J525 part number and full coding on the actual fitted vehicle, not brand alone",
+      "Prove native QNX audio stack, PCM sink and session/focus APIs for exact target firmware; no Audi Qualcomm drivers",
+      "Observe multichannel MOST route/format/width and channel-to-speaker assignments using safe tests without overwriting amplifier coding",
+      "Confirm six independent music PCM channels, centre and LFE, gain limits, output phase/cabin matrix and DSP CPU deadline",
+      "Isolate voice, navigation announcements, telephone and reverse camera audio from upmix; preserve existing stock mixer owner",
+      "Prove per-profile signed-off ABI build/source provenance, QNX regression, rollback and repeatable on-car A/B"
+    ],
+    "safe_fallback": "Unmodified OEM stereo; never inject six-channel PCM or modify J525 without all gates"
+  },
+  "notes": "Source-only profile declaration; exact firmware identification does not establish physical amplifier identity"
+}
