@@ -26,6 +26,22 @@ Known build-source provenance for that archived image:
 
 The archived toolchain image is a **compiler/build environment**, not an application firmware image or a distributable installer. GCC 4.9.4 source downloads are unnecessary when the verified archived image is being used. Project C/C++ sources still need recompiling after changes. The OEM Java/J9 path is separate and requires exact firmware-specific dependencies.
 
+## Public repository-owned compiler archive (new implementation)
+
+A project-owned GHCR publication workflow now exists at
+[`archive-qnx65-image.yml`](../../.github/workflows/archive-qnx65-image.yml).
+It creates a separate package at `ghcr.io/harman-f/mhi2-qnx65-armv7`
+from the public repository's pinned toolchain recipe, tests GCC 4.9.4,
+QNX ARM ELF and qcc, and records the real registry digest in Actions evidence.
+The package is **not** considered available until that workflow actually
+publishes it and its visibility/actions read permissions are confirmed.
+See the [project-owned GHCR runbook](HARMAN_F_TOOLCHAIN_ARCHIVE.md).
+
+The original archived digest above remains a historic reference, **not**
+proof of identity with the separately rebuilt public image. The application
+builds must be switched only after a complete digest-pinned cross-build
+comparison; the current transition PR is [#126](https://github.com/harman-f/mhi2_altscreen_carplay/pull/126).
+
 ## Present CI implementation versus intended consumption
 
 As of 2026-11-04, the public workflows still invoke `tools/build_qnx65_image.sh` to clone the pinned upstream toolchain and build a **new** local image named `mhi2-qnx65-armv7-public:4.9`. In particular, `.github/workflows/build-mu1440-source.yml` and `.github/workflows/build-altscreen111-gen2.yml` do so. Other native workflows (`build-direct-ts-remux.yml`, `build-keypanel-native.yml`, `build-support-tools.yml`) also obtain/build the pinned toolchain separately. A recent download fallback made that legacy rebuild path more reliable; it did **not** switch CI to the archived registry image.
