@@ -200,7 +200,7 @@ jobs:
 
 
       - name: Publish build-confirmed gate artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.QNX_TOOLCHAIN_MODE == 'legacy-rebuild'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.QNX_TOOLCHAIN_MODE == 'legacy-rebuild' && vars.QNX65_ALLOW_ARTIFACT_AUTOCOMMIT == 'true'
         shell: bash
         run: |
           set -euxo pipefail
