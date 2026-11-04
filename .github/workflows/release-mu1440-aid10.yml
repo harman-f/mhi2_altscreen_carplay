@@ -12,6 +12,7 @@ on:
       - 'settings/**'
       - 'runtime/diagnostics/**'
       - 'runtime/deployment/**'
+      - 'sd/**'
       - 'tools/release/**'
       - 'tools/prepare_mu1440_sd.sh'
       - 'tools/check_mu1440_target_shell.py'
@@ -30,6 +31,7 @@ on:
       - 'settings/**'
       - 'runtime/diagnostics/**'
       - 'runtime/deployment/**'
+      - 'sd/**'
       - 'tools/release/**'
       - 'tools/prepare_mu1440_sd.sh'
       - 'tools/check_mu1440_target_shell.py'
@@ -107,6 +109,7 @@ jobs:
           python3 tools/check_module_index.py --self-test
           python3 tools/validate_modular_package.py --self-test
           python3 tools/release/qnx_scripts.py --self-test --canonical
+          python3 tools/release/sd_support.py --self-test --source-check
           python3 tools/release/audit_legacy.py --self-test
           test -s modules/carplay/runtime/auto-direct/common.sh
           test -s modules/carplay/runtime/isotx2-gate/install_preload.sh
@@ -170,6 +173,7 @@ jobs:
           PKG="$RUNNER_TEMP/pkg"
           mkdir -p "$PKG"
           tools/prepare_mu1440_sd.sh "$PKG"
+          python3 tools/release/sd_support.py --stage-root "$PKG"
           # Validate exactly the shipped scripts, not only their source folders.
           python3 tools/release/qnx_scripts.py --package-root "$PKG"
 

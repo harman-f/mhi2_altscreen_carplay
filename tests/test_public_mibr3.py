@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Host regression for the independently published read-only protocol and mailbox."""
 import subprocess
+import os
 import sys
 import tempfile
 import unittest
@@ -8,6 +9,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "experimental" / "mibr3"
+NATIVE = ROOT / "modules" / "broker" / "source" / "mibr-control"
+CC = os.environ.get("CC", "cc")
 sys.path.insert(0, str(SRC))
 import api_v3_contract as api
 
@@ -40,16 +43,16 @@ class PublicProtocolTests(unittest.TestCase):
     def test_native_mailbox_and_owner_lifecycle_probes(self):
         with tempfile.TemporaryDirectory(prefix="mibr3-public-") as d:
             exe = str(Path(d) / "mailbox-probe")
-            subprocess.run(["cc", "-std=c99", "-Wall", "-Wextra", "-Werror", "-O2",
-                            str(SRC / "mibr_v3_parity_mailbox.c"),
-                            str(SRC / "mibr_v3_parity_mailbox_probe.c"), "-o", exe],
+            subprocess.run([CC, "-std=c99", "-Wall", "-Wextra", "-Werror", "-O2",
+                            str(NATIVE / "mibr_v3_parity_mailbox.c"),
+                            str(NATIVE / "mibr_v3_parity_mailbox_probe.c"), "-o", exe],
                            check=True)
             output = subprocess.run([exe], check=True, capture_output=True, text=True)
             self.assertIn("PARITY_MAILBOX_ONE_COMMAND_AT_A_TIME_HOST_PASS", output.stdout)
             owner = str(Path(d) / "owner-probe")
-            subprocess.run(["cc", "-std=c99", "-Wall", "-Wextra", "-Werror", "-O2",
-                            str(SRC / "mibr_v3_owner_lifecycle.c"),
-                            str(SRC / "mibr_v3_owner_lifecycle_probe.c"), "-o", owner],
+            subprocess.run([CC, "-std=c99", "-Wall", "-Wextra", "-Werror", "-O2",
+                            str(NATIVE / "mibr_v3_owner_lifecycle.c"),
+                            str(NATIVE / "mibr_v3_owner_lifecycle_probe.c"), "-o", owner],
                            check=True)
             verified = subprocess.run([owner], check=True, capture_output=True, text=True)
             self.assertIn("PASS", verified.stdout)
