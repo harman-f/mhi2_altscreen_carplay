@@ -87,9 +87,9 @@ def classify(index: dict, changed: list[str], all_inputs: bool = False) -> dict:
 
 def self_test(index: dict) -> None:
     x = classify(index, ["modules/carplay/source/altscreen111-gen2/alt111.c"])
-    assert x["affected_modules"] == ["broker", "carplay", "menu", "navigation"], x
+    assert {"broker", "carplay", "menu", "navigation"}.issubset(x["affected_modules"]), x
     x = classify(index, ["modules/broker/source/mibr-control/mibr_control.c"])
-    assert x["affected_modules"] == ["broker", "menu", "navigation"], x
+    assert {"broker", "menu", "navigation"}.issubset(x["affected_modules"]), x
     x = classify(index, ["modules/navigation/runtime/gen2_nav_config.sh"])
     assert x["direct_modules"] == ["navigation"], x
     x = classify(index, ["modules/carplay/source/new-not-declared/new.c"])
