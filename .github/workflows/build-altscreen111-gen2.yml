@@ -11,6 +11,8 @@ on:
       - 'modules/carplay/source/sha256sum-compat/**'
       - 'settings/**'
       - 'tools/build_altscreen111_gen2.sh'
+      - 'tools/ci_qnx65_image.sh'
+      - 'tools/qnx65-image.lock'
       - 'tools/build_alt111_settings.sh'
       - 'tools/generate_alt111_settings.py'
       - 'tools/test_installed_gen2_host.sh'
@@ -27,6 +29,8 @@ on:
       - 'modules/carplay/source/sha256sum-compat/**'
       - 'settings/**'
       - 'tools/build_altscreen111_gen2.sh'
+      - 'tools/ci_qnx65_image.sh'
+      - 'tools/qnx65-image.lock'
       - 'tools/build_alt111_settings.sh'
       - 'tools/generate_alt111_settings.py'
       - 'tools/test_installed_gen2_host.sh'
@@ -36,6 +40,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: public-gen2-build-${{ github.event.pull_request.number || github.ref }}
@@ -65,12 +70,13 @@ jobs:
           python3 tools/generate_alt111_settings.py --check
           bash tools/test_installed_gen2_host.sh
 
-      - name: Build pinned QNX 6.5 ARMv7 toolchain image
+      - name: Select verified QNX 6.5 ARMv7 image
         shell: bash
+        env:
+          QNX65_GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euxo pipefail
-          QNX_BUILDX_GHA_CACHE=1 bash tools/build_qnx65_image.sh "$RUNNER_TEMP/qnx-toolchain" "$IMAGE"
-
+          set -euo pipefail
+          bash tools/ci_qnx65_image.sh
       - name: Build public GEN2 source
         shell: bash
         run: |
@@ -78,6 +84,7 @@ jobs:
           mkdir -p build/gen2
           docker run --rm --platform=linux/amd64             -v "$PWD:/src" -w /src "$IMAGE"             bash -c 'QCC=arm-unknown-nto-qnx6.5.0eabi-gcc bash ./tools/build_altscreen111_gen2.sh build/gen2/libaltscreen111.so'
           sudo chown -R "$(id -u):$(id -g)" build/gen2
+          cp "$QNX_TOOLCHAIN_PROVENANCE" build/gen2/QNX_TOOLCHAIN_PROVENANCE.txt
 
       - name: Validate developer ELF
         shell: bash
@@ -113,3 +120,4 @@ jobs:
             build/gen2/ELF_HEADER.txt
             build/gen2/SECTIONS.txt
             build/gen2/SYMBOLS.txt
+            build/gen2/QNX_TOOLCHAIN_PROVENANCE.txt

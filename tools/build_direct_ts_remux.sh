@@ -2,7 +2,7 @@
 set -euo pipefail
 
 FFMPEG_VERSION="${FFMPEG_VERSION:-6.1.5}"
-FFMPEG_SHA256="${FFMPEG_SHA256:-b8c8e926b948c14df1264cd0beac1c773df9170ac9cac97bdf1275cd3d385902}"
+FFMPEG_SHA256="${FFMPEG_SHA256:-05fbe9db1f5452a3605bb1d9bf91da9d4bb08162891692e4f172b58c49109412}"
 SRC="${1:-modules/carplay/source/direct-ts-remux/direct_ts_remux.c}"
 OUT="${2:-build/direct-ts-remux}"
 WORK="${WORK:-build/ffmpeg-remux}"
@@ -25,13 +25,34 @@ printf '#include <stddef.h>\nint main(void){return 0;}\n' | "$CC" \
   -x c - -lsocket -o /tmp/mibr-qnx-link-smoke
 
 mkdir -p "$WORK" "$(dirname "$OUT")"
-TARBALL="$WORK/ffmpeg-${FFMPEG_VERSION}.tar.gz"
+TARBALL="$WORK/ffmpeg-${FFMPEG_VERSION}.tar.xz"
 FFDIR="$WORK/ffmpeg-${FFMPEG_VERSION}"
 
 if [ ! -f "$TARBALL" ]; then
-  curl -fL --retry 3     "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz"     -o "$TARBALL"
+  # Official FFmpeg tar.xz release, independently SHA-pinned by Buildroot.
+  # MacPorts mirrors carry the original release bytes. The original ffmpeg.org
+  # host is currently unreachable from public CI; do not use unsigned git HEAD.
+  URLS=(
+    "https://distfiles.macports.org/ffmpeg/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+    "https://mirror.math.princeton.edu/pub/macports/distfiles/ffmpeg/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+    "https://fco.it.distfiles.macports.org/ffmpeg/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+  )
+  for URL in "${URLS[@]}"; do
+    rm -f "$TARBALL.partial"
+    if curl --fail --location --retry 3 --retry-all-errors \
+      --retry-delay 2 --connect-timeout 12 --max-time 120 \
+      "$URL" -o "$TARBALL.partial"; then
+      if printf '%s  %s\n' "$FFMPEG_SHA256" "$TARBALL.partial" | sha256sum -c -; then
+        mv "$TARBALL.partial" "$TARBALL"
+        break
+      fi
+    fi
+    rm -f "$TARBALL.partial"
+  done
 fi
-echo "${FFMPEG_SHA256}  $TARBALL" | sha256sum -c -
+[[ -s "$TARBALL" ]] || { echo "FFMPEG_SOURCE_FETCH=FAIL" >&2; exit 32; }
+printf '%s  %s\n' "$FFMPEG_SHA256" "$TARBALL" | sha256sum -c -
+printf 'source=ffmpeg-%s.tar.xz\nsha256=%s\n' "$FFMPEG_VERSION" "$FFMPEG_SHA256" > "$WORK/FFMPEG_SOURCE_ARCHIVE.txt"
 
 if [ ! -f "$FFDIR/configure" ]; then
   rm -rf "$FFDIR"

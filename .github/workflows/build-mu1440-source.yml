@@ -14,6 +14,8 @@ on:
       - 'tools/menu-editor/**'
       - 'tests/**'
       - 'tools/build_*.sh'
+      - 'tools/ci_qnx65_image.sh'
+      - 'tools/qnx65-image.lock'
       - 'tools/check_mu1440_target_shell.py'
       - 'tools/generate_alt111_settings.py'
       - 'tools/test_*.sh'
@@ -34,6 +36,8 @@ on:
       - 'tools/menu-editor/**'
       - 'tests/**'
       - 'tools/build_*.sh'
+      - 'tools/ci_qnx65_image.sh'
+      - 'tools/qnx65-image.lock'
       - 'tools/check_mu1440_target_shell.py'
       - 'tools/generate_alt111_settings.py'
       - 'tools/test_*.sh'
@@ -44,6 +48,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: public-mu1440-source-build-${{ github.event.pull_request.number || github.ref }}
@@ -171,13 +176,13 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Build pinned QNX 6.5 toolchain image
+      - name: Select verified QNX 6.5 ARMv7 image
         shell: bash
+        env:
+          QNX65_GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euxo pipefail
-          bash tools/build_qnx65_image.sh \
-            "$RUNNER_TEMP/mu1440-qnx-toolchain-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" "$IMAGE"
-
+          set -euo pipefail
+          bash tools/ci_qnx65_image.sh
       - name: Build all MU1440 source outputs in one QNX container
         shell: bash
         run: |
@@ -187,6 +192,7 @@ jobs:
             -v "$PWD:/src" -w /src "$IMAGE" \
             bash -c 'QNX_CC=arm-unknown-nto-qnx6.5.0eabi-gcc bash tools/build_mu1440_source.sh build/mu1440-source'
           sudo chown -R "$(id -u):$(id -g)" build/mu1440-source
+          cp "$QNX_TOOLCHAIN_PROVENANCE" build/mu1440-source/QNX_TOOLCHAIN_PROVENANCE.txt
 
       - name: Verify expected installed source identities
         shell: bash

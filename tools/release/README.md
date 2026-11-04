@@ -6,13 +6,25 @@ The canonical source of truth for build ownership is
 uses this structure for **pre-publication readiness**, not as a vehicle-ready
 multi-profile release generator.
 
-## Canonical QNX compiler image (future release build gate)
+## Canonical QNX compiler image (build and release gate)
 
-The archived GCC 4.9 / QNX 6.5 ARMv7 compiler image, its immutable GHCR
-digest, current public-CI rebuild behavior, and required verification before
-migration are specified in [the QNX toolchain image contract](../../docs/build/QNX_TOOLCHAIN_IMAGE.md).
-Current release readiness uses pinned existing binaries and **does not**
-replace or requalify them with freshly compiled artifacts.
+The five native QNX CI workflows now call the shared selector
+[`tools/ci_qnx65_image.sh`](../ci_qnx65_image.sh). See the
+[digest-pinned image contract](../../docs/build/QNX_TOOLCHAIN_IMAGE.md)
+for the exact repository Actions variable, GHCR access checks and the
+**explicit temporary** legacy GCC rebuild path. A failed configured image
+pull never silently falls back to a different compiler. Each native build
+uploads `QNX_TOOLCHAIN_PROVENANCE.txt` with its selected mode and compiler
+identity; this is supplemental evidence, not yet a digest-attested
+`MODULE_BUILD_LINEAGE.json`.
+
+Current release readiness uses pinned historical binaries and **does not**
+replace or requalify them with freshly compiled artifacts. In particular,
+the support-tools workflow must not write candidate output back to
+`main` automatically: an existing legacy-mode artifact refresh now also
+requires the explicit `QNX65_ALLOW_ARTIFACT_AUTOCOMMIT=true` repository
+variable. Archived-image builds remain build-only, even if that variable
+is enabled.
 
 A future multi-profile packager must consume **verified native build lineage**
 (including the *actual* compiler image digest and output SHA-256), rather than
