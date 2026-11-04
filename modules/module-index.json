@@ -2,7 +2,7 @@
   "schema_version": 1,
   "contract": "docs/architecture/REPOSITORY_LAYOUT.md",
   "lifecycle": "migration-in-progress",
-  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable.",
+  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable. P1 media and P2 phone are disabled source-stage modules; no runtime outputs or auto-install.",
   "modules": {
     "carplay": {
       "status": "indexed",
@@ -109,6 +109,50 @@
       "outputs": [],
       "build_coverage": "target-specific-incomplete",
       "evidence": "docs/build/MU1440_MENU_RGI_SOURCE.md"
+    },
+    "media": {
+      "status": "indexed",
+      "distribution": "common/media",
+      "depends_on": [
+        "carplay",
+        "broker"
+      ],
+      "source": [
+        "modules/media/source",
+        "modules/media/reference"
+      ],
+      "runtime": [],
+      "support_tools": [
+        "modules/media/tests"
+      ],
+      "build_scripts": [
+        "modules/media/tests/run_host.sh"
+      ],
+      "outputs": [],
+      "build_coverage": "host-core-tested-only; OEM-ABI/J9 build absent",
+      "evidence": "modules/media/README.md"
+    },
+    "phone": {
+      "status": "indexed",
+      "distribution": "common/phone",
+      "depends_on": [
+        "carplay",
+        "broker"
+      ],
+      "source": [
+        "modules/phone/source",
+        "modules/phone/reference"
+      ],
+      "runtime": [],
+      "support_tools": [
+        "modules/phone/tests"
+      ],
+      "build_scripts": [
+        "modules/phone/tests/run_host.sh"
+      ],
+      "outputs": [],
+      "build_coverage": "host-core-tested-only; OEM-ABI/J9 build absent",
+      "evidence": "modules/phone/README.md"
     }
   },
   "profiles": [
