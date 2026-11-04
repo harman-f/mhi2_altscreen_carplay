@@ -37,15 +37,13 @@ echo "=== SOURCE ==="
 
 echo
 echo "=== LEGACY AUTO DIRECT ==="
-if [ -r /tmp/mibr-carplay-autodirect ]; then
-  echo "autodirect_source=temp"
-  echo "autodirect=$(cat /tmp/mibr-carplay-autodirect 2>/dev/null)"
-elif [ -r /mnt/app/root/mibr-carplay-autodirect ]; then
-  echo "autodirect_source=persistent"
-  echo "autodirect=$(cat /mnt/app/root/mibr-carplay-autodirect 2>/dev/null)"
-else
-  echo "autodirect_source=default"
+# Only the .enabled marker gates the Auto-Direct lsd.sh hook.
+if [ -e /mnt/app/root/mibr-carplay-autodirect.enabled ]; then
+  echo "autodirect_marker=present"
   echo "autodirect=1"
+else
+  echo "autodirect_marker=absent"
+  echo "autodirect=0"
 fi
 
 echo

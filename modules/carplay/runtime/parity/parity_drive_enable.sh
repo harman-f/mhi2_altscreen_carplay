@@ -9,7 +9,7 @@ RUNNER=$BASE/bin/parity-session
 BRIDGE=$BASE/bin/direct-ts-parity
 LSD=/mnt/app/eso/hmi/lsd/lsd.sh
 ENABLE=/mnt/app/root/mibr-parity-drive.enabled
-LEGACY=/mnt/app/root/mibr-carplay-autodirect
+AUTODIRECT_ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
 # Staged beside lsd.sh so the final mv is a same-filesystem rename.
 TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-parity-drive.$$
 BEGIN="# MIBR PARITY-DRIVE BEGIN"
@@ -52,9 +52,10 @@ mount -uw /mnt/app 2>/dev/null || fail 20 "app_rw"
 RW=1
 
 # The legacy Auto-Direct supervisor and parity-session are mutually exclusive.
-# Make the old guarded boot hook inert across the next boot.
-echo 0 > "$LEGACY" || fail 21 "legacy_disable_write"
-chmod 644 "$LEGACY" 2>/dev/null || true
+# Its lsd.sh hook starts only while the .enabled marker exists, so remove that
+# marker (the hook itself stays inert and is left in place).
+rm -f "$AUTODIRECT_ENABLED" 2>/dev/null
+[ ! -e "$AUTODIRECT_ENABLED" ] || fail 29 "autodirect_marker_remove"
 
 if [ ! -r "$BASE/backup/lsd.sh.pre-parity-drive" ]; then
   mkdir -p "$BASE/backup" || fail 22 "backup_dir"

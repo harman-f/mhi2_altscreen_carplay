@@ -802,5 +802,80 @@ class ParityEnableStatic(unittest.TestCase):
         self.assertIn('echo "PARITY_DRIVE_ENABLE=FAIL app_ro"; exit 28', t)
 
 
+@unittest.skipUnless(SHELL, "no POSIX shell on host")
+class ParityEnableExec(unittest.TestCase):
+    """Run parity_drive_enable.sh against a fake /mnt/app root (MIBR_PREPARE_ONLY)."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory(prefix="mibr-pe-")
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        self.app = self.root / "mnt/app"
+        base = self.app / "root/altscreen-u2"
+        for rel in ("scripts/parity_drive_supervisor.sh", "bin/parity-session", "bin/direct-ts-parity"):
+            f = base / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text("#!/bin/sh\n")
+            f.chmod(0o755)
+        self.lsd = self.app / "eso/hmi/lsd/lsd.sh"
+        self.lsd.parent.mkdir(parents=True)
+        self.lsd.write_text("#!/bin/sh\necho stock\n$J9 start\n")
+        self.marker = self.app / "root/mibr-carplay-autodirect.enabled"
+        self.parity_marker = self.app / "root/mibr-parity-drive.enabled"
+        self.tools = self.root / "tools"
+        self.tools.mkdir()
+        self.log = self.root / "mount.log"
+        for name, text in (("mount", FAKE_MOUNT), ("sync", "#!/bin/sh\nexit 0\n")):
+            (self.tools / name).write_text(text)
+            (self.tools / name).chmod(0o755)
+
+    def run_enable(self):
+        script = PARITY_ENABLE.read_text().replace("/mnt/app", str(self.app))
+        env = dict(os.environ, PATH=str(self.tools) + os.pathsep + os.environ["PATH"],
+                   MOUNT_LOG=str(self.log), MIBR_PREPARE_ONLY="1")
+        r = subprocess.run([SHELL, "-c", script], env=env, capture_output=True, text=True, timeout=20)
+        r.stdout = r.stdout.replace(str(self.app), "/mnt/app")
+        return r
+
+    def test_removes_existing_autodirect_marker(self):
+        self.marker.write_text("")
+        r = self.run_enable()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("PARITY_DRIVE_ENABLE=PASS", r.stdout)
+        self.assertFalse(self.marker.exists())
+        self.assertTrue(self.parity_marker.exists())
+        self.assertIn("MIBR PARITY-DRIVE BEGIN", self.lsd.read_text())
+
+    def test_no_marker_still_succeeds(self):
+        r = self.run_enable()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("PARITY_DRIVE_ENABLE=PASS", r.stdout)
+        self.assertFalse(self.marker.exists())
+
+    def test_does_not_write_legacy_value_file(self):
+        self.run_enable()
+        self.assertFalse((self.app / "root/mibr-carplay-autodirect").exists())
+
+    def test_marker_removal_failure_exits_29_without_success(self):
+        # A non-empty directory at the marker path makes rm -f fail while -e stays true.
+        self.marker.mkdir()
+        (self.marker / "x").write_text("")
+        r = self.run_enable()
+        self.assertEqual(r.returncode, 29, r.stdout + r.stderr)
+        self.assertIn("PARITY_DRIVE_ENABLE=FAIL autodirect_marker_remove", r.stdout)
+        self.assertNotIn("PARITY_DRIVE_ENABLE=PASS", r.stdout)
+        self.assertFalse(self.parity_marker.exists())
+        self.assertNotIn("PARITY-DRIVE", self.lsd.read_text())
+        self.assertIn("-ur " + str(self.app), self.log.read_text())
+
+    def test_autodirect_enable_after_parity_does_not_disable_parity(self):
+        # Documented behaviour: direct_ts_auto_enable.sh only touches its own marker
+        # and never clears mibr-parity-drive.enabled, so re-enabling Auto-Direct after
+        # parity re-creates the dual-owner state (guard is one-way, parity -> Auto-Direct).
+        t = ENABLE.read_text()
+        self.assertNotIn("mibr-parity-drive", t)
+        self.assertIn('touch "$ENABLED" || fail 32 "enable_marker"', t)
+
+
 if __name__ == "__main__":
     unittest.main()
