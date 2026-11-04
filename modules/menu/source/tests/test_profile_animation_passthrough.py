@@ -9,8 +9,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import profile_stubs
-import test_home_animation_mirror as mirror
+if __package__:
+    from . import profile_stubs
+else:
+    import profile_stubs
+if __package__:
+    from . import test_home_animation_mirror as mirror
+else:
+    import test_home_animation_mirror as mirror
 
 TEST = r"""package de.mibr.hmi;
 import de.vw.mib.view.internal.*;
