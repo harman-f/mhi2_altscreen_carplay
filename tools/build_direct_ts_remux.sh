@@ -2,7 +2,7 @@
 set -euo pipefail
 
 FFMPEG_VERSION="${FFMPEG_VERSION:-6.1.5}"
-FFMPEG_SHA256="${FFMPEG_SHA256:-b8c8e926b948c14df1264cd0beac1c773df9170ac9cac97bdf1275cd3d385902}"
+FFMPEG_SHA256="${FFMPEG_SHA256:-05fbe9db1f5452a3605bb1d9bf91da9d4bb08162891692e4f172b58c49109412}"
 SRC="${1:-modules/carplay/source/direct-ts-remux/direct_ts_remux.c}"
 OUT="${2:-build/direct-ts-remux}"
 WORK="${WORK:-build/ffmpeg-remux}"
@@ -25,21 +25,22 @@ printf '#include <stddef.h>\nint main(void){return 0;}\n' | "$CC" \
   -x c - -lsocket -o /tmp/mibr-qnx-link-smoke
 
 mkdir -p "$WORK" "$(dirname "$OUT")"
-TARBALL="$WORK/ffmpeg-${FFMPEG_VERSION}.tar.gz"
+TARBALL="$WORK/ffmpeg-${FFMPEG_VERSION}.tar.xz"
 FFDIR="$WORK/ffmpeg-${FFMPEG_VERSION}"
 
 if [ ! -f "$TARBALL" ]; then
-  # TLS resets at ffmpeg.org caused CI failures: use bounded retries, and
-  # accept only the original, SHA-256-pinned release archive from any mirror.
+  # Official FFmpeg tar.xz release, independently SHA-pinned by Buildroot.
+  # MacPorts mirrors carry the original release bytes. The original ffmpeg.org
+  # host is currently unreachable from public CI; do not use unsigned git HEAD.
   URLS=(
-    "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz"
-    "https://www.ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz"
-    "https://www.mirrorservice.org/sites/ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz"
+    "https://distfiles.macports.org/ffmpeg/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+    "https://mirror.math.princeton.edu/pub/macports/distfiles/ffmpeg/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+    "https://fco.it.distfiles.macports.org/ffmpeg/ffmpeg-${FFMPEG_VERSION}.tar.xz"
   )
   for URL in "${URLS[@]}"; do
     rm -f "$TARBALL.partial"
-    if curl --fail --location --retry 5 --retry-all-errors \
-      --retry-delay 3 --connect-timeout 15 --max-time 240 \
+    if curl --fail --location --retry 3 --retry-all-errors \
+      --retry-delay 2 --connect-timeout 12 --max-time 120 \
       "$URL" -o "$TARBALL.partial"; then
       if printf '%s  %s\n' "$FFMPEG_SHA256" "$TARBALL.partial" | sha256sum -c -; then
         mv "$TARBALL.partial" "$TARBALL"
@@ -51,6 +52,7 @@ if [ ! -f "$TARBALL" ]; then
 fi
 [[ -s "$TARBALL" ]] || { echo "FFMPEG_SOURCE_FETCH=FAIL" >&2; exit 32; }
 printf '%s  %s\n' "$FFMPEG_SHA256" "$TARBALL" | sha256sum -c -
+printf 'source=ffmpeg-%s.tar.xz\nsha256=%s\n' "$FFMPEG_VERSION" "$FFMPEG_SHA256" > "$WORK/FFMPEG_SOURCE_ARCHIVE.txt"
 
 if [ ! -f "$FFDIR/configure" ]; then
   rm -rf "$FFDIR"

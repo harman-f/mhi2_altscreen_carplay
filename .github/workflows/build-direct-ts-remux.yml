@@ -69,6 +69,7 @@ jobs:
           BIN=build/public-direct-ts-remux/direct-ts-remux
           mkdir -p "$OUTDIR"
           cp "$QNX_TOOLCHAIN_PROVENANCE" "$OUTDIR/QNX_TOOLCHAIN_PROVENANCE.txt"
+          cp build/ffmpeg-remux/FFMPEG_SOURCE_ARCHIVE.txt "$OUTDIR/FFMPEG_SOURCE_ARCHIVE.txt"
 
           docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" arm-unknown-nto-qnx6.5.0eabi-readelf -h "$BIN" > "$OUTDIR/ELF_HEADER.txt"
           docker run --rm --platform=linux/amd64 -v "$PWD:/src" -w /src "$IMAGE" arm-unknown-nto-qnx6.5.0eabi-readelf -S "$BIN" > "$OUTDIR/SECTIONS.txt"
@@ -102,7 +103,8 @@ jobs:
           debug=-g
           stripped=no
           ffmpeg=6.1.5
-          ffmpeg_sha256=b8c8e926b948c14df1264cd0beac1c773df9170ac9cac97bdf1275cd3d385902
+          ffmpeg_sha256=05fbe9db1f5452a3605bb1d9bf91da9d4bb08162891692e4f172b58c49109412
+          ffmpeg_archive_format=tar.xz
           toolchain_repo=$TOOLCHAIN_REPO
           toolchain_commit=$TOOLCHAIN_COMMIT
           toolchain_dockerfile_sha256=$TOOLCHAIN_DOCKERFILE_SHA256
@@ -119,6 +121,7 @@ jobs:
             ${{ env.OUTDIR }}/direct-ts-remux
             ${{ env.OUTDIR }}/direct-ts-remux.sha256
             ${{ env.OUTDIR }}/QNX_TOOLCHAIN_PROVENANCE.txt
+            ${{ env.OUTDIR }}/FFMPEG_SOURCE_ARCHIVE.txt
             ${{ env.OUTDIR }}/BUILDINFO.txt
             ${{ env.OUTDIR }}/FILE.txt
             ${{ env.OUTDIR }}/ELF_HEADER.txt
