@@ -4,7 +4,8 @@ This document specifies the single **three-target beta** distribution: all three
 
 ```text
 package/
-  installer/                 install, check, and uninstall entrypoints
+  installer/                 mibr-install.ksh, mibr-uninstall.ksh, mibr-status.ksh, select-profile.ksh,
+                             lib/migrate-root.ksh, config/{profiles.list,root-migration.list}
   common/
     carplay/{bin,scripts,config}/
     broker/{bin,scripts,config}/
@@ -47,3 +48,22 @@ If profile selection uses the original firmware executable, selection is based o
 **Single-profile scope (developer subset).** The three-profile requirement above is the default and is enforced whenever `package.json` has no `scope` key. A package may instead declare `"scope": "single-profile"` together with `"profiles": ["<one known profile id>"]` (for example `skoda-mu1440-p4526`); the gate then requires exactly that profile in `installer/config/profiles.list` and in `profiles/`, and rejects unknown profile ids or any other `scope` value. Whole-file OEM variants are never published. Each `profiles/<id>/integration/variants.list` row is `target stock_sha256 patched_sha256 transform_file transform_sha256 [mode]`: the transform file (`.awk`, `.sed`, `.block`, `.patch`, `.sh` or `.ksh`) lives under `profiles/<id>/integration/`, its SHA-256 is checked against `transform_sha256`, and the installer applies it only to an input matching `stock_sha256`, expecting `patched_sha256`. A variant file that is named like an OEM payload or whose bytes equal the stock or patched hash is rejected.
 
 Package validation checks manifest coverage and hashes, known profile identifiers, unique fail-closed profile selection, and the source/build relationship for profile artifacts. Run `python tools/validate_modular_package.py --self-test <package.zip>` before distributing an archive. The distribution includes this host gate under `tools/package/`. The CI self-test covers rejection of legacy/unsafe layouts; validating the actual final ZIP is a separate required step. Host checks describe packaging correctness only; they do not by themselves establish target compatibility or vehicle readiness.
+
+## Assembler and package manifest
+
+`tools/release/build_modular.py --native-dir <build-output> [--hmi-dir <dir>] --out <zip>` builds the
+single three-profile ZIP (`--profiles <id> --scope single-profile` builds an explicit test package;
+`build_mu1440_modular.py` is a wrapper for the MU1440 test package). Profiles come from
+`modules/profiles/*/profile.json`; a profile whose selector has `install_enabled=false` is packaged and
+marked `"install_enabled": false` in `package.json` and `installer/config/profiles.list`, and the installer
+refuses it. Native outputs use the build-output layout (`bin/mu1440-source`, `bin/gen2`,
+`bin/support-tools`, `bin/direct-ts-remux`); `SOURCE_COMMIT.txt`, `COMPILER.txt` and `IMAGE_SOURCE.txt`
+are recorded in `package.json` `native_build`, and every binary row carries its SHA-256 and
+`status: SOURCE_BUILD_PASS` (a host/CI build result, never vehicle-tested). The only renames are the explicit
+`RENAME` table of the assembler (the `-QNX65-ARMv7-NOT-INSTALL-READY` suffix of the four broker binaries);
+the original name stays in `renamed_from`. Per-profile HMI JARs come from `<hmi-dir>/<profile_id>/MIBR-CarPlay.jar`;
+a missing JAR or installer entrypoint is a `MISSING_INPUT` entry and the package status is `incomplete`
+(`--require-complete` turns that into a failure). `package.json` `status` uses `SOURCE_BUILD_PASS`,
+`PACKAGE_VALIDATED`, `UNIT_TESTED`, `VEHICLE_RELEASE_APPROVED` with `NOT_RUN`/`BLOCKED`;
+`VEHICLE_RELEASE_APPROVED` is never true. The ZIP is deterministic (fixed timestamps, sorted entries,
+modes from a fixed table). `tools/validate_modular_package.py` accepts the ZIP or an extracted directory.

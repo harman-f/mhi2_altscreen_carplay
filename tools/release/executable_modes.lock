@@ -41,4 +41,5 @@ tools/build_keypanel_native.sh
 tools/build_support_tools.sh
 tools/prepare_mu1440_sd.sh
 tools/release/build_mu1440_modular.py
+tools/release/build_modular.py
 tools/release/check_executable_modes.py
