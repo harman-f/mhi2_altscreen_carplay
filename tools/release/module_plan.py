@@ -49,6 +49,15 @@ def classify(index: dict, changed: list[str], all_inputs: bool = False) -> dict:
         # The module index itself is global metadata, not an unowned module.
         unowned.discard("modules/module-index.json")
     for p in changed:
+        if p == "runtime/README.md":
+            unowned.discard(p)  # shared runtime documentation
+        if p.startswith(("src/experimental/hmi-model/", "src/experimental/mibr3/")) and not (ROOT / p).exists():
+            unowned.discard(p)  # removed, superseded experimental source
+        if p == "runtime/experimental/viewarea_mode.sh":
+            unowned.discard(p)
+            direct.add("carplay")
+            a, _ = impact(index, ["modules/carplay/runtime/auto-direct/direct_ts_auto_enable.sh"])
+            affected.update(a)
         if p.startswith(("settings/", "runtime/diagnostics/", "runtime/deployment/")):
             # Registry-generated files, diagnosis and deployment scripts are
             # deliberate shared inputs outside any functional module. Unknown
@@ -100,6 +109,12 @@ def self_test(index: dict) -> None:
     assert x["run_release_checks"] and not x["unknown_owner_paths"], x
     x = classify(index, ["README.md"])
     assert not x["run_release_checks"], x
+    x = classify(index, ["runtime/README.md", "src/experimental/hmi-model/java/de/mibr/hmi/MibrI18n.java"])
+    assert not x["unknown_owner_paths"], x
+    x = classify(index, ["runtime/experimental/viewarea_mode.sh"])
+    assert x["direct_modules"] == ["carplay"] and x["run_release_checks"] and not x["unknown_owner_paths"], x
+    x = classify(index, ["runtime/experimental/unknown.sh"])
+    assert x["unknown_owner_paths"], x
     print("RELEASE_MODULE_PLAN_SELF_TEST=PASS")
 
 
