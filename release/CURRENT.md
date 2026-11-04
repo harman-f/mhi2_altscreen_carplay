@@ -2,7 +2,7 @@
 
 This is the currently pinned **MU1440-specific developer prerelease**, not the newest experimental source line. Documentation-only main-branch updates do not mutate the already published ZIP or retroactively re-qualify its binary hashes. See [current integration status](../docs/status/INTEGRATION_STATUS_2026-10-21.md), [latest known issues](../docs/findings/KNOWN_ISSUES.md) and [dated vehicle test evidence](../docs/status/MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md).
 
-The effective 29 September Most20/D2 update at the end of this file is incorporated into the consolidated statements below; later release-tag decisions require their own verification.
+The 29 September Most20/D2 update (kept at the end of this file as a historical implementation note) is already incorporated into the consolidated statements below; later release-tag decisions require their own verification.
 
 ## Release readiness after module migration (2026-11-03)
 
@@ -25,6 +25,7 @@ target command/option inventory and vehicle test still govern acceptance.
 
 **No ZIP is uploaded as a distributable artifact and no GitHub release/tag is
 created or replaced by this workflow.** The old seven-payload SD-root archive
+(`..._LEGACY_CI_ONLY.zip`, never uploaded, tagged or released; any "release ZIP" mentioned below means the historically published one)
 is deliberately still generated *inside CI* for compatibility regression checks,
 but it does **not** satisfy the [R3 modular distribution contract](../docs/build/PACKAGE_LAYOUT.md).
 The R3 validator is run on the actual legacy archive to prove that it is
@@ -37,9 +38,11 @@ can be enabled. Existing historical releases and tags are not modified.
 See [release pipeline design](../tools/release/README.md) for module impact
 rules, source-build boundaries and the QNX-script inventory gates. The
 [digest-pinned QNX toolchain image contract](../docs/build/QNX_TOOLCHAIN_IMAGE.md)
-describes the existing archived compiler environment and the **not yet
-implemented** CI/release-lineage transition away from rebuilding GCC on
-each job; it does not change or requalify this pinned developer prerelease.
+describes the archived compiler environment. The five native CI workflows
+already consume the digest-pinned image in `tools/qnx65-image.lock` through
+`tools/ci_qnx65_image.sh` instead of rebuilding GCC on each job (PR #126). Still
+open: recording the actual image digest in `MODULE_BUILD_LINEAGE.json`. None of
+this changes or requalifies this pinned developer prerelease.
 
 ## Validated reference target
 

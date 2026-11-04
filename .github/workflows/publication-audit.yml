@@ -122,7 +122,7 @@ jobs:
           set -euxo pipefail
           javac -version
           build_dir="$(mktemp -d)"
-          javac -d "$build_dir" src/experimental/hmi-model/java/de/mibr/hmi/*.java
+          javac -sourcepath modules/menu/source/java -d "$build_dir" modules/menu/source/tests/PublicProtocolSmokeTest.java
           java -cp "$build_dir" de.mibr.hmi.PublicProtocolSmokeTest
           rm -rf "$build_dir"
 

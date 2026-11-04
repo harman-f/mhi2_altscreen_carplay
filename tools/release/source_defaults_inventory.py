@@ -30,7 +30,7 @@ BROKER_LINE = re.compile(
 LITERAL_PATH = re.compile(
     r"/(?:mnt/app/root|tmp)/(?:mibr|altscreen-u2)[A-Za-z0-9_.$/{}/%+\-]*"
 )
-SCAN_ROOTS = ("modules", "runtime", "deployment", "src", "settings", "tools")
+SCAN_ROOTS = ("modules", "runtime", "deployment", "settings", "tools")
 SCAN_EXTS = {".c", ".h", ".java", ".sh", ".ksh", ".py"}
 # Audit generators contain documentation examples, not installed QNX paths.
 SELF_AUDIT_TOOLS = {"tools/release/storage_migration_review.py",
