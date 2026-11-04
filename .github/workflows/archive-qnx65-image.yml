@@ -71,16 +71,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat > "$RUNNER_TEMP/QnxArchive.Dockerfile" <<'DOCKERFILE'
+          mkdir -p "$RUNNER_TEMP/qnx65-label-context"
+          cat > "$RUNNER_TEMP/qnx65-label-context/Dockerfile" <<'DOCKERFILE'
           FROM mhi2-qnx65-armv7-archive-candidate:4.9
           LABEL org.opencontainers.image.source="https://github.com/harman-f/mhi2_altscreen_carplay"
           LABEL org.opencontainers.image.title="QNX 6.5 ARMv7 GCC 4.9.4 cross-toolchain"
           LABEL org.opencontainers.image.description="Host compiler image; not firmware or vehicle release"
           DOCKERFILE
           docker build --platform linux/amd64 \
-            --file "$RUNNER_TEMP/QnxArchive.Dockerfile" \
+            --file "$RUNNER_TEMP/qnx65-label-context/Dockerfile" \
             --tag "$REGISTRY_IMAGE:qnx65-gcc4.9.4-$GITHUB_SHA" \
-            "$RUNNER_TEMP"
+            "$RUNNER_TEMP/qnx65-label-context"
           docker run --rm --platform linux/amd64 \
             --entrypoint /bin/bash \
             "$REGISTRY_IMAGE:qnx65-gcc4.9.4-$GITHUB_SHA" \
