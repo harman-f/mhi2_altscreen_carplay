@@ -129,6 +129,24 @@ Because that license is materially different from this repository's GPL-3.0-or-l
 yuedizhibo/MHI2Q-CarPlay-AltScreen source/binaries are treated as **comparative research/prior art only**. They must not be copied
 into project-owned GPL source merely because they are publicly visible.
 
+### P6 — LuKa MHI2Q SCENE and yety-ua NVIDIA audio references (not runtime)
+
+Selected GPL-3.0-family third-party source files are copied **verbatim** to
+[modules/audio/reference/](modules/audio/reference/PROVENANCE.md) with exact
+upstream commit and blob SHA identifiers. LuKa:
+[`luka-dev/mib2q-carplay-rgi`](https://github.com/luka-dev/mib2q-carplay-rgi)
+at `df73e061a29c4d996550716987f42a9243daa09a`.
+The target-native research reference is
+[`yety-ua/mhi2-k3346-carplay-audio-upmix`](https://github.com/yety-ua/mhi2-k3346-carplay-audio-upmix)
+at `feb077310a10ce9aef357ebb6467c549eca972ee`, a fork of
+`ProManiFest2122/mhi2-k3346-carplay-vc` that credits LuKa's DSP work.
+These six selected files are incomplete, **not assembled, installed or
+loaded**. No OEM audio drivers/firmware, ODIS licensed material, prebuilt
+DSP binaries or J525 sound system images were imported. Original contributor
+notices and GPL obligations remain. The project-authored
+`modules/audio/source/mibr_audio_gate.[ch]` is an independent host
+safety-model, not a DSP implementation.
+
 ## Apple / CarPlay reverse engineering
 
 Research may document behavior observed in Apple CarPlay frameworks and AirPlay components, including symbols, state transitions, protocol roles, build identities and hashes.
