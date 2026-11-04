@@ -4,11 +4,13 @@ This is the public contract for selecting the **host-side cross-compiler environ
 
 ## Archived compiler environment
 
-The project has an existing, prebuilt GCC 4.9 / QNX 6.5 / ARMv7 Docker image in GitHub Container Registry. Use its immutable digest, not a floating tag:
+The project has an existing, prebuilt GCC 4.9 / QNX 6.5 / ARMv7 Docker image archived in GitHub Container Registry. Its archived **manifest digest** is:
 
 ```text
-ghcr.io/canetlotw/mib-qnx65-armv7@sha256:19b5fb1d4559264a844080b6e381837655d4dcca50151cce3ff0ac509e4f3393
+sha256:19b5fb1d4559264a844080b6e381837655d4dcca50151cce3ff0ac509e4f3393
 ```
+
+The original archive belongs to the separate development build infrastructure. The public project must first establish and verify an approved, accessible registry reference before CI can switch to it. Do not guess a registry path, treat this digest alone as a pullable image reference, or assume a mirrored image necessarily retains the same manifest digest. Use a fully qualified `registry/image@sha256:<verified-manifest>` value for actual builds; keep internal registry ownership details outside this public repository.
 
 Known build-source provenance for that archived image:
 
@@ -33,7 +35,8 @@ As of 2026-11-04, the public workflows still invoke `tools/build_qnx65_image.sh`
 Example for a Linux GitHub runner or developer machine with Docker and read permission to the container package:
 
 ```bash
-IMAGE='ghcr.io/canetlotw/mib-qnx65-armv7@sha256:19b5fb1d4559264a844080b6e381837655d4dcca50151cce3ff0ac509e4f3393'
+IMAGE="${QNX65_VERIFIED_IMAGE:?set the approved, digest-qualified image reference}"
+case "$IMAGE" in *@sha256:*) ;; *) echo 'Expected digest-qualified image' >&2; exit 2 ;; esac
 docker pull "$IMAGE"
 docker image inspect "$IMAGE" >/dev/null
 docker run --rm --platform linux/amd64 "$IMAGE" arm-unknown-nto-qnx6.5.0eabi-gcc --version
