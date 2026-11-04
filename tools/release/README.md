@@ -11,9 +11,10 @@ multi-profile release generator.
 The five native QNX CI workflows now call the shared selector
 [`tools/ci_qnx65_image.sh`](../ci_qnx65_image.sh). See the
 [digest-pinned image contract](../../docs/build/QNX_TOOLCHAIN_IMAGE.md)
-for the exact repository Actions variable, GHCR access checks and the
-**explicit temporary** legacy GCC rebuild path. A failed configured image
-pull never silently falls back to a different compiler. Each native build
+for the reviewed, immutable `tools/qnx65-image.lock` reference and GHCR
+access checks. Every normal native build pulls this project-owned digest;
+no repository variable or transitional GCC rebuild fallback is used.
+A failed image pull always stops the build. Each native build
 uploads `QNX_TOOLCHAIN_PROVENANCE.txt` with its selected mode and compiler
 identity; this is supplemental evidence, not yet a digest-attested
 `MODULE_BUILD_LINEAGE.json`.
