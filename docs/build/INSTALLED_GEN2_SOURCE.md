@@ -14,6 +14,8 @@ The public build workflow uses the pinned `luka-dev/qnx65-armv7-toolchain` revis
 `9a867a7ae70f2c0222a241b80232856526ccec0db2cfe013f8991ca31c74bcb1`, and builds target `base-env`
 with `BASE=base-4.9`. It tags the resulting image `mhi2-qnx65-armv7-public:4.9`.
 
+The shared `tools/build_qnx65_image.sh` pre-fetches the GCC 4.9.4 source archive on the host using the official GCC release server plus two mirrors. Its pinned SHA-256 `6c11d292cd01b294f9f84c9a59c230d80e9e4a47e5c6355f046bb36d4f358092` is verified before Docker sees it, and again by the pinned Dockerfile. `GCC49_SOURCE_ARCHIVE=/local/path/gcc-4.9.4.tar.bz2` lets an existing cross-build environment supply the same verified source without a network download. No GCC source archive is committed. The MU1440 and GEN2 workflows share the same bootstrap helper.
+
 Build the shared object from the repository root:
 
 ```sh

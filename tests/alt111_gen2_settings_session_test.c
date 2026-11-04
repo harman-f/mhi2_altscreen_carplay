@@ -2,6 +2,9 @@
 #define ALT111_GEN2_HOST_TEST 1
 static char recovery_path[192];
 #define ALT111_RECOVERY_PATH recovery_path
+static char safe_path_fmt[160],platform_defaults_path[160];
+#define MIBR_GEN2_SAFE_PATH_FMT safe_path_fmt
+#define MIBR_GEN2_PLATFORM_DEFAULTS platform_defaults_path
 #include "../modules/carplay/source/altscreen111-gen2/libaltscreen111_gen2.c"
 #include <assert.h>
 static CFTypeRef test_retain(CFTypeRef object){return object;}
@@ -28,6 +31,82 @@ static void test_m1au_time_presence(void)
     m1au_prepare_header_locked(&ticket,size);
     assert((g_tee_frame_header[11]&12u)==4u);
     alt111_video_destroy(&video);
+}
+
+static void write_file(const char *path,const char *text)
+{
+    FILE *f=fopen(path,"w");
+    assert(f);
+    assert(fputs(text,f)>=0);
+    assert(!fclose(f));
+}
+
+/* Load view 0 safe area with the given registry layer for viewarea.0.safe.x
+ * (ALT111_PROFILE = nothing stored) under a fresh scope. */
+static void load_safe(unsigned layer,struct mibr_viewareas_config *views)
+{
+    struct gen2_settings_scope scope;
+    struct alt111_settings desired;
+    assert(!alt111_settings_defaults(&desired,"mibr_dual_view"));
+    if(layer!=ALT111_PROFILE)
+        assert(!alt111_settings_set(&desired,alt111_setting_find("viewarea.0.safe.x"),"33",layer));
+    memset(&scope,0,sizeof(scope));scope.settings=desired;scope.valid=1;
+    assert(!pthread_setspecific(g_settings_scope_key,&scope));
+    load_viewareas_config(views);
+    assert(!pthread_setspecific(g_settings_scope_key,NULL));
+}
+
+static void test_safe_precedence(const char *root)
+{
+    struct mibr_viewareas_config views;
+    char broker[192];
+    int profile_x;
+    snprintf(safe_path_fmt,sizeof(safe_path_fmt),"%s/%%s.conf",root);
+    snprintf(platform_defaults_path,sizeof(platform_defaults_path),"%s/plat.conf",root);
+    snprintf(broker,sizeof(broker),"%s/mibr-safe-wide.conf",root);
+    unlink(broker);unlink(platform_defaults_path);
+
+    /* No files, nothing stored: compiled profile stays. */
+    load_safe(ALT111_PROFILE,&views);profile_x=views.view[0].safe_x;
+    assert(views.count>=1 && profile_x!=55 && profile_x!=33 && profile_x!=11);
+
+    /* 3: no broker file, only profile layer -> platform default applies. */
+    write_file(platform_defaults_path,"safe_voll=1,2,300,200\nsafe_wide=55,66,320,220\n");
+    load_safe(ALT111_PROFILE,&views);
+    assert(views.view[0].safe_x==55 && views.view[0].safe_y==66 &&
+           views.view[0].safe_w==320 && views.view[0].safe_h==220);
+
+    /* 2: stored PERSISTENT or TEMP value is kept; platform default not applied. */
+    load_safe(ALT111_PERSISTENT,&views);
+    assert(views.view[0].safe_x==33 && views.view[0].safe_w!=320);
+    load_safe(ALT111_TEMP,&views);
+    assert(views.view[0].safe_x==33 && views.view[0].safe_w!=320);
+
+    /* 1: valid broker file wins over stored value and platform default. */
+    write_file(broker,"# mibr\nrevision=3\nvalue=11,22,310,210\n");
+    load_safe(ALT111_PERSISTENT,&views);
+    assert(views.view[0].safe_x==11 && views.view[0].safe_y==22 &&
+           views.view[0].safe_w==310 && views.view[0].safe_h==210);
+    load_safe(ALT111_TEMP,&views);assert(views.view[0].safe_x==11);
+    load_safe(ALT111_PROFILE,&views);assert(views.view[0].safe_x==11);
+
+    /* 4: a non-empty but corrupt broker file returns early: the configured
+     * area stays (stored or profile); the platform default is NOT applied. */
+    write_file(broker,"revision=3\nvalue=11,22,310\n");
+    load_safe(ALT111_PROFILE,&views);assert(views.view[0].safe_x==profile_x);
+    load_safe(ALT111_PERSISTENT,&views);assert(views.view[0].safe_x==33);
+    write_file(broker,"revision=3\nvalue=11,22,310,210 junk\n");
+    load_safe(ALT111_PROFILE,&views);assert(views.view[0].safe_x==profile_x);
+    /* Out-of-range broker value (w<100) is rejected, area unchanged. */
+    write_file(broker,"revision=3\nvalue=11,22,50,210\n");
+    load_safe(ALT111_PROFILE,&views);assert(views.view[0].safe_x==profile_x);
+    /* An empty broker file counts as no choice: falls through like a missing one. */
+    write_file(broker,"");
+    load_safe(ALT111_PROFILE,&views);assert(views.view[0].safe_x==55);
+    load_safe(ALT111_PERSISTENT,&views);assert(views.view[0].safe_x==33);
+
+    unlink(broker);unlink(platform_defaults_path);
+    load_safe(ALT111_PROFILE,&views);assert(views.view[0].safe_x==profile_x);
 }
 
 int main(void)
@@ -76,6 +155,7 @@ int main(void)
     assert(!strcmp(value,"950.7.1"));
     assert(!strcmp(g_settings_active_version,"950.7.1"));
     assert(!pthread_setspecific(g_settings_scope_key,NULL));
+    test_safe_precedence(root);
     gen2_control_release();
     assert(!g_settings_have_active && !g_settings_active_confirmed);
     assert(!gen2_control_projection_on(session)); /* Teardown invalidates old /info. */

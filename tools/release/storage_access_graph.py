@@ -11,6 +11,12 @@ import json
 import re
 from pathlib import Path
 
+import sys
+
+# Sibling tools are imported by name; keep that working under `python3 -I`,
+# which drops the script directory from sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import source_defaults_inventory as inventory
 import storage_migration_review as storage
 import storage_path_triage as triage

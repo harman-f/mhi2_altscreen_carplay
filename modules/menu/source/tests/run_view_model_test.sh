@@ -45,7 +45,8 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/tests/MibrV3BindingTest.java" \
   "$MODULE/tests/MibrV3BusyTest.java" \
   "$MODULE/tests/MibrV3QueueTest.java" \
-  "$MODULE/tests/MibrV3ShowTest.java"
+  "$MODULE/tests/MibrV3ShowTest.java" \
+  "$MODULE/tests/MibrDurableRevisionTest.java"
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrViewStateTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrCanonicalElementMenuTest
 "$JAVA" -Dmibr.menu.standard="$(cd "$MODULE/../../.." && pwd)/tools/menu-editor/standard-menu.txt" \
@@ -54,3 +55,4 @@ python3 "$MODULE/generate_catalog.py" \
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3BusyTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3QueueTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3ShowTest
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrDurableRevisionTest

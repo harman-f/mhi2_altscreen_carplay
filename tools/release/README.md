@@ -6,6 +6,19 @@ The canonical source of truth for build ownership is
 uses this structure for **pre-publication readiness**, not as a vehicle-ready
 multi-profile release generator.
 
+## Canonical QNX compiler image (future release build gate)
+
+The archived GCC 4.9 / QNX 6.5 ARMv7 compiler image, its immutable GHCR
+digest, current public-CI rebuild behavior, and required verification before
+migration are specified in [the QNX toolchain image contract](../../docs/build/QNX_TOOLCHAIN_IMAGE.md).
+Current release readiness uses pinned existing binaries and **does not**
+replace or requalify them with freshly compiled artifacts.
+
+A future multi-profile packager must consume **verified native build lineage**
+(including the *actual* compiler image digest and output SHA-256), rather than
+silently rebuilding GCC in a packaging job or treating source-build PASS as
+vehicle acceptance. No automatic release publication is enabled.
+
 ## Mandatory three-profile beta release inputs
 
 `python3 tools/release/plan_multi_profile_beta.py --self-test --json-out beta-profile-plan.json` emits the *same* common beta inclusion for Škoda MU1440 and both SEAT firmware families. Java adapters are per-firmware repairable; code and registry remain shared. This is a real CI input for the future R3 packager, not yet an executable installation ZIP. Final vehicle acceptance is common beta testing, not an exclusion gate. The three original LSD JXE SHA-256 profile selectors are now present in source. Exact compiled ABI-specific Java, target integration and package/vehicle qualification are still required for the final installer; never manufacture substitutes.
@@ -54,6 +67,7 @@ python3 tools/release/module_plan.py --self-test
 python3 tools/release/module_plan.py --all
 python3 tools/release/qnx_scripts.py --self-test --canonical
 python3 tools/release/audit_legacy.py --self-test
+python3 -I -B tools/release/check_executable_modes.py --self-test
 tools/prepare_mu1440_sd.sh /tmp/mu1440-legacy-audit
 python3 tools/release/qnx_scripts.py --package-root /tmp/mu1440-legacy-audit
 ```
@@ -61,6 +75,10 @@ python3 tools/release/qnx_scripts.py --package-root /tmp/mu1440-legacy-audit
 The final archive integrity gate is invoked from CI **after ZIP creation**.
 These commands are workstation/GitHub-Runner commands and are **not installed
 or executed on the QNX unit**.
+
+`check_executable_modes.py` fails when a file in `executable_modes.lock` loses
+git mode 100755 or a new executable is not pinned (`--write-lock` regenerates
+the lock; review the diff before committing it).
 
 ## QNX caveats that cannot be waived by green host CI
 
@@ -272,12 +290,15 @@ C↔Java inventory and 63-candidate storage graph, emits source SHA receipts,
 and adds negative mutations for CAS, CRC, Java cache, stage and default changes.
 The CI artifact is a source review receipt, **not** a firmware acceptance.
 
-Important cross-language asymmetry: native C requires canonical revision
-digits without a leading zero (except `0`), but Java's read-only parser checks
-only that each revision character is a digit. The Java file reader also
-caches by mtime/length, while its platform defaults are cached on first read.
-Broker C reopens platform defaults in its default lookup. Do not assume
-in-place migration/replay changes are immediately visible in Java. The broker
+Java and native C now apply the same revision rule: canonical decimal, no
+leading zero (except `0`), at most `18446744073709551615`. The Java switch,
+menu-layout and platform-defaults readers cache by mtime/length, but do not
+trust an mtime younger than 2 s, and platform defaults are re-read when the
+file changes (broker C reopens them on every lookup). An entry read while its
+mtime was inside that window is never trusted later. A file whose mtime lies
+ahead of the unit clock keeps the plain cache rule. Limit: a foreign rewrite
+that keeps both the size and the exact old mtime stays invisible to any
+mtime+size cache; writers must not restore an old mtime onto a changed file. The broker
 C's own guarded CAS/fsync/rename/readback/RO restoration does not protect
 the older independent navigation scripts or the menu shell's separate loader.
 
@@ -306,6 +327,22 @@ rather than fabricating a safe conversion. Critically,
 `mibr-carplay-autodirect.enabled` (legacy boot-presence flag) have
 **different** candidate identities. Changing existing native content
 formats requires a dedicated parser/converter and all consumers together.
+
+Every row also carries an A3 disposition (`a3_disposition`, `a3_reason`,
+`a3_single_writer`): **18 MIGRATE** (12 broker CAS switches, display
+scaling, menu language, menu layout, platform defaults, two installer
+ownership receipts), **40 KEEP_AT_LEGACY** (all 13 CarPlay registry groups,
+because the native settings layer refuses persistent writes, plus boot
+markers, aliases, backups and the single-writer gate), **2
+EXCLUDE_NONCONFIG** (calibration clip, test-only script) and **3
+BLOCKED_INPUT** (SD-log switch, two version receipts whose writers are not in
+source). Only MIGRATE rows have a `candidate_destination_path`; every other
+row keeps its former proposal as `reserved_future_name`, so two kept stores
+can never collide in one target. Negative tests reject a held alias marked
+MIGRATE, a reserved-name collision, a value boolean (absent means ON)
+relabelled as presence, a stock backup split from its held directory, a
+second writable safe-area store and a MIGRATE row without exactly one
+writer.
 
 This is a naming and source-provenance **proposal**, not implemented MMX
 paths. All `verified_destination_path` fields remain null, and

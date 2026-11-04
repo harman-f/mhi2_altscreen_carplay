@@ -9,12 +9,30 @@ RUNNER=$BASE/bin/parity-session
 BRIDGE=$BASE/bin/direct-ts-parity
 LSD=/mnt/app/eso/hmi/lsd/lsd.sh
 ENABLE=/mnt/app/root/mibr-parity-drive.enabled
-LEGACY=/mnt/app/root/mibr-carplay-autodirect
-TMP=/mnt/app/root/lsd.sh.mibr-parity-drive.$$
+AUTODIRECT_ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
+# Staged beside lsd.sh so the final mv is a same-filesystem rename.
+TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-parity-drive.$$
 BEGIN="# MIBR PARITY-DRIVE BEGIN"
 END="# MIBR PARITY-DRIVE END"
 BOOTCMD='/bin/ksh /mnt/app/root/altscreen-u2/scripts/parity_drive_supervisor.sh >/tmp/mibr-parity-drive-boot.log 2>&1 &'
 RW=0
+# Integrity gate for a rewritten lsd.sh before it replaces the original:
+# the J9 start-line count must be unchanged and BEGIN/END marker lines must
+# form exactly WANT ordered pairs (WANT=- skips the pair check).
+lsd_check(){
+  awk -v b="$2" -v e="$3" -v want="$4" -v orig="$5" '
+    b != "" && $0 == b { nb++; if (open) bad=1; open=1 }
+    e != "" && $0 == e { ne++; if (!open) bad=1; open=0 }
+    /^\$J9/ { nj++ }
+    END {
+      if (nj != orig || nj < 1) exit 1
+      if (want != "-" && (bad || open || nb != want || ne != want)) exit 1
+    }
+  ' "$1"
+}
+j9_count(){
+  awk '/^\$J9/ { n++ } END { print n+0 }' "$1"
+}
 
 fail(){
   RC=$1
@@ -34,9 +52,10 @@ mount -uw /mnt/app 2>/dev/null || fail 20 "app_rw"
 RW=1
 
 # The legacy Auto-Direct supervisor and parity-session are mutually exclusive.
-# Make the old guarded boot hook inert across the next boot.
-echo 0 > "$LEGACY" || fail 21 "legacy_disable_write"
-chmod 644 "$LEGACY" 2>/dev/null || true
+# Its lsd.sh hook starts only while the .enabled marker exists, so remove that
+# marker (the hook itself stays inert and is left in place).
+rm -f "$AUTODIRECT_ENABLED" 2>/dev/null
+[ ! -e "$AUTODIRECT_ENABLED" ] || fail 29 "autodirect_marker_remove"
 
 if [ ! -r "$BASE/backup/lsd.sh.pre-parity-drive" ]; then
   mkdir -p "$BASE/backup" || fail 22 "backup_dir"
@@ -60,13 +79,14 @@ else
   ' "$LSD" > "$TMP" || fail 24 "boot_patch_insert"
 fi
 
+lsd_check "$TMP" "$BEGIN" "$END" 1 "$(j9_count "$LSD")" || fail 27 "boot_patch_integrity"
 chmod 755 "$TMP" 2>/dev/null || true
 mv "$TMP" "$LSD" || fail 25 "boot_install"
 
 echo 1 > "$ENABLE" || fail 26 "enable_write"
 chmod 644 "$ENABLE" 2>/dev/null || true
 sync
-mount -ur /mnt/app 2>/dev/null || true
+mount -ur /mnt/app 2>/dev/null || { RW=0; echo "PARITY_DRIVE_ENABLE=FAIL app_ro"; exit 28; }
 RW=0
 
 echo "PARITY_DRIVE_ENABLE=PASS"

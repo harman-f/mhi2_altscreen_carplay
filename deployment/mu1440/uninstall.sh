@@ -31,7 +31,26 @@ mibr_vehicle_summary || echo "WARN vehicle_summary_failed"
 
 OWNED=/mnt/app/root/mibr-deploy-navignore-owned
 MOSTOWNED=/mnt/app/root/mibr-deploy-most20-owned
-TMP=/tmp/lsd.sh.mibr-deploy-java-remove.$
+# Stage in the lsd.sh directory itself, not in /tmp (RAM): the final mv is
+# then a same-filesystem rename whatever the mount layout under /mnt/app is.
+TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-deploy-java-remove.$$
+# Integrity gate for a rewritten lsd.sh before it replaces the original:
+# the J9 start-line count must be unchanged and BEGIN/END marker lines must
+# form exactly WANT ordered pairs (WANT=- skips the pair check).
+lsd_check(){
+  awk -v b="$2" -v e="$3" -v want="$4" -v orig="$5" '
+    b != "" && $0 == b { nb++; if (open) bad=1; open=1 }
+    e != "" && $0 == e { ne++; if (!open) bad=1; open=0 }
+    /^\$J9/ { nj++ }
+    END {
+      if (nj != orig || nj < 1) exit 1
+      if (want != "-" && (bad || open || nb != want || ne != want)) exit 1
+    }
+  ' "$1"
+}
+j9_count(){
+  awk '/^\$J9/ { n++ } END { print n+0 }' "$1"
+}
 
 FAIL=0
 
@@ -55,6 +74,7 @@ if [ -e "$OWNED" ]; then
       index($0, "-Xbootclasspath/p:$BASE_DIR/lsd/jars/MIBR-NavIgnore.jar") { next }
       { print }
     ' "$LSD" > "$TMP" &&
+    lsd_check "$TMP" "" "" - "$(j9_count "$LSD")" &&
     chmod 755 "$TMP" 2>/dev/null &&
     mv "$TMP" "$LSD"
     RC=$?
@@ -65,7 +85,10 @@ if [ -e "$OWNED" ]; then
       FAIL=1
     fi
     sync
-    mount -ur /mnt/app 2>/dev/null || true
+    mount -ur /mnt/app 2>/dev/null || {
+      echo "ERROR /mnt/app did not return to read-only"
+      FAIL=1
+    }
   else
     FAIL=1
   fi
@@ -81,6 +104,7 @@ if [ -e "$MOSTOWNED" ]; then
       index($0, "-Xbootclasspath/p:$BASE_DIR/lsd/jars/MIBR-Most20FPS.jar") { next }
       { print }
     ' "$LSD" > "$TMP" &&
+    lsd_check "$TMP" "" "" - "$(j9_count "$LSD")" &&
     chmod 755 "$TMP" 2>/dev/null &&
     mv "$TMP" "$LSD"
     RC=$?
@@ -91,12 +115,58 @@ if [ -e "$MOSTOWNED" ]; then
       FAIL=1
     fi
     sync
-    mount -ur /mnt/app 2>/dev/null || true
+    mount -ur /mnt/app 2>/dev/null || {
+      echo "ERROR /mnt/app did not return to read-only"
+      FAIL=1
+    }
   else
     FAIL=1
   fi
 else
   echo "Most20FPS not owned by deployment; leaving it untouched."
+fi
+
+# Parity-drive keeps its boot hook on disable by design; uninstall removes
+# it, because the supervisor it starts stays under $DST after uninstall.
+PARITY_BEGIN="# MIBR PARITY-DRIVE BEGIN"
+PARITY_END="# MIBR PARITY-DRIVE END"
+if grep -F "$PARITY_BEGIN" "$LSD" >/dev/null 2>&1; then
+  echo "Removing parity-drive boot hook"
+  if [ -x "$DST/scripts/parity_drive_disable.sh" ]; then
+    "$DST/scripts/parity_drive_disable.sh" || FAIL=1
+  fi
+  if mount -uw /mnt/app 2>/dev/null; then
+    awk -v b="$PARITY_BEGIN" -v e="$PARITY_END" '
+      $0 == b { skip=1; next }
+      skip && $0 == e { skip=0; next }
+      !skip { print }
+      END { if (skip) exit 42 }
+    ' "$LSD" > "$TMP"
+    ARC=$?
+    if [ "$ARC" -eq 0 ] && lsd_check "$TMP" "$PARITY_BEGIN" "$PARITY_END" 0 "$(j9_count "$LSD")"; then
+      chmod 755 "$TMP" 2>/dev/null || true
+      if mv "$TMP" "$LSD"; then
+        echo 0 > /mnt/app/root/mibr-parity-drive.enabled 2>/dev/null || true
+        echo "Parity-drive boot hook removed"
+      else
+        rm -f "$TMP" 2>/dev/null || true
+        echo "ERROR parity-drive boot hook replacement failed"
+        FAIL=1
+      fi
+    else
+      rm -f "$TMP" 2>/dev/null || true
+      echo "ERROR malformed parity-drive boot hook; lsd.sh left unchanged"
+      FAIL=1
+    fi
+    sync
+    mount -ur /mnt/app 2>/dev/null || {
+      echo "ERROR /mnt/app did not return to read-only"
+      FAIL=1
+    }
+  else
+    echo "ERROR cannot mount /mnt/app rw to remove the parity-drive boot hook"
+    FAIL=1
+  fi
 fi
 
 echo "Restoring DisplayManager startup"
@@ -112,7 +182,50 @@ else
   FAIL=1
 fi
 
-rm -f /tmp/mibr-alt111-keyframe-policy.enabled /mnt/app/root/mibr-alt111-keyframe-policy.enabled /tmp/mibr-alt111-resync.enabled /tmp/mibr-alt111-resync-arm 2>/dev/null || true
+rm -f /tmp/mibr-alt111-keyframe-policy.enabled /tmp/mibr-alt111-resync.enabled /tmp/mibr-alt111-resync-arm 2>/dev/null || true
+
+# The persistent D2 marker lives on /mnt/app, which every step above has
+# already returned to read-only. Remove it inside its own RW window and
+# report a marker that survives, instead of hiding the failure. Only a
+# marker the installer created (ownership file) is removed; one the user or
+# another tool created stays. The install-defaults receipt goes as well, so
+# a later install applies the defaults again.
+D2_MARKER=/mnt/app/root/mibr-alt111-keyframe-policy.enabled
+D2_OWNED=$DST/version/ownership/d2-marker.owned
+RECEIPT=$DST/version/install-defaults.receipt
+if [ -e "$D2_MARKER" ] && [ ! -e "$D2_OWNED" ]; then
+  echo "Persistent D2 marker not created by the installer; left in place"
+elif [ -e "$D2_MARKER" ]; then
+  if mount -uw /mnt/app 2>/dev/null; then
+    rm -f "$D2_MARKER" 2>/dev/null || true
+    sync
+    mount -ur /mnt/app 2>/dev/null || {
+      echo "ERROR /mnt/app did not return to read-only"
+      FAIL=1
+    }
+  fi
+  if [ -e "$D2_MARKER" ]; then
+    echo "ERROR persistent D2 marker survived uninstall: $D2_MARKER"
+    FAIL=1
+  else
+    echo "Persistent D2 marker removed"
+  fi
+fi
+if [ -e "$D2_OWNED" ] || [ -e "$RECEIPT" ]; then
+  if mount -uw /mnt/app 2>/dev/null; then
+    [ -e "$D2_MARKER" ] || rm -f "$D2_OWNED" 2>/dev/null || true
+    rm -f "$RECEIPT" 2>/dev/null || true
+    sync
+    mount -ur /mnt/app 2>/dev/null || {
+      echo "ERROR /mnt/app did not return to read-only"
+      FAIL=1
+    }
+  fi
+  if [ -e "$RECEIPT" ]; then
+    echo "ERROR install-defaults receipt survived uninstall: $RECEIPT"
+    FAIL=1
+  fi
+fi
 
 if [ "$FAIL" -ne 0 ]; then
   echo "MIBR_UNINSTALL=COMPLETED_WITH_ERRORS"
