@@ -54,6 +54,7 @@ python3 tools/release/module_plan.py --self-test
 python3 tools/release/module_plan.py --all
 python3 tools/release/qnx_scripts.py --self-test --canonical
 python3 tools/release/audit_legacy.py --self-test
+python3 -I -B tools/release/check_executable_modes.py --self-test
 tools/prepare_mu1440_sd.sh /tmp/mu1440-legacy-audit
 python3 tools/release/qnx_scripts.py --package-root /tmp/mu1440-legacy-audit
 ```
@@ -61,6 +62,10 @@ python3 tools/release/qnx_scripts.py --package-root /tmp/mu1440-legacy-audit
 The final archive integrity gate is invoked from CI **after ZIP creation**.
 These commands are workstation/GitHub-Runner commands and are **not installed
 or executed on the QNX unit**.
+
+`check_executable_modes.py` fails when a file in `executable_modes.lock` loses
+git mode 100755 or a new executable is not pinned (`--write-lock` regenerates
+the lock; review the diff before committing it).
 
 ## QNX caveats that cannot be waived by green host CI
 

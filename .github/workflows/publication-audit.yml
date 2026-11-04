@@ -55,6 +55,7 @@ jobs:
           python3 tools/release/storage_destination_plan.py --self-test --json-out "$RUNNER_TEMP/storage-destination-plan.json"
           python3 -I -B tools/release/storage_destination_plan.py --self-test
           python3 -B -m unittest discover -s tests/deployment -p 'test_*.py' -v
+          python3 -I -B tools/release/check_executable_modes.py --self-test
 
       - name: Upload source-defined inventory (host evidence only)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
