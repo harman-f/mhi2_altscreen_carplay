@@ -1,0 +1,51 @@
+name: Staged media and phone host contract
+on:
+  pull_request:
+    paths:
+      - 'modules/media/**'
+      - 'modules/phone/**'
+      - 'modules/module-index.json'
+      - 'modules/profiles/**/integration/media-phone-abi.json'
+      - '.github/workflows/media-phone-staging.yml'
+  push:
+    branches: [ develop ]
+    paths:
+      - 'modules/media/**'
+      - 'modules/phone/**'
+      - '.github/workflows/media-phone-staging.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: OEM-free media model host test
+        run: bash modules/media/tests/run_host.sh
+      - name: OEM-free phone model host test
+        run: bash modules/phone/tests/run_host.sh
+      - name: Three profile adapters must fail closed
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          names = ['skoda-mu1440-p4526','seat-mu1409-p4708','seat-mu1447-p4709']
+          for name in names:
+              p = Path('modules/profiles')/name/'integration/media-phone-abi.json'
+              d = json.loads(p.read_text(encoding='utf-8'))
+              assert d['profile'] == name
+              for key in ('media','phone'):
+                  assert d[key]['status'] == 'pending-exact-abi'
+                  assert d[key]['auto_install'] is False
+                  assert d[key]['compiled_artifact'] is None
+          print('MEDIA_PHONE_PROFILE_GATES=PASS')
+          PY
+      - name: Source ownership and publication
+        run: |
+          python3 tools/check_module_index.py --self-test
+          python3 tools/audit_public_repo.py
