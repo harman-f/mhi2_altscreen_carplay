@@ -10,6 +10,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+if __package__:
+    from . import profile_stubs
+else:
+    import profile_stubs
+
 P = Path(__file__).resolve().parents[1]
 H = P / "java/de/mibr/hmi"
 
@@ -21,7 +26,7 @@ public interface OutEventListener { void outHMIEventFired(String a); void outInt
  void outSpellerEventFired(String a,String b,int c,int d,int e); }""",
 "de/vw/mib/widgets/controller/AbstractWidgetController.java": """package de.vw.mib.widgets.controller;
 public abstract class AbstractWidgetController { public final java.util.Vector listeners=new java.util.Vector();
- public final void addOutEventListener(de.vw.mib.widgets.event.OutEventListener l){listeners.addElement(l);}
+ public final void addOutEventListener(de.vw.mib.widgets.event.OutEventListener l){if(!listeners.contains(l))listeners.addElement(l);}
  public final void removeOutEventListener(de.vw.mib.widgets.event.OutEventListener l){listeners.removeElement(l);}
  protected void fire(String e){for(int i=0;i<listeners.size();i++)((de.vw.mib.widgets.event.OutEventListener)listeners.elementAt(i)).outHMIEventFired(e);} }""",
 "de/vw/mib/widgets/controller/DefaultPushButtonController.java": """package de.vw.mib.widgets.controller;
@@ -72,7 +77,13 @@ public class LongPressTest {
   c.press();c.timerElapsed();c.release();check(opened==1&&carplay==1,"long press opens settings, not CarPlay");
   lp.refresh();check(c.listeners.size()==2,"refresh does not double-hook");
   b.set_buttonMode(0);lp.refresh();check(b.get_buttonMode()==2,"re-armed after Sgm re-init");
-  lp.restore();check(b.get_buttonMode()==0&&b.get_startTimePrimary()==0&&c.listeners.size()==1,"restore puts stock back");
+  boolean rr=Boolean.getBoolean("mibr.test.reregister");
+  if(rr){
+   int before=opened;c.listeners.removeAllElements();lp.refresh();
+   c.press();c.timerElapsed();c.release();check(opened==before+1&&c.listeners.size()==1,"hook re-registered after deInit cleared listeners");
+   lp.refresh();check(c.listeners.size()==1,"re-registration is idempotent");
+  }
+  lp.restore();check(b.get_buttonMode()==0&&b.get_startTimePrimary()==0&&c.listeners.size()==(rr?0:1),"restore puts stock back");
   Button other=new Button("ButtonOther");other.controller=new DefaultPushButtonController();
   sgm.set(new CloneData(new WidgetModel[]{new ListItem("ListItemOther"),other}));
   MibrOemTileLongPress.install(sgm,open);check(other.get_buttonMode()==0,"foreign layout untouched");
@@ -84,12 +95,18 @@ public class LongPressTest {
 
 class OemTileLongPress(unittest.TestCase):
     def test_long_press_opens_settings_short_tap_unchanged(self):
+        self._run(False)
+
+    def test_listeners_cleared_profile_reregisters_hook(self):
+        self._run(True)
+
+    def _run(self, reregister):
         javac, java = shutil.which("javac"), shutil.which("java")
         if not javac or not java:
             self.skipTest("JDK required")
         root = Path(tempfile.mkdtemp(prefix="mibr-oem-longpress-"))
         sources = []
-        for rel, text in STUBS.items():
+        for rel, text in list(STUBS.items()) + list(profile_stubs.STUBS.items()):
             p = root / "src" / rel
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(text, encoding="utf-8")
@@ -97,12 +114,13 @@ class OemTileLongPress(unittest.TestCase):
         t = root / "src/de/mibr/hmi/LongPressTest.java"
         t.parent.mkdir(parents=True, exist_ok=True)
         t.write_text(TEST, encoding="utf-8")
-        sources += [str(t), str(H / "MibrOemTileLongPress.java")]
+        sources += [str(t), str(H / "MibrOemTileLongPress.java")] + [str(x) for x in profile_stubs.REAL_SOURCES]
         out = root / "classes"
         out.mkdir()
         run = subprocess.run([javac, "-encoding", "UTF-8", "-d", str(out)] + sources, capture_output=True, text=True)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-        run = subprocess.run([java, "-cp", str(out), "de.mibr.hmi.LongPressTest"], capture_output=True, text=True, timeout=20)
+        run = subprocess.run([java, "-Dmibr.test.reregister=" + ("true" if reregister else "false"),
+                              "-cp", str(out), "de.mibr.hmi.LongPressTest"], capture_output=True, text=True, timeout=20)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         self.assertIn("MIBR_OEM_TILE_LONGPRESS_PASS", run.stdout)
 

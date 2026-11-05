@@ -13,6 +13,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+if __package__:
+    from . import profile_stubs
+else:
+    import profile_stubs
+
 P = Path(__file__).resolve().parents[1]
 ROOT = P.parents[2]
 H = P / "java/de/mibr/hmi"
@@ -226,7 +231,7 @@ class NativeRowsCallbacks(unittest.TestCase):
         if not cls.javac or not cls.java:
             raise RuntimeError("Existing JDK required; set MIBR_TEST_JAVA_HOME (no installation/setup)")
         sources = []
-        for relative, body in STUBS.items():
+        for relative, body in list(STUBS.items()) + list(profile_stubs.STUBS.items()):
             path = cls.tmp / "src" / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(body, encoding="utf-8")
@@ -243,6 +248,7 @@ class NativeRowsCallbacks(unittest.TestCase):
                      "MibrV3Protocol", "MibrV3Client", "MibrV3Session",
                      "MibrSettingsCatalog"):
             sources.append(str(H / (name + ".java")))
+        sources += [str(x) for x in profile_stubs.REAL_SOURCES]
         cls.out = cls.tmp / "classes"
         cls.out.mkdir()
         run = subprocess.run([cls.javac, "-encoding", "UTF-8", "-source", "8", "-target", "8", "-d", str(cls.out)] + sources,
