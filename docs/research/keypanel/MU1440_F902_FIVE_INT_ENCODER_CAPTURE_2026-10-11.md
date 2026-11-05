@@ -1,5 +1,8 @@
 # MU1440 right/left wheel 5-int raw mapping (2026-10-11)
 
+> **Research status · 2026-11-05:** **MEASURED FOLLOW-UP.** Exact 12-detent F902 correlation resolves an earlier input-ID uncertainty for that capture, not all live zoom/focus behavior. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 **Finding: direct offline recovery of all twelve physical wheel detents in previously undecoded inner DebugSPI 0x0110 records.** Passive v1.4 vehicle run; no Java/LSD/J9, CarPlay, Parity or OEM input patch.
 
 ## Capture and operator provenance

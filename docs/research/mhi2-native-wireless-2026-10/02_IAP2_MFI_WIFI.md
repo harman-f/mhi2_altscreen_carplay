@@ -1,5 +1,8 @@
 # 02. Stock Type-3 iAP2, MFi and WLAN credential handoff
 
+> **Research status · 2026-11-05:** **FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 **Evidence:** exact-target static binary/config analysis and project-authored offline transport prototype. Not a vehicle-validated Wireless CarPlay bootstrap.
 
 ## Use what stock MU1440 already provides

@@ -1,5 +1,8 @@
 # 09. Detailed native Wireless CarPlay architecture and implementation boundaries
 
+> **Research status · 2026-11-05: FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 **Scope:** Wireless connection, secure session and control-plane integration only. Target: classic MHI2 ER SKG13 P4526/MU1440, QNX 6.5 ARM32. **Frozen research, 9 October 2026.** This is a reconstruction of *interfaces and missing integration*, not a vehicle-proven complete implementation. No video, instrument-cluster, MOST or alternate-display data is used as evidence.
 
 ## 1. Three complementary architectures must not be conflated

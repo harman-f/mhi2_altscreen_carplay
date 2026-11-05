@@ -1,5 +1,8 @@
 # 03. Receiver/DIO, Controller Connect and encrypted pairing
 
+> **Research status · 2026-11-05:** **FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 **Evidence:** detailed, exact-MU1440 binary/callback audit on 7 October 2026, combined with a separate stock-firmware semantic comparison. Target code is not a working backport.
 
 ## The most useful target-side finding
