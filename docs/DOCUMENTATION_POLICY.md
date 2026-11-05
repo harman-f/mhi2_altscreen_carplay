@@ -25,6 +25,6 @@ The product has three separate versioned surfaces: **public source**, a **specif
 
 ## CI coverage
 
-`python3 tools/docs/check_docs.py --self-test` runs parser fixtures; `--scope active` is the required strict index/status/link gate. `--scope all --report-only` inventories historical Markdown links as a separately visible cleanup queue. The repository already runs generator and package validators; they govern machine-readable behavior, not a prose claim that an untested ZIP has passed real-world qualification.
+`python3 tools/docs/check_docs.py --self-test` runs parser fixtures; `--scope active` is the required strict index/status/link gate. `--scope all` strictly checks every tracked Markdown file, including historical studies. `--report-only` remains available for local diagnostics when investigating old references. The repository already runs generator and package validators; they govern machine-readable behavior, not a prose claim that an untested ZIP has passed real-world qualification.
 
 Do not turn this document into a second roadmap. The [roadmap](../ROADMAP.md) lists remaining product gates; this page governs how to keep the documentation coherent.

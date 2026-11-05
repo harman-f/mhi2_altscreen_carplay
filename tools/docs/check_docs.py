@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Check internal Markdown links, anchors, and live documentation/source contracts.
 
-The mandatory CI gate covers reader-facing current documentation. --scope all
-also inventories dated historical/technical Markdown without silently changing
-original evidence. --report-only provides a non-blocking backlog for archival links.
+The mandatory CI gate checks both reader-facing current documentation and all
+tracked Markdown links, including historical studies, without altering the
+original evidence. --report-only remains available for exploratory audits.
 No network requests or third-party Python dependencies are used.
 """
 from __future__ import annotations
