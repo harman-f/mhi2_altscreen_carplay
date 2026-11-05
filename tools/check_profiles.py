@@ -51,7 +51,7 @@ def validate_profile(pid, doc):
     en = sel.get("install_enabled")
     chk(isinstance(en, bool), "selector.install_enabled must be bool")
     if isinstance(en, bool):
-        chk(en == (ev in ENABLING), "install_enabled inconsistent with evidence")
+        chk(not en or ev in ENABLING, "install_enabled inconsistent with evidence")
     fc = doc.get("firmware_check")
     fc = fc if isinstance(fc, dict) else {}
     chk(fc.get("status") in FW_STATUS, "firmware_check.status invalid")
@@ -118,15 +118,17 @@ def self_test():
         errs = validate_all(p)
         assert any(needle in x for x in errs), (needle, errs)
     bad(lambda p: p[s9]["selector"].update(evidence="bogus"), "evidence invalid")
-    bad(lambda p: p[s8]["selector"].update(install_enabled=True), "inconsistent")
-    bad(lambda p: p[sk]["selector"].update(install_enabled=False), "inconsistent")
+    bad(lambda p: p[s8]["selector"].update(evidence="profile_source_unverified", install_enabled=True), "inconsistent")
+    disabled = copy.deepcopy(base)
+    disabled[sk]["selector"]["install_enabled"] = False
+    assert not validate_all(disabled), "verified evidence must not force installation enablement"
     bad(lambda p: p[sk]["selector"].update(digest="XYZ"), "64 lowercase hex")
     bad(lambda p: p[s8]["selector"].update(digest=p[sk]["selector"]["digest"]), "duplicate selector digest")
     bad(lambda p: p[s9]["hmi"].update(adapter_from="nope"), "adapter_from")
     bad(lambda p: p[s9]["hmi"].update(adapter_from=s9), "adapter_from")
     bad(lambda p: p[sk]["hmi"].update(api_jar_sha256=p[s9]["selector"]["digest"]), "equals selector digest")
     bad(lambda p: p[sk]["hmi"].update(api_jar_sha256="abc"), "api_jar_sha256")
-    bad(lambda p: p[sk]["hmi"].update(api_jar_status="confirmed"), "needs a hash")
+    bad(lambda p: p[sk]["hmi"].update(api_jar_status="confirmed", api_jar_sha256=None), "needs a hash")
     bad(lambda p: p[sk]["java"].update(adapter_status="free text"), "adapter_status")
     bad(lambda p: p[sk].update(evidence=[]), "evidence list")
     bad(lambda p: p[sk].update(schema_version=1), "schema_version")

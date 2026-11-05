@@ -113,11 +113,14 @@ class SelectProfile(unittest.TestCase):
             self.assertNotIn(bad, text)
 
     def test_committed_list_selects_enabled_only(self):
-        # real generated list: every digest line parses and P4708 is disabled
+        # real generated list: every digest line parses and install_enabled mirrors profile.json
         rows = [l.split() for l in LIST.read_text().splitlines() if l and not l.startswith("#")]
         self.assertEqual(len(rows), len({r[0] for r in rows}))
         self.assertTrue(all(len(r) == 4 and r[3] in ("0", "1") for r in rows))
-        self.assertEqual({r[1]: r[3] for r in rows}["seat-mu1409-p4708"], "0")
+        import json
+        for pid, en in {r[1]: r[3] for r in rows}.items():
+            prof = json.loads((LIST.parents[2] / "modules" / "profiles" / pid / "profile.json").read_text())
+            self.assertEqual(en, "1" if prof["selector"]["install_enabled"] else "0", pid)
 
 
 if __name__ == "__main__":

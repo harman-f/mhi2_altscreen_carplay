@@ -20,8 +20,8 @@
     "status": "defined"
   },
   "hmi": {
-    "api_jar_sha256": null,
-    "api_jar_status": "to_confirm",
+    "api_jar_sha256": "57dc5e9313ef8a59403a17b3a6726f0852f6ac68cc72e42ef2a1ca530aba3ae7",
+    "api_jar_status": "confirmed",
     "adapter": null,
     "adapter_from": null,
     "image_index_offset": null
