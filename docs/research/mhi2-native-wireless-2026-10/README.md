@@ -1,5 +1,9 @@
 # Native Wireless CarPlay on classic MHI2: research handoff
 
+[Research library](../README.md) · [Current product evidence](../../status/FEATURE_STATUS.md) · [Research archive rules](../AGENTS.md)
+
+> **Research status · 2026-11-05: FROZEN / UNQUALIFIED PROTOTYPE.** Not part of the current working secondary-screen release or a vehicle-validated native Wireless CarPlay integration.
+
 **Frozen research snapshot — 9 October 2026 — not a release, installer or maintained project.**
 
 This material may be useful to developers who already have Wireless CarPlay connected on a classic MHI2 head unit but are still diagnosing integration and lifecycle problems. It documents exact-target interface observations, independently reviewed defects and explicitly incomplete prototype components. **This project did not demonstrate a complete native Wireless CarPlay session on its target vehicle.** No production support or further implementation work is currently planned.

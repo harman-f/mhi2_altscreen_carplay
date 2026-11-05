@@ -1,4 +1,7 @@
 # MU1440 / Škoda: raw keypanel, wheel encoders, Omonob CarPlay zoom
+
+> **Research status · 2026-11-05:** **DATED INPUT RESEARCH.** Evidence is limited to the documented physical capture, static API or attribution scope. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
 **Later evidence update:** The 240-second v1.4 capture subsequently resolved the baseline right and left five-int vectors; the earlier statements below saying that numeric encoder IDs are still unknown preserve the historical 300-second capture status only. See [the current consolidated physical wheel/head-unit map](../../testing/MU1440_MFW_RAW_KEY_MAPPING.md), [twelve direct wheel events](MU1440_F902_FIVE_INT_ENCODER_CAPTURE_2026-10-11.md) and the [public omonob/MHI2-Carplay-Maps adapter comparison](MU1440_OMONOB_MHI2_WHEEL_ENCODER_BINARY_PATCH_OPTIONS_2026-10-11.md). Original dated warnings-only analysis below is preserved as chronology, not the latest numeric conclusion.
 
 Status: evidence + research only, 2026-10-11. No vehicle firmware or Java-class modification is made by this document.

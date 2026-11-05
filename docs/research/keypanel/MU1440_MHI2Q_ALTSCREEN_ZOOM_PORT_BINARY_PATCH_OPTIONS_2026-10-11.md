@@ -1,5 +1,8 @@
 # MU1440: real rotary input to CarPlay zoom — MHI2Q AltScreen / Audi comparator audit (2026-10-11)
 
+> **Research status · 2026-11-05:** **CROSS-PLATFORM COMPARATOR.** Audi/MHI2Q behavior is not a compatible MU1440 binary or tested integration. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 **Scope:** This is the separate Audi comparison: `yuedizhibo/MHI2Q-CarPlay-AltScreen` (owner: yuedizhibo). The requested MHI2 implementation is `omonob/MHI2-Carplay-Maps` (owner: omonob/QCDWJ); see [the dedicated MHI2 input study](MU1440_OMONOB_MHI2_WHEEL_ENCODER_BINARY_PATCH_OPTIONS_2026-10-11.md).\n\nStatus: **sanitized evidence + implementation design, NOT a compiled vehicle patch**. Target Škoda MHI2_ER_SKG13_P4526_MU1440, not Audi MHI2Q/AUG22. Preserve the frozen four-core MIBR video/ownership architecture and 48 setting registry. No new J9/LSD/CarPlay/Parity patch authorized or installed by this document.
 
 ## 1. New physical input evidence

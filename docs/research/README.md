@@ -1,123 +1,39 @@
-# Research index
+# Research library — MIB Runtime
 
-This directory collects research that is useful to contributors before it becomes a vehicle-approved implementation.
+[Documentation home](../README.md) · [Feature and vehicle evidence](../status/FEATURE_STATUS.md) · [Packages and releases](../packages/README.md) · [Research rules](AGENTS.md)
 
-> [!NOTE]
-> Start with the [current October integration status](../status/INTEGRATION_STATUS_2026-10-21.md); the [2026-10-05 research preview](CURRENT_RESEARCH_PREVIEW_2026-10-05.md) is historical. That dated preview summarizes the then-new
-> media/timing, HMI/menu and steering-wheel findings and clearly labels what is vehicle-proven vs static/design-only.
+The research library retains **dated technical evidence, competing implementations, reverse engineering, failed approaches and open hypotheses**. It is not a second product manual. To see what the **current public source**, **a released package**, or **an actual vehicle run** proves, start with the links above.
 
-**Dated MMX finding (R15):** [Native archived 64-MiB MMX fs0 PT, exact installed /70/ KERNEL_PRIMARY mapping, Recovery and the second outer CRC at 0x7FC](MU1440_MMX_FS0_NATIVE_PT_AND_STAGE1_HEADER_CRC_R15_2026-10-12.md). The uploaded file matches R14 catalog BACKUP-SNAPSHOT-06 (not initially requested Snapshot-10), and its actual native PT directly establishes the G11 Normal 3-MiB Primary/6-MiB Recovery boundaries. Sample-specific original-forensic proof only; current-car identity and modified-image acceptance remain open. [Full Toolkit PR #8](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/pull/8).
+## Browse by topic
 
-**Separate RCC CPU research (R16):** [Original RCC Jacinto-5 / Cortex-A8 stock clock and ARM/DSP/DDR baseline](MU1440_RCC_JACINTO5_CLOCK_BASELINE_R16_2026-10-12.md) — original RCC IPL/startup has a distinct Jacinto5 clock chain; publicly documented sibling traces show 720/600/400 MHz ARM/DSP/DDR, but this is NOT yet a live clock observation of the current unit. MMX/Tegra getter/voltage interfaces do not carry over. Read-only evidence plan only.
+| Research area | What you will find | Start here |
+| --- | --- | --- |
+| **[CarPlay / protocol](carplay/README.md)** | Stream 111, iOS sender, cluster settings, ViewArea, PlatformControl | [Stream-111 protocol](carplay/STREAM111_PROTOCOL.md) |
+| **[Media / MOST](media/README.md)** | Producer comparisons, GEN2 hooks, frame rate, decoder and keyframe hypotheses | [Comparator findings](media/COMPARATOR_FINDINGS.md) |
+| **[Firmware and cluster](firmware/README.md)** | Exact MHI2 baselines, portability, AID/FPK and OEM source comparison | [Firmware profile map](firmware/MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md) |
+| **[Hardware, boot and clocks](hardware/README.md)** | MMX Tegra/QNX, NOR, RCC Jacinto5, safe read-only diagnostics | [Consolidated hardware study](hardware/MU1440_TEGRA_T30_CPU_CLOCK_POWER_TIMEBASE_AUDIT_2026-10-11.md) |
+| **[HMI and input](interface/README.md)** | J9 build interface, buttons, media/Now Playing, native input | [Key and encoder studies](keypanel/README.md) |
+| **[Wireless CarPlay](mhi2-native-wireless-2026-10/README.md)** | Independent Bluetooth/iAP2/Wi-Fi research, prototypes, blockers | [Wireless end-to-end architecture](mhi2-native-wireless-2026-10/09_END_TO_END_ARCHITECTURE.md) |
+| **[Historical / superseded summaries](archive/README.md)** | Older summaries replaced as current navigation, retained for provenance | [5 October preview](archive/CURRENT_RESEARCH_PREVIEW_2026-10-05.md) |
 
-## CPU / Tegra clock and QNX timebase (exact MU1440; read-only)
+The existing [AltScreen Cluster Atlas](../index.html) is a separate, cross-project comparison view. [Public references and attribution](PUBLIC_REFERENCES.md) · [Research method](../RESEARCH_METHOD.md).
 
-**Start here:** [Consolidated MU1440 Tegra T30 CPU-clock, PMIC, qtime and Stream-111/VC audit](MU1440_TEGRA_T30_CPU_CLOCK_POWER_TIMEBASE_AUDIT_2026-10-11.md) — now contains a **linked R4–R14 research map and current evidence gates**. Follow its links to [R12 source](MU1440_BOOT_CHAIN_FIRST_STAGE_SOURCE_AUDIT_R12_2026-10-11.md), [R13 instruction-level clock/qtime](MU1440_FIRST_STAGE_CPU_CLOCK_QTIME_XREF_AUDIT_R13_2026-10-11.md), [original Stage-1 packaging/NOR study](MU1440_STAGE1_OEM_WRAPPER_ROUNDTRIP_AND_NOR_BOUNDARIES_2026-10-11.md), the [merged Toolkit OEM repack manual](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/blob/main/docs/MU1440_STAGE1_OEM_OFFLINE_ROUNDTRIP.md) and [R14 Codex source inventory Issue #41](https://github.com/harman-f/mhi2_altscreen_carplay/issues/41). Original firmware and raw/private backup data remain outside Git; no live clock or flash change is validated.
+## What does the status on a research page mean?
 
-- [R4: exact MU1440 libnvsku static audit](MU1440_TEGRA_SKU_STATIC_AUDIT_R4_2026-10-11.md) — confirms board-SKU wrapper only; speedo/fuse qualification remains open.
-- **[R11: exact nvclock API front-to-backend and special-clock audit](MU1440_NVCLOCKAPI_FRONT_BACKEND_SPECIAL_CLOCK_AUDIT_R11_2026-10-11.md)** — confirms QNX resource-manager proxy, 5 backend SCLK/CCLK/HCLK/PCLK/EMC CAR branches vs only 3 named stock-default calls, and outstanding PLLX0/PMIC/qtime gates. No live writes.
-- **[R13 follow-up: original MU1440 /50/ Stage-1 OEM-exact unpack/repack, module map, SWDL integrity layers and NOR boundaries](MU1440_STAGE1_OEM_WRAPPER_ROUNDTRIP_AND_NOR_BOUNDARIES_2026-10-11.md)** — 3-MiB original OEM wrapper reassembled byte-identically, first-page CRC32 at 0x264 measured, harmless offline byte-differential re-decode passed; unknown outer integrity fields and actual NOR update path remain OPEN. [Full OEM unpack/repack manual on Toolkit main](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/blob/main/docs/MU1440_STAGE1_OEM_OFFLINE_ROUNDTRIP.md) ([Toolkit PR #6 merged](https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit/pull/6)).
-- **[R13: first-stage CPU-clock/PLLX read and QNX qtime /2 ARM XREF audit](MU1440_FIRST_STAGE_CPU_CLOCK_QTIME_XREF_AUDIT_R13_2026-10-11.md)** — verifies CAR+0xE0 PLLX getter, CAR+0x20 CCLK policy selector and direct CPU-source-rate/2 initialization of qtime with interrupt 27. The original 900-MHz PLLX writer and safe dynamic retiming remain unresolved. Offline only.
-- **[R12: exact MU1440 QNX first-stage startup extraction and Tegra30 BCT source audit](MU1440_BOOT_CHAIN_FIRST_STAGE_SOURCE_AUDIT_R12_2026-10-11.md)** — identifies the original 106,760-byte Stage-1 startup payload by exact package bytes and R7 RAM boundaries; reports BCT/SDRAM profiles as not found in the then-available update/export inputs; the later separate MMX NOR R15 report identifies original BCT copies. Static only; no live changes.
-- **[R10: exact clock_init clock-table static audit and IFS-loader observation](MU1440_CLOCK_INIT_STATIC_AND_IFSLOADER_AUDIT_R10_2026-10-11.md)** — confirms clock-writing API and identical SKU2/SKU5 PLL tables with no direct PLLX0/PLLM0 record; reconciles 84-MiB IFS reservation with 74-MiB mounted image. Read-only research.
-- **[R9: exact QNX clock_init handoff and Stage-2 84-MiB IFS reservation](MU1440_QNX_CLOCK_INIT_STAGE2_IFS_AUDIT_R9_2026-10-11.md)** — first confirmed post-kernel clock initializer call, driver ordering, exact ASINFO gap correlation and prioritized private clock_init binary audit. Research only.
-- **[R8: binary QNX startup-script / PMU-I²C5 handoff audit](MU1440_QNX_STARTUP_SCRIPT_PMU_HANDOFF_AUDIT_R8_2026-10-11.md)** — actual boot command/argument order, mNAND clock vs SDRAM distinction, I²C5-before-power sequence and next-stage `/usr/sbin/startup.sh` target. Research only.
-- **[R7: exact QNX ASINFO startup/imagefs and RAM-layout audit](MU1440_QNX_ASINFO_BOOT_MEMORY_LAYOUT_AUDIT_R7_2026-10-11.md)** — records 2,047-MiB QNX RAM mapping, 104-KiB startup region, 6.42-MiB imagefs, early SKU metadata and the next startup.script/boot-image acquisition gate. Read-only.
-- **[R6: exact MU1440 nvmemctrl MC error-handler audit](MU1440_NVMEMCTRL_MC_ERROR_HANDLER_AUDIT_R6_2026-10-11.md)** — disassembly identifies MC IRQ/fault logging at 0x7000F000, not the RAM training/EMC frequency governor; redirects SDRAM profile work to the original early boot/BCT. Research only.
-- **[R5: RAM_CODE physical strap and boot-memory/CPU-clock separation](MU1440_TEGRA_RAM_CODE_BOOT_MEMORY_CLOCK_AUDIT_R5_2026-10-11.md)** — exact devg-nvsku ARM disassembly, 0x70000008 bits [7:4], RAM_CODE=2 selector, BCT/SDRAM investigation, nvmemctrl next target and boot-vs-runtime risk matrix. Research only; no clock-changing code.
+| Classification | Meaning | How to use it |
+| --- | --- | --- |
+| **REFERENCE / EVIDENCE** | Original analysis, static proof, repeatable observation, or dated experimental record | Reusable **within its documented exact target and evidence limits**; it is not automatically the latest runtime |
+| **OPEN RESEARCH / PROPOSAL** | Design, untested hypothesis or experiment with unclosed validation gates | Investigate; do not equate it with a ready-made feature |
+| **HISTORICAL SNAPSHOT** | A faithful record of an earlier point in the project | Useful for chronology and regression reasoning, not current release instructions |
+| **SUPERSEDED OVERVIEW** | A newer canonical status or architecture page replaced the *summary's role* | Follow the replacement for current conclusions; preserve original evidence and attribution |
+| **SOURCE INTEGRATED** | A separately cited PR/commit includes a particular implementation | Source presence does not demonstrate package, unit or vehicle acceptance |
 
-- **[Consolidated baseline and navigation (R0–R14)](MU1440_TEGRA_T30_CPU_CLOCK_POWER_TIMEBASE_AUDIT_2026-10-11.md)** — measured four-core stock 900 MHz and 450-MHz qtime, genuine clock/power getters vs unvalidated voltage, CarPlay/VC load and a dated guide into R12/R13, the proven offline Stage-1 wrapper roundtrip, historical NOR boundaries and the subsequent R14–R16 source/audit checkpoints. **Research only: no live overclock or boot qualification.**
+**A newer result supersedes a specific conclusion, not necessarily an entire study.** For example, one previously unknown input key can be resolved while the same report still provides valid measured packet data. Do not reclassify a whole document without linking the exact later evidence.
 
-- **[TegraDiag R1: stock-only offline-prepared QNX reader and desktop analysis kit (2026-10-12)](MU1440_TEGRADIAG_R1_OFFLINE_PREP_2026-10-12.md)** — bounded known-getter recorder, 1–3-log CSV/JSON/Markdown comparison, nine parser tests and synthetic examples; private source kit archived and hashed. **Mock/syntax tested only; not yet QNX/vehicle-run, no VDD_CPU measurement or clock control.**
+## From research to implementation
 
-## Historical cross-topic preview
+Research notes belong here. Current interfaces, source and ownership belong in [modules](../../modules/), [architecture](../architecture/README.md) and [configuration](../configuration/DEFAULT_CONFIGURATION_MATRIX.md). Package details and vehicle claims belong in [package status](../packages/README.md) and [feature/evidence status](../status/FEATURE_STATUS.md), respectively.
 
-- [Current research preview — 2026-10-05](CURRENT_RESEARCH_PREVIEW_2026-10-05.md)
-  - source-timestamp / AU / MPEG-TS design;
-  - configurable frame/time keyframe policy;
-  - DMDT vs vehicle-proven writev ownership;
-  - dual ViewArea/SafeArea direction;
-  - HMI settings registry;
-  - menu/ViewHandler and steering-wheel findings.
+When a research line becomes integrated, **add a short pointer to its canonical current owner and keep the original dated study**. When an approach is abandoned, mark the decision and its later evidence explicitly rather than deleting the failed experiment. Preserve real-world negative results and safety constraints.
 
-## Native Wireless CarPlay (separate, experimental project)
-
-- [Wireless research handoff](mhi2-native-wireless-2026-10/README.md) — one starting point for the October 2026 study.
-- **[Firmware and iOS binary findings ↔ actual prototype source](mhi2-native-wireless-2026-10/FIRMWARE_SOURCE_CROSS_REFERENCE.md)** — module-by-module links to research and project-authored C/H/INC/tests.
-- [Prototype source and publication review](mhi2-native-wireless-2026-10/prototype/README.md) · [source hash manifest](mhi2-native-wireless-2026-10/prototype/SOURCE_MANIFEST.tsv).
-
-**Scope warning:** this Wireless bootstrap/session prototype is not vehicle-validated; it is independent of the vehicle-tested Stream-111 / Virtual Cockpit path below. Proprietary firmware binaries are not included.
-
-## CarPlay / Stream-111 / control plane
-
-- [Stream-111 protocol](STREAM111_PROTOCOL.md)
-- [CarPlay cluster configuration index](CARPLAY_CLUSTER_CONFIGURATION_INDEX_IOS26_7_1_2026-10-01.md)
-- [CarPlay cluster function / frontend-effect matrix](CARPLAY_CLUSTER_FUNCTION_FRONTEND_MATRIX_IOS26_7_1_2026-10-01.md)
-- [iOS sender lifecycle](IOS27_SENDER_LIFECYCLE.md)
-- [PlatformControl flight recorder](PLATFORMCONTROL_FLIGHT_RECORDER.md)
-- [VC ViewArea state](VC_VIEWAREA_STATE.md)
-
-## HMI / settings / input
-
-- [Current native HMI / project-owned menu and controller architecture](../architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md) — public feature/interface description; lengthy superseded OEM ViewHandler research retained outside the product tree
-- [MU1440 steering-wheel / hardkey API](MU1440_BUTTON_INPUT_API.md)
-- **[MU1440 wheel DSI / decoded vehicle evidence / Omonob Java bytecode / VC zoom video (2026-10-11)](keypanel/MU1440_WHEEL_DSI_AND_OMONOB_2026-10-11.md)** — distinguishes `updateKey2` from `updateEncoder2`, documents the public Omonob KEY38/39-only interception, and defines a passive next-step probe.
-- [Canonical current physical wheel/head-unit map and open assignments](../testing/MU1440_MFW_RAW_KEY_MAPPING.md) · [sanitized underlying key/encoder matrix](keypanel/MU1440_CAPTURE_SANITIZED_MATRIX.tsv).
-- **[New actual 12-detent MU1440 five-int mapping](keypanel/MU1440_F902_FIVE_INT_ENCODER_CAPTURE_2026-10-11.md)** — right 4/40 ±1 and left 4/44 ±1; supersedes earlier warnings-only uncertainty; [offline read-only decoder](../../tools/decode_keypanel_f902.py).
-- **[Primary: omonob/MHI2-Carplay-Maps (owner: omonob/QCDWJ) — exact MU1440/790 wheel-input correction and JAR patch options](keypanel/MU1440_OMONOB_MHI2_WHEEL_ENCODER_BINARY_PATCH_OPTIONS_2026-10-11.md)** — the relevant Free790 `CarPlayClusterControls.jar`, `updateEncoder2` gap, real 4/40 ±1 detents, Omonob core zoom worker and safe adapter strategy. Design only; no patch installed.
-- **[Separate comparator: yuedizhibo/MHI2Q-CarPlay-AltScreen (owner: yuedizhibo)](keypanel/MU1440_MHI2Q_ALTSCREEN_ZOOM_PORT_BINARY_PATCH_OPTIONS_2026-10-11.md)** — Audi MHI2Q/AUG22 absolute-magnification/pacing reference, **not** the Omonob MHI2 implementation or a compatible MU1440 binary.
-- [Java / IBM J9 build notes](JAVA_J9_BUILD_NOTES.md)
-
-Historical input/HMI snapshot from 11 October (newer Java model and native source-only components are listed under [public source coverage](../status/PUBLISHED_SOURCE_COVERAGE.md); current UI/store/APPLY/ACTIVE acceptance is in [HMI architecture](../architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md)):
-
-```text
-menu/ViewHandler original audit      exact-target static + compile-only PoC
-WidgetFactory injection              offline/build-proven, not vehicle-proven
-steering-wheel ASL APIs              exact-target static
-physical MFW press subset           vehicle-log correlated; VIEW/Assist still open
-rotary five-int baseline           right 4/40 ±1; left 4/44 ±1 / 12 directly parsed records
-actual semantic zoom/focus path     partly development-observed; current focus/owner integration open
-```
-
-## Media / transport / comparator research
-
-- [Comparator findings / non-portable traps](COMPARATOR_FINDINGS.md)
-- [Omonob 790/791 artifact audit](OMONOB_790_791_ARTIFACT_AUDIT_2026-10-03.md)
-- [Omonob 791 30-fps / 1-s IDR test plan](OMONOB_791_30FPS_1S_IDR_TEST_PLAN_2026-10-03.md)
-- [Direct VC video path](../architecture/DIRECT_VC_VIDEO_PATH.md)
-- [Keyframe recovery vehicle finding](../findings/KEYFRAME_RECOVERY_2026-09-27.md)
-
-The October 5 parity/keyframe/ownership model is archived as a dated research preview. For current publicly evidenced behavior and remaining qualifications, use the [integration status](../status/INTEGRATION_STATUS_2026-10-21.md), [module ownership](../architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md), and [October aggregate evidence](../findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md).
-
-## Firmware / platform portability
-
-- [MU1440 stock reference](MU1440_STOCK_REFERENCE.md)
-- [MU1440 GEN2 hook map](MU1440_GEN2_HOOK_MAP.md)
-- [MHI2 firmware profile map](MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md)
-- [MHI2 patch portability estimate](MHI2_PATCH_PORTABILITY_ESTIMATE_2026-09-28.md)
-- [MU1438 vs MU1440 comparison](MU1438_MU1440_OFFLINE_COMPARISON_2026-09-28.md)
-- [Audi B9 compatibility lead](AUDI_B9_MU1438_COMPATIBILITY_LEAD_2026-09-28.md)
-- [Cluster/display transport knowledge base](MIB2_CLUSTER_DISPLAY_TRANSPORT_KNOWLEDGE_BASE.md)
-- [FPK firmware/control access](FPK_FIRMWARE_AND_CONTROL_ACCESS.md)
-
-## Prior art and methodology
-
-- [Public references](PUBLIC_REFERENCES.md)
-- [Research method](../RESEARCH_METHOD.md)
-- [Acknowledgements](../../ACKNOWLEDGEMENTS.md)
-
-## Evidence rule
-
-Please preserve this distinction when contributing:
-
-```text
-vehicle-proven
-  !=
-exact-target static
-  !=
-offline/build-proven
-  !=
-design/inference
-```
-
-A useful research result can be published before vehicle validation as long as its evidence class is explicit.
+[Documentation and archival policy](../DOCUMENTATION_POLICY.md) · [Instructions for documentation agents](../AGENTS.md) · [Research-specific agent rules](AGENTS.md).

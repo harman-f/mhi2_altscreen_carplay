@@ -1,5 +1,8 @@
 # 06. QNX ownership and recovery — wireless transport scope only
 
+> **Research status · 2026-11-05: FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 The early native wireless bootstrap prototype uses QNX Resource Manager callbacks, a native Bluetooth process/service owner and an optional volatile startup wrapper. These observations apply to iAP/RFCOMM ownership, not to any cockpit/video transport.
 
 ## Key engineering boundaries
