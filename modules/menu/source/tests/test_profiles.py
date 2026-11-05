@@ -63,10 +63,20 @@ class WidgetFactoryImpl {
 
 class SkodaAnchorsAreIdentical(unittest.TestCase):
     def test_activator_output_identical_to_legacy_patcher(self):
-        self.assertEqual(prepare_oem_sources.patch_activator(SKODA_ACTIVATOR),
-                         legacy_oem_patcher.patch_activator(SKODA_ACTIVATOR))
+        # Intentional deviation from the legacy patcher (2026-11-05): the service-filter edit catches
+        # Exception instead of InvalidSyntaxException and no longer adds that import, because the pinned
+        # API jar declares no checked exception there. Everything else must stay identical.
+        def normalise(text):
+            text = text.replace("import org.osgi.framework.InvalidSyntaxException;\n", "")
+            text = text.replace("        } catch (InvalidSyntaxException invalidSyntaxException) {\n",
+                                "        } catch (RuntimeException runtimeException) {\n"
+                                "            throw runtimeException;\n"
+                                "        } catch (Exception invalidSyntaxException) {\n")
+            return text
+        legacy = normalise(legacy_oem_patcher.patch_activator(SKODA_ACTIVATOR))
+        self.assertEqual(prepare_oem_sources.patch_activator(SKODA_ACTIVATOR), legacy)
         self.assertEqual(prepare_oem_sources.patch_activator(SKODA_ACTIVATOR, prepare_oem_sources.load_anchors(SKODA)),
-                         legacy_oem_patcher.patch_activator(SKODA_ACTIVATOR))
+                         legacy)
 
     def test_widget_factory_output_identical_to_legacy_patcher(self):
         self.assertEqual(prepare_oem_sources.patch_widget_factory(WIDGET_FACTORY),
