@@ -1,4 +1,7 @@
-# Developer installation
+# Developer installation — frozen MU1440 reference package
+
+> [!IMPORTANT]
+> **Scope: historical seven-payload MU1440 developer deployment only.** The repository now also has a new modular MIB Runtime installer for three exact firmware profiles. The commands and payload paths below do **not** install that new package and must not be used as general SEAT instructions. See [package generations and current availability](packages/README.md), [feature evidence](status/FEATURE_STATUS.md) and the package-specific `INSTALLATION-README.md` of any future complete modular ZIP.
 
 The project now publishes a **developer deployment path**, not an end-user SD-card solution.
 

@@ -1,8 +1,8 @@
-# MIB Runtime (MIBR) on-unit storage and naming contract (design proposal)
+# MIB Runtime (MIBR) on-unit storage and naming contract
 
 > **Superseded target:** earlier revisions used `/mnt/app/root/altscreen-u2/` as target root; that target is obsolete. The single target root is `/mnt/app/root/mibr/` (decision E6, 2026-11-04; see [firmware profiles and configuration](FIRMWARE_PROFILES_AND_CONFIGURATION.md) §2.4). `altscreen-u2` paths remain listed as current/legacy source paths in the migration tables below.
 
-> **Status: design only, 2026-11-03.** No on-unit files have been moved and no installed binary, Java class, legacy developer ZIP or release tag has been changed. This document defines a future *single three-firmware beta* migration contract, **not a current implemented filesystem layout**. Actual MMX paths are the authority until a target-tested migration is complete.
+> **Status: design plus integrated implementation source, 2026-11-05.** The M1 root-migration library, code path cutover and transactional installer are now present in public source. **No vehicle/unit migration is documented as performed:** existing installed files, the frozen MU1440 developer ZIP and release tags are unchanged. Target-tested installation, reboot and rollback remain qualification gates. Actual MMX paths are authoritative until a tested upgrade completes.
 
 ## Problem: a single functional subsystem has multiple path owners
 
@@ -103,4 +103,4 @@ Safe area keeps four stores but one user authority: the broker `safe-*` CAS file
 4. **Check QNX and persistence.** Actual MMX SSH startup is the execution contract; on unit, prove `/mnt/app` RW lease, RO restoration, interrupted-write/powerloss recovery, read/write permissions and no ambiguous old/new active copies. `/tmp` and SD behave differently and require separate tests.
 5. **Enforce at release.** CI checks staged source/target file-reference inventory, exact files and schema, all three firmware profiles, generated defaults, version receipt and installed-menu readback. Verify the *actual* final multi-profile ZIP; host static checks alone are not target acceptance. Preserve user configuration on upgrade; an uninstall removes project-owned files only and restores modified OEM state from exact backups.
 
-**Status:** Only the inventory/design is established in this document. The migration, full path discovery, automated validation, new QNX/Java builds, three-firmware beta ZIP and on-unit tests remain open and must not be described as implemented.
+**Status:** The storage inventories, M1 migration source, shared path constants and related host checks are implemented in the public tree. This is **not** proof of an executed on-unit migration. M2 writer/format cutovers, exact J9 artifacts, a complete three-profile beta ZIP and power-loss/recovery/vehicle tests remain open. See [feature and target evidence](../status/FEATURE_STATUS.md) and [package status](../packages/README.md).

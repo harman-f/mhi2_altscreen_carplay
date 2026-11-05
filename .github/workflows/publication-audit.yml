@@ -28,6 +28,16 @@ jobs:
           test -s docs/architecture/ADVANCED_RUNTIME_SWITCHES.md
           grep -Fq 'ADVANCED_RUNTIME_SWITCHES.md' README.md
 
+      - name: Documentation navigation and status gate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -B tools/docs/check_docs.py --self-test
+          python3 -B tools/docs/check_docs.py --scope active
+          # All tracked Markdown files (including dated research) have zero
+          # broken internal targets; enforce that baseline for future PRs.
+          python3 -B tools/docs/check_docs.py --scope all
+
       - name: Verify QNX image selector policy (host only)
         shell: bash
         run: |

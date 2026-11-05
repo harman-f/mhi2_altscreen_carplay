@@ -1,6 +1,6 @@
 # Configuration matrix — source-defined defaults (beta)
 
-> Status: source snapshot from `develop`, 2026-11-03. This document describes **defined defaults**, not a report of a live installed unit, and does not constitute an installable three-profile beta release. Do not confuse the three CarPlay *presets* below with the three *firmware profiles* (Škoda MU1440, SEAT MU1409, SEAT MU1447).
+> Status: source-defined defaults inventory (reviewed 2026-11-05). This table describes **compiled presets and fallback values**, not a report of a live installed unit or a qualified three-profile beta ZIP. The registry and firmware profiles have since been integrated into public source, but the values below are not proof of what a target has stored or applied. Do not confuse the three CarPlay *presets* below with the three *firmware profiles* (Škoda MU1440, SEAT MU1409, SEAT MU1447).
 
 ## Reading this matrix
 
@@ -64,7 +64,7 @@
 
 ## B. MIBR broker — all 13 durable switches
 
-The compiled fallback values below are **shared source defaults**, not a claim that they override per-platform settings or an existing vehicle configuration. For firmware-dependent defaults the intended override location is `/mnt/app/root/altscreen-u2/config/mibr-platform-defaults.conf` (`capability=value`). The stored files are under the same `config/` root.
+The compiled fallback values below are **shared source defaults**, not a claim that they override per-platform settings or an existing vehicle configuration. For firmware-dependent defaults the intended override location is `/mnt/app/root/mibr/config/platform/defaults.conf` (`capability=value`). The stored broker values belong to their owner-specific `mibr/config/` group paths after the M1 root migration. Older basenames in the table indicate legacy physical formats, not a second active writer.
 
 | Capability / menu ID | Valid values | Compiled default | Stored file |
 | --- | --- | --- | --- |

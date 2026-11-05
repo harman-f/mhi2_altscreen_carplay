@@ -1,101 +1,70 @@
-# MHI2 AltScreen CarPlay
+# MHI2 AltScreen CarPlay — MIB Runtime
+
+**Experimental CarPlay navigation and integration for selected Volkswagen Group MHI2 infotainment units and instrument clusters.** The project provides a secondary CarPlay video path (type/stream 111), guarded output to the Virtual Cockpit, an OEM-style menu, a native broker, navigation controls, and exact firmware-specific adapters.
 
 > [!WARNING]
-> **Experimental research software — not production-ready.** This repository contains evolving prototypes, target-specific developer builds and incomplete/partially validated integrations. It is intended for experienced developers and researchers, **not as a consumer-ready installer or a dependable feature for everyday driving**.
+> **Research and developer software, not a production-ready vehicle product.** The software can disrupt the infotainment system, original navigation or cluster output. Use exact firmware/component checks, verified backups and an independent recovery route. Perform installation and interactive tests only while safely parked. **Do not rely on experimental cluster output for driving or safety-critical information.**
 >
-> Modifying an infotainment unit or Virtual Cockpit can disrupt original functionality, cause loss of display/navigation output or require recovery. Before any test, confirm the exact firmware and hardware, retain verified backups and an independent stock-recovery path. Perform installation, diagnosis and interaction tests only while safely parked. **Do not depend on experimental output for navigation, vehicle status or safety-critical information during driving.** No universal compatibility, safety certification, manufacturer support or operational reliability is claimed.
->
-> Use is at your own risk and subject to the applicable licenses; this notice does not add restrictions to the [GPL-3.0-or-later](LICENSE). The project is **independent of Volkswagen AG and other named manufacturers**. Its license does not grant rights to OEM firmware, binaries, trademarks or third-party components. See [rights and attribution](THIRD_PARTY_NOTICES.md), [security and vehicle-test guidance](SECURITY.md), [compatibility](docs/testing/COMPATIBILITY_MATRIX.md) and the [current developer release scope](release/CURRENT.md).
+> No universal compatibility, manufacturer endorsement, warranty or vehicle safety qualification is claimed. The [GPL-3.0-or-later license](LICENSE) does not grant rights to OEM firmware or other third-party assets. See [security and test guidance](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
-[Configuration defaults matrix](docs/configuration/DEFAULT_CONFIGURATION_MATRIX.md) · [Installer defaults and caveats](docs/INSTALLATION.md)
+## What it does
 
-[Menu, controller and Route Guidance source build](docs/build/MU1440_MENU_RGI_SOURCE.md) · [Menu editor](tools/menu-editor/mibr-menu-editor.html)
+On the **Škoda MU1440/AID10 reference vehicle**, live auxiliary CarPlay maps from **Apple Maps, Google Maps and Waze** have been displayed in the Virtual Cockpit. Additional development has produced a native menu and controller, ViewArea/SafeArea configuration, input and zoom experiments, and navigation/route-guidance components. **These observations come from different tested configurations; they are not a claim that one current download contains every feature.**
 
-**Find a component:** [CarPlay and video](modules/carplay/) · [Broker and input](modules/broker/) · [Menu](modules/menu/) · [Navigation](modules/navigation/) · [Platform profiles](modules/profiles/). Each component page connects its source, runtime, build tools, binary artifacts and documentation.
+![Waze displayed on the reference Virtual Cockpit](docs/media/mu1440-stream111-poc-2026-09-29/waze_vc_stream111_photo_public_minblur.jpg)
 
-**Build and configuration entry points:** [SDK and external build inputs](sdk/) · [configuration source map](config/) · [vehicle profiles](config/vehicles/). These are indexes into canonical sources, not duplicate configuration trees.
-
-**Research testers wanted — Škoda MU1440 and SEAT MU1409/MU1447.** The modular package design uses one shared CarPlay/video, broker, menu and navigation stack with exact firmware profiles. The SEAT profiles have host-build/static integration evidence; their native menu, icon presentation, input behavior and end-to-end vehicle output still need independent vehicle tests. This is experimental research, not general vehicle support. See [profile status and tester reports](docs/testing/MULTI_PROFILE_TESTING.md) and the [binding package layout](docs/build/PACKAGE_LAYOUT.md). This update does not publish a complete three-platform installer download.
-
-**Real CarPlay secondary navigation in the original Volkswagen Group MHI2 Virtual Cockpit — direct video, guarded native-navigation fallback and an OEM-style control architecture.**
-
-The project has advanced beyond the first moving-map proof of concept. On the exact Škoda MU1440/AID10 reference unit, **Apple Maps, Google Maps and Waze** have appeared as moving auxiliary video. Subsequent development sessions exercised long-running protected direct/parity transport, navigation composition, SafeArea/ViewArea, an OEM-native menu, zoom and an experimental stock/CarPlay route controller. This is a working vehicle-reference engineering project, **not** a universal product or a claim that all the newer features are already in the downloadable public ZIP.
-
-[Feature status](#features-and-status) · [Module architecture](docs/architecture/README.md) · [Published source coverage](docs/status/PUBLISHED_SOURCE_COVERAGE.md) · [Developer release](release/CURRENT.md) · [Compatibility](docs/testing/COMPATIBILITY_MATRIX.md) · [Measured steering-wheel/head-unit key map](docs/testing/MU1440_MFW_RAW_KEY_MAPPING.md) · [Acknowledgements](ACKNOWLEDGEMENTS.md) · [Documentation](docs/README.md) · [AltScreen Cluster Atlas](docs/index.html)
-
-**Source baseline, 23 October 2026:** the real [MU1440 source stack and build guide](docs/build/MU1440_R57_SOURCE.md) now include R38 GEN2, the shared three-view settings, direct-TS transport, native gates, R57 controller, R57 OEM menu adapter and R49/R52 lifecycle sources. Native reference hashes were reproduced. The public owner adds a regression-tested failed-grace safety correction that is not yet vehicle-qualified. OEM Java/skin inputs and several installed support-file source lineages remain external or unresolved; this is a partial vehicle-matched source publication. The downloadable developer release retains its own older scope.
-
-## Features and status
-
-✅ = demonstrated reference-vehicle or existing reference-release milestone; ◐ = advanced development/partial field evidence with integration or release gates; ◻ = still research/planned. The evidence refers to **different pinned test configurations**, not an assertion that one current public download includes every item.
-
-| | Capability | Current evidence and limit |
+| Capability | Public implementation | Physical-vehicle / release evidence |
 | --- | --- | --- |
-| ✅ | Real CarPlay map in the VC | Apple Maps, Google Maps, Waze via ScreenAlt/type 111; not screenshot mirroring |
-| ✅ | H.264 to MPEG-TS/MOST150 | Direct compressed video path, one protected writer and reversible native STOCK handback observed |
-| ✅ | Extended transport sessions | Multiple longer development sessions; one ~56-minute run processed 83,919 input AUs with no reported sequence or writer errors. Separate USB/source-111 disconnects are **not resolved** by this metric |
-| ✅ | Native-map Most20 | Exact reference-unit 1010×376 OEM native-video rate measured at 20 fps, separate from CarPlay negotiated sender FPS |
-| ◐ | ViewArea, SafeArea, navigation composition | Two-area and visible presentation observations; individual settings still require current-session APPLY/ACTIVE proof |
-| ◐ | OEM-style HOME / VC settings | Built and reference-unit-tested menu candidates plus single-authority MIBR/3 design; value persistence is not itself a visibly applied CarPlay setting |
-| ◐ | Map zoom via steering-wheel roller | Semantic zoom and source/input research; Apple Maps visual zoom observed in a development configuration, with focus and cross-provider validation outstanding |
-| ◐ | Native ↔ CarPlay cluster selection | Guarded physical-input/KEY40 and action-control development; current route owner, physical visual result and ACK need complete qualification; not bundled as a general public toggle |
-| ◻ | Vehicle data to CarPlay | Actual speed, ambient temperature, range and warning integration being developed; existing-session phone acceptance not yet proven |
-| ◻ | Further platforms and optional features | SEAT/VW/CUPRA, native wireless, RGI/native maneuvers need independent hardware/software qualification |
+| Live CarPlay map in the Virtual Cockpit | Auxiliary type-111 receiver, H.264/MPEG-TS/MOST path and guarded STOCK handback | Demonstrated on the exact Škoda reference; later integrated source and other targets need separate acceptance |
+| OEM-native HOME / settings and physical controls | Shared Java menu, MIBR broker, firmware-specific adapters, settings registry | Reference development tests; latest Java/profile integration not fully vehicle-qualified |
+| Three presentation layouts, SafeArea and zoom | Shared settings and display/input controls | Partial vehicle observations; per-option APPLY/ACTIVE and focus/reconnect behavior still need proof |
+| Navigation arrows and route guidance | Menu options, broker navigation switches and Route Guidance (RGI) source | **Phone-sourced turn arrows are OFF by default**; stored options or source code do not prove live visible arrows |
+| Vehicle data, diagnostics and optional extensions | Experimental source and bounded integration interfaces | Phone/vehicle acceptance pending; not a qualified release feature |
 
-**Remaining milestones:** finish integrated source reconnect and visible VC recovery; qualify HMI STORE → APPLY → ACTIVE; qualify Zoom/KEY40 while preserving OEM behavior; confirm optional truthful vehicle data; resolve the documented Java/support-source gaps and complete vehicle-release acceptance. [Source and build status](docs/build/MU1440_R57_SOURCE.md) · [Dated vehicle status](docs/status/INTEGRATION_STATUS_2026-10-21.md) · [Known issues](docs/findings/KNOWN_ISSUES.md) · [Roadmap](ROADMAP.md).
+[Detailed feature/evidence matrix](docs/status/FEATURE_STATUS.md) · [Reference photos and video](docs/media/mu1440-stream111-poc-2026-09-29/README.md) · [Current source coverage](docs/status/PUBLISHED_SOURCE_COVERAGE.md)
 
-## Vehicle demonstration
+## Firmware profiles: source availability is not vehicle support
 
-![Waze on the reference Virtual Cockpit](docs/media/mu1440-stream111-poc-2026-09-29/waze_vc_stream111_photo_public_minblur.jpg)
-
-[Waze, Google Maps and Apple Maps photos/videos](docs/media/mu1440-stream111-poc-2026-09-29/README.md) · [Aggregated October vehicle findings](docs/findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md). Photographic evidence demonstrates a working physical output, not independently measured panel frame rate.
-
-## Project goals
-
-1. Implement reproducible, independently developed CarPlay auxiliary/instrument-cluster navigation on qualified MHI2 targets while preserving main CarPlay and original navigation.
-2. Keep a single bounded H.264/MPEG-TS/MOST video owner, source-generation control, recovery and predictable STOCK handback.
-3. Provide intuitive OEM-style HMI, navigation configuration and steering-wheel operation without compromising stock keys, Java/HMI or original runtime services.
-4. Support calibrated ViewArea/SafeArea and optional real vehicle data through the existing authenticated CarPlay session, where demonstrated.
-5. Publish **actual project source**, build recipes, tests, architecture and pinned artifacts after provenance and consistency review, not only screenshots or binary files.
-6. Adapt the portable architecture to selected Škoda, SEAT, CUPRA and VW firmware/cluster families; never treat the MU1440 J9/widget/MOST layout as universally interchangeable.
-
-## Target and compatibility
-
-| Target | Classification |
+| Firmware profile | Current status |
 | --- | --- |
-| Škoda MHI2_ER_SKG13_P4526_MU1440 with fitted AID10-class 10.x-inch MQB Virtual Cockpit and MOST route | Original exact-component vehicle reference |
-| Other Škoda/SEAT/CUPRA/VW MHI2 | Candidate ports requiring exact firmware, J9/HMI, DSI, cluster geometry and video-route review |
-| MU1409 / Continental FPK 790 | External user demonstrated an adapted **third-party** solution in [Issue #47](https://github.com/harman-f/mhi2_altscreen_carplay/issues/47), not compatibility proof for our current binary |
-| Older/larger 12.3-inch AID and Audi LVDS/MHI2Q | Different hardware/transport; not a drop-in implementation |
+| **Škoda MU1440 P4526** | Exact AID10-class reference vehicle has demonstrated the auxiliary CarPlay video path. The newer unified runtime/installer still requires its own end-to-end acceptance. |
+| **SEAT MU1409 P4708** | Exact firmware hash, profile, Java adapter source and shared runtime integration exist; OEM-menu rendering, arrows and CarPlay output have **not** been qualified in a project vehicle test. |
+| **SEAT MU1447 P4709** | Exact firmware hash, profile and separate Java adapter lineage exist; independent J9/vehicle acceptance remains outstanding. |
 
-Before attempting changes on an unknown unit, use [read-only compatibility guidance](docs/testing/COMPATIBILITY_MATRIX.md) and maintain an independent rollback.
+The **installer selector** recognizes all three listed original `/ifs/lsd.jxe` SHA-256 fingerprints and checks the firmware train. This is source-level eligibility, **not** proof of compatibility with an arbitrary vehicle or dashboard. `P4708_1` is **not** equivalent to `P4708` without independent evidence.
 
-## System architecture
+[Exact firmware/cluster compatibility](docs/testing/COMPATIBILITY_MATRIX.md) · [Three-profile testing and evidence](docs/testing/MULTI_PROFILE_TESTING.md) · [Firmware profiles](modules/profiles/)
 
-- **Media:** iPhone authenticated CarPlay → existing MHI2 receiver/GEN2 → auxiliary type-111 H.264 AUs → direct TS remux or source-time parity development → one guarded STOCK/DIRECT writer → /dev/mlb/isoTX2 → MOST150 → Virtual Cockpit.
-- **Control:** OEM HOME/settings view → bounded J9 client → single native settings/action owner → qualified media/route owner with request-specific receipts and actual VC effect verification.
-- **Optional vehicle telemetry:** original DSI vehicle inputs → bounded adapter → existing authenticated session. No competing CarPlay/iAP2 login, independent second video writer or invented sensor values.
+## Packages and installation
 
-Stock primary CarPlay type 110 stays separate from private auxiliary 111. An accepted write, current source stream, stored UI selection and actually displayed navigation are distinct test outcomes. [Module boundaries/SEAT–VW adaptation](docs/architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md) · [HMI/controller](docs/architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md) · [Vehicle-data concept](docs/architecture/OPTIONAL_VEHICLE_DATA_FEATURE_OVERVIEW.md).
+The public source now contains the **MIB Runtime** (`/mnt/app/root/mibr/`), transactional installer, firmware-specific adapters and a three-profile ZIP assembler. A successful source build or host test is **not** a completed, downloadable, vehicle-tested installer.
 
-## Published source and developer release
+- **Historical MU1440 developer package:** frozen seven-payload reference with its own exact hashes and recovery instructions. It does **not** include every recent menu, navigation or profile feature.
+- **New shared three-profile package:** one common runtime plus Škoda MU1440 and SEAT MU1409/MU1447 profiles. Assembly/validation tooling exists; a complete, qualified combined beta artifact must be checked separately.
+- **Installation:** read the correct package's instructions and run an exact-target, read-only preflight before any target write. Do not use legacy MU1440 instructions for the new multi-profile installer.
 
-The public repository already includes project-owned **GEN2 receiver C**, **Direct-TS remux C**, **MOST writer and exclusive gate C**, runtime/deployment and diagnostic code; start at [CarPlay module](modules/carplay/), [runtime](runtime/) and [full coverage table](docs/status/PUBLISHED_SOURCE_COVERAGE.md).
+[Packages and release status](docs/packages/README.md) · [Developer installation / legacy scope](docs/INSTALLATION.md) · [Package contract](docs/build/PACKAGE_LAYOUT.md) · [Current frozen release](release/CURRENT.md)
 
-**The latest integrated source for newer parity/supervisor, Java HMI, MIBR/3 controller and optional vehicle-data modules is not yet distributed here as a cohesive source or release.** Closing historical experimental PRs did not import them into main. Each new public source package needs dependency, license, build and appropriate vehicle-evidence review.
+## Architecture and development
 
-The existing [hash-pinned MU1440 developer prerelease](release/CURRENT.md) assumes existing SSH, exact-compatible components, backup and tested recovery. It does not contain a finished public menu/zoom/KEY40/vehicle-data installer and is not a universal one-click SD-card solution. [Installation guidance](docs/INSTALLATION.md) · [Build notes](docs/build/DIRECT_TS_REMUX_BUILD.md) · [Advanced runtime reference](docs/architecture/ADVANCED_RUNTIME_SWITCHES.md).
+**MIBR = MIB Runtime.** Shared CarPlay/video, broker, menu, navigation and settings definitions have one canonical owner each; firmware-specific HMI, display, input, icons and integrations belong to exact profiles. The broker controls native state and actions; the receiver/video chain carries the secondary CarPlay stream. Firmware identification and build-input hashes are distinct.
 
-## Open-source acknowledgements
+```text
+iPhone CarPlay ── auxiliary stream 111 ── receiver / TS / MOST ── Virtual Cockpit
+                        ↑
+          OEM menu / input ── MIBR broker ── settings / navigation
+                        ↑
+          exact Škoda / SEAT firmware profile
+```
 
-This implementation builds on independently published MIB2/MHI2 research and tools. Special thanks to [Luka](https://github.com/luka-dev), [OneB1t](https://github.com/OneB1t/VcMOSTRenderMqb), [jilleb/MIB Toolbox](https://github.com/jilleb/mib2-toolbox), [omonob](https://github.com/omonob/MHI2-Carplay-Maps) and other credited public project maintainers. See [full acknowledgements](ACKNOWLEDGEMENTS.md), [exact upstream/source and license notices](THIRD_PARTY_NOTICES.md), and [public reference projects](docs/research/PUBLIC_REFERENCES.md). Prior art, separately licensed incorporated material and independently authored project code are distinguished there; attribution is not a claim that the upstream maintainers endorse this project.
+The public tree contains current shared source, toolchain and build tooling, but some exact J9, OEM and firmware inputs must be supplied externally and cannot be redistributed. Current code is not necessarily identical to the binaries of an older vehicle test.
 
-## Independence and trademarks
+[Documentation hub](docs/README.md) · [Architecture and ownership](docs/architecture/README.md) · [Repository modules](modules/) · [QNX/J9 build guides](docs/build/) · [Configuration defaults](docs/configuration/DEFAULT_CONFIGURATION_MATRIX.md) · [Developer runtime switches](docs/architecture/ADVANCED_RUNTIME_SWITCHES.md) · [Roadmap](ROADMAP.md)
 
-**Unofficial, independent community project.** This project is not affiliated with, authorized, sponsored, endorsed, supported or maintained by Volkswagen AG, Volkswagen, Škoda Auto, SEAT, CUPRA, Audi, Harman International or Apple. Product, company and trademark names are used solely to identify the original hardware/software, describe compatibility and credit third-party work; all respective marks remain with their owners. The project does not provide official OEM updates, support or warranties. Modifications are experimental; check the exact target, retain backups and an independent recovery path, and do not operate or test modified controls while driving. See [third-party and rights notices](THIRD_PARTY_NOTICES.md), [compatibility](docs/testing/COMPATIBILITY_MATRIX.md) and [safety guidance](SECURITY.md).
+## Research, contributions and attribution
 
-## Contributing and safety
+We welcome reproducible vehicle reports, firmware/cluster fingerprints, independently authored improvements and safely collected evidence. Distinguish *source exists*, *build passed*, *package validated*, *unit tested* and *vehicle effect observed* in reports. The [Cluster Atlas](docs/index.html) and [public research index](docs/research/README.md) preserve broader context; historical dated studies are not the current installation instructions.
 
-External reproducible bugs, firmware/cluster compatibility reports and independently authored code contributions are welcome; questions can use Discussions. [Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) · [Security/privacy](SECURITY.md) · [Vehicle test protocol](docs/testing/VEHICLE_TEST_PROTOCOL.md).
+[Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) · [Vehicle test protocol](docs/testing/VEHICLE_TEST_PROTOCOL.md) · [Acknowledgements](ACKNOWLEDGEMENTS.md) · [License and third-party notices](THIRD_PARTY_NOTICES.md)
 
-**Experimental; use at your own risk.** Do not upload original OEM/iOS packages, personal navigation content or credentials, or try an unqualified cross-firmware installation.
+**Independent, unofficial project.** Not affiliated with, authorized or supported by Volkswagen AG, Škoda, SEAT, CUPRA, Audi, Harman or Apple. Names identify target products and credited research only.
