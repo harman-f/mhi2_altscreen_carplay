@@ -10,9 +10,9 @@ import java.util.Vector;
 
 /** Read-only, Java 1.2-compatible identity view; never claims running bytes match. */
 public final class MibrVersionInfo {
-    private static final String INSTALLED="/mnt/app/root/mibr-kit/installed-version.properties";
+    private static final String INSTALLED="/mnt/app/root/mibr/version/installed-version.properties";
     /** r60: one line per functional package, written by the installer (write-components-manifest.ksh). */
-    private static final String COMPONENTS="/mnt/app/root/mibr-kit/components.manifest";
+    private static final String COMPONENTS="/mnt/app/root/mibr/version/components.manifest";
     private static final String[][] NAMES={
         {"menu-jar","Men\u00fc (JAR)","Menu (JAR)"},
         {"broker","Broker","Broker"},

@@ -2,7 +2,7 @@
 """Proposed A2/A3 storage identities; host-only and NOT an installer.
 
 This is a source-derived naming/ownership collision gate for the existing
-63-candidate graph. A proposed destination is not a verified active path or
+66-candidate graph. A proposed destination is not a verified active path or
 permission to write. Keep legacy native grammars and early-boot consumers
 unchanged until a separately qualified coordinated release.
 """
@@ -23,14 +23,15 @@ import storage_migration_review as review
 
 ROOT = Path(__file__).resolve().parents[2]
 OLD = "/mnt/app/root/"
-NEW = OLD + "altscreen-u2/"
+LEGACY_U2 = OLD + "altscreen-u2/"  # where the unit stores today (migration source)
+NEW = OLD + "mibr/"  # the single MIB Runtime root (E6): planned targets
 VALID_RELATIVE = re.compile(
     r"(?:config/(?:carplay|navigation|cockpit|menu|vehicle|platform|features)"
     r"|state/[a-z0-9-]+|version(?:/[a-z0-9-]+)?|backup/[a-z0-9-]+)"
     r"/[a-z0-9][a-z0-9._-]*"
 )
 
-# Exactly the 37 *additional candidates*, not a claim of 37 real settings.
+# Exactly the 40 *additional candidates*, not a claim of 40 real settings.
 # relative old path | reserved relative name or '-' | owner/role | file policy
 # | A3 disposition
 # "hold-*" means no automatic migration target exists yet. In particular,
@@ -66,6 +67,9 @@ mibr-parity-drive.enabled|config/features/parity-drive.conf|runtime-policy|prese
 mibr-parity-statistics-enabled|config/features/parity-statistics.conf|runtime-policy|preserve-value-boolean-default-on|KEEP_AT_LEGACY
 mibr-parity-status-enabled|config/features/parity-status.conf|runtime-policy|preserve-value-boolean-default-on|KEEP_AT_LEGACY
 mibr-rgi/rgi.on|config/features/rgi.conf|navigation-activation|convert-presence|KEEP_AT_LEGACY
+mibr-cpvc.enabled|config/features/cpvc.conf|runtime-policy|preserve-scalar|KEEP_AT_LEGACY
+mibr-kit/disabled|-|boot-kill-switch|hold-exact-presence|KEEP_AT_LEGACY
+mibr-rgi|-|navigation-payload-directory|hold-payload|EXCLUDE_NONCONFIG
 mibr-carplay111-backup|-|legacy-backup-directory|hold-backup|KEEP_AT_LEGACY
 mibr-gen2-backup|-|legacy-backup-directory|hold-backup|KEEP_AT_LEGACY
 mibr-isotx2-gate-backup|-|early-boot-backup-directory|hold-backup|KEEP_AT_LEGACY
@@ -90,7 +94,8 @@ REASONS = {
     "broker-sd-log-consumer-unproven":
         "a second reader of the SD-log switch is claimed but not in source",
     "cpvc-replay-reader-outside-source":
-        "the boot replay of the CPVC profile is not in this repository",
+        "the boot replay reader is in source (cpvc_config.sh) but the installed "
+        "lsd.sh block that calls boot.ksh is not",
     "no-writer-in-source":
         "readers exist but no writer is in source; moving gains nothing",
     "legacy-alias-of-registry-value":
@@ -127,6 +132,9 @@ ADDITIONAL_REASON = {
     "mibr-parity-statistics-enabled": "value-file-paired-writer",
     "mibr-parity-status-enabled": "value-file-paired-writer",
     "mibr-rgi/rgi.on": "no-writer-in-source",
+    "mibr-cpvc.enabled": "early-boot-or-stock-backup-contract",
+    "mibr-kit/disabled": "early-boot-or-stock-backup-contract",
+    "mibr-rgi": "payload-not-state",
     "mibr-carplay111-backup": "early-boot-or-stock-backup-contract",
     "mibr-gen2-backup": "early-boot-or-stock-backup-contract",
     "mibr-isotx2-gate-backup": "early-boot-or-stock-backup-contract",
@@ -178,7 +186,7 @@ REGISTRY_ARCH = (
     "profile so only one persistent channel remains")
 
 ARCH_SPECS = """
-altscreen-u2/config/cpvc-r5.profile|CONSOLIDATE_OR_RETIRE|-|broker (import into registry persistent layer, then retire)|boot replay reader of the profile is not in source; must be proven before the replay is removed
+altscreen-u2/config/cpvc-r5.profile|CONSOLIDATE_OR_RETIRE|-|broker (import into registry persistent layer, then retire)|the replay reader is in source (cpvc_config.sh _boot-replay) but the installed lsd.sh block that starts it is not; prove the hook before the replay is removed
 altscreen-u2/config/display-scaling.conf|MIGRATE_AS_PLANNED|config/cockpit/scaling.conf|broker|joint C/GEN2 constant change
 altscreen-u2/config/mibr-calib.avcc|EXCLUDE_NONCONFIG|-|installer payload|none: asset follows the payload layout
 altscreen-u2/config/mibr-menu-language.conf|MIGRATE_AS_PLANNED|config/menu/language.conf|broker|joint C constant change
@@ -205,6 +213,9 @@ mibr-parity-drive.enabled|DEFER_MIGRATION|config/features/parity-drive.conf|pari
 mibr-parity-statistics-enabled|DEFER_MIGRATION|config/features/parity-statistics.conf|parity_drive_status.sh|value boolean, absent means ON; shell and supervisors move together
 mibr-parity-status-enabled|DEFER_MIGRATION|config/features/parity-status.conf|parity_drive_status.sh|value boolean, absent means ON; native reader too
 mibr-rgi/rgi.on|DEFER_MIGRATION|config/features/rgi.conf|menu/broker (to be added)|no writer in source; two native readers in different processes
+mibr-cpvc.enabled|DEFER_MIGRATION|config/features/cpvc.conf|cpvc_config.sh enable/disable|read by the boot.ksh hook of the generated lsd.sh block; migrate only with hook regeneration, together with the parity-drive marker it writes
+mibr-kit/disabled|KEEP_TECHNICALLY_REQUIRED|-|boot-guard.ksh (auto) or operator|kill switch read by the lsd.sh block, boot.ksh, boot-guard.ksh, mm-ipod-rgi and mibr-watch; a rename orphans an installed switch
+mibr-rgi|EXCLUDE_NONCONFIG|-|installer payload|directory of installed RGI binaries and the enable file; follows the payload layout
 mibr-carplay111-backup|EXCLUDE_NONCONFIG|-|auto-direct patcher|exact OEM backup; restore depends on the path
 mibr-gen2-backup|EXCLUDE_NONCONFIG|-|gen2 prerequisite script|exact backup
 mibr-isotx2-gate-backup|EXCLUDE_NONCONFIG|-|isoTX2 installer|exact stock startup.sh backup
@@ -278,7 +289,7 @@ def source_spec():
                        "owner_role": owner, "format_policy": policy,
                        "disposition": disposition, "reason": reason,
                        "writer": MIGRATE_WRITERS.get(old)}
-    require(len(specs) == 37, "unexpected additional storage candidates")
+    require(len(specs) == 40, "unexpected additional storage candidates")
     return specs
 
 
@@ -381,8 +392,8 @@ def build(graph, specs=None, arch=None):
         arch = arch_spec()
     require(graph["migration_authorized"] is False,
             "graph unexpectedly authorized runtime writes")
-    require(len(graph["records"]) == 63, "source candidate count changed")
-    require(len({r["current_path"] for r in graph["records"]}) == 63,
+    require(len(graph["records"]) == 66, "source candidate count changed")
+    require(len({r["current_path"] for r in graph["records"]}) == 66,
             "duplicate current storage paths")
     require(all(r["destination_path"] is None for r in graph["records"]),
             "unexpected independently authorized graph destination")
@@ -394,7 +405,7 @@ def build(graph, specs=None, arch=None):
     expected = {r["current_path"] for r in graph["records"]
                 if r["kind"] not in ("carplay-registry-group",
                                      "broker-durable-switch")}
-    require(set(specs) == expected and len(specs) == 37,
+    require(set(specs) == expected and len(specs) == 40,
             "added/removed unreviewed legacy store or source classification")
     rows, targets = [], {}
     for original in sorted(graph["records"], key=lambda r: r["current_path"]):
@@ -487,7 +498,7 @@ def build(graph, specs=None, arch=None):
             "two stores share one reserved future name")
     # Safe area has four stores; only the broker CAS files are user authority.
     for name in ("safe-voll", "safe-wide", "safe-center"):
-        require(by_source[NEW + "config/mibr-" + name + ".conf"]
+        require(by_source[LEGACY_U2 + "config/mibr-" + name + ".conf"]
                 ["a3_disposition"] == "MIGRATE", "safe-area authority moved")
     for path in (OLD + "mibr-carplay111-safearea.conf",
                  OLD + "mibr-carplay111-viewareas.conf"):
@@ -552,15 +563,15 @@ def require_migration_authorized(plan):
 def self_test():
     graph = access.build(ROOT)
     plan = build(graph)
-    assert plan["counts"]["input_candidate_paths"] == 63
-    assert plan["counts"]["additional_candidate_paths"] == 37
+    assert plan["counts"]["input_candidate_paths"] == 66
+    assert plan["counts"]["additional_candidate_paths"] == 40
     assert not plan["migration_authorized"]
     rows = {r["current_path_candidate"]: r for r in plan["records"]}
     assert rows[OLD + "altscreen-u2/config/mibr-menu.conf"][
         "native_format_or_conversion_policy"] == "preserve-crc"
     counts = plan["counts"]["a3_dispositions"]
-    assert counts == {"MIGRATE": 18, "KEEP_AT_LEGACY": 40,
-                      "EXCLUDE_NONCONFIG": 2, "BLOCKED_INPUT": 3}, counts
+    assert counts == {"MIGRATE": 18, "KEEP_AT_LEGACY": 42,
+                      "EXCLUDE_NONCONFIG": 3, "BLOCKED_INPUT": 3}, counts
     assert plan["counts"]["target_names_proposed"] == 18
     for row in plan["records"]:
         assert (row["candidate_destination_path"] is not None) == \
@@ -577,21 +588,21 @@ def self_test():
         "reserved_future_name"] == NEW + "config/features/auto-direct.conf"
     assert rows[OLD + "mibr-carplay-autodirect.enabled"][
         "candidate_destination_path"] is None
-    assert rows[NEW + "config/mibr-sd-log.conf"]["a3_disposition"] == "BLOCKED_INPUT"
-    assert rows[NEW + "config/mibr-safe-voll.conf"][
+    assert rows[LEGACY_U2 + "config/mibr-sd-log.conf"]["a3_disposition"] == "BLOCKED_INPUT"
+    assert rows[LEGACY_U2 + "config/mibr-safe-voll.conf"][
         "candidate_destination_path"] == NEW + "config/cockpit/safe-voll.conf"
     assert rows[OLD + "mibr-isotx2-gate-backup/startup.sh.stock"][
         "candidate_destination_path"] is None
     assert rows[OLD + "mibr-parity-status-enabled"][
         "native_format_or_conversion_policy"] == "preserve-value-boolean-default-on"
-    assert rows[NEW + "config/mibr-calib.avcc"]["a3_disposition"] == \
+    assert rows[LEGACY_U2 + "config/mibr-calib.avcc"]["a3_disposition"] == \
         "EXCLUDE_NONCONFIG"
     assert all(r["a3_disposition"] == "KEEP_AT_LEGACY" for r in plan["records"]
                if r["source_kind"] == "carplay-registry-group")
     arch = plan["counts"]["architecture_classes"]
-    assert arch == {"MIGRATE_AS_PLANNED": 18, "KEEP_TECHNICALLY_REQUIRED": 1,
-                    "DEFER_MIGRATION": 19, "CONSOLIDATE_OR_RETIRE": 13,
-                    "EXCLUDE_NONCONFIG": 7, "BLOCKED_INPUT": 5}, arch
+    assert arch == {"MIGRATE_AS_PLANNED": 18, "KEEP_TECHNICALLY_REQUIRED": 2,
+                    "DEFER_MIGRATION": 20, "CONSOLIDATE_OR_RETIRE": 13,
+                    "EXCLUDE_NONCONFIG": 8, "BLOCKED_INPUT": 5}, arch
     # KEEP now is not the end state: the registry groups have a long-term
     # target under config/carplay/ and one persistent owner.
     viewareas = rows[OLD + "mibr-carplay111-viewareas.conf"]

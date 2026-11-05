@@ -1,14 +1,15 @@
 #!/bin/ksh
 # SPDX-License-Identifier: GPL-3.0-or-later
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 runtime_init || { echo "AUTO_DIRECT_START=FAIL_RUNTIME"; exit 3; }
 
-ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
+ENABLED=$MIBR_ROOT/config/features/mibr-carplay-autodirect.enabled
 SUP=$BASE/scripts/direct_ts_auto_supervisor.sh
 WD=$BASE/scripts/direct_ts_auto_watchdog.sh
 SUPPID=/tmp/mibr-direct-auto-supervisor.pid
 WDPID=/tmp/mibr-direct-auto-watchdog.pid
-D2_PERSIST=/mnt/app/root/mibr-alt111-keyframe-policy.enabled
+D2_PERSIST=$MIBR_ROOT/config/features/mibr-alt111-keyframe-policy.enabled
 D2_SESSION=/tmp/mibr-alt111-keyframe-policy.enabled
 
 # Compatibility bridge: current source reads the persistent marker directly;

@@ -53,9 +53,9 @@ int main(void){
     for(i=0;i<MIBR_SWITCH_COUNT;i++)one(&mibr_switch_defs[i]);
     /* the file names and verbs the supervisor, the menu and earlier installs rely on */
     assert(!strcmp(mibr_switch_defs[0].magic,"MIBR_CARPLAY_NAV/1"));
-    assert(!strcmp(mibr_switch_defs[0].path,"/mnt/app/root/altscreen-u2/config/mibr-carplay-nav.conf"));
+    assert(!strcmp(mibr_switch_defs[0].path,"/mnt/app/root/mibr/config/navigation/carplay-nav.conf"));
     assert(!strcmp(mibr_switch_defs[1].magic,"MIBR_SD_LOG/1"));
-    assert(!strcmp(mibr_switch_defs[1].path,"/mnt/app/root/altscreen-u2/config/mibr-sd-log.conf"));
+    assert(!strcmp(mibr_switch_defs[1].path,"/mnt/app/root/mibr/config/features/sd-log.conf"));
     assert(mibr_switch_for_op("SD_LOG_SET",&set)==&mibr_switch_defs[1]&&set==1);
     assert(mibr_switch_for_op("CARPLAY_NAV_GET",&set)==&mibr_switch_defs[0]&&set==0);
     assert(mibr_switch_for_op("NOPE",&set)==NULL);

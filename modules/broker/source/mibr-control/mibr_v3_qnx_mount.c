@@ -7,6 +7,7 @@
 #ifndef __QNXNTO__
 #error MIBR_V3_QNX_TARGET_ONLY
 #endif
+#include "../../../carplay/source/alt111-settings/include/mibr_paths.h"
 #include "mibr_v3_qnx_mount.h"
 #include "mibr_v3_recovery_gate.h"
 #include "mibr_app_rw_lease.h"
@@ -21,9 +22,20 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#define CPVC_PROFILE "/mnt/app/root/altscreen-u2/config/cpvc-r5.profile"
+#define CPVC_PROFILE MIBR_CONFIG_DIR "/cockpit/cpvc-r5.profile"
 #define RW_LEASE_WAIT_MS 3000u
-#define OWNER_MARKER "/mnt/app/root/altscreen-u2/config/mibr-v3-single-writer.enabled"
+#define OWNER_MARKER MIBR_CONFIG_DIR "/features/mibr-v3-single-writer.enabled"
+#define SCALING_PATH MIBR_CONFIG_DIR "/cockpit/scaling.conf"
+#define LANGUAGE_PATH MIBR_CONFIG_DIR "/menu/language.conf"
+/* The directory that holds the file must be a real directory (no symlink) on the /mnt/app mount. */
+static int parent_dir_ok(const char *path,dev_t device){
+    char dir[512];const char *slash=strrchr(path,'/');struct stat st;size_t n;
+    if(!slash||slash==path)return -1;
+    n=(size_t)(slash-path);if(n>=sizeof(dir))return -1;
+    memcpy(dir,path,n);dir[n]=0;
+    if(lstat(dir,&st)||!S_ISDIR(st.st_mode)||st.st_dev!=device)return -1;
+    return 0;
+}
 /* On-target explicit migration gate: a marker is necessary, NOT evidence by
  * itself that the historical alternate writers/boot order were retired.
  * The independent release preflight must verify their installed bytes. */
@@ -41,7 +53,7 @@ static int owner_marker(void){
 static int probe(const struct mibr_v3_qnx_store *s,int ro){
     struct stat mount,root,profile;struct statvfs fs;
     if(!s||!s->profile||lstat("/mnt/app",&mount)||
-       lstat("/mnt/app/root",&root)||lstat(s->profile,&profile)||
+       lstat(MIBR_ROOT_DIR,&root)||lstat(s->profile,&profile)||
        statvfs("/mnt/app",&fs)||!S_ISDIR(mount.st_mode)||
        !S_ISDIR(root.st_mode)||!S_ISREG(profile.st_mode)||
        mount.st_dev!=s->mount_device||root.st_dev!=s->mount_device||
@@ -76,10 +88,11 @@ int mibr_v3_qnx_preflight(struct mibr_v3_qnx_store *s,const char *profile,
 int mibr_v3_qnx_scaling_preflight(struct mibr_v3_qnx_store *s,const char *path){
     struct stat mount,config;struct mibr_display_scaling_state state;char err[80]={0};
     struct mibr_v3_qnx_store staged;
-    if(!s||!path||strcmp(path,"/mnt/app/root/altscreen-u2/config/display-scaling.conf")||
+    if(!s||!path||strcmp(path,SCALING_PATH)||
        geteuid()!=0||owner_marker()||lstat("/mnt/app",&mount)||
-       lstat("/mnt/app/root/altscreen-u2/config",&config)||
-       !S_ISDIR(config.st_mode)||config.st_dev!=mount.st_dev)return -1;
+       lstat(MIBR_CONFIG_DIR,&config)||
+       !S_ISDIR(config.st_mode)||config.st_dev!=mount.st_dev||
+       parent_dir_ok(path,mount.st_dev))return -1;
     /* Keep the already qualified CPVC store intact if the optional scaling
      * mount/config/file probe fails. Publish staged state only on full success. */
     memset(&staged,0,sizeof(staged));staged.profile=CPVC_PROFILE;
@@ -157,10 +170,10 @@ int mibr_v3_qnx_scaling_set(void *context,const char *path,
 
 int mibr_v3_qnx_menu_language_preflight(struct mibr_v3_qnx_store *s,const char *path){
     struct stat mount,dir;struct statvfs fs;
-    const char *expected="/mnt/app/root/altscreen-u2/config/mibr-menu-language.conf";
+    const char *expected=LANGUAGE_PATH;
     if(!s||!path||strcmp(path,expected)||geteuid()!=0||owner_marker()||
-       lstat("/mnt/app",&mount)||lstat("/mnt/app/root/altscreen-u2/config",&dir)||
-       !S_ISDIR(dir.st_mode)||dir.st_dev!=mount.st_dev||statvfs("/mnt/app",&fs)||
+       lstat("/mnt/app",&mount)||lstat(MIBR_CONFIG_DIR,&dir)||
+       !S_ISDIR(dir.st_mode)||dir.st_dev!=mount.st_dev||parent_dir_ok(path,mount.st_dev)||statvfs("/mnt/app",&fs)||
        !(fs.f_flag&ST_RDONLY)||s->degraded)return -1;
     /* Do not clear any existing profile/scaling store qualifications. */
     s->menu_language_path=path;s->mount_device=mount.st_dev;
@@ -184,8 +197,8 @@ int mibr_v3_qnx_menu_language_set(void *context,const char *path,
 int mibr_v3_qnx_switch_preflight(struct mibr_v3_qnx_store *s,const struct mibr_switch_def *def,const char *path){
     struct stat mount,dir;struct statvfs fs;
     if(!s||!def||!path||strcmp(path,def->path)||geteuid()!=0||owner_marker()||
-       lstat("/mnt/app",&mount)||lstat("/mnt/app/root/altscreen-u2/config",&dir)||
-       !S_ISDIR(dir.st_mode)||dir.st_dev!=mount.st_dev||statvfs("/mnt/app",&fs)||
+       lstat("/mnt/app",&mount)||lstat(MIBR_CONFIG_DIR,&dir)||
+       !S_ISDIR(dir.st_mode)||dir.st_dev!=mount.st_dev||parent_dir_ok(path,mount.st_dev)||statvfs("/mnt/app",&fs)||
        !(fs.f_flag&ST_RDONLY)||s->degraded)return -1;
     /* Do not clear any existing profile/scaling store qualifications. */
     s->switch_ready[def-mibr_switch_defs]=1;s->mount_device=mount.st_dev;

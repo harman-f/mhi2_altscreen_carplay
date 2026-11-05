@@ -7,10 +7,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Registry schema 3 names the compiled-preset layer "preset" ("profile" now means
+# firmware profile). The emitted C/CLI/HMI vocabulary is unchanged: the runtime
+# still reports that layer as "profile", and hmi-bindings keeps its schema 2.
+EMITTED_LAYER_NAMES = {'preset': 'profile'}
+EMITTED_HMI_SCHEMA = 2
+# Registry-only metadata that must not leak into the generated outputs.
+REGISTRY_ONLY_FIELDS = ('storage_group',)
+
 def outputs():
     schema = json.loads((ROOT / 'settings/registry.json').read_text())
-    assert schema['schema'] == 2
-    keys = schema['settings']
+    assert schema['schema'] == 3
+    keys = [{k: v for k, v in x.items() if k not in REGISTRY_ONLY_FIELDS}
+            for x in schema['settings']]
     assert len(keys) <= 64 and len({x['key'] for x in keys}) == len(keys)
     groups = list(dict.fromkeys(x['basename'] for x in keys))
     assert len(groups) <= 16
@@ -39,8 +48,9 @@ def outputs():
     table = ('/* Generated private descriptors. Do not edit. */\n'
              'static const struct alt111_setting_descriptor registry[] = {\n' +
              '\n'.join(rows) + '\n};\n')
-    hmi = {'schema': schema['schema'], 'authority': 'settings/registry.json',
-           'layer_order': schema['layer_order'], 'settings': keys}
+    layers = [EMITTED_LAYER_NAMES.get(x, x) for x in schema['layer_order']]
+    hmi = {'schema': EMITTED_HMI_SCHEMA, 'authority': 'settings/registry.json',
+           'layer_order': layers, 'settings': keys}
     return {
         ROOT / 'modules/carplay/source/alt111-settings/include/registry_generated.h': header,
         ROOT / 'modules/carplay/source/alt111-settings/include/registry_table_generated.h': table,

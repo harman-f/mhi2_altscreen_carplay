@@ -1,9 +1,10 @@
 #!/bin/ksh
 # SPDX-License-Identifier: GPL-3.0-or-later
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 runtime_init_durable || { echo "FAIL runtime/log bootstrap"; exit 3; }
 
-MARKER=/mnt/app/root/mibr-carplay111-viewareas.enabled
+MARKER=$MIBR_ROOT/config/features/mibr-carplay111-viewareas.enabled
 
 status(){
   if [ -e "$MARKER" ]; then

@@ -15,12 +15,13 @@ export LD_LIBRARY_PATH=/lib:/mnt/app/root/lib-target:/eso/lib:/mnt/app/usr/lib:/
 unset LD_PRELOAD
 export GEM=1
 
-BASE=/mnt/app/root/altscreen-u2
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+BASE=$MIBR_ROOT
 RUNNER=$BASE/bin/parity-session
 BRIDGE=$BASE/bin/direct-ts-parity
 HELPER=$BASE/bin/alt111-settings
 PROFILE_READY=/tmp/mibr-cpvc-profile-ready
-ENABLE=/mnt/app/root/mibr-parity-drive.enabled
+ENABLE=$MIBR_ROOT/config/features/mibr-parity-drive.enabled
 STATE=/tmp/mibr-parity-drive.state
 HB=/tmp/mibr-parity-drive.heartbeat
 PIDFILE=/tmp/mibr-parity-drive-supervisor.pid
@@ -35,9 +36,9 @@ PARITY_STATUS=/tmp/mibr-parity-ts.status
 GATE_STATUS=/tmp/mibr-alt111-native-gate.status
 
 STATUS_CFG_TEMP=/tmp/mibr-parity-status-enabled
-STATUS_CFG_PERSIST=/mnt/app/root/mibr-parity-status-enabled
+STATUS_CFG_PERSIST=$MIBR_ROOT/config/features/mibr-parity-status-enabled
 STATS_CFG_TEMP=/tmp/mibr-parity-statistics-enabled
-STATS_CFG_PERSIST=/mnt/app/root/mibr-parity-statistics-enabled
+STATS_CFG_PERSIST=$MIBR_ROOT/config/features/mibr-parity-statistics-enabled
 
 CARD=/net/mmx/fs/sda0
 LOGROOT=/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive

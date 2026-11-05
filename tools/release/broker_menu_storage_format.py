@@ -50,23 +50,23 @@ CHECKS = {
         "if(!rest.startsWith(", "rest.endsWith(",
     ),
     PLATFORM_JAVA: (
-        "mibr-platform-defaults.conf",
+        "/mnt/app/root/mibr/config/platform/defaults.conf",
         "if(text==null||racy||!path.equals(textPath)||stamp!=textStamp||length!=textLength){",
         "String prefix=key+", "if(length<=0L||length>4096L)",
         "US-ASCII",
     ),
     MENU_JAVA: (
-        "mibr-menu.conf", "MIBR_MENU/1", "TOO_LARGE",
+        "/mnt/app/root/mibr/config/menu/layout.conf", "MIBR_MENU/1", "TOO_LARGE",
         "crc32(file,at+1)", "CHECKSUM", "current=parse(read(storedPath))",
     ),
     MENU_SH: (
-        "MIBR_MENU_DIR:-/mnt/app/root/altscreen-u2/config",
+        "MIBR_MENU_DIR:-$MIBR_ROOT/config/menu",
         "MIBR_APP_RW_LOCK:-/tmp/mibr-app-rw.lock",
         "lease_get(){", "mount -uw", "mount -ur",
-        'STAGE="$DIR/mibr-menu.conf.new.$$"',
-        'cp "$SRC" "$STAGE"', 'mv "$STAGE" "$DIR/mibr-menu.conf"',
+        'STAGE="$DIR/layout.conf.new.$$"',
+        'cp "$SRC" "$STAGE"', 'mv "$STAGE" "$DIR/layout.conf"',
     ),
-    GEN2: ("mibr-platform-defaults.conf",),
+    GEN2: ('MIBR_CONFIG_DIR "/platform/defaults.conf"',),
     MOUNT: ("int mibr_v3_qnx_preflight(", "owner_marker()",
             "mibr_v3_recovery_check("),
 }
@@ -109,7 +109,7 @@ def build(sources, canonical, graph, checked):
     by_path = {row["current_path"]: row for row in graph["records"]}
     broker_rows = []
     for pair in sorted(pairs, key=lambda p: p["path"]):
-        p = pair["path"]
+        p = pair["unit_path"]  # graph rows describe the unit (legacy) location
         require(p in by_path and by_path[p]["kind"] == "broker-durable-switch",
                 "broker path missing/wrong owner: " + p)
         require(by_path[p]["destination_path"] is None, "unreviewed destination: " + p)
@@ -126,8 +126,8 @@ def build(sources, canonical, graph, checked):
             "backup_upgrade_uninstall_confirmed": False,
             "destination": None,
         })
-    pdefaults = canonical["broker"]["platform_override"]
-    menu = "/mnt/app/root/altscreen-u2/config/mibr-menu.conf"
+    pdefaults = canonical["broker"]["legacy_platform_override"]
+    menu = "/mnt/app/root/altscreen-u2/config/mibr-menu.conf"  # unit location; M1 target config/menu/layout.conf
     require(pdefaults in by_path and menu in by_path,
             "platform/menu source absent from graph")
     return {
@@ -192,7 +192,7 @@ def self_test():
         (PLATFORM_JAVA, "if(text==null||racy||!path.equals(textPath)||stamp!=textStamp||length!=textLength){",
          "if(text==null){"),
         (MENU_JAVA, "crc32(file,at+1)", "crc32(file,0)"),
-        (MENU_SH, 'STAGE="$DIR/mibr-menu.conf.new.$$"', 'STAGE="/tmp/stage"'),
+        (MENU_SH, 'STAGE="$DIR/layout.conf.new.$$"', 'STAGE="/tmp/stage"'),
     ):
         corrupted = dict(files)
         require(old in corrupted[file], "stale negative test input")

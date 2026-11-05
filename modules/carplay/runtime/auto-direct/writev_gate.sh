@@ -1,6 +1,7 @@
 #!/bin/ksh
 # SPDX-License-Identifier: GPL-3.0-or-later
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 
 MARKER=/tmp/mibr-isotx2-gate.direct
 RESET=/tmp/mibr-isotx2-gate.reset

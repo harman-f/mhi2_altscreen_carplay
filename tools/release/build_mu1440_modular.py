@@ -38,8 +38,7 @@ INSTALLABLE_FIELD = "installable"
 MISSING_FIELD = "missing_inputs"
 ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 SCRIPT_SUFFIXES = {".sh", ".ksh"}
-APP = "/mnt/app/root/altscreen-u2"
-MIBR_V3 = "/mnt/app/root/mibr-v3"
+APP = "/mnt/app/root/mibr"  # the single MIB Runtime root (M1)
 ESO_LIB = "/mnt/app/eso/lib"
 README = "INSTALLATION-README.md"
 MATRIX = "docs/configuration/DEFAULT_CONFIGURATION_MATRIX.md"
@@ -89,16 +88,16 @@ NATIVE = [
      [ESO_LIB + "/libmibr_isotx2_guard.so"]),
     ("common/broker/bin/mibr-v3-service",
      ["mu1440-source/mibr-control/mibr-v3-service-QNX65-ARMv7-NOT-INSTALL-READY"],
-     [MIBR_V3 + "/bin/mibr-v3-service"]),
+     [APP + "/bin/mibr-v3-service"]),
     ("common/broker/bin/mibrctl-v3",
      ["mu1440-source/mibr-control/mibrctl-v3-QNX65-ARMv7-NOT-INSTALL-READY"],
-     [MIBR_V3 + "/bin/mibrctl-v3"]),
+     [APP + "/bin/mibrctl-v3"]),
     ("common/broker/bin/mibr-v3-genkey",
      ["mu1440-source/mibr-control/mibr-v3-genkey-QNX65-ARMv7-NOT-INSTALL-READY"],
-     [MIBR_V3 + "/bin/mibr-v3-genkey"]),
+     [APP + "/bin/mibr-v3-genkey"]),
     ("common/broker/bin/mibr-key40d",
      ["mu1440-source/mibr-control/mibr-key40d-QNX65-ARMv7-NOT-INSTALL-READY"],
-     [MIBR_V3 + "/bin/mibr-key40d"]),
+     [APP + "/bin/mibr-key40d"]),
     ("installer/bin/sha256sum", ["support-tools/sha256sum"], []),
     ("installer/bin/tee", ["support-tools/tee"], []),
 ]
@@ -151,7 +150,7 @@ def render_matrix(repo, menu_text):
     for s in broker["switches"]:
         out.append("| %s | %s | `%s` | `%s` |" % (
             md_cell(s["key"]), md_cell("|".join(s["allowed"]) if s["allowed"] else "rectangle"),
-            md_cell(s["compiled_default"]), md_cell(s["current_path"])))
+            md_cell(s["compiled_default"]), md_cell(s["declared_path"])))
     out += ["", "## Menu (brand `%s`, %d layout entries)" % (menu["brand_hint"], menu["layout_entries"]),
             "", "Menu presence, actions and aliases are not default values.", "",
             "Menu entries bound directly to CarPlay registry keys: %d. Bound to broker "
@@ -218,7 +217,7 @@ def render_readme(repo, menu_text, complete):
             "Copy the package to an SD card as a whole; do not run single files.", "",
             "## Recovery", "",
             "Uninstall via `installer/uninstall.ksh`. The boot guard kill switch is the file "
-            "`/mnt/app/root/mibr-kit/disabled`.", "",
+            "`/mnt/app/root/mibr/state/boot/disabled`.", "",
             "## Not included", "",
             "OEM firmware files, OEM icons, the menu JAR when built outside this package, RGI "
             "binaries and the boot probe JAR. Source coverage is PARTIAL "
@@ -297,15 +296,15 @@ def assemble(native, repo=ROOT, installer=None, menu_jar=None, allow_incomplete=
     read_repo_file(repo, "modules/carplay/runtime/auto-direct/altscreen111.conf", files, prov,
                    "common/carplay/config/altscreen111.conf")
     manifest.append((sha(files["common/carplay/config/altscreen111.conf"][0]), "644",
-                     APP + "/config/altscreen111.conf", "common/carplay/config/altscreen111.conf"))
+                     APP + "/config/carplay/altscreen111.conf", "common/carplay/config/altscreen111.conf"))
     for name in BROKER_SCRIPTS:
         pkg = "common/broker/scripts/" + name
         read_repo_file(repo, "modules/broker/runtime/mibr-control/" + name, files, prov, pkg)
-        manifest.append((sha(files[pkg][0]), "755", MIBR_V3 + "/" + name, pkg))
+        manifest.append((sha(files[pkg][0]), "755", APP + "/scripts/" + name, pkg))
     read_repo_file(repo, "tools/menu-editor/standard-menu.txt", files, prov,
                    "common/menu/config/mibr-menu.conf")
     manifest.append((sha(files["common/menu/config/mibr-menu.conf"][0]), "644",
-                     APP + "/config/mibr-menu.conf", "common/menu/config/mibr-menu.conf"))
+                     APP + "/config/menu/layout.conf", "common/menu/config/mibr-menu.conf"))
     for name in SCROLL:
         read_repo_file(repo, "modules/menu/source/assets/scroll/" + name, files, prov,
                        "common/menu/icons/" + name)

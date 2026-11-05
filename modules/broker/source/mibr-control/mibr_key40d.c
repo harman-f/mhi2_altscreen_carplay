@@ -14,6 +14,7 @@
  *   pause file     -> remove it (the supervisor reopens the CarPlay route on the live stream)
  * Nothing is written to OEM state, no DebugSPI byte is ever sent.
  */
+#include "../../../carplay/source/alt111-settings/include/mibr_paths.h"
 #include "mibr_v3_key40.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -34,7 +35,7 @@
 #define PAUSE_PATH "/tmp/mibr-parity-drive.pause"
 #define OWNER_PID_PATH "/tmp/mibr-parity-session.pid"
 #define OWNER_LOCK_PATH "/tmp/mibr-parity-session.lock"
-#define VIEW_SCRIPT "/mnt/app/root/altscreen-u2/scripts/mibr-view.ksh"
+#define VIEW_SCRIPT MIBR_SCRIPTS_DIR "/mibr-view.ksh"
 #define VIEW_WAIT_MS 3000
 #define BUF_CAP 8192u
 #define NEEDLE "HK Received: KBD["

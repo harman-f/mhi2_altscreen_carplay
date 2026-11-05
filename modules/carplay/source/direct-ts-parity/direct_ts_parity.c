@@ -42,6 +42,7 @@
 #include <unistd.h>
 #define ALT111_RECOVERY_POSIX 1
 #include "../altscreen111-gen2/include/alt111_recovery.h"
+#include "../alt111-settings/include/mibr_paths.h"
 
 #ifdef __QNXNTO__
 #include <devctl.h>
@@ -80,7 +81,7 @@
 #define AU_QUEUE_PACKET_CAP 65536u
 #define STATUS_PATH "/tmp/mibr-parity-ts.status"
 #define STATUS_ENABLE_TEMP "/tmp/mibr-parity-status-enabled"
-#define STATUS_ENABLE_PERSIST "/mnt/app/root/mibr-parity-status-enabled"
+#define STATUS_ENABLE_PERSIST MIBR_CONFIG_DIR "/features/mibr-parity-status-enabled"
 #define AU_EVENT_STARTED 0x01u
 #define AU_EVENT_COMPLETED 0x02u
 #define AU_EVENT_IDR 0x04u
