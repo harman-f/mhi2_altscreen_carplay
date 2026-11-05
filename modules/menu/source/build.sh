@@ -34,6 +34,12 @@ python3 "$MODULE/prepare_oem_sources.py" \
   --out-dir "$OUT/oem-source" \
   --profile "$PROFILE"
 mkdir -p "$OUT/classes"
+# The committed MibrSettingsCatalog/MibrMenuDefinition are the production menu snapshot and are
+# compiled from java/. The generator output in $OUT/catalog is a check only: compiling both gives
+# "duplicate class". The settings catalog must be identical to its generated form; the authored menu
+# definition is a superset of the legacy projection (cockpit arrows, safe areas, version page).
+cmp -s "$OUT/catalog/MibrSettingsCatalog.java" "$MODULE/java/de/mibr/hmi/MibrSettingsCatalog.java" || {
+  echo "ERROR: committed MibrSettingsCatalog.java drifts from settings/registry.json (regenerate)" >&2; exit 1; }
 # One JAR per profile: the generated binding names the adapter; its source dirs join the build.
 python3 "$MODULE/generate_profile_binding.py" --profile "$PROFILE" --out-dir "$OUT/profile"
 mapfile -t ADAPTER_DIRS < <(python3 "$MODULE/generate_profile_binding.py" --profile "$PROFILE" --print-source-dirs)
@@ -42,8 +48,6 @@ mapfile -t SOURCES < <(find "$MODULE/java/de/mibr/hmi" "$MODULE/java/mib/mu1440/
   -cp "$LSD_JAR" -d "$OUT/classes" \
   "${SOURCES[@]}" \
   "$OUT/profile/de/mibr/hmi/MibrProfileBinding.java" \
-  "$OUT/catalog/MibrSettingsCatalog.java" \
-  "$OUT/catalog/MibrMenuDefinition.java" \
   "$OUT/oem-source/de/vw/mib/cio/internal/Activator.java" \
   "$OUT/oem-source/generated/de/vw/mib/global/view/internal/WidgetFactoryImpl.java"
 (

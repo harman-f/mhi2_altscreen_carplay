@@ -15,11 +15,6 @@
         "new": "public void start(BundleContext bundleContext) {\n        de.mibr.hmi.MibrHomeCio.activatorStarted();\n        this.bundleContext = bundleContext;"
       },
       {
-        "label": "ACTIVATOR_INVALID_SYNTAX_IMPORT",
-        "old": "import org.osgi.framework.BundleContext;",
-        "new": "import org.osgi.framework.BundleContext;\nimport org.osgi.framework.InvalidSyntaxException;"
-      },
-      {
         "label": "ACTIVATOR_STOP",
         "old": "public void stop(BundleContext bundleContext) {\n    }",
         "new": "public void stop(BundleContext bundleContext) {\n        de.mibr.hmi.MibrHomeCio.deactivate();\n    }"
@@ -42,7 +37,8 @@
       {
         "label": "ACTIVATOR_SERVICE_FILTER_CHECKED_EXCEPTION",
         "old": "this.bundleContext.addServiceListener(this, string);\n        ServiceReference[] serviceReferenceArray = this.bundleContext.getServiceReferences(null, string);",
-        "new": "ServiceReference[] serviceReferenceArray;\n        try {\n            this.bundleContext.addServiceListener(this, string);\n            serviceReferenceArray = this.bundleContext.getServiceReferences(null, string);\n        } catch (InvalidSyntaxException invalidSyntaxException) {\n            throw new IllegalArgumentException(\"Invalid CIO service filter: \" + invalidSyntaxException.toString());\n        }"
+        "new": "ServiceReference[] serviceReferenceArray;\n        try {\n            this.bundleContext.addServiceListener(this, string);\n            serviceReferenceArray = this.bundleContext.getServiceReferences(null, string);\n        } catch (RuntimeException runtimeException) {\n            throw runtimeException;\n        } catch (Exception invalidSyntaxException) {\n            throw new IllegalArgumentException(\"Invalid CIO service filter: \" + invalidSyntaxException.toString());\n        }",
+        "note": "catch Exception, not InvalidSyntaxException: the pinned API jar (57dc5e93, jxe2jar reconstruction) declares no checked exception on addServiceListener/getServiceReferences, so a typed catch does not compile; the runtime lsd.jxe may still throw it, and catch(Exception) covers both."
       },
       {
         "label": "ACTIVATOR_VISUALIZATION",
