@@ -159,6 +159,7 @@ jobs:
             modules.menu.source.tests.test_verify_class_major \
             modules.menu.source.tests.test_v3_route \
             modules.menu.source.tests.test_native_rows_callbacks
+          python3 -B -m unittest discover -s modules/menu/source/tests -p 'test_*.py' -v
           bash modules/menu/source/tests/run_view_model_test.sh
           python3 -B modules/menu/source/generate_catalog.py \
             --registry settings/registry.json \

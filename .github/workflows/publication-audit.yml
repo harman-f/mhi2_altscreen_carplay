@@ -93,6 +93,7 @@ jobs:
           set -euxo pipefail
           test -s docs/build/PACKAGE_LAYOUT.md
           python3 tools/validate_modular_package.py --self-test
+          python3 -B -m unittest discover -s tests/release -p 'test_*.py' -v
 
 
       - name: Release module graph and complete QNX script preflight
