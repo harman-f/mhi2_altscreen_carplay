@@ -9,6 +9,7 @@
  */
 #define _POSIX_C_SOURCE 200809L
 #include "mibr_vdata.h"
+#include "mibr_paths.h"
 #include "mibr_vstatus.h"
 #include <dlfcn.h>
 #include <pthread.h>
@@ -17,10 +18,10 @@
 #include <sys/stat.h>
 #include <time.h>
 
-#define VDATA_MODE_FILE   "/mnt/app/root/altscreen-u2/config/vdata.mode"
+#define VDATA_MODE_FILE   MIBR_CONFIG_DIR "/vehicle/vdata.mode"
 #define VDATA_SOURCE_FILE "/tmp/mibr-vdata-speed.ring"
 #define VDATA_STATUS_FILE "/tmp/mibr-vdata.status"
-#define VSTATUS_MODE_FILE   "/mnt/app/root/altscreen-u2/config/vstatus.mode"
+#define VSTATUS_MODE_FILE   MIBR_CONFIG_DIR "/vehicle/vstatus.mode"
 #define VSTATUS_SOURCE_FILE "/tmp/mibr-vdata-status.vss"
 #define VSTATUS_STATUS_FILE "/tmp/mibr-vstatus.status"
 

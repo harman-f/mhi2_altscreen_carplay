@@ -1,6 +1,7 @@
 #!/bin/ksh
 # SPDX-License-Identifier: GPL-3.0-or-later
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 runtime_init || { echo "DIRECT_FPS=FAIL_RUNTIME"; exit 3; }
 load_altscreen_config || { echo "DIRECT_FPS=FAIL_CONFIG"; exit 4; }
 

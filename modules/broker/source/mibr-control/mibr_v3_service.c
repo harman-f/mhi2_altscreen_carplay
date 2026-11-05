@@ -4,6 +4,7 @@
  * The production secret is provisioned out of band, never passed in argv.
  */
 #define _POSIX_C_SOURCE 200809L
+#include "../../../carplay/source/alt111-settings/include/mibr_paths.h"
 #include "mibr_v3_readonly.h"
 #include "mibr_v3_runtime_observer.h"
 #include "mibr_v3_recovery_gate.h"
@@ -266,7 +267,7 @@ static int engine_op(void *context,const char *op,const char *value,char *out,si
     if(!out||cap<16||!op||(strcmp(op,"get")&&strcmp(op,"set")))return -1;
     if(!strcmp(op,"set")&&(!value||(strcmp(value,"gas")&&strcmp(value,"diesel")&&
                                       strcmp(value,"electric")&&strcmp(value,"cng"))))return -1;
-    script="/mnt/app/root/altscreen-u2/scripts/mibr-engine.ksh";
+    script=MIBR_SCRIPTS_DIR "/mibr-engine.ksh";
 #ifdef ALT111_SETTINGS_TEST
     if(getenv("MIBR_ENGINE_SCRIPT"))script=getenv("MIBR_ENGINE_SCRIPT");
     if(getenv("MIBR_ENGINE_SHELL"))shell=getenv("MIBR_ENGINE_SHELL");
@@ -312,7 +313,7 @@ static int view_op(void *context,const char *op,const char *key,const char *valu
     (void)context;
     if(!out||cap<16||!op||(strcmp(op,"get")&&strcmp(op,"set")&&strcmp(op,"menu")))return -1;
     if(!strcmp(op,"set")&&(!key||!value))return -1;
-    script=!strcmp(op,"menu")?"/mnt/app/root/altscreen-u2/scripts/mibr-menu.ksh":"/mnt/app/root/altscreen-u2/scripts/mibr-view.ksh";
+    script=!strcmp(op,"menu")?MIBR_SCRIPTS_DIR "/mibr-menu.ksh":MIBR_SCRIPTS_DIR "/mibr-view.ksh";
 #ifdef ALT111_SETTINGS_TEST
     if(strcmp(op,"menu")&&getenv("MIBR_VIEW_SCRIPT"))script=getenv("MIBR_VIEW_SCRIPT");
     if(!strcmp(op,"menu")&&getenv("MIBR_MENU_SCRIPT"))script=getenv("MIBR_MENU_SCRIPT");
@@ -395,7 +396,7 @@ static void serve(int fd,struct mibr_v3_reader *reader,const char *secret,
     (void)send_full(fd,out,strlen(out));
 }
 int main(int argc,char **argv){
-    struct alt111_settings_paths paths={"/tmp","/mnt/app/root"};
+    struct alt111_settings_paths paths={"/tmp",MIBR_CARPLAY_CONFIG_DIR};
     struct mibr_v3_reader *reader=NULL;
     struct sockaddr_in local,peer;struct timeval tv;char secret[TOKEN_LENGTH+1]={0};
     unsigned long port;char *end;int server=-1,fd,one=1; socklen_t peerlen;
@@ -452,7 +453,7 @@ int main(int argc,char **argv){
         scaling_path=getenv("MIBR_V3_HOST_SCALING_PATH");
         if(!scaling_path||!*scaling_path)scaling_path="/tmp/mibr-display-scaling-readonly.conf";
 #else
-        scaling_path="/mnt/app/root/altscreen-u2/config/display-scaling.conf";
+        scaling_path=MIBR_CONFIG_DIR "/cockpit/scaling.conf";
 #endif
         if(strlen(scaling_path)<sizeof(reader->scaling_path)){
             strcpy(reader->scaling_path,scaling_path);
@@ -479,7 +480,7 @@ int main(int argc,char **argv){
         path=getenv("MIBR_V3_HOST_MENU_LANGUAGE_PATH");
         if(!path||!*path)path="/tmp/mibr-menu-language-readonly.conf";
 #else
-        path="/mnt/app/root/altscreen-u2/config/mibr-menu-language.conf";
+        path=MIBR_CONFIG_DIR "/menu/language.conf";
 #endif
         if(strlen(path)<sizeof(reader->menu_language_path)){
             strcpy(reader->menu_language_path,path);
@@ -562,7 +563,7 @@ int main(int argc,char **argv){
 #if defined(__QNXNTO__) && defined(MIBR_V3_TARGET_STORAGE_QUALIFIED)
     if(qualify_durable){
         if(mibr_v3_qnx_preflight(&target_store,
-              "/mnt/app/root/altscreen-u2/config/cpvc-r5.profile",&reader->cached)){
+              MIBR_CONFIG_DIR "/cockpit/cpvc-r5.profile",&reader->cached)){
             free(reader);memset(secret,0,sizeof(secret));return 4;
         }
         reader->durable_set=mibr_v3_qnx_set;reader->storage_context=&target_store;

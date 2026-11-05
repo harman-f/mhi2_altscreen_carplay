@@ -1,7 +1,7 @@
 # MU1440 Route Guidance source build
 
 This directory builds two QNX ARM outputs: `libmibr_rgi_ipod.so` and `mibr-rgi`.
-It does not contain an `mm-ipod` launcher/wrapper, an installer, or a deployable kit.
+The `mm-ipod` launcher wrapper is published separately as `../runtime/mm-ipod-rgi.sh`; this directory contains no installer or deployable kit.
 The output manifest covers only these two artifacts.
 
 ## Inputs

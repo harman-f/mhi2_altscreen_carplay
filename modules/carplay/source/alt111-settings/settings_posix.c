@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 static int fail(char *out, size_t cap, const char *format, ...)
@@ -168,6 +169,39 @@ static int stale_lock_owner_gone(const char *path)
     return 0;
 }
 
+/* Bounded diagnostics only: do not expose arbitrary lock-file bytes. */
+static const char *lock_owner_state(const char *path, long *owner_pid,
+                                    const char **liveness)
+{
+    char owner[64], *end;
+    size_t size = 0;
+    long pid;
+    int rc = read_file(path, owner, sizeof(owner), &size);
+    if (rc == 1) { *liveness = "unknown"; return "missing"; }
+    if (rc != 0 || !size) { *liveness = "unknown"; return "invalid"; }
+    errno = 0;
+    pid = strtol(owner, &end, 10);
+    if (errno || pid <= 1 || end == owner || (*end != '\n' && *end != 0) ||
+        (*end == '\n' && end[1] != 0)) {
+        *liveness = "unknown";
+        return "invalid";
+    }
+    *owner_pid = pid;
+    errno = 0;
+    if (kill((pid_t)pid, 0) == 0) *liveness = "live";
+    else if (errno == ESRCH) *liveness = "dead";
+    else *liveness = "unknown";
+    return "readable";
+}
+
+static unsigned long long lock_monotonic_ms(void)
+{
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now)) return 0;
+    return (unsigned long long)now.tv_sec * 1000ull +
+           (unsigned long long)(now.tv_nsec / 1000000L);
+}
+
 static int lock_settings(const struct alt111_settings_paths *paths, int write_lock,
                           char *error, size_t cap)
 {
@@ -175,6 +209,7 @@ static int lock_settings(const struct alt111_settings_paths *paths, int write_lo
     struct stat st;
     unsigned attempt;
     int fd, n;
+    unsigned long long started_ms;
     (void)write_lock;
 
     /*
@@ -186,6 +221,8 @@ static int lock_settings(const struct alt111_settings_paths *paths, int write_lo
     if (!paths || path_for(path, sizeof(path), paths->temp,
                            "mibr-alt111-settings.lock-v2"))
         return fail(error, cap, "INVALID_VALUE settings_root");
+
+    started_ms = lock_monotonic_ms();
 
     for (attempt = 0; attempt < 100u; ++attempt) {
         fd = open(path, O_RDWR | O_CREAT | O_EXCL, 0600);
@@ -221,7 +258,23 @@ static int lock_settings(const struct alt111_settings_paths *paths, int write_lo
 
         if (attempt + 1u < 100u) (void)usleep(1000);
     }
-    return fail(error, cap, "BUSY settings_lock");
+    {
+        long owner_pid = 0;
+        const char *owner_state, *liveness;
+        unsigned long long ended_ms = lock_monotonic_ms();
+        unsigned long long wait_ms = ended_ms >= started_ms ? ended_ms - started_ms : 0;
+        struct stat observed;
+        int have_inode = !lstat(path, &observed) && S_ISREG(observed.st_mode);
+        owner_state = lock_owner_state(path, &owner_pid, &liveness);
+        if (have_inode)
+            return fail(error, cap,
+                "BUSY settings_lock waiter_pid=%ld owner_state=%s owner_pid=%ld owner_liveness=%s wait_ms=%llu attempts=%u lock_dev=%lu lock_ino=%lu",
+                (long)getpid(), owner_state, owner_pid, liveness, wait_ms, attempt,
+                (unsigned long)observed.st_dev, (unsigned long)observed.st_ino);
+        return fail(error, cap,
+            "BUSY settings_lock waiter_pid=%ld owner_state=%s owner_pid=%ld owner_liveness=%s wait_ms=%llu attempts=%u lock_dev=unknown lock_ino=unknown",
+            (long)getpid(), owner_state, owner_pid, liveness, wait_ms, attempt);
+    }
 }
 
 static void unlock_settings(const struct alt111_settings_paths *paths, int fd)

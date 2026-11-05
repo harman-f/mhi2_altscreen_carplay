@@ -1,5 +1,6 @@
 #!/bin/ksh
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 runtime_init_durable || { echo "ERROR runtime/bootstrap failed"; exit 15; }
 runtime_require_cmds mount cp mv chmod awk grep sync mkdir rm || { log "ERROR required QNX command missing"; exit 16; }
 

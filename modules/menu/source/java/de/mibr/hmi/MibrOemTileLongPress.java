@@ -60,13 +60,22 @@ final class MibrOemTileLongPress {
             Button button = tileButton(cd);
             if (button == null) continue;
             Hook hook = find(button);
+            boolean reRegister = MibrOemProfiles.current().listenersClearedOnDeInit();
+            if (reRegister && hook != null && hook.controller != button.getController()) {
+                hook.controller.removeOutEventListener(hook);
+                hooks.removeElement(hook);
+                hook = null;
+            }
             if (hook == null) {
                 if (button.get_buttonMode() != STOCK_MODE) continue;
                 hook = new Hook(button);
                 if (hook.controller == null) continue;
                 hooks.addElement(hook);
-                hook.controller.addOutEventListener(hook);
+                if (!reRegister) hook.controller.addOutEventListener(hook);
             }
+            // deInit clears all listeners and addOutEventListener is addIfAbsent,
+            // so re-registering after a pooled clone reinitialization cannot duplicate.
+            if (reRegister) hook.controller.addOutEventListener(hook);
             if (button.get_buttonMode() != LONG_MODE || button.get_startTimePrimary() != LONG_PRESS_MS) {
                 button.set_buttonMode(LONG_MODE);
                 button.set_startTimePrimary(LONG_PRESS_MS);

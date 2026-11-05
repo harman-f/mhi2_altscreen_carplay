@@ -51,6 +51,12 @@ recipe may differ. Treat output equivalence as **unproven** until validated.
    compiler, QNX ARM ELF, symbol, artifact SHA and source/receipt review;
    a successful compiler build is still not vehicle acceptance.
 
+Note: the build-support-tools workflow still contains a legacy artifact
+auto-commit step (`QNX65_ALLOW_ARTIFACT_AUTOCOMMIT`). It is disabled in
+practice because it requires `QNX_TOOLCHAIN_MODE=legacy-rebuild`, which the
+image selector never sets, and it is slated for removal. Support-tools output
+is never committed back automatically.
+
 If the package push or cross-compilation fails, do **not** silently repoint
 CI to a Research package, use a `:latest` alias, or publish a new application
 release. Recover the owning package or rerun the **separate archive workflow**.

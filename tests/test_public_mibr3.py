@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src" / "experimental" / "mibr3"
+SRC = ROOT / "tests" / "mibr-control"
 NATIVE = ROOT / "modules" / "broker" / "source" / "mibr-control"
 INCLUDE_DIRS = (
     ROOT / "modules" / "carplay" / "source" / "altscreen111-gen2" / "include",

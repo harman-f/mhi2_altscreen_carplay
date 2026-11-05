@@ -1,6 +1,7 @@
 #!/bin/ksh
 # SPDX-License-Identifier: GPL-3.0-or-later
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 runtime_init || { echo "AUTO_DIRECT_STOP=FAIL_RUNTIME"; exit 3; }
 
 SUPPID=/tmp/mibr-direct-auto-supervisor.pid

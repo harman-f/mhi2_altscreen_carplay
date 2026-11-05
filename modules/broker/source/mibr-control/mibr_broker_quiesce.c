@@ -6,6 +6,7 @@
 #define _GNU_SOURCE
 #endif
 #define _POSIX_C_SOURCE 200809L
+#include "../../../carplay/source/alt111-settings/include/mibr_paths.h"
 #include "bound_process.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -23,7 +24,7 @@
 #endif
 
 #define DEFAULT_PIDFILE "/tmp/mibr-v3-service.pid"
-#define DEFAULT_EXEC "/mnt/app/root/mibr-v3/bin/mibr-v3-service"
+#define DEFAULT_EXEC MIBR_BIN_DIR "/mibr-v3-service"
 #define QUIESCE_TIMEOUT_MS 10000
 #define POLL_INTERVAL_MS 100
 

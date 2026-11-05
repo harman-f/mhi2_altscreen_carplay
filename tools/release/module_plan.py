@@ -49,13 +49,15 @@ def classify(index: dict, changed: list[str], all_inputs: bool = False) -> dict:
         # The module index itself is global metadata, not an unowned module.
         unowned.discard("modules/module-index.json")
     for p in changed:
-        if p.startswith("src/experimental/mibr3/"):
-            # The standalone protocol model and its migrated probes exercise
-            # Broker behavior; they are not a second production source owner.
-            related, _ = impact(index, ["modules/broker/source/mibr-control"])
-            direct.add("broker")
-            affected.update(related)
+        if p == "runtime/README.md":
+            unowned.discard(p)  # shared runtime documentation
+        if p.startswith(("src/experimental/hmi-model/", "src/experimental/mibr3/")) and not (ROOT / p).exists():
+            unowned.discard(p)  # removed, superseded experimental source
+        if p == "runtime/experimental/viewarea_mode.sh":
             unowned.discard(p)
+            direct.add("carplay")
+            a, _ = impact(index, ["modules/carplay/runtime/auto-direct/direct_ts_auto_enable.sh"])
+            affected.update(a)
         if p.startswith(("settings/", "runtime/diagnostics/", "runtime/deployment/")):
             # Registry-generated files, diagnosis and deployment scripts are
             # deliberate shared inputs outside any functional module. Unknown
@@ -103,12 +105,16 @@ def self_test(index: dict) -> None:
     assert not x["unknown_owner_paths"], x
     x = classify(index, ["modules/carplay/unlisted/new.c"])
     assert x["unknown_owner_paths"] == ["modules/carplay/unlisted/new.c"], x
-    x = classify(index, ["src/experimental/mibr3/mibr_v3_owner_lifecycle.c"])
-    assert x["direct_modules"] == ["broker"] and not x["unknown_owner_paths"] and x["run_release_checks"], x
     x = classify(index, ["sd/manifest.json"])
     assert x["run_release_checks"] and not x["unknown_owner_paths"], x
     x = classify(index, ["README.md"])
     assert not x["run_release_checks"], x
+    x = classify(index, ["runtime/README.md", "src/experimental/hmi-model/java/de/mibr/hmi/MibrI18n.java"])
+    assert not x["unknown_owner_paths"], x
+    x = classify(index, ["runtime/experimental/viewarea_mode.sh"])
+    assert x["direct_modules"] == ["carplay"] and x["run_release_checks"] and not x["unknown_owner_paths"], x
+    x = classify(index, ["runtime/experimental/unknown.sh"])
+    assert x["unknown_owner_paths"], x
     print("RELEASE_MODULE_PLAN_SELF_TEST=PASS")
 
 

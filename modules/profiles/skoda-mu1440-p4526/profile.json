@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "profile_id": "skoda-mu1440-p4526",
   "brand": "skoda",
   "firmware": "MHI2_ER_SKG13_P4526_MU1440",
@@ -10,8 +10,29 @@
   "selector": {
     "source": "/ifs/lsd.jxe",
     "algorithm": "sha256",
-    "digest": "a55d9cfb69c5756f8202b7f7aa4079d4d5b637ae4c2fd0fe723f1d6816cbeea8"
+    "digest": "a55d9cfb69c5756f8202b7f7aa4079d4d5b637ae4c2fd0fe723f1d6816cbeea8",
+    "evidence": "unit_measured",
+    "install_enabled": true
   },
+  "firmware_check": {
+    "source": "e2p:3A0:19 (runtime/deployment/session.sh mibr_e2p_ascii)",
+    "expected": "MHI2_ER_SKG13_P4526_MU1440",
+    "status": "defined"
+  },
+  "hmi": {
+    "api_jar_sha256": "57dc5e9313ef8a59403a17b3a6726f0852f6ac68cc72e42ef2a1ca530aba3ae7",
+    "api_jar_status": "confirmed",
+    "adapter": null,
+    "adapter_from": null,
+    "image_index_offset": null
+  },
+  "evidence": [
+    {
+      "path": "/ifs/lsd.jxe",
+      "sha256": "a55d9cfb69c5756f8202b7f7aa4079d4d5b637ae4c2fd0fe723f1d6816cbeea8",
+      "kind": "unit_measured"
+    }
+  ],
   "common_modules": [
     "carplay",
     "broker",
@@ -20,8 +41,9 @@
   ],
   "java": {
     "shared_source": "modules/menu/source",
-    "adapter_status": "r57-reference-java-source",
-    "firmware_specific_updates_supported": true
+    "firmware_specific_updates_supported": true,
+    "adapter_status": "source",
+    "adapter_note": "r57-reference-java-source"
   },
   "groups": [
     "hmi",

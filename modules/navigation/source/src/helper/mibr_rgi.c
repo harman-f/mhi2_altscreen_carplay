@@ -26,9 +26,10 @@
 
 #include "mibr_rgi_guidance.h"
 #include "mibr_rgi_wire.h"
+#include "../../../../carplay/source/alt111-settings/include/mibr_paths.h"
 #include "routeguidance/rgd_tlv.h"
 
-#define ENABLE_FILE "/mnt/app/root/mibr-rgi/rgi.on"
+#define ENABLE_FILE MIBR_CONFIG_DIR "/features/rgi.on"
 #define READY_FILE  "/dev/shmem/mibr-rgi-ready"
 #define WANT_FILE   "/dev/shmem/mibr-rgi.want"
 #define GUIDANCE    "/dev/shmem/mibr-rgi.guidance"

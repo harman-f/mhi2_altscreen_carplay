@@ -21,7 +21,7 @@ class ActivationProductPreworkContract(unittest.TestCase):
         cls.rows = {r["key"]: r for r in cls.reg["settings"]}
 
     def test_original_schema_and_exact_apply_counts(self):
-        self.assertEqual(self.reg["schema"], 2)
+        self.assertEqual(self.reg["schema"], 3)
         self.assertEqual(len(self.rows), 48)
         self.assertEqual(len(self.reg["settings"]), len(self.rows))
         self.assertEqual(Counter(r["apply"] for r in self.rows.values()),

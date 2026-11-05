@@ -25,7 +25,7 @@ on:
       - 'tools/qnx65-image.lock'
 
 permissions:
-  contents: write
+  contents: read
   packages: read
 
 concurrency:
@@ -48,7 +48,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Host-test gate semantics
         shell: bash
@@ -197,88 +197,6 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mu1440-support-tools-unstripped
+          retention-days: 30
           path: build/support-tools/
           if-no-files-found: error
-
-
-      - name: Publish build-confirmed gate artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.QNX_TOOLCHAIN_MODE == 'legacy-rebuild' && vars.QNX65_ALLOW_ARTIFACT_AUTOCOMMIT == 'true'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          DEST=artifacts/mu1440/isotx2-gate/build-confirmed-current
-          mkdir -p "$DEST"
-          cp build/support-tools/libmibr_isotx2_gate.so "$DEST/libmibr_isotx2_gate.so"
-          sed 's#build/support-tools/##' build/support-tools/libmibr_isotx2_gate.so.sha256 > "$DEST/libmibr_isotx2_gate.so.sha256"
-          cat > "$DEST/README.md" <<'EOF'
-          # Build-confirmed isoTX2 writev gate
-
-          This binary is produced by the pinned public QNX 6.5 ARMv7 workflow from
-          `modules/carplay/source/isotx2-gate/isotx2_gate.c`.
-
-          The gate mechanism/source has been vehicle-proven on the MU1440 reference target.
-          This particular public binary is labelled **build-confirmed** unless its exact SHA-256
-          is separately recorded in a vehicle test.
-
-          The library defaults to STOCK/pass-through behavior. DIRECT suppression is only requested
-          through the explicit runtime marker/control path.
-
-          See `docs/architecture/DIRECT_VC_VIDEO_PATH.md` and `runtime/isotx2-gate/`.
-          EOF
-          VEHICLEDEST=artifacts/mu1440/isotx2-gate/vehicle-tested-2026-09-27
-          mkdir -p "$VEHICLEDEST"
-          cp build/support-tools/libmibr_isotx2_gate_vehicle.so "$VEHICLEDEST/libmibr_isotx2_gate.so"
-          sha256sum "$VEHICLEDEST/libmibr_isotx2_gate.so" | sed 's#  .*/#  #' > "$VEHICLEDEST/libmibr_isotx2_gate.so.sha256"
-          cat > "$VEHICLEDEST/README.md" <<'EOF'
-          # Vehicle-tested MU1440 isoTX2 gate — 2026-09-27
-
-          Exact stripped QNX ARMv7 build identity recovered from the archived vehicle-test package
-          and reproduced from the public source/toolchain.
-
-          SHA-256:
-
-          `05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957`
-
-          This is the exact gate binary identity used by the vehicle-proven MU1440/AID10 media path.
-          EOF
-
-          SHADEST=artifacts/mu1440/sha256sum-compat/build-confirmed-current
-          mkdir -p "$SHADEST"
-          cp build/support-tools/sha256sum "$SHADEST/sha256sum"
-          sed 's#build/support-tools/##' build/support-tools/sha256sum.sha256 > "$SHADEST/sha256sum.sha256"
-          cat > "$SHADEST/README.md" <<'EOF'
-          # Build-confirmed QNX SHA-256 compatibility helper
-
-          Minimal project-owned SHA-256 file utility used by the guarded MU1440 developer deployment.
-          It is built from `modules/carplay/source/sha256sum-compat/sha256sum_compat.c` with the same pinned public
-          QNX 6.5 ARMv7 toolchain as the other support tools.
-
-          The deployment uses this helper so it has no hidden dependency on an existing M.I.B.
-          `/apps/sbin` SD-card layout.
-          EOF
-          TEEDEST=artifacts/mu1440/tee-compat/build-confirmed-current
-          mkdir -p "$TEEDEST"
-          cp build/support-tools/tee "$TEEDEST/tee"
-          sed 's#build/support-tools/##' build/support-tools/tee.sha256 > "$TEEDEST/tee.sha256"
-          cat > "$TEEDEST/README.md" <<'EOF'
-          # Build-confirmed QNX tee compatibility helper
-
-          Project-owned MU1440/QNX 6.5 ARMv7 logging helper implementing the subset used by the
-          deployment and Auto-Direct runtime: stdin -> stdout plus file outputs, with `-a` append
-          and `-i` ignore-SIGINT compatibility.
-
-          It replaces the historical dependency on M.I.B. `apps/sbin/tee` without redistributing
-          a QNX/OEM binary.
-          EOF
-
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add "$DEST" "$VEHICLEDEST" "$SHADEST" "$TEEDEST"
-          if git diff --cached --quiet; then
-            echo "Gate artifact unchanged."
-            exit 0
-          fi
-          git commit -m "artifacts: publish build-confirmed isoTX2 gate"
-          git fetch origin main
-          git rebase origin/main
-          git push origin HEAD:main

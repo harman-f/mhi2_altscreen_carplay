@@ -1,5 +1,6 @@
 #!/bin/ksh
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 FAIL=0
 REBOOT_REQUIRED=0
 CURRENT_BEFORE=$(hash256 "$TARGET" 2>/dev/null)
@@ -13,7 +14,7 @@ fi
 
 # Auto-Direct is U2-owned runtime state. Full restore must make STOCK the
 # fail-safe state before touching the persistent CarPlay preload.
-AUTO_ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
+AUTO_ENABLED=$MIBR_ROOT/config/features/mibr-carplay-autodirect.enabled
 AUTO_BEGIN="# MIBR AUTO-DIRECT BEGIN"
 AUTO_END="# MIBR AUTO-DIRECT END"
 # Stage in the lsd.sh directory itself, not in /tmp (RAM): the final mv is
@@ -147,15 +148,15 @@ fi
 # internal preload file as well. A currently running CarPlay process may still
 # have it mapped, so REBOOT_REQUIRED remains the authoritative unload boundary.
 # A full CarPlay111 rollback also clears optional protocol-experiment markers.
-if [ "$C" = "$EXPECTED_SMARTPHONE" ] && [ -e /mnt/app/root/mibr-carplay111-viewareas.enabled ]; then
+if [ "$C" = "$EXPECTED_SMARTPHONE" ] && [ -e $MIBR_ROOT/config/features/mibr-carplay111-viewareas.enabled ]; then
   if mount -uw /mnt/app 2>/dev/null; then
-    rm -f /mnt/app/root/mibr-carplay111-viewareas.enabled 2>/dev/null || true
+    rm -f $MIBR_ROOT/config/features/mibr-carplay111-viewareas.enabled 2>/dev/null || true
     sync
     mount -ur /mnt/app 2>/dev/null || {
       log "ERROR /mnt/app did not return to read-only"
       FAIL=1
     }
-    [ ! -e /mnt/app/root/mibr-carplay111-viewareas.enabled ] || {
+    [ ! -e $MIBR_ROOT/config/features/mibr-carplay111-viewareas.enabled ] || {
       log "ERROR ViewArea fallback marker could not be removed"
       FAIL=1
     }

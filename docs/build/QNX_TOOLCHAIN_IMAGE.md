@@ -56,8 +56,9 @@ Each native build uploads `QNX_TOOLCHAIN_PROVENANCE.txt` with the
 verified image reference and manifest digest, compiler version, image ID,
 source revision and explicit `vehicle_qualified=false`. A source build
 passing CI **does not authorize** replacing the vehicle-tested legacy
-binaries or publishing a modular release. Review ELF/ABI symbols and
-SHA-256 differences versus previous builds.
+binaries or publishing a modular release. Reviewing ELF/ABI symbols and
+SHA-256 differences versus previous builds is a **manual** reviewer step today;
+no CI step performs this comparison.
 
 The older Research image (`sha256:19b5fb...`) remains available for
 history; it is not byte-for-byte interchangeable with this separately
