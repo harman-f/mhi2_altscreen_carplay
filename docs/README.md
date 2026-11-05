@@ -1,64 +1,46 @@
-# Documentation
+# Documentation hub — MIB Runtime
 
-The pages here describe the **current public product/source, exact reference-target evidence and implementation interfaces**. Old dated experiments are retained only where they still explain a verified finding or an important limitation; they are not competing “current” plans.
+Start with the information you need. **Current source, released packages and vehicle observations are separate evidence levels.** Dated research reports remain available but do not override this index or the status tables.
 
-## AltScreen Cluster Atlas
+## Explore the project
 
-- **[Open the standalone AltScreen Cluster Atlas](index.html)** — interactive cross-project matrix for MHI2, MHI2Q and MST2, supported cluster hardware, navigation/telephony/audio capabilities, repository lineage and dated evidence. It is a static, self-contained HTML file; basic filtering and sorting work without JavaScript.
-- **GitHub Pages:** after enabling Pages from `main` → `/docs`, this page is served at `https://harman-f.github.io/mhi2_altscreen_carplay/`. The repository file remains usable without Pages.
+- **[Overview and reference-vehicle demonstration](../README.md)** — what the project does, picture and main safety limitations.
+- **[Feature and evidence status](status/FEATURE_STATUS.md)** — which features exist in source, which have been seen on a vehicle and which still need acceptance.
+- **[Firmware and cluster compatibility](testing/COMPATIBILITY_MATRIX.md)** — exact target identities, not generic brand support.
+- **[Current three-profile test matrix](testing/MULTI_PROFILE_TESTING.md)** — Škoda MU1440 and SEAT MU1409/MU1447; evidence and test requests.
 
-## Start here
+## Packages, installers and updates
 
-[Repository components](../modules/) connects each module to its source, runtime, build tools, binary artifacts and documentation.
+- **[Packages and release status](packages/README.md)** — legacy MU1440 package versus modular three-profile beta, plus what a PASS means.
+- [Developer installation and known target prerequisites](INSTALLATION.md) — **historical MU1440 developer package**, not universal instructions.
+- [Frozen reference release](../release/CURRENT.md) — exact historical artifacts and SHA-256.
+- [New package structure and manifests](build/PACKAGE_LAYOUT.md) — common modules, firmware profiles, J9 inputs and final ZIP gate.
+- [Configuration defaults and application timing](configuration/DEFAULT_CONFIGURATION_MATRIX.md) — 48 CarPlay keys, 13 broker switches, presets versus firmware profiles.
 
-The [MU1440 R57 source/build baseline](build/MU1440_R57_SOURCE.md) is the current entrypoint for source availability, native reproduction, the real OEM-menu/controller modules, and explicit Java/support-source exclusions. The [QNX 6.5 compiler image and release provenance contract](build/QNX_TOOLCHAIN_IMAGE.md) documents the archived GCC 4.9 toolchain image and the planned CI/release-lineage transition. Dated vehicle reports below retain their original acceptance scope.
+## Technical development
 
-1. [Features and goals](../README.md)
-2. [Current integration and evidence status](status/INTEGRATION_STATUS_2026-10-21.md)
-3. [Exact public source coverage](status/PUBLISHED_SOURCE_COVERAGE.md)
-4. [System architecture and SEAT/VW portability](architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md)
-5. [OEM-native HMI and controller](architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md)
-6. [Configuration defaults matrix](configuration/DEFAULT_CONFIGURATION_MATRIX.md) — 48 CarPlay settings, 13 broker switches, menu-only entries and per-preset activation timing
-7. [Reference developer release](../release/CURRENT.md), [installation](INSTALLATION.md) and [compatibility matrix](testing/COMPATIBILITY_MATRIX.md)
-8. [Current roadmap](../ROADMAP.md) and [known issues](findings/KNOWN_ISSUES.md)
+- [Architecture and canonical interfaces](architecture/README.md) · [Module and source ownership](../modules/) · [Repository organization](architecture/REPOSITORY_LAYOUT.md)
+- [MIB Runtime: firmware profiles, configuration, migration](architecture/FIRMWARE_PROFILES_AND_CONFIGURATION.md) · [On-unit storage contract](architecture/UNIT_STORAGE_AND_NAMING_CONTRACT.md)
+- [CarPlay/video](../modules/carplay/) · [Broker/input](../modules/broker/) · [Java menu](../modules/menu/) · [Navigation/RGI](../modules/navigation/) · [Profiles](../modules/profiles/)
+- [Source coverage and external dependencies](status/PUBLISHED_SOURCE_COVERAGE.md)
+- [QNX toolchain](build/QNX_TOOLCHAIN_IMAGE.md) · [Menu and RGI build](build/MU1440_MENU_RGI_SOURCE.md) · [SDK entry point](../sdk/)
+- [Default-menu editor](../tools/menu-editor/mibr-menu-editor.html) · [Menu format](../tools/menu-editor/MENU_FILE_FORMAT.md)
+- [Developer runtime switches](architecture/ADVANCED_RUNTIME_SWITCHES.md) · [Vehicle test protocol](testing/VEHICLE_TEST_PROTOCOL.md)
 
-## SEAT/CUPRA contributor port
+## Validation and contribution
 
-- [Multi-profile research candidates and tester reports](testing/MULTI_PROFILE_TESTING.md) — exact MU1409/MU1440/MU1447 status, remaining vehicle acceptance and useful SEAT visual references.
-- [Binding modular ZIP/source layout](build/PACKAGE_LAYOUT.md) — common feature modules, symmetric firmware profiles, default menu, source inventory and build-coverage rules.
+- [Three-profile tester report and acceptance limits](testing/MULTI_PROFILE_TESTING.md)
+- [Stream 111 diagnostics and recovery](testing/STREAM111_FAULT_ISOLATION_2026-10-21.md)
+- [Known issues](findings/KNOWN_ISSUES.md) · [Roadmap](../ROADMAP.md) · [Documentation maintenance policy](DOCUMENTATION_POLICY.md) · [Contributing](../CONTRIBUTING.md) · [Security](../SECURITY.md)
+- [SEAT port background](porting/SEAT_CUPRA_MU1409_COLLABORATION.md) and [key-input capture](porting/SEAT_CUPRA_KEY_INPUT_CAPTURE_HANDOFF.md)
 
-- [MU1409 / P4708_1 joint AltScreen and native Settings port — public collaboration guide](porting/SEAT_CUPRA_MU1409_COLLABORATION.md). This is a staged development proposal, not a supported installer or a vehicle compatibility claim for our binary.
-- [Local Mac/QNX build and firmware-analysis environment for the SEAT MU1409 contributor](porting/SEAT_CUPRA_MU1409_LOCAL_ENVIRONMENT.md) — host-only prerequisites, reproducibility gates and steps before any vehicle tests.
+## Research and historic evidence
 
-- [Installer/test-package requirement: persistent Type-111 `carplay0` PF profile handling](installation/TYPE111_FIREWALL_INSTALLER_CONTRACT.md) — read-only check, profile-aware staged patch, postboot effective-rule verification and owned rollback (automatic target patching not yet implemented).
+- **[Research index](research/README.md)** — dated firmware, video and input investigations, including wireless CarPlay.
+- **[October vehicle observations](findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md)** and [21 October integration snapshot](status/INTEGRATION_STATUS_2026-10-21.md).
+- **[Reference visual evidence](media/mu1440-stream111-poc-2026-09-29/README.md)**.
+- **[AltScreen Cluster Atlas](index.html)** — independent MIB2/MHI2/MST2 comparison. When GitHub Pages is enabled from `main/docs`, it may also be accessible at `https://harman-f.github.io/mhi2_altscreen_carplay/`.
 
-- [SEAT/CUPRA MU1409 key-input capture and AI-agent handoff](porting/SEAT_CUPRA_KEY_INPUT_CAPTURE_HANDOFF.md) — reproduce our two-stage Škoda passive key/encoder analysis on a different firmware; no unverified SEAT key IDs or live remapping.
+Historical documents keep their original dates and claims. Do not rewrite an archived test result to imply newer binaries were installed. The latest *source* and the latest *vehicle-tested release* are different things.
 
-## System interfaces
-
-- **[On-unit MMX storage and naming contract](architecture/UNIT_STORAGE_AND_NAMING_CONTRACT.md)** — current path fragmentation, proposed single project root, naming rules, and fail-closed migration/rollback gates (design; not deployed)
-
-- **[Architecture module index and ownership guide](architecture/README.md)** — current authoritative page per subsystem, supporting historical references and release/source boundaries
-
-- [Direct VC video](architecture/DIRECT_VC_VIDEO_PATH.md) · [ScreenAlt control](architecture/SCREENALT_CONTROL_PLANE.md) · [Source/owner runtime](architecture/RUNTIME_CONTRACT.md)
-- [Auto-Direct reference runtime](architecture/AUTO_DIRECT_RUNTIME.md) · [Advanced developer switches](architecture/ADVANCED_RUNTIME_SWITCHES.md)
-- [Navigation and SafeArea](architecture/NAVIGATION_COMPOSITION_AND_SAFEAREA.md) · [View-state overview](research/VC_VIEWAREA_STATE.md)
-- [Optional real vehicle-data feature](architecture/OPTIONAL_VEHICLE_DATA_FEATURE_OVERVIEW.md)
-- [Public MIBR/3 source-only protocol and owner mailbox](../modules/broker/source/mibr-control/README.md)
-
-## Vehicle evidence and testing
-
-- [October reference observations: timing, video quality and disconnect classes](findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md)
-- [Reference vehicle demonstration](media/mu1440-stream111-poc-2026-09-29/README.md)
-- [Dated Final Drive checkpoint](status/MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md) and [visual cadence limitations](findings/MU1440_ZOOM_CADENCE_OBSERVATION_2026-10-11.md)
-- [Stream-111 fault isolation and recovery acceptance](testing/STREAM111_FAULT_ISOLATION_2026-10-21.md)
-- [Measured physical wheel and head-unit input map; unknown IDs and contribution request](testing/MU1440_MFW_RAW_KEY_MAPPING.md) · [Safe vehicle test protocol](testing/VEHICLE_TEST_PROTOCOL.md) · [QNX shell compatibility](testing/MU1440_QNX_SHELL_COMPATIBILITY.md)
-
-## Platform and advanced background
-
-- [Firmware/cluster compatibility](testing/COMPATIBILITY_MATRIX.md) · [platform profile map](research/MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md)
-- [GEN2 hook and reference ABI](research/MU1440_GEN2_HOOK_MAP.md) · [source-111 framing](research/STREAM111_PROTOCOL.md)
-- [Research background index](research/README.md) · [native wireless prototype status](research/mhi2-native-wireless-2026-10/README.md)
-- [Public technical references](research/PUBLIC_REFERENCES.md)
-
-[Official-repository acknowledgements](../ACKNOWLEDGEMENTS.md) · [Third-party license notices](../THIRD_PARTY_NOTICES.md) · [Contributor instructions](../CONTRIBUTING.md) · [Privacy and security](../SECURITY.md). Internal audits, working handoffs and experiment tracking are not part of this public documentation index.
+[Rights and attribution](../THIRD_PARTY_NOTICES.md) · [Privacy/publication](PUBLICATION_PRIVACY.md)
