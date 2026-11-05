@@ -6,6 +6,8 @@ The 29 September Most20/D2 update (kept at the end of this file as a historical 
 
 ## Release readiness after module migration (2026-11-03)
 
+> **2026-11-04, MIB Runtime cutover:** current sources use the single unit root `/mnt/app/root/mibr/`. The pre-MIBR 7-payload developer ZIP (altscreen-u2 layout, hash-pinned binaries) is a **frozen legacy line**: it is no longer assembled from the current tree and is only built from its frozen tag. The next installable package is the MIB Runtime beta ZIP with the root migration (`installer/lib/migrate-root.ksh`).
+
 The [release-readiness workflow](../.github/workflows/release-mu1440-aid10.yml)
 is now a **fail-closed CI audit**, not an automatic GitHub release publisher.
 It reads [canonical module ownership](../modules/module-index.json), calculates
