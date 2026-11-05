@@ -36,7 +36,9 @@ Start with the information you need. **Current source, released packages and veh
 
 ## Research and historic evidence
 
-- **[Research index](research/README.md)** — dated firmware, video and input investigations, including wireless CarPlay.
+- **[Research library / topic index](research/README.md)** — wiki-style starting point, evidence classes, current versus superseded research.
+- **By topic:** [CarPlay and iOS](research/carplay/README.md) · [Media and MOST](research/media/README.md) · [Firmware and clusters](research/firmware/README.md) · [Hardware and boot](research/hardware/README.md) · [HMI and input](research/interface/README.md) · [Wireless CarPlay](research/mhi2-native-wireless-2026-10/README.md) · [Historic overviews](research/archive/README.md).
+- [Documentation-agent instructions](AGENTS.md) · [Research archival instructions](research/AGENTS.md).
 - **[October vehicle observations](findings/OCTOBER_2026_VEHICLE_AND_TIMING_EVIDENCE.md)** and [21 October integration snapshot](status/INTEGRATION_STATUS_2026-10-21.md).
 - **[Reference visual evidence](media/mu1440-stream111-poc-2026-09-29/README.md)**.
 - **[AltScreen Cluster Atlas](index.html)** — independent MIB2/MHI2/MST2 comparison. When GitHub Pages is enabled from `main/docs`, it may also be accessible at `https://harman-f.github.io/mhi2_altscreen_carplay/`.

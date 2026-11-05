@@ -1,5 +1,8 @@
 # 10. iOS AirPlaySender/CarKit binary findings relevant to *Wireless* CarPlay
 
+> **Research status · 2026-11-05: FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 **Scope:** phone-side capability/compatibility decisions, negotiated secure Control session, accessory version identity and `iAPChannel`. No auxiliary screen, display geometry, video, cluster or Stream111 analysis is imported into this document. This is a dated **static analysis snapshot (October 2026)**, not an Apple specification or a phone-to-MU1440 live trace.
 
 ## 1. Exactly which iOS evidence was used

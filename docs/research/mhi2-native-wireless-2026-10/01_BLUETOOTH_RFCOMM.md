@@ -1,5 +1,8 @@
 # 01. Bluetooth servicegraph, SDP and RFCOMM on MU1440
 
+> **Research status · 2026-11-05:** **FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 **Target:** MHI2 ER SKG13 P4526/MU1440, classic MHI2/QNX 6.5 ARM32. **Evidence:** static comparison of target firmware components and adjacent stock software generations, plus independent offline prototype tests. No live full-session proof.
 
 ## What was actually observed

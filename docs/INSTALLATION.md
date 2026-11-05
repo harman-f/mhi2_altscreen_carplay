@@ -53,7 +53,7 @@ pass in quick on carplay0 proto tcp from any to any port 6031 allow-opts
 If Type 111 is advertised in SETUP but no video connection follows, verify the effective
 `carplay0` rule before attributing the failure to the hook, decoder or MOST output.
 The distinct port roles and diagnostic sequence are in
-[STREAM111_PROTOCOL.md](research/STREAM111_PROTOCOL.md#111-mu1440-carplay0-firewall-and-port-ownership)
+[STREAM111_PROTOCOL.md](research/carplay/STREAM111_PROTOCOL.md#111-mu1440-carplay0-firewall-and-port-ownership)
 and [VEHICLE_TEST_PROTOCOL.md](testing/VEHICLE_TEST_PROTOCOL.md#4-verify-the-type-111-source-separately).
 
 ### Mandatory PF installer and test-package gate

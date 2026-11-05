@@ -1,5 +1,8 @@
 # 05. Symptom-based debug matrix for a separately working Wireless build
 
+> **Research status · 2026-11-05: FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 Use stage-specific *non-sensitive* state transitions rather than screenshots or opaque "connected" flags. This table describes **suggested comparisons**, not a claim that this project's native wireless build passed these stages.
 
 | Reported behavior | Inspect first | Common false positive | Best corresponding research |

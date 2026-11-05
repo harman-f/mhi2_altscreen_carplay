@@ -1,5 +1,8 @@
 # 04. DNS-SD Controller discovery, peer binding and reconnect
 
+> **Research status · 2026-11-05: FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 The experimental project `B0` tool is a **read-only observer** for `_carplay-ctrl._tcp`; it is not a trusted controller directory or a production connection owner. **It covers the classic Bonjour discovery path only.** Apple also documents an iAP2 IP/port handoff that can bypass Bonjour; this was not proven on MU1440. See [11_CONNECTION_FLOW_VARIANTS.md](11_CONNECTION_FLOW_VARIANTS.md).
 
 ## Known observer shortcomings

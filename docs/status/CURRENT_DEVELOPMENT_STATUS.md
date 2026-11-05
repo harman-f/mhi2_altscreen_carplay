@@ -3,7 +3,7 @@
 # Historical public implementation status — 2026-10-02
 
 > [!IMPORTANT]
-> This page primarily tracks the **vehicle-proven/public implementation line**. Newer design-only work on source-timestamp transport, configurable keyframe policy, ownership A/B, HMI integration and steering-wheel control is summarized separately in the [current research preview](../research/CURRENT_RESEARCH_PREVIEW_2026-10-05.md). Those newer items are not vehicle-approved binaries yet.
+> This page primarily tracks the **vehicle-proven/public implementation line**. Newer design-only work on source-timestamp transport, configurable keyframe policy, ownership A/B, HMI integration and steering-wheel control is summarized separately in the [current research preview](../research/archive/CURRENT_RESEARCH_PREVIEW_2026-10-05.md). Those newer items are not vehicle-approved binaries yet.
 
 Historical snapshot: **2026-10-02**
 
@@ -400,7 +400,7 @@ This is a concrete mechanism for `corrupted/blocky picture -> fresh IDR -> clean
 
 Recommended discriminators are: disable permanent every-20-frame IDRs first, then test the same 791 geometry at 20 fps, and correlate visible artifacts with bridge `idr_max`, `queue_hi`, `latency-reset`, write-latency and `latency-resume-idr` telemetry.
 
-See [Omonob/QCDWJ 790 vs 791 artifact-path audit](../research/OMONOB_790_791_ARTIFACT_AUDIT_2026-10-03.md).
+See [Omonob/QCDWJ 790 vs 791 artifact-path audit](../research/media/OMONOB_790_791_ARTIFACT_AUDIT_2026-10-03.md).
 
 
 ### 2026-10-03: Minimal AID12 30-fps candidate plan
@@ -420,4 +420,4 @@ The AID12 geometry remains `800x480`; the shared bridge/supervisor remain untouc
 
 Before any tester receives a binary, the exact instruction/file offsets must be pinned and a post-patch decompile must prove that the only semantic deltas are the intended `40->30` and periodic `20->30` changes. Original/patched hashes and a reversible patch manifest must accompany the candidate.
 
-See [Omonob/QCDWJ 791 AID12 minimal 30-fps test plan](../research/OMONOB_791_30FPS_1S_IDR_TEST_PLAN_2026-10-03.md).
+See [Omonob/QCDWJ 791 AID12 minimal 30-fps test plan](../research/media/OMONOB_791_30FPS_1S_IDR_TEST_PLAN_2026-10-03.md).

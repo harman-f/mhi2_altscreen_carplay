@@ -1,5 +1,8 @@
 # 11. Two Wireless CarPlay connection-flow variants (Apple background vs MU1440 evidence)
 
+> **Research status · 2026-11-05: FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 **Reason for this separate note:** Apple's public design guidance changed after early classic Wireless CarPlay. A research document that always equates Controller discovery with Bonjour might mislead a developer working on a newer approach. These are **alternative endpoint-discovery modes**, not alternate display paths.
 
 ## A. Classic Wireless CarPlay sequence (public Apple overview, 2017)
