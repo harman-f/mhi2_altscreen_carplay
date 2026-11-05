@@ -6,10 +6,11 @@ For the detailed cross-brand cluster/transport matrix, including panel resolutio
 
 ## Platform matrix
 
-The newer [three-profile research candidate](MULTI_PROFILE_TESTING.md) separates
-exact MU1409/P4708, MU1440/P4526 and MU1447/P4709 profiles. Its target builds and
-static checks do not change the vehicle-support classification below, and this
-page does not offer a complete multi-platform installer download.
+The [three integrated firmware profiles](MULTI_PROFILE_TESTING.md) separate exact
+MU1409/P4708, MU1440/P4526 and MU1447/P4709. Exact JXE hash matching and checked-in
+Java adapter source **do not** change the vehicle-support classification below;
+this page does not offer a complete validated multi-platform beta installer download.
+See [feature evidence](../status/FEATURE_STATUS.md) and [package status](../packages/README.md).
 
 | Platform | Firmware / baseline | Status | Evidence |
 | --- | --- | --- | --- |
