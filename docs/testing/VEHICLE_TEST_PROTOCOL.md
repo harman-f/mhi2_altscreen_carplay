@@ -40,7 +40,7 @@ MHI2_ER_SKG13_P4526_MU1440
 
 If the hash differs, stop treating the current native hook as compatible.
 
-See `docs/research/MU1440_STOCK_REFERENCE.md`.
+See `docs/research/firmware/MU1440_STOCK_REFERENCE.md`.
 
 ## 2. Capture a stock baseline
 
