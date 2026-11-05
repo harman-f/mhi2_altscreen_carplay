@@ -1,0 +1,10 @@
+# Text that only exists on units with MIBR development installs (separate, per-feature
+# lsd.sh blocks of earlier prototypes). The installer refuses to stack on top of them
+# (plain substring match); such units are migrated manually.
+MIBR P1 BEGIN
+MIBR CPVC R5 BEGIN
+MIBR PARITY-DRIVE BEGIN
+MIBR V3 BROKER BEGIN
+MIBR AUTO-DIRECT BEGIN
+MIBR NAVIGNORE
+MIBR MOST20FPS

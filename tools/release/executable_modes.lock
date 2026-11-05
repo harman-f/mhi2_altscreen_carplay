@@ -9,6 +9,9 @@ deployment/mu1440/install.sh
 deployment/mu1440/status.sh
 deployment/mu1440/uninstall.sh
 installer/lib/migrate-root.ksh
+installer/mibr-install.ksh
+installer/mibr-status.ksh
+installer/mibr-uninstall.ksh
 installer/select-profile.ksh
 modules/broker/runtime/mibr-control/boot-guard.ksh
 modules/broker/runtime/mibr-control/boot.ksh
