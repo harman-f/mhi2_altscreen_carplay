@@ -14,17 +14,17 @@ The P4709 digest is taken from the existing exact JXE corpus matrix. The P4708 d
 
 Each of the three profile directories has exactly the same `hmi/`, `icons/`, `display/`, `input/` and `integration/` groups. Shared CarPlay, Broker, Menu and Navigation code is published once, with one settings registry and one broker. Java adapter repairs and optimization happen in their target profile without forking shared menu/business logic.
 
-Host-side `python3 tools/release/plan_multi_profile_beta.py --self-test` emits the mandatory three-profile release input. **Missing exact original firmware hashes and compiled Java adapter payloads do not exclude the target from the beta source/build plan, but must be supplied before a genuinely working auto-install ZIP for that firmware is distributed.** All three obey the same package integrity, QNX shell, reversible installation and fingerprint-selection requirements. Final physical vehicle acceptance is not a special prerequisite to building beta test packages.
+Host-side `python3 tools/release/plan_multi_profile_beta.py --self-test` emits the mandatory three-profile release input. **All three exact JXE selector fingerprints and API JAR fingerprints are recorded, and the selector is enabled for each listed profile.** The external firmware-specific Java outputs and actual completed ZIP must still be built and validated before a genuinely installable beta is distributed. All three obey the same package-integrity, target-shell, reversible-installation and fingerprint rules. Firmware identification is not vehicle qualification.
 
-This integration does not claim a complete new R3 ZIP or newly measured vehicle tests.
+This source integration does not claim a complete, validated and downloadable R3 ZIP or any new physical-vehicle test. See [feature evidence](../../docs/status/FEATURE_STATUS.md) and [packages](../../docs/packages/README.md).
 
 ## Selector rules (owner decision E3)
 
 - The only automatic selector is the SHA-256 of `/ifs/lsd.jxe`; it must match exactly one profile in `installer/config/profiles.list` (generated from `profile.json`, see `installer/select-profile.ksh`).
 - The firmware/train string (read from the unit EEPROM at `3A0`, 19 bytes, as in `runtime/deployment/session.sh`) is a mandatory plausibility cross-check, not a second selector. Unknown, unreadable, ambiguous or contradictory input means no install write.
-- The API `lsd.jar` hash (`hmi.api_jar_sha256`, for the Java build) is a separate field and is never a selector. It is `null` / `to_confirm` until the owner confirms one value.
-- `install_enabled` is true only for `unit_measured` or `firmware_corpus` evidence. `seat-mu1409-p4708` carries a digest from profile source that is not independently verified, so it is not install-enabled. P4708_1 has no profile and must not be enabled without its own evidence.
-- `seat-mu1447-p4709` reuses the P4708 adapter lineage (`adapter_from`) with image index offset 6; no adapter is built yet (`adapter_status: none`).
+- The API `lsd.jar` hash (`hmi.api_jar_sha256`, for the Java build) is a separate field and is **not** a selector. All three have confirmed input hashes; builds must verify their supplied input against the matching profile.
+- `install_enabled=true` for exactly the three listed profiles based on `unit_measured` or `firmware_corpus` input evidence. **This allows exact profile selection, not installation or physical-vehicle approval.** P4708_1 has no profile and is not implicitly supported.
+- The MU1409 Java adapter source is in `hmi/java`, and MU1447 reuses its lineage (`adapter_from`) with image index offset 6. The `java.adapter_status` field currently still says `none` for the SEAT profiles: this metadata does **not** negate the checked-in source; reconcile metadata with the actual build/qualification evidence rather than claiming a completed J9 build.
 
 ## Known discrepancy: /ifs vs /mnt/app/eso (K8)
 
