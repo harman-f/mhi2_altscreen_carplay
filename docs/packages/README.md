@@ -26,7 +26,7 @@ The ordinary beta package should include all three profiles; a deliberately flag
 1. **SOURCE:** public modules and firmware-profile source available.
 2. **BUILD / HOST:** CI tests and native source builds evaluated by exact revision; external J9 build is separately evidenced.
 3. **PACKAGE:** all required binaries/JARs, manifests, installer and source inventory present; final complete ZIP validator passes.
-4. **UNIT:** target preflight, backup, startup, STO​​CK handback, boot guard, settings/readback, reboot and rollback observed on exact unit.
+4. **UNIT:** target preflight, backup, startup, STOCK handback, boot guard, settings/readback, reboot and rollback observed on exact unit.
 5. **RELEASE:** package published with accurate tested-target and evidence labels. **No source or CI PASS automatically satisfies level 4 or 5.**
 
 When a necessary J9/firmware input is missing, record `MISSING_INPUT` or `incomplete`; do not substitute a Škoda binary for SEAT. [Firmware-profile schema](../architecture/FIRMWARE_PROFILES_AND_CONFIGURATION.md) · [Compatibility](../testing/COMPATIBILITY_MATRIX.md) · [Full features and evidence](../status/FEATURE_STATUS.md).

@@ -72,10 +72,12 @@ def anchors(path: Path, cache: dict) -> set:
         return cache[path]
     result = set()
     used = {}
-    for line in visible_lines(path.read_text(encoding="utf-8")).splitlines():
-        m = HEAD.match(line)
-        if not m:
+    original = path.read_text(encoding="utf-8")
+    for raw, visible in zip(original.splitlines(), visible_lines(original).splitlines()):
+        # Ignore fenced code, but preserve inline-code text in real headings.
+        if not HEAD.match(visible):
             continue
+        m = HEAD.match(raw)
         base = slug(m.group(1))
         count = used.get(base, 0)
         result.add(base if count == 0 else "{}-{}".format(base, count))
@@ -151,11 +153,11 @@ def run_selftest() -> None:
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp).resolve()
         a, b = root / "a.md", root / "b.md"
-        b.write_text("# Example Heading\n## Example Heading\n", encoding="utf-8")
-        a.write_text("[ok](b.md#example-heading) and [second](b.md#example-heading-1)\n",
-                     encoding="utf-8")
+        b.write_text("# Example Heading\n## Example Heading\n### 11.1 `carplay0` firewall\n", encoding="utf-8")
+        a.write_text("[ok](b.md#example-heading) and [second](b.md#example-heading-1)\n"
+                     "[code heading](b.md#111-carplay0-firewall)\n", encoding="utf-8")
         links, failures = check_file(a, root, {})
-        assert links == 2 and not failures, failures
+        assert links == 3 and not failures, failures
         a.write_text("[bad](missing.md)\n[bad](b.md#not-here)\n", encoding="utf-8")
         links, failures = check_file(a, root, {})
         assert links == 2 and len(failures) == 2, failures

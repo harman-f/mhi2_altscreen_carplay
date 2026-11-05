@@ -31,7 +31,7 @@ Start with the information you need. **Current source, released packages and veh
 
 - [Three-profile tester report and acceptance limits](testing/MULTI_PROFILE_TESTING.md)
 - [Stream 111 diagnostics and recovery](testing/STREAM111_FAULT_ISOLATION_2026-10-21.md)
-- [Known issues](findings/KNOWN_ISSUES.md) · [Roadmap](../ROADMAP.md) · [Contributing](../CONTRIBUTING.md) · [Security](../SECURITY.md)
+- [Known issues](findings/KNOWN_ISSUES.md) · [Roadmap](../ROADMAP.md) · [Documentation maintenance policy](DOCUMENTATION_POLICY.md) · [Contributing](../CONTRIBUTING.md) · [Security](../SECURITY.md)
 - [SEAT port background](porting/SEAT_CUPRA_MU1409_COLLABORATION.md) and [key-input capture](porting/SEAT_CUPRA_KEY_INPUT_CAPTURE_HANDOFF.md)
 
 ## Research and historic evidence
