@@ -22,6 +22,7 @@
 #include "bound_process.h"
 #include "alt111_native_gate.h"
 #include "alt111_settings.h"
+#include "mibr_paths.h"
 
 #define DMDT "/eso/bin/apps/dmdt"
 #define IPL_CONFIG "/etc/eso/production"
@@ -36,9 +37,9 @@
 #define SOURCE_HB "/tmp/mibr-carplay111.heartbeat"
 #define OLD_AUTO_PID "/tmp/mibr-direct-auto-supervisor.pid"
 #define OLD_AUTO_TEMP "/tmp/mibr-carplay-autodirect"
-#define OLD_AUTO_PERSIST "/mnt/app/root/mibr-carplay-autodirect"
+#define OLD_AUTO_PERSIST MIBR_CARPLAY_CONFIG_DIR "/mibr-carplay-autodirect"
 #define SETTINGS_TEMP_ROOT "/tmp"
-#define SETTINGS_PERSIST_ROOT "/mnt/app/root"
+#define SETTINGS_PERSIST_ROOT MIBR_CARPLAY_CONFIG_DIR
 #define GATE_STATUS_PATH "/tmp/mibr-alt111-native-gate.status"
 #define BACKEND_STATE_PATH "/tmp/mibr-parity-session.backend"
 #define OWNER_TICKET_PATH "/tmp/mibr-parity-session.ticket"

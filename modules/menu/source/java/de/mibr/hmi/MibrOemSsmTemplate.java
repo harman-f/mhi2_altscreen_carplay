@@ -11,9 +11,9 @@ import de.vw.mib.widgets.models.ViewModel;
 import de.vw.mib.widgets.models.WidgetModel;
 
 /**
- * Non-mutating exact-MU1440 stock setup template discovery.
- * Source: retained skin1/skin2 Ssm_5458.java: getName=SMI_SETUP_MAIN,
- * internal view id 982, root targetId 24786208, SelectDevice (PLAIN),
+ * Non-mutating exact-firmware stock setup template discovery.
+ * Source: retained skin Ssm_5458.java: getName=SMI_SETUP_MAIN,
+ * internal view id from MibrOemProfile (982 on MU1440), root targetId 24786208, SelectDevice (PLAIN),
  * ConnectionType (VALUE/dropdown) and ExternalApps (CHECK) masters. The CHECK
  * row is the stock checkbox row of the same view (image arrays 147/686/1365,
  * ImageGlowContainer); no state images are grafted from another view.
@@ -25,7 +25,8 @@ import de.vw.mib.widgets.models.WidgetModel;
  */
 public final class MibrOemSsmTemplate {
     public static final int ROOT_TARGET_ID=24786208;
-    public static final int INTERNAL_VIEW_ID=982;
+    /** Internal view id of the stock setup page; the value comes from the bound profile. */
+    public static int internalViewId() { return MibrOemProfiles.current().internalViewId(); }
     public static final String VIEW_NAME="SMI_SETUP_MAIN";
     public static final String ROW_PLAIN="SelectDevice";
     public static final String ROW_VALUE="ConnectionType";

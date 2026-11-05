@@ -1,9 +1,10 @@
 #!/bin/ksh
 # SPDX-License-Identifier: GPL-3.0-or-later
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 runtime_init || { echo "AUTO_DIRECT_STATUS=FAIL_RUNTIME"; exit 3; }
 
-ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
+ENABLED=$MIBR_ROOT/config/features/mibr-carplay-autodirect.enabled
 SUPPID=/tmp/mibr-direct-auto-supervisor.pid
 WDPID=/tmp/mibr-direct-auto-watchdog.pid
 BRIDGEPID=/tmp/mibr-direct-auto-bridge.pid

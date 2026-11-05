@@ -191,7 +191,7 @@ def load_inputs(registry_path, menu_path):
     digest = hashlib.sha256(raw).hexdigest()
     schema = json.loads(raw)
     settings = schema.get("settings")
-    if (schema.get("schema") != 2 or not isinstance(settings, list) or
+    if (schema.get("schema") != 3 or not isinstance(settings, list) or
             len(settings) != 48 or
             len({s.get("key") for s in settings if isinstance(s, dict)}) != 48):
         raise ValueError("REGISTRY_SCHEMA_OR_COUNT_CHANGED")

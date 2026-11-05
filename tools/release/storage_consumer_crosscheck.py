@@ -31,7 +31,8 @@ INPUTS = (C, J, PLATFORM, JM, LOADER, SETTINGS, *CLIENTS, GEN2, PARITY, ENABLE, 
 PATTERN = re.compile(
     r'new\s+MibrDurableSwitch\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*'
     r'"([^"]+)"\s*,\s*"([^"]+)"', re.S)
-PAIR = re.compile(r'\{\s*"/tmp"\s*,\s*"/mnt/app/root"\s*\}')
+PAIR = re.compile(r'\{\s*"/tmp"\s*,\s*MIBR_CARPLAY_CONFIG_DIR\s*\}')
+CARPLAY_ROOT = "/mnt/app/root/mibr/config/carplay"  # MIBR_CARPLAY_CONFIG_DIR of mibr_paths.h
 
 
 class ContractError(ValueError):
@@ -66,26 +67,28 @@ def inspect(source, inventory):
         key = item["key"]
         check(key in by_id, "missing Java switch: " + key)
         path, magic, verb, capability = by_id[key]
-        check(path == item["current_path"], "C/Java path mismatch: " + key)
+        check(path == item["declared_path"], "C/Java path mismatch: " + key)
         check(magic == item["magic"], "C/Java magic mismatch: " + key)
         check(verb + "_GET" == item["get_operation"]
               and verb + "_SET" == item["set_operation"],
               "C/Java operations mismatch: " + key)
         rows.append({
-            "capability": capability, "path": path, "magic": magic,
+            "capability": capability, "path": path, "unit_path": item["current_path"],
+            "magic": magic,
             "observed_broker_writer_api": "mibr_switch_set()",
             "observed_java_reader": "MibrDurableSwitch.persistedValue()",
             "other_consumers_exhaustively_audited": False,
         })
     platform = inventory["broker"]["platform_override"]
-    check(all(platform in source[p] for p in (C, PLATFORM, GEN2)),
+    macro = 'MIBR_CONFIG_DIR "/platform/defaults.conf"'
+    check(macro in source[C] and macro in source[GEN2] and platform in source[PLATFORM],
           "platform defaults consumer drift")
-    menu = "/mnt/app/root/altscreen-u2/config/mibr-menu.conf"
+    menu = "/mnt/app/root/mibr/config/menu/layout.conf"
     check('STORED="' + menu + '"' in source[JM], "Java menu path drift")
     loader = source[LOADER]
-    check("MIBR_MENU_DIR:-/mnt/app/root/altscreen-u2/config" in loader
-          and '"$DIR/mibr-menu.conf"' in loader
-          and 'STAGE="$DIR/mibr-menu.conf.new.$$"' in loader,
+    check("MIBR_MENU_DIR:-$MIBR_ROOT/config/menu" in loader
+          and '"$DIR/layout.conf"' in loader
+          and 'STAGE="$DIR/layout.conf.new.$$"' in loader,
           "shell menu loader path drift")
     cp = source[SETTINGS]
     check(all(s in cp for s in (
@@ -95,9 +98,9 @@ def inspect(source, inventory):
     )), "layered CarPlay settings or hard stop drift")
     check(all(PAIR.search(source[p]) for p in CLIENTS),
           "broker/settings CLI CarPlay roots drift")
-    check('#define MIBR_CFG_PERSIST_ROOT "/mnt/app/root"' in source[GEN2],
+    check('#define MIBR_CFG_PERSIST_ROOT MIBR_CARPLAY_CONFIG_DIR' in source[GEN2],
           "GEN2 CarPlay root drift")
-    check('#define SETTINGS_PERSIST_ROOT "/mnt/app/root"' in source[PARITY],
+    check('#define SETTINGS_PERSIST_ROOT MIBR_CARPLAY_CONFIG_DIR' in source[PARITY],
           "parity CarPlay root drift")
     check('echo 1 > "$ENABLE"' in source[ENABLE]
           and 'echo 0 > "$ENABLE"' in source[DISABLE],
@@ -114,7 +117,7 @@ def inspect(source, inventory):
              "all_readers_verified": False}
         ],
         "carplay_grouped_store": {
-            "layered_roots": ["/tmp", "/mnt/app/root"],
+            "layered_roots": ["/tmp", CARPLAY_ROOT],
             "path_joiner": SETTINGS,
             "selected_consumer_sources": [*CLIENTS, GEN2, PARITY],
             "persistent_mutation": "POLICY_BLOCKED",
@@ -137,10 +140,10 @@ def self_test(files, inventory):
     result = inspect(files, inventory)
     assert result["counts"]["matched_broker_switches"] == 13
     for file, old, new in (
-        (J, "/mnt/app/root/altscreen-u2/config/mibr-carplay-nav.conf",
-         "/mnt/app/root/altscreen-u2/config/wrong-nav.conf"),
-        (JM, "/mnt/app/root/altscreen-u2/config/mibr-menu.conf",
-         "/mnt/app/root/altscreen-u2/config/wrong-menu.conf"),
+        (J, "/mnt/app/root/mibr/config/navigation/carplay-nav.conf",
+         "/mnt/app/root/mibr/config/navigation/wrong-nav.conf"),
+        (JM, "/mnt/app/root/mibr/config/menu/layout.conf",
+         "/mnt/app/root/mibr/config/menu/wrong-menu.conf"),
         (SETTINGS, "POLICY_BLOCKED persistent_backup_powerloss_gate", "REMOVED"),
     ):
         bad = dict(files)

@@ -8,6 +8,11 @@ It provides a compact developer deployment path for the exact vehicle-proven ref
 MHI2_ER_SKG13_P4526_MU1440
 ```
 
+The release-readiness CI workflow builds only a legacy SD-root ZIP
+(`..._LEGACY_CI_ONLY.zip`) for compatibility checks; it is never uploaded, so
+no ZIP can be downloaded from CI. The local staging path is
+`tools/prepare_mu1440_sd.sh`.
+
 Prerequisite: working SSH/developer access and the ability to recover the unit. The documentation does
 not explain how to obtain shell access.
 

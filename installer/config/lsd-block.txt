@@ -1,0 +1,10 @@
+# Installed by the MIB Runtime installer. Remove with installer/mibr-uninstall.ksh.
+MIBR_LOAD=1
+[ -r /mnt/app/root/mibr/scripts/boot-guard.ksh ] && { /bin/ksh /mnt/app/root/mibr/scripts/boot-guard.ksh check >/tmp/mibr-boot-guard.log 2>&1 || MIBR_LOAD=0; }
+[ -r /mnt/app/root/mibr/state/boot/disabled ] && MIBR_LOAD=0
+if [ "$MIBR_LOAD" = 1 ]; then
+VMOPTIONS="$VMOPTIONS -Dmibr.control.v3.devtest=1 -Dmibr.control.v3.port=28743 -Dmibr.control.v3.secretFile=/tmp/mibr-v3-hmi.secret"
+BOOTCLASSPATH="$BOOTCLASSPATH -Xbootclasspath/p:$BASE_DIR/lsd/jars/MIBR-NavIgnore.jar"
+BOOTCLASSPATH="$BOOTCLASSPATH -Xbootclasspath/p:$BASE_DIR/lsd/jars/MIBR-CarPlay.jar:$BASE_DIR/lsd/jars/MIBR-Most20FPS.jar:$BASE_DIR/lsd/jars/MIBR-Extender-P1-BootProbe.jar -DextendedStartupSPI.class=de.mibr.extender.MibrStartupHook"
+[ -r /mnt/app/root/mibr/scripts/boot.ksh ] && /bin/ksh /mnt/app/root/mibr/scripts/boot.ksh >/tmp/mibr-boot.log 2>&1
+fi

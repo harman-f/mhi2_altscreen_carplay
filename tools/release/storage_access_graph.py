@@ -110,7 +110,7 @@ def build(root=ROOT):
         entry["reported_lexical_references"] = record["lexical_locations"]
         if is_broker:
             pair = next((x for x in checked["broker_c_java_consistency"]
-                         if x["path"] == path), None)
+                         if x["unit_path"] == path), None)
             require(pair is not None, "C/Java pair missing for " + path)
             require(pair["magic"] == record["magic_and_format_owner"],
                     "C/Java broker format mismatch")
@@ -170,7 +170,8 @@ def build(root=ROOT):
     dynamic = []
     for filename in NAV_SCRIPTS:
         source = (root / filename).read_text(encoding="utf-8")
-        require(re.search(r"^ROOT=/mnt/app/root$", source, re.M) is not None,
+        require(re.search(r"^ROOT=\$MIBR_ROOT/config/(navigation|cockpit)$", source, re.M)
+                is not None,
                 "navigation persistent ROOT changed: " + filename)
         matches = NAV_VARIABLE.findall(source)
         require(matches, "navigation ROOT filename consumers disappeared: " + filename)

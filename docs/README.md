@@ -44,7 +44,7 @@ The [MU1440 R57 source/build baseline](build/MU1440_R57_SOURCE.md) is the curren
 - [Auto-Direct reference runtime](architecture/AUTO_DIRECT_RUNTIME.md) · [Advanced developer switches](architecture/ADVANCED_RUNTIME_SWITCHES.md)
 - [Navigation and SafeArea](architecture/NAVIGATION_COMPOSITION_AND_SAFEAREA.md) · [View-state overview](research/VC_VIEWAREA_STATE.md)
 - [Optional real vehicle-data feature](architecture/OPTIONAL_VEHICLE_DATA_FEATURE_OVERVIEW.md)
-- [Public MIBR/3 source-only protocol and owner mailbox](../src/experimental/mibr3/README.md)
+- [Public MIBR/3 source-only protocol and owner mailbox](../modules/broker/source/mibr-control/README.md)
 
 ## Vehicle evidence and testing
 

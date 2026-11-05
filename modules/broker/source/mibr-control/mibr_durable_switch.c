@@ -3,6 +3,7 @@
  * Classic111 registry entry. A missing file means the default. A new one is one row in mibr_switch_defs.
  */
 #define _POSIX_C_SOURCE 200809L
+#include "../../../carplay/source/alt111-settings/include/mibr_paths.h"
 #include "mibr_durable_switch.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -13,36 +14,35 @@
 #include <unistd.h>
 #define SWITCH_CAP 96u
 #define PATH_CAP 512u
-#define CONFIG "/mnt/app/root/altscreen-u2/config/"
 const struct mibr_switch_def mibr_switch_defs[MIBR_SWITCH_COUNT]={
-    {"MIBR_CARPLAY_NAV/1","on|off","off",CONFIG "mibr-carplay-nav.conf","CARPLAY_NAV_GET","CARPLAY_NAV_SET","carplay_nav",
+    {"MIBR_CARPLAY_NAV/1","on|off","off",MIBR_CONFIG_DIR "/navigation/carplay-nav.conf","CARPLAY_NAV_GET","CARPLAY_NAV_SET","carplay_nav",
      "MIBR_V3_HOST_CARPLAY_NAV_PATH","/tmp/mibr-carplay-nav-readonly.conf"},
-    {"MIBR_SD_LOG/1","on|off","off",CONFIG "mibr-sd-log.conf","SD_LOG_GET","SD_LOG_SET","sd_log",
+    {"MIBR_SD_LOG/1","on|off","off",MIBR_CONFIG_DIR "/features/sd-log.conf","SD_LOG_GET","SD_LOG_SET","sd_log",
      "MIBR_V3_HOST_SD_LOG_PATH","/tmp/mibr-sd-log-readonly.conf"},
-    {"MIBR_NAV_LINE/1","dist|street|off","dist",CONFIG "mibr-nav-line.conf","NAV_LINE_GET","NAV_LINE_SET","nav_line",
+    {"MIBR_NAV_LINE/1","dist|street|off","dist",MIBR_CONFIG_DIR "/navigation/nav-line.conf","NAV_LINE_GET","NAV_LINE_SET","nav_line",
      "MIBR_V3_HOST_NAV_LINE_PATH","/tmp/mibr-nav-line-readonly.conf"},
-    {"MIBR_NAV_NIGHT/1","auto|light|dark","auto",CONFIG "mibr-nav-night.conf","NAV_NIGHT_GET","NAV_NIGHT_SET","nav_night",
+    {"MIBR_NAV_NIGHT/1","auto|light|dark","auto",MIBR_CONFIG_DIR "/navigation/nav-night.conf","NAV_NIGHT_GET","NAV_NIGHT_SET","nav_night",
      "MIBR_V3_HOST_NAV_NIGHT_PATH","/tmp/mibr-nav-night-readonly.conf"},
-    {"MIBR_NAV_SOURCE/1","auto|stock|phone","auto",CONFIG "mibr-nav-source.conf","NAV_SOURCE_GET","NAV_SOURCE_SET","nav_source",
+    {"MIBR_NAV_SOURCE/1","auto|stock|phone","auto",MIBR_CONFIG_DIR "/navigation/nav-source.conf","NAV_SOURCE_GET","NAV_SOURCE_SET","nav_source",
      "MIBR_V3_HOST_NAV_SOURCE_PATH","/tmp/mibr-nav-source-readonly.conf"},
-    {"MIBR_NAV_DISPLAY/1","side|top|both","side",CONFIG "mibr-nav-display.conf","NAV_DISPLAY_GET","NAV_DISPLAY_SET","nav_display",
+    {"MIBR_NAV_DISPLAY/1","side|top|both","side",MIBR_CONFIG_DIR "/navigation/nav-display.conf","NAV_DISPLAY_GET","NAV_DISPLAY_SET","nav_display",
      "MIBR_V3_HOST_NAV_DISPLAY_PATH","/tmp/mibr-nav-display-readonly.conf"},
-    {"MIBR_NAV_BOTTOM/1","eta|rtt","eta",CONFIG "mibr-nav-bottom.conf","NAV_BOTTOM_GET","NAV_BOTTOM_SET","nav_bottom",
+    {"MIBR_NAV_BOTTOM/1","eta|rtt","eta",MIBR_CONFIG_DIR "/navigation/nav-bottom.conf","NAV_BOTTOM_GET","NAV_BOTTOM_SET","nav_bottom",
      "MIBR_V3_HOST_NAV_BOTTOM_PATH","/tmp/mibr-nav-bottom-readonly.conf"},
-    {"MIBR_NAV_SIDE/1","on|off","on",CONFIG "mibr-nav-side.conf","NAV_SIDE_GET","NAV_SIDE_SET","nav_side",
+    {"MIBR_NAV_SIDE/1","on|off","on",MIBR_CONFIG_DIR "/navigation/nav-side.conf","NAV_SIDE_GET","NAV_SIDE_SET","nav_side",
      "MIBR_V3_HOST_NAV_SIDE_PATH","/tmp/mibr-nav-side-readonly.conf"},
-    {"MIBR_NAV_LANES/1","on|off","on",CONFIG "mibr-nav-lanes.conf","NAV_LANES_GET","NAV_LANES_SET","nav_lanes",
+    {"MIBR_NAV_LANES/1","on|off","on",MIBR_CONFIG_DIR "/navigation/nav-lanes.conf","NAV_LANES_GET","NAV_LANES_SET","nav_lanes",
      "MIBR_V3_HOST_NAV_LANES_PATH","/tmp/mibr-nav-lanes-readonly.conf"},
-    {"MIBR_SAFE_VOLL/1",NULL,"0,58,1010,248",CONFIG "mibr-safe-voll.conf","SAFE_VOLL_GET","SAFE_VOLL_SET","safe_voll",
+    {"MIBR_SAFE_VOLL/1",NULL,"0,58,1010,248",MIBR_CONFIG_DIR "/cockpit/safe-voll.conf","SAFE_VOLL_GET","SAFE_VOLL_SET","safe_voll",
      "MIBR_V3_HOST_SAFE_VOLL_PATH","/tmp/mibr-safe-voll-readonly.conf"},
-    {"MIBR_SAFE_WIDE/1",NULL,"200,58,590,248",CONFIG "mibr-safe-wide.conf","SAFE_WIDE_GET","SAFE_WIDE_SET","safe_wide",
+    {"MIBR_SAFE_WIDE/1",NULL,"200,58,590,248",MIBR_CONFIG_DIR "/cockpit/safe-wide.conf","SAFE_WIDE_GET","SAFE_WIDE_SET","safe_wide",
      "MIBR_V3_HOST_SAFE_WIDE_PATH","/tmp/mibr-safe-wide-readonly.conf"},
-    {"MIBR_SAFE_CENTER/1",NULL,"370,58,256,248",CONFIG "mibr-safe-center.conf","SAFE_CENTER_GET","SAFE_CENTER_SET","safe_center",
+    {"MIBR_SAFE_CENTER/1",NULL,"370,58,256,248",MIBR_CONFIG_DIR "/cockpit/safe-center.conf","SAFE_CENTER_GET","SAFE_CENTER_SET","safe_center",
      "MIBR_V3_HOST_SAFE_CENTER_PATH","/tmp/mibr-safe-center-readonly.conf"},
-    {"MIBR_EXPERT_MODE/1","on|off","off",CONFIG "mibr-expert-mode.conf","EXPERT_MODE_GET","EXPERT_MODE_SET","expert_mode",
+    {"MIBR_EXPERT_MODE/1","on|off","off",MIBR_CONFIG_DIR "/features/expert-mode.conf","EXPERT_MODE_GET","EXPERT_MODE_SET","expert_mode",
      "MIBR_V3_HOST_EXPERT_MODE_PATH","/tmp/mibr-expert-mode-readonly.conf"},
 };
-const char *mibr_switch_platform_path="/mnt/app/root/altscreen-u2/config/mibr-platform-defaults.conf";
+const char *mibr_switch_platform_path=MIBR_CONFIG_DIR "/platform/defaults.conf";
 const struct mibr_switch_def *mibr_switch_for_op(const char *op,int *set){
     unsigned i;
     for(i=0;i<MIBR_SWITCH_COUNT;i++){

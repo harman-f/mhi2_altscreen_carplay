@@ -22,7 +22,7 @@ import storage_access_graph
 ROOT = Path(__file__).resolve().parents[2]
 NAV = "modules/navigation/runtime/gen2_nav_config.sh"
 SAFE = "modules/navigation/runtime/gen2_safearea.sh"
-ROOT_PATH = "/mnt/app/root"
+ROOT_PATH = "/mnt/app/root"  # unit (legacy) location the rows describe; scripts use $MIBR_ROOT/config/<group>
 ASSIGNMENT = re.compile(r"^([A-Z][A-Z0-9_]*)=\$ROOT/([A-Za-z0-9_.-]+)$", re.M)
 
 # One row per actual root+basename from these scripts. Tokens below are
@@ -135,7 +135,7 @@ def build(sources, graph):
     source_hash = {}
     for file in (NAV, SAFE):
         text = sources[file]
-        require(re.search(r"^ROOT=/mnt/app/root$", text, re.M) is not None,
+        require(re.search(r"^ROOT=\$MIBR_ROOT/config/(navigation|cockpit)$", text, re.M) is not None,
                 "persistent root changed: " + file)
         found = ASSIGNMENT.findall(text)
         require(len(found) == (7 if file == NAV else 1),

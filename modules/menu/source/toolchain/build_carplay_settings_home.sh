@@ -7,7 +7,17 @@ set -eu
 test -x "$J9_HOME/bin/javac" && test -x "$J9_HOME/bin/jar" || { echo J9_SDK_MISSING >&2; exit 21; }
 test -s "$LSD_JAR" || { echo EXACT_MU1440_LSD_MISSING >&2; exit 22; }
 test -f "$SRC/generated-src/de/vw/mib/cio/internal/Activator.java" || { echo CIO_SOURCE_NOT_PREPARED >&2; exit 23; }
-mkdir -p "$OUT/classes"
+mkdir -p "$OUT/classes" "$OUT/profile-binding"
+# Fixed default (Skoda MU1440) binding; generate_profile_binding.py is not available here.
+cat > "$OUT/profile-binding/MibrProfileBinding.java" <<'BINDING'
+package de.mibr.hmi;
+final class MibrProfileBinding {
+    static final String PROFILE_ID = "skoda-mu1440-p4526";
+    static final String ADAPTER_CLASS = "de.mibr.hmi.MibrSkodaMu1440Profile";
+    private MibrProfileBinding() { }
+    static MibrOemProfile create() { return new de.mibr.hmi.MibrSkodaMu1440Profile(); }
+}
+BINDING
 "$J9_HOME/bin/javac" -encoding UTF-8 -source 1.2 -target 1.2 -cp "$LSD_JAR" -d "$OUT/classes" \
  "$SRC/java/de/mibr/hmi/MibrSettingsCatalog.java" \
  "$SRC/java/de/mibr/hmi/MibrMenuDefinition.java" \
@@ -53,6 +63,11 @@ mkdir -p "$OUT/classes"
  "$SRC/java/de/mibr/hmi/MibrMenuKeyBack.java" \
  "$SRC/java/de/mibr/hmi/MibrHomeAnimationMirror.java" \
  "$SRC/java/de/mibr/hmi/MibrOemTileLongPress.java" \
+ "$SRC/java/de/mibr/hmi/MibrOemProfile.java" \
+ "$SRC/java/de/mibr/hmi/MibrTileRenderer.java" \
+ "$SRC/java/de/mibr/hmi/MibrOemProfiles.java" \
+ "$SRC/java/de/mibr/hmi/MibrSkodaMu1440Profile.java" \
+ "$OUT/profile-binding/MibrProfileBinding.java" \
  "$SRC/java/de/mibr/hmi/MibrOwnedSsmPageHost.java" \
  "$SRC/java/de/mibr/hmi/MibrSsmSourceBinding.java" \
  "$SRC/java/de/mibr/hmi/MibrIsolatedSsmServices.java" \

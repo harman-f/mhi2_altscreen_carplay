@@ -14,13 +14,13 @@ import org.dsi.ifc.global.CarBCSpeed;
 
 /**
  * HMI-side vehicle speed source for the CarPlay vehicle-data module.
- * Default OFF: nothing is attached unless /mnt/app/root/altscreen-u2/config/vdata.mode says shadow or send.
+ * Default OFF: nothing is attached unless /mnt/app/root/mibr/config/vehicle/vdata.mode says shadow or send.
  * It only READS the stock DSI speed through the vendored R1 adapter and writes the last genuine events as
  * MVS1 records into a small ring file that the native module (inside dio_manager) reads. It never
  * touches OEM state, never blocks an OEM thread and swallows every failure.
  */
 public final class MibrVdataBridge {
-    private static final String MODE = "/mnt/app/root/altscreen-u2/config/vdata.mode";
+    private static final String MODE = "/mnt/app/root/mibr/config/vehicle/vdata.mode";
     private static final String RING = "/tmp/mibr-vdata-speed.ring";
     private static final String STATUS = "/tmp/mibr-vdata-source.status";
     private static final int RING_RECORDS = 8;

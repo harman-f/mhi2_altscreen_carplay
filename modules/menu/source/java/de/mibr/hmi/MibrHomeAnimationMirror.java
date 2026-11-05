@@ -81,7 +81,13 @@ final class MibrHomeAnimationMirror extends AnimationAdapters {
         int[][] data = (int[][]) field(AnimationAdapters.class, "data", int[][].class).get(stock);
         WidgetAnimator animator = (WidgetAnimator)
             field(AnimationAdapters.class, "widgetAnimator", WidgetAnimator.class).get(stock);
-        if (data == null || animator == null || data.length != TABLE_ROWS) return null;
+        if (data == null || animator == null) return null;
+        // Profiles whose skins animate the container instead of per-tile clone
+        // chains accept their exact table with an empty (pass-through) mirror.
+        int[][] passThrough = MibrOemProfiles.current().passThroughAnimationTable();
+        if (passThrough != null && sameTable(data, passThrough))
+            return new MibrHomeAnimationMirror(stock, animator, new int[0], new int[0][], targets);
+        if (data.length != TABLE_ROWS) return null;
         int[] ids = new int[DONORS.length * WHATS.length];
         int[][] slot = new int[ids.length][];
         int found = 0;
@@ -95,6 +101,16 @@ final class MibrHomeAnimationMirror extends AnimationAdapters {
         }
         if (found != ids.length) return null;
         return new MibrHomeAnimationMirror(stock, animator, ids, slot, targets);
+    }
+
+    private static boolean sameTable(int[][] actual, int[][] expected) {
+        if (actual.length != expected.length) return false;
+        for (int r = 0; r < expected.length; r++) {
+            if (actual[r] == null || actual[r].length != expected[r].length) return false;
+            for (int c = 0; c < expected[r].length; c++)
+                if (actual[r][c] != expected[r][c]) return false;
+        }
+        return true;
     }
 
     /** Puts the original adapter back if this mirror is still installed. */

@@ -15,12 +15,13 @@ export LD_LIBRARY_PATH=/lib:/mnt/app/root/lib-target:/eso/lib:/mnt/app/usr/lib:/
 unset LD_PRELOAD
 export GEM=1
 
-BASE=/mnt/app/root/altscreen-u2
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+BASE=$MIBR_ROOT
 RUNNER=$BASE/bin/parity-session
 BRIDGE=$BASE/bin/direct-ts-parity
 HELPER=$BASE/bin/alt111-settings
 PROFILE_READY=/tmp/mibr-cpvc-profile-ready
-ENABLE=/mnt/app/root/mibr-parity-drive.enabled
+ENABLE=$MIBR_ROOT/config/features/mibr-parity-drive.enabled
 STATE=/tmp/mibr-parity-drive.state
 HB=/tmp/mibr-parity-drive.heartbeat
 PIDFILE=/tmp/mibr-parity-drive-supervisor.pid
@@ -35,9 +36,9 @@ PARITY_STATUS=/tmp/mibr-parity-ts.status
 GATE_STATUS=/tmp/mibr-alt111-native-gate.status
 
 STATUS_CFG_TEMP=/tmp/mibr-parity-status-enabled
-STATUS_CFG_PERSIST=/mnt/app/root/mibr-parity-status-enabled
+STATUS_CFG_PERSIST=$MIBR_ROOT/config/features/mibr-parity-status-enabled
 STATS_CFG_TEMP=/tmp/mibr-parity-statistics-enabled
-STATS_CFG_PERSIST=/mnt/app/root/mibr-parity-statistics-enabled
+STATS_CFG_PERSIST=$MIBR_ROOT/config/features/mibr-parity-statistics-enabled
 
 CARD=/net/mmx/fs/sda0
 LOGROOT=/net/mmx/fs/sda0/esd/carplay-test/logs/parity-drive
@@ -117,6 +118,44 @@ cfg_source(){
   [ -r "$T" ] && { echo temp; return; }
   [ -r "$P" ] && { echo persistent; return; }
   echo default
+}
+
+# SD diagnostics only while the menu switch "Logs auf SD-Karte" is on (broker-owned
+# durable file, missing = off). Off: the SD card is never remounted writable and no per-second
+# sampling runs. On: bounded per session and in the number of kept sessions.
+SD_SWITCH=$MIBR_ROOT/config/features/sd-log.conf
+SD_KEEP_SESSIONS=30
+SD_MAX_SAMPLES=1800
+SD_MASTER_MAX=1048576
+sd_wanted(){
+  [ -r "$SD_SWITCH" ] || return 1
+  while IFS= read -r L; do [ "$L" = "value=on" ] && return 0; done < "$SD_SWITCH"
+  return 1
+}
+sd_enable_logs(){
+  sd_wanted || return 1
+  sd_make_rw || { sd_make_ro >/dev/null 2>&1; return 1; }
+  SD_LOG=1
+  MASTER_LOG="$LOGROOT/drive-supervisor.log"
+  LATEST_STATUS="$LOGROOT/current.status"
+  LATEST_STATS="$LOGROOT/current.statistics"
+  return 0
+}
+sd_disable_logs(){
+  SD_LOG=0
+  MASTER_LOG=/dev/null
+  LATEST_STATUS=/dev/null
+  LATEST_STATS=/dev/null
+  sd_make_ro >/dev/null 2>&1 || true
+}
+sd_prune(){
+  # keep the newest SD_KEEP_SESSIONS session folders and one rotated master log
+  set -- $(ls -d "$LOGROOT"/*-session-* 2>/dev/null)
+  while [ "$#" -gt "$SD_KEEP_SESSIONS" ]; do rm -rf "$1" 2>/dev/null || true; shift; done
+  if [ -f "$MASTER_LOG" ]; then
+    SZ=$(ls -l "$MASTER_LOG" 2>/dev/null | awk '{print $5}')
+    [ -n "$SZ" ] && [ "$SZ" -gt "$SD_MASTER_MAX" ] && mv -f "$MASTER_LOG" "$MASTER_LOG.1" 2>/dev/null || true
+  fi
 }
 
 load_diagnostics(){
@@ -257,6 +296,7 @@ evidence_loop(){
     fi
 
     N=$((N+1))
+    [ "$N" -gt "$SD_MAX_SAMPLES" ] && break
 
     if [ "$STATUS_ON" = "1" ]; then
       append_raw_status "$SNAPSHOTS" "$N"
@@ -361,7 +401,51 @@ evidence_loop(){
   done
 }
 
+# "Logs auf SD-Karte" also mirrors the RAM logs. Every 30 s each changed /tmp log is copied
+# into one folder per boot on the card, so they survive switching the car off (at most the last
+# 30 s are missing). The RAM logs themselves are always written; only this copy needs the card,
+# and nothing else waits for it. At most SD_MIRROR_KEEP boot folders, files above 4 MB skipped.
+SD_MIRROR_ROOT=$CARD/esd/carplay-test/logs/boot
+SD_MIRROR_KEEP=20
+SD_MIRROR_MAX=4194304
+MPID=""
+fsize(){ set -- $(ls -l "$1" 2>/dev/null); echo "${5:-}"; }
+log_mirror(){
+  trap - 0 1 2 15
+  DIR=
+  while :; do
+    if sd_wanted && [ -d "$CARD" ]; then
+      if [ -z "$DIR" ] && sd_make_rw; then
+        set -- $(ls -d "$SD_MIRROR_ROOT"/*-boot 2>/dev/null)
+        while [ "$#" -ge "$SD_MIRROR_KEEP" ]; do rm -rf "$1" 2>/dev/null || true; shift; done
+        DIR="$SD_MIRROR_ROOT/$(stamp)-$SELF_PID-boot"
+        mkdir -p "$DIR" 2>/dev/null || DIR=
+      fi
+      if [ -n "$DIR" ]; then
+        for f in /tmp/mibr*.log /tmp/altscreen111.log /tmp/iap2.log /tmp/mibr*.status /tmp/mibr-rgi.state; do
+          [ -f "$f" ] || continue
+          b=${f##*/}
+          n=$(fsize "$f")
+          [ -n "$n" ] && [ "$n" -le "$SD_MIRROR_MAX" ] || continue
+          [ "$n" = "$(fsize "$DIR/$b")" ] && continue
+          if ! { cp "$f" "$DIR/$b.tmp" 2>/dev/null && mv -f "$DIR/$b.tmp" "$DIR/$b" 2>/dev/null; }; then
+            DIR=   # card gone or full: start a fresh folder once it is back
+            break
+          fi
+        done
+        sync 2>/dev/null || true
+      fi
+    else
+      # switched off (or card gone): give the card back read-only once
+      [ "$SD_RW" -eq 1 ] && sd_make_ro >/dev/null 2>&1
+      DIR=
+    fi
+    sleep 30
+  done
+}
+
 cleanup(){
+  [ -z "$MPID" ] || { kill -TERM "$MPID" 2>/dev/null; wait "$MPID" 2>/dev/null; } || true
   [ "$TIMING_ENABLE_OWNED" -eq 0 ] || rm -f "$SOURCE_TIMING_ENABLE" 2>/dev/null || true
   [ "$TIMING_INTERVAL_OWNED" -eq 0 ] || rm -f "$SOURCE_TIMING_INTERVAL" 2>/dev/null || true
   rm -f "$HB" "$PIDFILE" 2>/dev/null || true
@@ -389,16 +473,12 @@ echo "$SELF_PID" > "$PIDFILE" 2>/dev/null || exit 4
 MASTER_LOG=/dev/null
 LATEST_STATUS=/dev/null
 LATEST_STATS=/dev/null
-if sd_make_rw; then
-  SD_LOG=1
-  MASTER_LOG="$LOGROOT/drive-supervisor.log"
-  LATEST_STATUS="$LOGROOT/current.status"
-  LATEST_STATS="$LOGROOT/current.statistics"
-else
+if ! sd_enable_logs; then
   SD_LOG=0
-  sd_make_ro >/dev/null 2>&1 || true
 fi
 echo "SUPERVISOR_START pid=$SELF_PID sd_log=$SD_LOG" >> "$MASTER_LOG" 2>/dev/null || true
+log_mirror &
+MPID=$!
 
 publish waiting_stream111
 
@@ -456,6 +536,11 @@ while enabled; do
     continue
   fi
 
+  # follow the menu switch at every session start
+  if [ "$SD_LOG" -eq 1 ] && ! sd_wanted; then sd_disable_logs
+  elif [ "$SD_LOG" -ne 1 ] && sd_wanted; then sd_enable_logs || true
+  fi
+  [ "$SD_LOG" -eq 1 ] && sd_prune
   load_diagnostics
   if [ "$SD_LOG" -ne 1 ]; then STATUS_ON=0; STATS_ON=0; fi
   configure_timing
@@ -545,6 +630,9 @@ while enabled; do
       if [ "$OWN_RETRY" -le "$OWN_RETRY_MAX" ]; then
         WAIT_NEW_STREAM=0
         OBSERVED_DISCONNECT=0
+        # The retry runs on the same stream generation, like a resume or reopen: request the
+        # explicit re-show so the cockpit does not keep the stock initialisation picture.
+        FASTSHOW=1
         publish retry_ownership_unproven
         echo "RETRY_OWNERSHIP_UNPROVEN try=$OWN_RETRY" >> "$MASTER_LOG" 2>/dev/null || true
         sleep "$OWN_RETRY_DELAY"
