@@ -32,6 +32,12 @@ ACTIVE = (
     "docs/architecture/UNIT_STORAGE_AND_NAMING_CONTRACT.md",
     "docs/build/PACKAGE_LAYOUT.md", "modules/profiles/README.md",
     "release/CURRENT.md",
+    "docs/AGENTS.md", "docs/research/AGENTS.md", "docs/research/README.md",
+    "docs/research/carplay/README.md", "docs/research/media/README.md",
+    "docs/research/firmware/README.md", "docs/research/hardware/README.md",
+    "docs/research/interface/README.md", "docs/research/archive/README.md",
+    "docs/research/keypanel/README.md",
+    "docs/research/mhi2-native-wireless-2026-10/README.md",
 )
 LINKS = (
     re.compile(r'!?\[[^\]\n]*\]\(\s*(<[^>]+>|[^\s)]+)(?:\s+["' + "'" + r'][^"' + "'" + r']*["' + "'" + r'])?\s*\)'),
@@ -122,6 +128,46 @@ def tracked_markdown(root: Path) -> list:
     names = result.stdout.decode("utf-8").split("\0")
     return [root / name for name in names if name.endswith((".md", ".markdown"))]
 
+
+RESEARCH_TOPICS = (
+    "carplay", "media", "firmware", "hardware", "interface", "archive",
+    "keypanel", "mhi2-native-wireless-2026-10",
+)
+
+def check_research_navigation(root: Path) -> list:
+    """Keep the research wiki browsable even after future note migrations."""
+    errors = []
+    base = root / "docs/research"
+    hub = (base / "README.md").read_text(encoding="utf-8")
+    for topic in RESEARCH_TOPICS:
+        folder = base / topic
+        index = folder / "README.md"
+        if not index.is_file():
+            errors.append("research topic missing README: " + topic)
+            continue
+        if "({}/README.md)".format(topic) not in hub:
+            errors.append("research hub does not link topic: " + topic)
+        contents = index.read_text(encoding="utf-8")
+        if "(../README.md)" not in contents:
+            errors.append("topic README missing parent navigation: " + topic)
+        for record in sorted(folder.glob("*.md")):
+            if record.name == "README.md":
+                continue
+            if "({})".format(record.name) not in contents:
+                errors.append("research topic index omits document: {}/{}".format(
+                    topic, record.name))
+            if topic in ("carplay", "media", "firmware", "hardware",
+                         "interface", "archive"):
+                if "**Research status ·" not in "\n".join(record.read_text(
+                        encoding="utf-8").split("\n", 13)[:13]):
+                    errors.append("research document missing status header: {}/{}".format(
+                        topic, record.name))
+    known_root = {"README.md", "AGENTS.md", "PUBLIC_REFERENCES.md"}
+    for record in base.glob("*.md"):
+        if record.name not in known_root:
+            errors.append("ungrouped research Markdown at library root: " + record.name)
+    return errors
+
 def check_contracts(root: Path) -> list:
     errs = []
     overview = (root / "README.md").read_text(encoding="utf-8")
@@ -147,6 +193,7 @@ def check_contracts(root: Path) -> list:
         errs.append("configuration matrix still prescribes old platform default root")
     if "so it is not install-enabled" in profiles_doc:
         errs.append("profile README contains obsolete MU1409 install-disabled claim")
+    errs.extend(check_research_navigation(root))
     return errs
 
 def run_selftest() -> None:

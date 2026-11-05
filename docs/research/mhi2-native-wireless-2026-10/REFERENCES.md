@@ -1,5 +1,8 @@
 # References and reproducibility boundaries
 
+> **Research status · 2026-11-05: FROZEN WIRELESS SOURCE REFERENCE.** This preserves dated original cross-references; no complete native Wireless CarPlay vehicle qualification is claimed. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 ## Public, independently retrievable references
 
 - [Apple WWDC 2017: Developing Wireless CarPlay Systems](https://developer.apple.com/videos/play/wwdc2017/717/): classic pairing, Bluetooth/iAP2, WLAN credential and Bonjour Controller flow.

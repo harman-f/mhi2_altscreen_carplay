@@ -20,7 +20,7 @@ The product has three separate versioned surfaces: **public source**, a **specif
 3. **Configuration changed:** regenerate definitions and check the 48 CarPlay settings/13 broker switches; do not edit generated values blindly or equate stored state with applied state.
 4. **Assembler/installer changed:** update package contract and package index. Label new packages by their actual manifest and validation, not by presence of source.
 5. **Vehicle run completed:** attach date, firmware hash, installed SHA, exact feature and result. Distinguish media frames, broker ACK, applied settings and physically visible result.
-6. **Historical docs:** keep dated evidence intact; add a superseding current reference or archive label instead of rewriting observations into fictitious contemporary tests.
+6. **Historical docs:** keep dated evidence intact; add a superseding current reference or archive label instead of rewriting observations into fictitious contemporary tests. Follow the [research library](research/README.md), [documentation-agent rules](AGENTS.md) and [research-specific archival rules](research/AGENTS.md).
 7. **Publication:** check internal links, anchors, referenced paths and programmatic profile/doc correspondence; do not copy private handoffs, OEM source bytes or restricted artifacts to the public repo.
 
 ## CI coverage

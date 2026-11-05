@@ -1,5 +1,8 @@
 # 08. Published prototype source and tests
 
+> **Research status · 2026-11-05: FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 **Public status: source published.** The dependency-complete prototype snapshot is now available in [prototype/](prototype/README.md). It contains 42 of the 43 entries in the private candidate manifest; the single excluded patch-builder and the reason are documented in [publication review](prototype/PUBLICATION_REVIEW.md). The six RFCOMM provider `.inc` modules are all present beside their C wrapper and header. The exact exported paths and SHA-256 values are in [SOURCE_MANIFEST.tsv](prototype/SOURCE_MANIFEST.tsv).
 
 The source publication preserves relative include/build relationships, including the Makefile's generated QNX host-test fixtures. It includes C/H/INC files, the full RFCOMM provider, servicegraph owner hook, Type-3 transport adapter, MFi dynamic wrapper, A3/B0 modules, QNX helpers, shell tools and offline tests.

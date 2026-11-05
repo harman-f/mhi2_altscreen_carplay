@@ -1,5 +1,8 @@
 # 07. Evidence grades, provenance and unimplemented functions
 
+> **Research status · 2026-11-05: FROZEN EXPERIMENTAL WIRELESS RESEARCH.** This is a dated hypothesis/source observation; a complete native Wireless CarPlay session was not vehicle-qualified by this project. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 **Frozen:** 2026-10-09. **Target:** classic MHI2 ER SKG13 P4526, MU1440, QNX6.5/ARM32. The observations are specific to this firmware and must not be generalized across MHI2, MHI2Q, MHI2P or other versions without revalidating symbols, ABI, service ownership and stock credentials.
 
 | Topic | Evidence | Project's completion state |

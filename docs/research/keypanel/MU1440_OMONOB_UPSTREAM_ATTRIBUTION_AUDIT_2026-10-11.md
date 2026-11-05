@@ -1,5 +1,8 @@
 # Public repository attribution and steering-wheel scope audit (2026-10-11)
 
+> **Research status · 2026-11-05:** **DATED INPUT RESEARCH.** Evidence is limited to the documented physical capture, static API or attribution scope. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 Audit target: **harman-f/mhi2_altscreen_carplay**, current default-branch working tree. This is a documentation/provenance audit; it neither replaces proprietary firmware nor changes car binaries, key events, QNX runtime or Parity.
 
 ## Correct owner/project identity

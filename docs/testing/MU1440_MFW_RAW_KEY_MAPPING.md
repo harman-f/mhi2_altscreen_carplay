@@ -110,5 +110,5 @@ We welcome **sanitized, read-only** observations from compatible Škoda, VW, SEA
 
 - [Sanitized key observation matrix](../research/keypanel/MU1440_CAPTURE_SANITIZED_MATRIX.tsv) (early press capture and later separately recovered encoder result).
 - [Twelve typed five-int detent records](../research/keypanel/MU1440_F902_FIVE_INT_ENCODER_CAPTURE_2026-10-11.md); [project-owned read-only offline decoder](../../tools/decode_keypanel_f902.py).
-- [Earlier DSI/consumer investigation](../research/keypanel/MU1440_WHEEL_DSI_AND_OMONOB_2026-10-11.md); [exact-target hardkey API](../research/MU1440_BUTTON_INPUT_API.md).
+- [Earlier DSI/consumer investigation](../research/keypanel/MU1440_WHEEL_DSI_AND_OMONOB_2026-10-11.md); [exact-target hardkey API](../research/interface/MU1440_BUTTON_INPUT_API.md).
 - Public [voice-key input example](https://github.com/y-batsianouski/mib2-voicecontrol-button-patch) and [omonob MHI2 map comparator](https://github.com/omonob/MHI2-Carplay-Maps) are acknowledged prior art, **not** a claim that their physical mappings transfer directly.

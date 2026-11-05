@@ -322,7 +322,7 @@ https://github.com/y-batsianouski/mib2-voicecontrol-button-patch
 
 Useful public lead for MIB2 ASL key listeners, press/long/double handling and synthetic hardkey events.
 The mechanism was compared against the exact MU1440 Java baseline; see
-[MU1440 steering-wheel / hardkey API](MU1440_BUTTON_INPUT_API.md).
+[MU1440 steering-wheel / hardkey API](interface/MU1440_BUTTON_INPUT_API.md).
 
 ## MIB2 HMI / bootclasspath precedent
 
