@@ -25,6 +25,10 @@ for name in settings_core gen2_settings_session policy video_queue_recovery resy
     -pthread -ldl -lm -o "$OUT/$name"
   "$OUT/$name"
 done
+# The lock-diagnostics test includes settings_posix.c itself, so it is built without CORE.
+"$CC" "${F[@]}" "${I[@]}" tests/alt111_settings_lock_diagnostics_test.c \
+  "${CORE[0]}" "${CORE[@]:2}" -pthread -ldl -lm -o "$OUT/settings_lock_diagnostics"
+"$OUT/settings_lock_diagnostics"
 bash tools/test_alt111_zoom_host.sh
 python3 -B tests/alt111_settings_integration.py
 echo 'GEN2_COMPONENTS_HOST=PASS host_only=1'

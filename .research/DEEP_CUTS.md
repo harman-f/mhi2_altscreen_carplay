@@ -291,7 +291,7 @@ Useful extracted binary hashes:
 
 The AirPlaySender hash below specifically refers to the historical `ipsw dyld extract --objc --slide`
 standalone-Mach-O materialization. Plain or slide-only reconstructions from the same exact cache have
-different whole-file hashes; see `docs/research/IOS27_SENDER_LIFECYCLE.md` for the reproduction
+different whole-file hashes; see `docs/research/carplay/IOS27_SENDER_LIFECYCLE.md` for the reproduction
 matrix. The executable `__TEXT,__text` payload is identical across those materializations.
 
 ```text

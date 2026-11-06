@@ -3,6 +3,7 @@
 set -u
 
 HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
 BACKDIR=/mnt/app/root/mibr-gen2-backup
 BACKUP=$BACKDIR/libmibr_carplay111.pre-gen2.so
 BACKUP_SHA=$BACKDIR/libmibr_carplay111.pre-gen2.so.sha256
@@ -10,7 +11,7 @@ INSTALLED_SHA=$BACKDIR/installed-gen2.sha256
 LEGACY_BACKUP=/mnt/app/eso/lib/libmibr_carplay111.so.pre-gen2
 
 find_sha(){
-  for p in /mnt/app/root/altscreen-u2/bin/sha256sum /usr/bin/sha256sum /bin/sha256sum; do
+  for p in $MIBR_ROOT/bin/sha256sum /usr/bin/sha256sum /bin/sha256sum; do
     [ -x "$p" ] && { echo "$p"; return 0; }
   done
   return 1
@@ -40,10 +41,10 @@ echo "auto_resync=OFF"
 echo
 
 echo "--- A/B controls ---"
-[ -r /mnt/app/root/mibr-carplay111-url-map.enabled ] && echo "url=maps:/car/instrumentcluster/map" || echo "url=maps:/car/instrumentcluster"
-if [ -r /mnt/app/root/mibr-carplay111-bit26.force-on ]; then
+[ -r $MIBR_ROOT/config/navigation/mibr-carplay111-url-map.enabled ] && echo "url=maps:/car/instrumentcluster/map" || echo "url=maps:/car/instrumentcluster"
+if [ -r $MIBR_ROOT/config/features/mibr-carplay111-bit26.force-on ]; then
   echo "bit26=force-on"
-elif [ -r /mnt/app/root/mibr-carplay111-bit26.force-off ]; then
+elif [ -r $MIBR_ROOT/config/features/mibr-carplay111-bit26.force-off ]; then
   echo "bit26=force-off"
 else
   echo "bit26=stock"
@@ -63,7 +64,7 @@ echo "--- recent hook log ---"
 tail -120 /tmp/altscreen111.log 2>/dev/null || true
 echo
 
-if [ -x /mnt/app/root/altscreen-u2/scripts/direct_ts_auto_status.sh ]; then
+if [ -x $MIBR_ROOT/scripts/direct_ts_auto_status.sh ]; then
   echo "--- Auto-Direct ---"
-  /mnt/app/root/altscreen-u2/scripts/direct_ts_auto_status.sh 2>/dev/null || true
+  $MIBR_ROOT/scripts/direct_ts_auto_status.sh 2>/dev/null || true
 fi

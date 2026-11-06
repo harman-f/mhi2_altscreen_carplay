@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
 STAGE=${MIBR_GEN2_STAGE:-/mnt/app/root/mibr-gen2-stage}
 BIN=${MIBR_GEN2_BINARY:-$STAGE/libaltscreen111.so}
 SHAFILE=${MIBR_GEN2_SHA256:-$BIN.sha256}
@@ -14,7 +15,7 @@ BACKUP=$BACKDIR/libmibr_carplay111.pre-gen2.so
 BACKUP_SHA=$BACKDIR/libmibr_carplay111.pre-gen2.so.sha256
 
 find_sha(){
-  for p in /mnt/app/root/altscreen-u2/bin/sha256sum /usr/bin/sha256sum /bin/sha256sum; do
+  for p in $MIBR_ROOT/bin/sha256sum /usr/bin/sha256sum /bin/sha256sum; do
     [ -x "$p" ] && { echo "$p"; return 0; }
   done
   command -v sha256sum 2>/dev/null && return 0

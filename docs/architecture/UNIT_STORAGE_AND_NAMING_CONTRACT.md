@@ -1,6 +1,8 @@
-# MMX on-unit storage and naming contract (design proposal)
+# MIB Runtime (MIBR) on-unit storage and naming contract
 
-> **Status: design only, 2026-11-03.** No on-unit files have been moved and no installed binary, Java class, legacy developer ZIP or release tag has been changed. This document defines a future *single three-firmware beta* migration contract, **not a current implemented filesystem layout**. Actual MMX paths are the authority until a target-tested migration is complete.
+> **Superseded target:** earlier revisions used `/mnt/app/root/altscreen-u2/` as target root; that target is obsolete. The single target root is `/mnt/app/root/mibr/` (decision E6, 2026-11-04; see [firmware profiles and configuration](FIRMWARE_PROFILES_AND_CONFIGURATION.md) §2.4). `altscreen-u2` paths remain listed as current/legacy source paths in the migration tables below.
+
+> **Status: design plus integrated implementation source, 2026-11-05.** The M1 root-migration library, code path cutover and transactional installer are now present in public source. **No vehicle/unit migration is documented as performed:** existing installed files, the frozen MU1440 developer ZIP and release tags are unchanged. Target-tested installation, reboot and rollback remain qualification gates. Actual MMX paths are authoritative until a tested upgrade completes.
 
 ## Problem: a single functional subsystem has multiple path owners
 
@@ -25,23 +27,25 @@ The current source uses, among others:
 ## Proposed target layout: one project root, separated by ownership and lifespan
 
 ```text
-/mnt/app/root/altscreen-u2/
-  bin/                       executables and shared libraries
-  scripts/                   executable helpers and start/recovery integration
-  config/                    persistent configuration (never volatile)
-    carplay/                 registry-backed video/protocol settings
-    navigation/              phone arrow preferences and nav composition
-    cockpit/                 view mapping, safe areas and scaling
-    menu/                    user menu layout/language
-    vehicle/                 optional vehicle-data modes
-    platform/                firmware/brand-supplied immutable-ish defaults
-    features/                explicit persistent enable/disable intent
-  state/                     **persistent** operational state only, with owning writer
-    cockpit/                 remembered view positions/resync selections
-  version/                   installed product/build and per-component identity
-  backup/                    installer-owned migration/restore snapshots
-  logs/                      bounded durable logs only when requested
-/tmp/mibr-*                   volatile runtime IPC/overrides/locks/status (existing names first)
+/mnt/app/root/mibr/
+  bin/                           executables, runtime libraries
+  scripts/                       start, guard, service, installer, recovery helpers
+  config/                        persistent configuration (never volatile)
+    carplay/<group>.conf         registry-backed video/protocol settings (active only after the beta)
+    cockpit/                     safe-{voll,wide,center}.conf (Broker CAS), scaling.conf
+    navigation/                  phone arrow preferences and nav composition
+    menu/                        layout.conf (CRC), language.conf
+    platform/defaults.conf       installer-written firmware defaults, fallback only
+    features/*.conf              explicit persistent enable/disable intent (positive, 0/1)
+    vehicle/                     optional vehicle-data modes
+  state/                         persistent operational state only, with owning writer
+    boot/disabled                single kill switch (presence flag) plus boot failure counter
+    cockpit/                     remembered view positions/resync selections
+  version/                       installed product/build and per-component identity
+    ownership/                   markers for installer-owned interventions
+  backup/<migration-id>/         installer-owned migration/restore snapshots with hashes
+  logs/                          bounded durable logs only when requested
+/tmp/mibr-*                      volatile runtime IPC/overrides/locks/status (names unchanged)
 ```
 
 This is a **namespace**, not permission to sweep arbitrary existing paths. Do not move `/mnt/app/eso` stock/OEM files or `/ifs` into the project root; firmware hooks and OEM resources have their own explicit install/rollback contract.
@@ -63,6 +67,8 @@ The example target names are **logical desired names**, not existing parsers or 
 
 ## Migration map (representative, not exhaustive)
 
+Source paths in the left column are the **current/legacy** locations. Legacy source roots that fold into `mibr/`: `/mnt/app/root/altscreen-u2/`, `mibr-kit/`, `mibr-v3/`, `mibr-rgi/` and the `mibr-*.enabled` markers (including `mibr-cpvc.enabled`). Migration M1 (root move, single installer transaction, no runtime compat readers, reader and writer cut over together, kill switch first) is specified in [FIRMWARE_PROFILES_AND_CONFIGURATION.md](FIRMWARE_PROFILES_AND_CONFIGURATION.md) §2.4.
+
 | Current source of truth | Proposed target namespace | Required code coordination |
 | --- | --- | --- |
 | `/mnt/app/root/mibr-carplay111-*` and companion `/tmp/mibr-carplay111-*` | `config/carplay/` and same logical volatile overrides | GEN2 C macros; settings CLI; 13 grouped registry basenames; generated HMI/C bindings; tests |
@@ -72,18 +78,19 @@ The example target names are **logical desired names**, not existing parsers or 
 | `/mnt/app/root/altscreen-u2/config/mibr-platform-defaults.conf` | `config/platform/defaults.conf` | GEN2 C, Java, broker C; ensure per-firmware selector determined before applying defaults |
 | `/mnt/app/root/mibr-view/` | `state/cockpit/` | `mibr-view.ksh`, physical key actions, broker, backup and rollback |
 | `/mnt/app/root/mibr-carplay-autodirect.enabled` / `mibr-alt111-keyframe-policy.enabled` | `config/features/*.conf` after format-aware conversion | Installer, boot scripts, GEN2 and diagnostics must agree on positive toggle semantics |
-| `/mnt/app/root/mibr-kit/` | `version/` | Unified version manifest/receipt writer, HMI reader, upgrade/uninstall |
+| `/mnt/app/root/mibr-kit/` (receipts) | `version/`; `mibr-kit/disabled` → `state/boot/disabled` | Unified version manifest/receipt writer, HMI reader, upgrade/uninstall |
+| `/mnt/app/root/mibr-v3/`, `mibr-rgi/`, `mibr-cpvc.enabled` | `bin/`, `scripts/`, `config/features/` | Broker, `boot.ksh`, watchdog, RGI wrapper; exact-path writer check must be switched together |
 | `/tmp/mibr-*` | **keep original volatile paths during first migration** | Each IPC producer and consumer must be migrated together later if needed |
 
-## A3 disposition of the 63 source candidates (proposal)
+## A3 disposition of the 66 source candidates (proposal)
 
 `tools/release/storage_destination_plan.py` assigns each candidate exactly one disposition, with a reason and, for MIGRATE, exactly one source writer. It is a proposal: `final_destination_reviewed` and `migration_authorized` stay `false`.
 
 | Disposition | Count | Rows | Rule |
 |---|---|---|---|
 | MIGRATE | 18 | 12 broker CAS switches, display scaling, menu language, menu layout, platform defaults, two installer ownership receipts | One writer, all source readers known. Bytes are copied verbatim (magic, revision, CRC unchanged) in one cutover together with every reader. The receipts move only with the installer that replaces the current install/uninstall scripts. |
-| KEEP_AT_LEGACY | 40 | All 13 CarPlay registry groups; CPVC profile; vehicle data/status mode; boot markers (Auto-Direct, D2, isoTX2, parity); legacy navigation files; bit26 pair; three backup directories and the isoTX2 stock preimage; the single-writer gate | No destination. The registry is kept because the native settings layer refuses persistent writes (durability is the CPVC profile replay). The Auto-Direct registry value and the Auto-Direct boot marker therefore no longer share a target basename. |
-| EXCLUDE_NONCONFIG | 2 | Calibration clip, test-only rollback script | Payload or test reference, not state. |
+| KEEP_AT_LEGACY | 42 | All 13 CarPlay registry groups; CPVC profile; vehicle data/status mode; boot markers (Auto-Direct, D2, isoTX2, parity, CPVC enable, kit kill switch); legacy navigation files; bit26 pair; three backup directories and the isoTX2 stock preimage; the single-writer gate | No destination. The registry is kept because the native settings layer refuses persistent writes (durability is the CPVC profile replay). The Auto-Direct registry value and the Auto-Direct boot marker therefore no longer share a target basename. |
+| EXCLUDE_NONCONFIG | 3 | Calibration clip, test-only rollback script, RGI payload directory | Payload or test reference, not state. |
 | BLOCKED_INPUT | 3 | SD-log switch, the two version receipts | A claimed reader or the writer is not in source. |
 
 Safe area keeps four stores but one user authority: the broker `safe-*` CAS files. The registry view-area group is a read path, platform defaults are an installer-written fallback, and the legacy `mibr-carplay111-safearea.conf` is rollback-only. `mibr-parity-statistics-enabled` and `mibr-parity-status-enabled` are value booleans whose absence means ON, never presence markers.
@@ -96,4 +103,4 @@ Safe area keeps four stores but one user authority: the broker `safe-*` CAS file
 4. **Check QNX and persistence.** Actual MMX SSH startup is the execution contract; on unit, prove `/mnt/app` RW lease, RO restoration, interrupted-write/powerloss recovery, read/write permissions and no ambiguous old/new active copies. `/tmp` and SD behave differently and require separate tests.
 5. **Enforce at release.** CI checks staged source/target file-reference inventory, exact files and schema, all three firmware profiles, generated defaults, version receipt and installed-menu readback. Verify the *actual* final multi-profile ZIP; host static checks alone are not target acceptance. Preserve user configuration on upgrade; an uninstall removes project-owned files only and restores modified OEM state from exact backups.
 
-**Status:** Only the inventory/design is established in this document. The migration, full path discovery, automated validation, new QNX/Java builds, three-firmware beta ZIP and on-unit tests remain open and must not be described as implemented.
+**Status:** The storage inventories, M1 migration source, shared path constants and related host checks are implemented in the public tree. This is **not** proof of an executed on-unit migration. M2 writer/format cutovers, exact J9 artifacts, a complete three-profile beta ZIP and power-loss/recovery/vehicle tests remain open. See [feature and target evidence](../status/FEATURE_STATUS.md) and [package status](../packages/README.md).

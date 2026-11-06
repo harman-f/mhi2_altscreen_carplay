@@ -13,6 +13,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = "settings/registry.json"
+# Schema 3 calls the compiled-preset layer "preset"; reports keep the runtime name.
+LEGACY_LAYER_NAMES = {"preset": "profile"}
 BROKER_C = "modules/broker/source/mibr-control/mibr_durable_switch.c"
 BROKER_H = "modules/broker/source/mibr-control/mibr_durable_switch.h"
 CATALOG = "tools/menu-editor/function-catalog.json"
@@ -20,10 +22,26 @@ MENU = "tools/menu-editor/standard-menu.txt"
 INDEX = "modules/module-index.json"
 INPUTS = (REGISTRY, BROKER_C, BROKER_H, CATALOG, MENU, INDEX)
 LIFECYCLES = {"live", "session", "presentation", "reconnect", "unit_reboot"}
+BROKER_CONFIG_ROOT = "/mnt/app/root/mibr/config"
+LEGACY_APP_ROOT = "/mnt/app/root/"
+MIGRATION_MAP = ROOT / "installer/config/root-migration.list"
+
+
+def legacy_of(declared):
+    """Unit location of a file the sources declare under the M1 root: the map
+    row's legacy_rel. The storage tools keep analysing what exists on units
+    today, so they continue to see this legacy path as current_path."""
+    new_rel = declared[len(LEGACY_APP_ROOT + "mibr/"):]
+    for line in MIGRATION_MAP.read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) >= 3 and not line.startswith("#") and parts[1] == new_rel:
+            return LEGACY_APP_ROOT + parts[0]
+    raise InventoryError("broker path without M1 map row: " + declared)
+
 BROKER_LINE = re.compile(
     r'^[ \t]*\{"(?P<magic>MIBR_[A-Z0-9_]+/\d+)",'
     r'(?P<allowed>NULL|"[^"\n]*"),"(?P<default>[^"\n]+)",'
-    r'CONFIG "(?P<file>[^"\n]+)","(?P<get>[A-Z0-9_]+)",'
+    r'MIBR_CONFIG_DIR "(?P<file>/[^"\n]+)","(?P<get>[A-Z0-9_]+)",'
     r'"(?P<set>[A-Z0-9_]+)","(?P<id>[a-z0-9_]+)",',
     re.M,
 )
@@ -40,7 +58,8 @@ SELF_AUDIT_TOOLS = {"tools/release/storage_migration_review.py",
                     "tools/release/storage_access_graph.py",
                     "tools/release/legacy_navigation_storage_contract.py",
                     "tools/release/broker_menu_storage_format.py",
-                    "tools/release/storage_destination_plan.py"}
+                    "tools/release/storage_destination_plan.py",
+                    "tools/release/build_mu1440_modular.py"}
 
 
 class InventoryError(ValueError):
@@ -57,8 +76,8 @@ def read(root, relative):
 
 
 def registry_inventory(data):
-    require(data.get("schema") == 2, "unsupported CarPlay registry schema")
-    require(data.get("layer_order") == ["temp", "persistent", "profile", "compiled"],
+    require(data.get("schema") == 3, "unsupported CarPlay registry schema")
+    require(data.get("layer_order") == ["temp", "persistent", "preset", "compiled"],
             "CarPlay setting precedence changed")
     entries = data.get("settings")
     require(isinstance(entries, list) and entries, "empty settings registry")
@@ -108,7 +127,8 @@ def registry_inventory(data):
             "read_only": item["read_only"],
         })
     return {
-        "layer_order": data["layer_order"], "carplay_presets": list(presets),
+        "layer_order": [LEGACY_LAYER_NAMES.get(x, x) for x in data["layer_order"]],
+        "carplay_presets": list(presets),
         "settings": records, "file_groups": dict(sorted(groups.items())),
         "source": REGISTRY,
     }
@@ -127,11 +147,65 @@ def broker_rectangle_valid(value):
             and x + width <= 1010 and y + height <= 376)
 
 
+NEW_ROOT_ABS = "/mnt/app/root/mibr"
+M1_DIRECTORIES = {NEW_ROOT_ABS + sub for sub in (
+    "", "/scripts", "/logs", "/config", "/config/carplay", "/config/cockpit",
+    "/config/navigation", "/config/features", "/config/menu", "/config/platform",
+    "/config/vehicle", "/state", "/state/boot", "/state/cockpit", "/version",
+    "/version/ownership", "/backup")}
+MACRO_DIRS = {"ROOT": "", "BIN": "/bin", "SCRIPTS": "/scripts", "CONFIG": "/config",
+              "STATE": "/state", "VERSION": "/version", "LOGS": "/logs",
+              "CARPLAY_CONFIG": "/config/carplay"}
+MACRO_JOIN = re.compile(r'MIBR_(ROOT|BIN|SCRIPTS|CONFIG|STATE|VERSION|LOGS|CARPLAY_CONFIG)_DIR\s*"([^"\n]*)"')
+MACRO_BARE = re.compile(r'MIBR_(ROOT|BIN|SCRIPTS|CONFIG|STATE|VERSION|LOGS|CARPLAY_CONFIG)_DIR\b')
+# Files under the M1 root that are installed payload / operator gates, not map rows:
+# the unit location they had before M1.
+LEGACY_EXTRA = {
+    "config/features/mibr-v3-single-writer.enabled": "altscreen-u2/config/mibr-v3-single-writer.enabled",
+    "bin/mibr-calib.avcc": "altscreen-u2/config/mibr-calib.avcc",
+    "state/boot/disabled": "mibr-kit/disabled",
+    # RGI payload: the former mibr-rgi/ directory is now part of bin/
+    "bin": "mibr-rgi",  # wrapper D=$MIBR_ROOT/bin (only bin/ literal of the RGI payload dir)
+    "bin/mm-ipod-rgi": "mibr-rgi",
+    "bin/mibr-rgi": "mibr-rgi",
+    "bin/libmibr_rgi_ipod.so": "mibr-rgi",
+}
+
+
+def expand_m1(line):
+    """Spell out $MIBR_ROOT and mibr_paths.h macro compositions on a source line."""
+    if "MIBR_ROOT=${MIBR_ROOT:-" in line or "#define MIBR_ROOT_DIR" in line:
+        return line  # the single root definition itself
+    line = re.sub(r"\$\{?MIBR_ROOT\}?", NEW_ROOT_ABS, line)
+    line = MACRO_JOIN.sub(lambda m: NEW_ROOT_ABS + MACRO_DIRS[m.group(1)] + m.group(2), line)
+    return MACRO_BARE.sub(lambda m: NEW_ROOT_ABS + MACRO_DIRS[m.group(1)], line)
+
+
+def unit_location(fragment):
+    """Legacy unit location of a literal under the M1 root; other fragments unchanged."""
+    prefix = NEW_ROOT_ABS + "/"
+    if not fragment.startswith(prefix):
+        return fragment
+    rel = fragment[len(prefix):]
+    if rel in LEGACY_EXTRA:
+        return LEGACY_APP_ROOT + LEGACY_EXTRA[rel]
+    try:
+        return legacy_of(fragment)
+    except InventoryError:
+        pass
+    head, _, tail = rel.partition("/")
+    if rel.startswith("config/carplay/mibr-"):
+        return LEGACY_APP_ROOT + rel[len("config/carplay/"):]  # registry group files: legacy name in place
+    if head in ("bin", "scripts", "logs") and tail:
+        return LEGACY_APP_ROOT + "altscreen-u2/" + rel
+    return fragment
+
+
 def broker_inventory(source, header):
-    root = re.search(r'^#define CONFIG "([^"\n]+)"', source, re.M)
+    # MIBR_CONFIG_DIR of modules/carplay/source/alt111-settings/include/mibr_paths.h
+    root = re.search(r'^#include "[^"\n]*(mibr_paths\.h)"', source, re.M)
     count = re.search(r"^#define MIBR_SWITCH_COUNT (\d+)u$", header, re.M)
-    require(root is not None and root.group(1).startswith("/mnt/app/root/"),
-            "missing broker persistent config root")
+    require(root is not None, "missing broker persistent config root")
     require(count is not None, "broker switch count not declared")
     entries = []
     used = set()
@@ -144,24 +218,26 @@ def broker_inventory(source, header):
             require(broker_rectangle_valid(m["default"]),
                     "invalid broker rectangle default: " + m["id"])
         require(m["id"] not in used, "duplicate broker capability: " + m["id"])
-        require(re.fullmatch(r"[a-z0-9-]+\.conf", m["file"]) is not None,
+        require(re.fullmatch(r"/[a-z]+/[a-z0-9-]+\.conf", m["file"]) is not None,
                 "invalid broker filename: " + m["id"])
         used.add(m["id"])
         entries.append({
             "key": m["id"], "owner": "broker",
             "magic": m["magic"], "compiled_default": m["default"],
-            "allowed": values, "current_path": root.group(1) + m["file"],
+            "allowed": values, "declared_path": BROKER_CONFIG_ROOT + m["file"],
+            "current_path": legacy_of(BROKER_CONFIG_ROOT + m["file"]),
             "get_operation": m["get"], "set_operation": m["set"],
             "storage_semantics": "broker-single-writer-revision-CAS",
         })
     require(len(entries) == int(count.group(1)),
             "broker declarations do not match MIBR_SWITCH_COUNT")
-    require(len({e["current_path"] for e in entries}) == len(entries),
+    require(len({e["declared_path"] for e in entries}) == len(entries),
             "two broker switches share a storage file")
     return {
         "source": BROKER_C, "header": BROKER_H,
-        "current_root": root.group(1),
-        "platform_override": root.group(1) + "mibr-platform-defaults.conf",
+        "current_root": BROKER_CONFIG_ROOT,
+        "platform_override": BROKER_CONFIG_ROOT + "/platform/defaults.conf",
+        "legacy_platform_override": legacy_of(BROKER_CONFIG_ROOT + "/platform/defaults.conf"),
         "switches": entries,
     }
 
@@ -211,9 +287,14 @@ def literal_path_inventory(root):
             for line_number, line in enumerate(
                 path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
             ):
+                if ("/mnt/app/root" not in line and "/tmp/mibr" not in line
+                        and "MIBR_ROOT" not in line and "_DIR" not in line):
+                    continue
+                line = expand_m1(line)
                 if "/mnt/app/root" not in line and "/tmp/mibr" not in line:
                     continue
-                paths = sorted(set(LITERAL_PATH.findall(line)))
+                paths = sorted({unit_location(p) for p in LITERAL_PATH.findall(line)
+                                if p.rstrip("/") not in M1_DIRECTORIES})
                 for match in paths:
                     references.append({
                         "literal_fragment": match,
@@ -295,7 +376,7 @@ def self_test(root=ROOT):
         )
         assert corrupted != broker
         rejects(lambda text=corrupted: broker_inventory(text, header))
-    assert LITERAL_PATH.search("/mnt/app/root/mibr-carplay111-enabled") is not None
+    assert LITERAL_PATH.search("/mnt/app/root/mibr/config/carplay/mibr-carplay111-enabled") is not None
     assert LITERAL_PATH.search("/tmp/mibr-status") is not None
     assert not any(r["source"] in SELF_AUDIT_TOOLS
                    for r in valid["unit_path_evidence"]["references"])

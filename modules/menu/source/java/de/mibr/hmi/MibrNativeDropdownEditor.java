@@ -256,13 +256,25 @@ public final class MibrNativeDropdownEditor {
                 if("dropDownClosed".equals(event))restoreAfterNativeDispatch();
             }
         };
+        /**
+         * Profile strategy: either the MU1440 image/colour style resolves, or the
+         * popup, option list and row loaded from the live OEM page are usable.
+         */
+        private static boolean nativeDropdownAvailable(MibrOemSsmTemplate.Binding stock) {
+            if (MibrOemProfiles.current().nativeDropdownStrategy()
+                    == MibrOemProfile.DROPDOWN_LIVE_OEM_WIDGETS) {
+                return stock.popup!=null && stock.options!=null && stock.option!=null &&
+                    stock.popup.get_width()>0 && stock.option.get_height()>0;
+            }
+            return MibrOemDropdownStyle.resolve()!=null;
+        }
         public StockBinding(MibrOemSsmTemplate.Binding stock,MibrPopupEditorModel model,Sink sink) {
             this.stock=stock;this.model=model;this.sink=sink;
             originalTransfer=stock.options.getListItemTransfer();
             originalPopupHeight=stock.popup.get_height();
             originalPopupY=stock.popup.get_y();
             originalOptionsHeight=stock.options.get_height();
-            model.setAvailable(MibrOemDropdownStyle.resolve()!=null);
+            model.setAvailable(nativeDropdownAvailable(stock));
             stock.options.setListItemTransfer(this);
         }
         public void prepare(DropDownButton button,int key) {

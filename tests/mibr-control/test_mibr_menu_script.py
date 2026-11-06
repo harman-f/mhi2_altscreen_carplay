@@ -27,21 +27,21 @@ class MenuScript(unittest.TestCase):
     def test_stores_the_file(self):
         self.src.write_bytes(b"MIBR_MENU/1\nx\n")
         self.assertEqual(self.run_script("load"), (0, "result=OK"))
-        self.assertEqual((self.dir / "mibr-menu.conf").read_bytes(), b"MIBR_MENU/1\nx\n")
-        self.assertEqual([p.name for p in self.dir.iterdir()], ["mibr-menu.conf"])
+        self.assertEqual((self.dir / "layout.conf").read_bytes(), b"MIBR_MENU/1\nx\n")
+        self.assertEqual([p.name for p in self.dir.iterdir()], ["layout.conf"])
 
     def test_no_file_keeps_the_stored_one(self):
-        (self.dir / "mibr-menu.conf").write_bytes(b"old")
+        (self.dir / "layout.conf").write_bytes(b"old")
         self.assertEqual(self.run_script("load"), (1, "result=NO_FILE"))
-        self.assertEqual((self.dir / "mibr-menu.conf").read_bytes(), b"old")
+        self.assertEqual((self.dir / "layout.conf").read_bytes(), b"old")
 
     def test_size_limit(self):
-        (self.dir / "mibr-menu.conf").write_bytes(b"old")
+        (self.dir / "layout.conf").write_bytes(b"old")
         self.src.write_bytes(b"x" * 16385)
         self.assertEqual(self.run_script("load"), (1, "result=TOO_LARGE"))
         self.src.write_bytes(b"")
         self.assertEqual(self.run_script("load"), (1, "result=TOO_LARGE"))
-        self.assertEqual((self.dir / "mibr-menu.conf").read_bytes(), b"old")
+        self.assertEqual((self.dir / "layout.conf").read_bytes(), b"old")
 
     def test_write_failure_leaves_nothing(self):
         self.src.write_bytes(b"new")

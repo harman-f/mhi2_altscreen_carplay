@@ -3,8 +3,9 @@
 set -u
 
 SELF_DIR=$(cd "$(dirname "$0")" 2>/dev/null && pwd)
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
 OUTDIR=${MIBR_REPORT_DIR:-/mnt/app/root/mibr-gen2-reports}
-DIRECT_ROOT=/mnt/app/root/altscreen-u2/logs/direct-ts
+DIRECT_ROOT=$MIBR_ROOT/logs/direct-ts
 STAMP=$(date +%Y%m%d-%H%M%S 2>/dev/null || echo report-$$)
 mkdir -p "$OUTDIR" 2>/dev/null || { echo "GEN2_COLLECT_LOGS=FAIL_OUTDIR"; exit 2; }
 

@@ -1,7 +1,8 @@
 #!/bin/ksh
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-BASE=/mnt/app/root/altscreen-u2
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+BASE=$MIBR_ROOT
 TARGET=/mnt/system/etc/eso/production/smartphone_integrator.json
 EXPECTED_AIRPLAY=193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5
 EXPECTED_SMARTPHONE=dd925b8a85ad1acc9d88dd5e7aedabc3118c1c8299e107bbaa99b4c145c807be
@@ -11,7 +12,7 @@ export LD_LIBRARY_PATH=/lib:/mnt/app/root/lib-target:/eso/lib:/mnt/app/usr/lib:/
 unset LD_PRELOAD
 export GEM=1
 
-# Installed runtime is self-contained under /mnt/app/root/altscreen-u2.
+# Installed runtime is self-contained under /mnt/app/root/mibr.
 # Persistent logs prefer the deployment SD/USB medium when available. This
 # preserves the proven M.I.B. writable-media behavior without importing its
 # BASICS/GLOBALS or depending on an apps/ tree.
@@ -20,7 +21,7 @@ SHA256="$BASE/bin/sha256sum"
 TEE="$BASE/bin/tee"
 TIMESTAMP="/net/rcc/usr/bin/date +%Y_%m_%d_%H_%M_%S"
 TMP="/net/rcc/dev/shmem"
-DEPLOY_MEDIA_FILE="$BASE/config/deployment_media_root"
+DEPLOY_MEDIA_FILE="$BASE/config/carplay/deployment_media_root"
 DEPLOY_MEDIA_ROOT=""
 U2_STORAGE_READY=0
 U2_LOG_ON_MEDIA=0
@@ -48,8 +49,8 @@ fi
 
 CARPLAY_HOOK=/mnt/app/eso/lib/libmibr_carplay111.so
 CARPLAY_BACKDIR=/mnt/app/root/mibr-carplay111-backup
-DIRECT_FPS_OVERRIDE_FILE=/mnt/app/root/mibr-direct-output-fps
-SOURCE_FPS_OVERRIDE_FILE=/mnt/app/root/mibr-carplay111-fps
+DIRECT_FPS_OVERRIDE_FILE=$MIBR_ROOT/config/carplay/mibr-direct-output-fps
+SOURCE_FPS_OVERRIDE_FILE=$MIBR_ROOT/config/carplay/mibr-carplay111-fps
 BACKUP=$CARPLAY_BACKDIR/smartphone_integrator.json.stock
 BACKUP_SHA=$CARPLAY_BACKDIR/smartphone_integrator.json.stock.sha256
 
@@ -300,7 +301,7 @@ dump_most_contract(){
 }
 
 load_altscreen_config(){
-  CONF="$BASE/config/altscreen111.conf"
+  CONF="$BASE/config/carplay/altscreen111.conf"
   [ -r "$CONF" ] || { log "ERROR missing $CONF"; return 1; }
   . "$CONF"
 

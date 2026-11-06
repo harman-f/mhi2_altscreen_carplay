@@ -3,9 +3,10 @@
 # Disable parity-drive and request a token-bound session stop if active.
 
 set -u
-BASE=/mnt/app/root/altscreen-u2
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+BASE=$MIBR_ROOT
 RUNNER=$BASE/bin/parity-session
-ENABLE=/mnt/app/root/mibr-parity-drive.enabled
+ENABLE=$MIBR_ROOT/config/features/mibr-parity-drive.enabled
 PROFILE_MARKER=/tmp/mibr-parity-drive-profile-applied
 
 mount -uw /mnt/app 2>/dev/null || { echo "PARITY_DRIVE_DISABLE=FAIL_APP_RW"; exit 20; }

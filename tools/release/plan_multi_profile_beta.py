@@ -4,9 +4,12 @@ import argparse
 import copy
 import json
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools"))
+import check_profiles  # noqa: E402  (single profile loader/validator)
 GROUPS = ("hmi", "icons", "display", "input", "integration")
 MODULES = ("carplay", "broker", "menu", "navigation")
 SHA = re.compile(r"^[a-f0-9]{64}$")
@@ -17,7 +20,7 @@ def validate_profile(pid, doc, root=ROOT):
     def check(condition, message):
         if not condition:
             errors.append(pid + ": " + message)
-    check(doc.get("schema_version") == 1, "profile schema")
+    check(doc.get("schema_version") == 2, "profile schema")
     check(doc.get("profile_id") == pid, "profile ID/directory mismatch")
     check(doc.get("brand") in ("skoda", "seat"), "unsupported brand")
     check(doc.get("firmware", "").startswith("MHI2_ER_"), "invalid firmware")
@@ -42,25 +45,47 @@ def validate_profile(pid, doc, root=ROOT):
     return errors
 
 
+def hash_copy_mismatches(profiles, root=ROOT):
+    """K8: compare every known copy of the MU1440 selector digest."""
+    errors = []
+    skoda = profiles.get("skoda-mu1440-p4526", {}).get("selector", {}).get("digest")
+    if not skoda:
+        return ["MU1440 profile digest missing"]
+    root = Path(root)
+    copies = {}
+    legacy = (root / "deployment/mu1440/install.sh").read_text(encoding="utf-8")
+    m = re.search(r"^EXPECTED_LSD_JXE=([a-f0-9]{64})$", legacy, flags=re.M)
+    copies["install.sh EXPECTED_LSD_JXE"] = m.group(1) if m else None
+    cur = (root / "release/CURRENT.md").read_text(encoding="utf-8")
+    m = re.search(r"exact LSD/J9 target hash:\s*`([a-f0-9]{64})`", cur)
+    copies["release/CURRENT.md"] = m.group(1) if m else None
+    readme = (root / "modules/profiles/README.md").read_text(encoding="utf-8")
+    for pid, doc in profiles.items():
+        row = re.search(r"^\| `%s` \|.*$" % re.escape(pid), readme, flags=re.M)
+        want = doc["selector"]["digest"]
+        if not row or want not in row.group(0):
+            errors.append("profiles README digest mismatch for " + pid)
+    for name, val in copies.items():
+        if val != skoda:
+            errors.append("K8 hash mismatch: profile.json=%s vs %s=%s" % (skoda, name, val))
+    return errors
+
+
 def build_plan(root=ROOT):
     index = json.loads((root / "modules/module-index.json").read_text(encoding="utf-8"))
     expected = index["profiles"]
     present = {p.name for p in (root / "modules/profiles").iterdir() if p.is_dir()}
     errors = [] if set(expected) == present else ["profile directory/declared profile mismatch"]
-    known = {}
+    profiles = check_profiles.load_profiles(root)
+    errors.extend(check_profiles.validate_all(profiles))
     resolved = []
     for pid in expected:
-        path = root / "modules/profiles" / pid / "profile.json"
-        if not path.is_file():
+        doc = profiles.get(pid)
+        if doc is None:
             errors.append(pid + ": metadata missing")
             continue
-        doc = json.loads(path.read_text(encoding="utf-8"))
         errors.extend(validate_profile(pid, doc, root))
         digest = doc.get("selector", {}).get("digest")
-        if digest:
-            if digest in known:
-                errors.append("duplicate firmware fingerprints: " + pid + ", " + known[digest])
-            known[digest] = pid
         resolved.append({
             "id": pid, "firmware": doc["firmware"], "brand": doc["brand"],
             "source": "modules/profiles/" + pid,
@@ -68,13 +93,11 @@ def build_plan(root=ROOT):
             "lsd_sha256": digest,
             "firmware_sha256_input_needed": not bool(digest),
             "java_adapter_status": doc["java"]["adapter_status"],
+            "evidence": doc["selector"]["evidence"],
+            "install_enabled": doc["selector"]["install_enabled"],
             "release_channel": "beta", "include": True,
         })
-    skoda = next((x for x in resolved if x["id"] == "skoda-mu1440-p4526"), None)
-    legacy = (root / "deployment/mu1440/install.sh").read_text(encoding="utf-8")
-    pinned = re.search(r"^EXPECTED_LSD_JXE=([a-f0-9]{64})$", legacy, flags=re.M)
-    if not skoda or not pinned or pinned.group(1) != skoda["lsd_sha256"]:
-        errors.append("MU1440 pinned original LSD fingerprint mismatch")
+    errors.extend(hash_copy_mismatches(profiles, root))
     return {
         "schema_version": 1,
         "release_channel": "beta",
@@ -95,7 +118,7 @@ def self_test():
     assert plan["all_three_in_standard_beta_package"] and plan["release_channel"] == "beta"
     # All three mandatory beta profiles now have exact original LSD fingerprints.
     assert not plan["missing_exact_firmware_hashes"], "unresolved mandatory firmware selector"
-    skoda = json.loads((ROOT / "modules/profiles/skoda-mu1440-p4526/profile.json").read_text())
+    skoda = check_profiles.load_profiles()["skoda-mu1440-p4526"]
     for field, val, error in (("release_channel", "stable", "beta release"),
                                ("release_inclusion", "optional", "exclude profile")):
         bad = copy.deepcopy(skoda)
@@ -106,6 +129,11 @@ def self_test():
     assert any("invalid fingerprint" in x for x in validate_profile(skoda["profile_id"], bad))
     bad["selector"]["digest"] = None
     assert any("missing mandatory beta fingerprint" in x for x in validate_profile(skoda["profile_id"], bad))
+    profs = check_profiles.load_profiles()
+    assert not hash_copy_mismatches(profs)
+    profs = copy.deepcopy(profs)
+    profs["skoda-mu1440-p4526"]["selector"]["digest"] = "0" * 64
+    assert any("K8 hash mismatch" in x for x in hash_copy_mismatches(profs))
     bad = copy.deepcopy(skoda)
     bad["java"]["shared_source"] = "modules/profiles/skoda-mu1440-p4526/hmi"
     assert any("duplicated" in x for x in validate_profile(skoda["profile_id"], bad))

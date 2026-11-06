@@ -1,0 +1,5 @@
+# Targets in a known previous state, accepted as upgrade sources by the installer.
+# Format: <target> <sha256> <label>     (target = unit path, e.g. /mnt/app/root/mibr/bin/<file>)
+# For an OEM file the installer additionally needs the stock bytes (own ownership receipt
+# or a verified legacy backup); otherwise it blocks. No public data yet: add rows only
+# from measured unit states, never invent hashes.

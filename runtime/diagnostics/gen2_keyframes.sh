@@ -2,7 +2,8 @@
 set -u
 
 SESSION_MARKER=/tmp/mibr-alt111-keyframe-policy.enabled
-PERSIST_MARKER=/mnt/app/root/mibr-alt111-keyframe-policy.enabled
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+PERSIST_MARKER=$MIBR_ROOT/config/features/mibr-alt111-keyframe-policy.enabled
 STATUS=/tmp/mibr-alt111-gen2.status
 
 usage(){

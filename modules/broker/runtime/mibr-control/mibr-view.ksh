@@ -11,10 +11,11 @@
 # Live state (RAM): $POS (position), $GEN (debounce generation), $LOCK.
 # Output of get/set: key=value lines, last line result=<OK|BAD_VALUE|BUSY|...>.
 # Never writes OEM state; the only external effect is the alt111-settings CLI (live layer) and the own state dir.
-DIR=${MIBR_VIEW_DIR:-/mnt/app/root/mibr-view}
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+DIR=${MIBR_VIEW_DIR:-$MIBR_ROOT/state/cockpit}
 MNT=${MIBR_VIEW_MOUNT:-/mnt/app}
 NOMOUNT=${MIBR_VIEW_NOMOUNT:-0}
-CLI=${MIBR_VIEW_CLI:-/mnt/app/root/altscreen-u2/bin/alt111-settings}
+CLI=${MIBR_VIEW_CLI:-$MIBR_ROOT/bin/alt111-settings}
 POS=${MIBR_VIEW_POS:-/tmp/mibr-view.pos}
 GEN=${MIBR_VIEW_GEN:-/tmp/mibr-view.gen}
 LOCK=${MIBR_VIEW_LOCK:-/tmp/mibr-view.lock}

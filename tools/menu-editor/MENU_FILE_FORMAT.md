@@ -2,7 +2,7 @@
 
 The file the editor saves and the unit loads. `function-catalog.json` lists the function IDs of a build.
 
-- SD card: `/mibr-menu/mibr-menu.txt`. On the unit after loading: `/mnt/app/root/altscreen-u2/config/mibr-menu.conf`.
+- SD card: `/mibr-menu/mibr-menu.txt`. On the unit after loading: `/mnt/app/root/mibr/config/menu/layout.conf`.
 - UTF-8, LF line ends, at most 16384 bytes.
 
 ```text

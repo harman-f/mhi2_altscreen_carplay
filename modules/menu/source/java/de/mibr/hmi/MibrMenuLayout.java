@@ -11,7 +11,7 @@ import java.util.Vector;
  * Format: tools/menu-editor/MENU_FILE_FORMAT.md.
  */
 final class MibrMenuLayout {
-    static final String STORED="/mnt/app/root/altscreen-u2/config/mibr-menu.conf";
+    static final String STORED="/mnt/app/root/mibr/config/menu/layout.conf";
     /** Test seam. */
     static String storedPath=STORED;
     static final String SD_FILE="/net/mmx/fs/sda0/mibr-menu/mibr-menu.txt";

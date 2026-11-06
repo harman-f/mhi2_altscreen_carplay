@@ -1,5 +1,8 @@
 # Firmware / binary findings ↔ published Wireless CarPlay prototype source
 
+> **Research status · 2026-11-05: FROZEN WIRELESS SOURCE REFERENCE.** This preserves dated original cross-references; no complete native Wireless CarPlay vehicle qualification is claimed. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 > **Research cross-reference — experimental / not vehicle validated.** This page links the firmware components examined in reverse engineering to the **documentation** and the **42 project-authored source files** published in this repository. It is an index of evidence and related source, **not** a claim that the stock OEM binaries or iOS frameworks have been redistributed.
 
 **Entry points:** [Research README](README.md) · [Detailed end-to-end architecture](09_END_TO_END_ARCHITECTURE.md) · [Prototype source README](prototype/README.md) · [Exact exported source manifest (SHA-256)](prototype/SOURCE_MANIFEST.tsv) · [Publication review](prototype/PUBLICATION_REVIEW.md).

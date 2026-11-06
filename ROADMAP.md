@@ -13,19 +13,19 @@
 - [x] Project-owned OEM-style HOME/Settings and bounded controller prototypes; still awaiting full per-setting APPLY/ACTIVE acceptance
 - [x] Demonstrated Apple Maps zoom in an independently tested development combination; input/visible focus integration remains gated
 
-The last three milestones are development results, **not** included as finished features in the existing pinned public ZIP. [Current evidence](docs/status/INTEGRATION_STATUS_2026-10-21.md) · [Released and experimental source coverage](docs/status/PUBLISHED_SOURCE_COVERAGE.md).
+The last three milestones are development results, **not** included as finished features in the existing pinned public ZIP. [Current feature and acceptance status](docs/status/FEATURE_STATUS.md) · [Published source coverage](docs/status/PUBLISHED_SOURCE_COVERAGE.md) · [Package stages](docs/packages/README.md).
 
 ## Next release milestones
 
 | Goal | Gate before promotion |
 | --- | --- |
 | **Stable session and recovery behavior** | Separate source-111 session teardown from native writer-gate loss; remove duplicate supervisor; validate reconnect with new session/config/IDR and visible VC result |
-| **Coherent source release** | Publish a reviewed source/build/test tree for newer parity/supervisor, MIBR/3 controller, project-owned Java HMI and physical input modules with provenance and real dependency manifest |
+| **Modular source integrated** | **Source milestone complete:** MIB Runtime common modules, settings registry, firmware adapters and installer/assembler tooling are on public `main`. Exact external J9 builds, final complete ZIP and vehicle evidence are independent remaining gates |
 | **OEM navigation configuration** | UI/store, qualified application and actual owner/session/visible ACTIVE independently evidenced; keep OEM keys and main CarPlay stable |
 | **Right-roller zoom and KEY40 STOCK/CARPLAY route selection** | Qualify current-focus input, semantic owner, real visual effect, request-specific ACK and safe handback on the exact fitted target |
 | **Vehicle status integration** | Preserve stock GNSS, qualify real DSI units, existing iAP2 owner attachment, feature subscription/stop and iPhone acceptance of actual speed, ambient temperature, range and warnings |
 | **Portability** | Exact firmware/J9, OEM widget IDs, DSI source and fitted display routing verified separately for each SEAT/VW/CUPRA/Škoda target |
-| **Distribution** | Build reproducibility, independent test evidence, exact installer preflight and rollback, manifest and separate vehicle acceptance |
+| **Three-profile beta distribution** | Finish per-profile J9 outputs and one complete validated MU1440/MU1409/MU1447 ZIP; separately verify preflight, install, recovery and vehicle behavior before stronger support claims |
 
 ## Additional research directions
 

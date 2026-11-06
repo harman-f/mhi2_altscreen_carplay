@@ -30,6 +30,7 @@ public final class MibrHomeList extends WidgetList {
     private MibrHomeAnimationMirror mirror;
     private de.vw.mib.view.internal.AbstractViewHandler mirrorHandler;
     private MibrOemTileLongPress oemLongPress;
+    private MibrTileRenderer tileRenderer;
     /** Opens the owned CarPlay settings page; shared by our tile and the OEM long press. */
     private static final Runnable OPEN_OWN_PAGE = new Runnable() {
         public void run() {
@@ -190,11 +191,13 @@ public final class MibrHomeList extends WidgetList {
         item.setUI(new ListItemUI());
         int width = template.get_width();
         int height = template.get_height();
-        int iconWidth = Math.min(235, Math.max(0, width - 60));
-        int iconHeight = Math.min(154, Math.max(0, height - 80));
-        int iconX = (width - iconWidth) / 2;
-        int iconY = Math.min(30, Math.max(0, height - iconHeight - 50));
-        int labelWidth = Math.min(235, Math.max(0, width - 60));
+        MibrOemProfile profile = MibrOemProfiles.current();
+        int[] geometry = profile.homeTileGeometry(width, height);
+        int iconX = geometry[0];
+        int iconY = geometry[1];
+        int iconWidth = geometry[2];
+        int iconHeight = geometry[3];
+        int labelWidth = geometry[4];
         int labelHeight = Math.min(37, height);
         int labelX = (width - labelWidth) / 2;
         int labelY = Math.max(0, height - labelHeight - 1);
@@ -205,33 +208,24 @@ public final class MibrHomeList extends WidgetList {
             new MibrOwnedWidgets.ActionSink() {
                 public void onReleased() { OPEN_OWN_PAGE.run(); }
             }, "MibrCarPlayTileButton", -8801, 0, 0, width, height);
-        // r27: the stock tile art (flat pressed bitmap) must not show behind our own four-state icon.
-        de.vw.mib.graphics.image.Image[] stockArt = style.get_imagesBackground();
-        de.vw.mib.graphics.image.Image[] blankArt =
-            new de.vw.mib.graphics.image.Image[stockArt == null ? 0 : stockArt.length];
-        for (int i = 0; i < blankArt.length; i++) blankArt[i] = new de.vw.mib.graphics.image.Image();
-        touch.set_imagesBackground(blankArt);
+        // The profile's renderer decides how the stock tile art is treated.
+        MibrTileRenderer renderer = profile.createTileRenderer();
+        renderer.configureBackground(style, touch);
         touch.set_colorsBackground(style.get_colorsBackground());
         touch.set_textColors(style.get_textColors());
-        WidgetModel icon = null;
-        if (iconWidth > 0 && iconHeight > 0) {
-            icon = MibrOwnedWidgets.createFourStateIcon(null, touch,
-                    "MibrCarPlayTileIcon", -8803,
-                    iconX, iconY, iconWidth, iconHeight);
-        }
-        if (icon != null && touch instanceof MibrOwnedWidgets.TouchButton) {
-            final WidgetModel art = icon;
-            ((MibrOwnedWidgets.TouchButton)touch).setStateListener(
-                new Runnable() { public void run() { art.repaint(); } });
-        }
-        touch.setChildren(icon == null ? new WidgetModel[] {label}
-                : new WidgetModel[] {icon, label});
+        WidgetModel[] icons = renderer.createIcons(touch, iconX, iconY, iconWidth, iconHeight);
+        WidgetModel[] children = new WidgetModel[icons.length + 1];
+        System.arraycopy(icons, 0, children, 0, icons.length);
+        children[icons.length] = label;
+        touch.setChildren(children);
         item.setChildren(new WidgetModel[] {touch});
         item.set_selectedButtonRefs(new AbstractButtonModel[] {touch});
         item.set_activatedButtonRefs(new AbstractButtonModel[] {touch});
         item.setCloneData(new Data());
         item.set_name("MibrCarPlayTile");
         ownedTiles.addElement(item);
+        tileRenderer = renderer;
+        renderer.refresh();
         return item;
     }
 
@@ -285,7 +279,12 @@ public final class MibrHomeList extends WidgetList {
             stockFactory.destroyWidgetCloneable(clone);
         }
         public boolean transferData(ListItemModel item, int first, int second) {
-            return item.getCloneData() instanceof Data || stockTransfer.transferData(item, first, second);
+            if (item.getCloneData() instanceof Data) return true;
+            boolean transferred = stockTransfer.transferData(item, first, second);
+            // Firmware that clears listeners on deInit: stock list scrolling can
+            // reinitialize SmartphoneIntegration clones, so arm those clones too.
+            if (MibrOemProfiles.current().listenersClearedOnDeInit()) refreshOemLongPress();
+            return transferred;
         }
     }
 
@@ -301,6 +300,9 @@ public final class MibrHomeList extends WidgetList {
         try {
             de.vw.mib.view.internal.AbstractViewHandler handler = MibrSsmSourceBinding.findHandler(owner);
             if (handler == null) return; // retried on activate()
+            // Where listeners are cleared on deInit the shortcut must not depend
+            // on the animation table being wrappable.
+            if (MibrOemProfiles.current().listenersClearedOnDeInit()) installOemLongPress(handler);
             mirror = MibrHomeAnimationMirror.install(handler, new MibrHomeAnimationMirror.Targets() {
                 public WidgetModel[] ownedTiles() {
                     WidgetModel[] tiles = new WidgetModel[ownedTiles.size()];
@@ -331,7 +333,12 @@ public final class MibrHomeList extends WidgetList {
 
     public void activate() {
         super.activate();
+        if (original != null && tileRenderer != null) tileRenderer.refresh();
         if (original != null && mirror == null) scheduleMirror();
+        refreshOemLongPress();
+    }
+
+    private void refreshOemLongPress() {
         if (oemLongPress != null) {
             try { oemLongPress.refresh(); }
             catch (Throwable t) { System.err.println("MIBR_OEM_LONGPRESS_REFRESH_FAILED " + t); }
@@ -360,6 +367,7 @@ public final class MibrHomeList extends WidgetList {
         } finally {
             setWidgetCloneFactory(stockFactory);
             setListItemTransfer(stockTransfer);
+            tileRenderer = null;
             original = null; stockFactory = null; stockTransfer = null;
             template = null; master = null; style = null; textStyle = null; owner = null;
             if (active == this) active = null;

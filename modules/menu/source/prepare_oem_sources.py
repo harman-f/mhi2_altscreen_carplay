@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Patch two caller-supplied OEM source files in a private build directory.
 
-The inputs are not distributed. Each patch is guarded by exact unique anchors;
-source drift fails closed instead of producing a partial replacement.
+The inputs are not distributed. Each patch is guarded by exact unique anchors,
+read as data from modules/profiles/<id>/hmi/oem-anchors.json; source drift fails
+closed instead of producing a partial replacement.
 """
 import argparse
+import json
 from pathlib import Path
 
 
@@ -15,88 +17,56 @@ def replace_once(text, old, new, label):
     return text.replace(old, new, 1)
 
 
-def patch_activator(text):
-    if "de.mibr.hmi.MibrHomeCio" in text or "new de.mibr.hmi.MibrVisualizationService" in text:
-        raise ValueError("ACTIVATOR_ALREADY_PATCHED")
-    text = replace_once(
-        text,
-        "public void start(BundleContext bundleContext) {\n        this.bundleContext = bundleContext;",
-        "public void start(BundleContext bundleContext) {\n"
-        "        de.mibr.hmi.MibrHomeCio.activatorStarted();\n"
-        "        this.bundleContext = bundleContext;",
-        "ACTIVATOR_START",
-    )
-    text = replace_once(
-        text,
-        "import org.osgi.framework.BundleContext;",
-        "import org.osgi.framework.BundleContext;\nimport org.osgi.framework.InvalidSyntaxException;",
-        "ACTIVATOR_INVALID_SYNTAX_IMPORT",
-    )
-    text = replace_once(
-        text,
-        "public void stop(BundleContext bundleContext) {\n    }",
-        "public void stop(BundleContext bundleContext) {\n"
-        "        de.mibr.hmi.MibrHomeCio.deactivate();\n"
-        "    }",
-        "ACTIVATOR_STOP",
-    )
-    text = replace_once(
-        text,
-        "throw new NoClassDefFoundError().initCause(classNotFoundException);",
-        "NoClassDefFoundError err = new NoClassDefFoundError(); "
-        "err.initCause(classNotFoundException); throw err;",
-        "ACTIVATOR_JAVA12_CAUSE",
-    )
-    text = replace_once(
-        text,
-        "this.factory = new Factory(this.logger, configurationManager, this.dictionary, this.idService);",
-        "this.factory = new Factory(this.logger, configurationManager, this.dictionary, this.idService);\n"
-        "        de.mibr.hmi.MibrHomeCio.bind(this.factory, this.dictionary, dispatcher, this.idService);",
-        "ACTIVATOR_BIND",
-    )
-    text = replace_once(
-        text,
-        "this.factory.setScriptWidgetService(this.scriptWidgetCioService);",
-        "this.factory.setScriptWidgetService(this.scriptWidgetCioService);\n"
-        "        de.mibr.hmi.MibrHomeCio.activate(this.cioVisualizationService);",
-        "ACTIVATOR_ACTIVATE",
-    )
-    text = replace_once(
-        text,
-        "this.bundleContext.addServiceListener(this, string);\n"
-        "        ServiceReference[] serviceReferenceArray = this.bundleContext.getServiceReferences(null, string);",
-        "ServiceReference[] serviceReferenceArray;\n"
-        "        try {\n"
-        "            this.bundleContext.addServiceListener(this, string);\n"
-        "            serviceReferenceArray = this.bundleContext.getServiceReferences(null, string);\n"
-        "        } catch (InvalidSyntaxException invalidSyntaxException) {\n"
-        "            throw new IllegalArgumentException(\"Invalid CIO service filter: \" + invalidSyntaxException.toString());\n"
-        "        }",
-        "ACTIVATOR_SERVICE_FILTER_CHECKED_EXCEPTION",
-    )
-    return replace_once(
-        text,
-        "this.cioVisualizationService = (CioVisualizationService)object;",
-        "this.cioVisualizationService = new de.mibr.hmi.MibrVisualizationService((CioVisualizationService)object);",
-        "ACTIVATOR_VISUALIZATION",
-    )
+DEFAULT_PROFILE = "skoda-mu1440-p4526"
+PROFILES_DIR = Path(__file__).resolve().parents[2] / "profiles"
+_CACHE = {}
 
 
-def patch_widget_factory(text):
-    if "import de.mibr.hmi.MibrHomeList;" in text or "return new MibrHomeList();" in text:
-        raise ValueError("WIDGET_FACTORY_ALREADY_PATCHED")
-    text = replace_once(
-        text,
-        "import de.vw.mib.view.internal.treebuilder.WidgetFactory;",
-        "import de.vw.mib.view.internal.treebuilder.WidgetFactory;\nimport de.mibr.hmi.MibrHomeList;",
-        "WIDGET_FACTORY_IMPORT",
-    )
-    return replace_once(
-        text,
-        "case 55: {\n                return new WidgetList();\n            }",
-        "case 55: {\n                return new MibrHomeList();\n            }",
-        "WIDGET_FACTORY_SLOT_55",
-    )
+def load_anchors(profile=DEFAULT_PROFILE, profiles_dir=None):
+    """Anchor set (data) of one profile: modules/profiles/<id>/hmi/oem-anchors.json.
+
+    A profile may reuse another profile's anchors with "anchors_from".
+    """
+    base = Path(profiles_dir) if profiles_dir else PROFILES_DIR
+    key = (str(base), profile)
+    if key in _CACHE:
+        return _CACHE[key]
+    seen = []
+    name = profile
+    while True:
+        if name in seen or "/" in name or "\\" in name or name.startswith("."):
+            raise ValueError("PROFILE_ANCHORS_INVALID=" + name)
+        seen.append(name)
+        path = base / name / "hmi" / "oem-anchors.json"
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            raise ValueError("PROFILE_ANCHORS_MISSING=" + name)
+        if "anchors_from" not in data:
+            break
+        name = data["anchors_from"]
+    _CACHE[key] = data
+    return data
+
+
+def apply_anchor_set(text, spec, already_patched_label):
+    """Apply guarded exact-anchor edits; every anchor must occur exactly once."""
+    for marker in spec["already_patched_markers"]:
+        if marker in text:
+            raise ValueError(already_patched_label)
+    for edit in spec["edits"]:
+        text = replace_once(text, edit["old"], edit["new"], edit["label"])
+    return text
+
+
+def patch_activator(text, anchors=None):
+    anchors = anchors or load_anchors()
+    return apply_anchor_set(text, anchors["activator"], "ACTIVATOR_ALREADY_PATCHED")
+
+
+def patch_widget_factory(text, anchors=None):
+    anchors = anchors or load_anchors()
+    return apply_anchor_set(text, anchors["widget_factory"], "WIDGET_FACTORY_ALREADY_PATCHED")
 
 
 def main():
@@ -107,19 +77,22 @@ def main():
                         help="local source for the target WidgetFactoryImpl")
     parser.add_argument("--out-dir", required=True, type=Path,
                         help="private generated-source directory")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE,
+                        help="profile id whose hmi/oem-anchors.json is applied")
     args = parser.parse_args()
     try:
+        anchors = load_anchors(args.profile)
         activator = args.activator.read_text(encoding="utf-8").replace("\r\n", "\n")
         widget = args.widget_factory.read_text(encoding="utf-8").replace("\r\n", "\n")
-        activator = patch_activator(activator)
-        widget = patch_widget_factory(widget)
+        activator = patch_activator(activator, anchors)
+        widget = patch_widget_factory(widget, anchors)
         a_path = args.out_dir / "de/vw/mib/cio/internal/Activator.java"
         w_path = args.out_dir / "generated/de/vw/mib/global/view/internal/WidgetFactoryImpl.java"
         a_path.parent.mkdir(parents=True, exist_ok=True)
         w_path.parent.mkdir(parents=True, exist_ok=True)
         a_path.write_text(activator, encoding="utf-8", newline="\n")
         w_path.write_text(widget, encoding="utf-8", newline="\n")
-        print("OEM_SOURCE_PATCH=PASS inputs=2 outputs=private-build-only")
+        print(anchors.get("pass_label", "OEM_SOURCE_PATCH") + "=PASS inputs=2 outputs=private-build-only")
         return 0
     except (OSError, UnicodeError, ValueError) as error:
         raise SystemExit(str(error))

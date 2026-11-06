@@ -4,6 +4,7 @@
  * OFFLINE/host qualified only; explicit standalone Unit approval required.
  */
 #define _POSIX_C_SOURCE 200809L
+#include "../../../carplay/source/alt111-settings/include/mibr_paths.h"
 #include "alt111_settings.h"
 #include <arpa/inet.h>
 #include <errno.h>
@@ -18,7 +19,7 @@
 #include <unistd.h>
 #define REQ_CAP 512
 #define REPLY_CAP 768
-static const struct alt111_settings_paths production_paths={"/tmp","/mnt/app/root"};
+static const struct alt111_settings_paths production_paths={"/tmp",MIBR_CARPLAY_CONFIG_DIR};
 static struct alt111_settings_paths paths;
 static char auth[33];
 static int enabled;

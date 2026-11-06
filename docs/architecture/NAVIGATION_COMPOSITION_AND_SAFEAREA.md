@@ -127,5 +127,5 @@ The intended runtime sequence is therefore:
 **Historical initial implementation (September):** the first public GEN2 variant exposed only one ViewArea and contained an `updateViewArea` command scaffold; its original adjacency list was incomplete. **Later development (October):** two-area negotiation and composition are present in separately tested development candidates and have vehicle observation, but the current public ZIP, physical layout/button mapping and full HMI current-session APPLY/ACTIVE acceptance must be checked **independently**. Do not use this older one-area paragraph to classify all later source or to infer a finished generic in-session layout toggle.
 
 See
-[CarPlay cluster / Ultra research closeout](../research/CARPLAY_CLUSTER_ULTRA_CLOSEOUT_2026-10-03.md)
+[CarPlay cluster / Ultra research closeout](../research/carplay/CARPLAY_CLUSTER_ULTRA_CLOSEOUT_2026-10-03.md)
 for the final research status.

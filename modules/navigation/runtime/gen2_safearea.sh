@@ -1,7 +1,8 @@
 #!/bin/ksh
 set -u
 
-ROOT=/mnt/app/root
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+ROOT=$MIBR_ROOT/config/cockpit
 CONF=$ROOT/mibr-carplay111-safearea.conf
 FULL_W=1010
 FULL_H=376
