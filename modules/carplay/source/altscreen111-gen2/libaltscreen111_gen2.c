@@ -395,6 +395,16 @@ static const char *g2_diag_stop_marker = "/tmp/mibr-alt111-stop-only";
 static const char *g2_diag_show_marker = "/tmp/mibr-alt111-show-only";
 static const char *g2_diag_keyframe_marker = "/tmp/mibr-alt111-keyframe-only";
 static const char *g2_view_request_path = "/tmp/mibr-alt111-viewarea-request";
+/* Opt-in, volatile, one-shot experiment; never a default feature. */
+static const char *g2_panel_enable="/tmp/mibr-alt111-panel-poc.enabled";
+static const char *g2_panel_request="/tmp/mibr-alt111-panel-poc.request";
+static const char *g2_panel_status="/tmp/mibr-alt111-panel-poc.status";
+static pthread_mutex_t g2_panel_lock=PTHREAD_MUTEX_INITIALIZER;
+static CFDictionaryRef g2_panel_advertised;
+static AirPlayReceiverSessionRef g2_panel_advertised_session;
+static uint64_t g2_panel_sequence,g2_panel_generation,g2_panel_deadline;
+static int g2_panel_busy;
+
 static const char *g2_resync_enable_marker = "/tmp/mibr-alt111-resync.enabled";
 static const char *g2_resync_arm_marker = "/tmp/mibr-alt111-resync-arm";
 static const char *g2_bridge_status_path = "/tmp/mibr-parity-ts.status";
@@ -3509,6 +3519,16 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
             return base;
         }
         if(settings_scope())settings_scope()->descriptor_complete=1u;
+        /* Reuse the exact completed /info descriptor, not unsent preferences. */
+        if(session){
+            CFDictionaryRef old;
+            pthread_mutex_lock(&g_settings_lock);
+            old=g2_panel_advertised;
+            g2_panel_advertised=(CFDictionaryRef)p_CFRetain(alt);
+            g2_panel_advertised_session=session;
+            pthread_mutex_unlock(&g_settings_lock);
+            if(old)p_CFRelease(old);
+        }
         /* These are called advertised only after the complete two-display
          * descriptor has been assembled and installed in the returned /info. */
         scaling_log_display("advertised-main",
@@ -3665,6 +3685,199 @@ done:
     if(params)p_CFRelease(params);
     if(req)p_CFRelease(req);
     return NULL;
+}
+
+/*
+ * updateDisplayPanels is a protocol experiment, NOT an established live scale
+ * setter. iOS 26.1 replaces its video-stream inventory on this command:
+ * always preserve exact advertised stream UUID and origin fields.
+ */
+static CFMutableDictionaryRef gen2_panel_command(CFDictionaryRef original,
+                                                 int zoom,int physical)
+{
+    CFMutableDictionaryRef req=NULL,params=NULL,panel=NULL;
+    CFMutableArrayRef panels=NULL;
+    CFStringRef uidkey=NULL,streamkey=NULL,key=NULL;
+    CFTypeRef uid=NULL,streams=NULL;
+    int64_t v;
+    int pw=0,ph=0;
+    OSStatus err;
+    const char *keys[]={"widthPixels","heightPixels","widthPhysical","heightPhysical"};
+    int i;
+    if(!original)return NULL;
+    uidkey=s_cf("uid");streamkey=s_cf("initialVideoStreams");
+    if(!uidkey||!streamkey)goto fail;
+    uid=p_CFDictionaryGetValue(original,uidkey);
+    streams=p_CFDictionaryGetValue(original,streamkey);
+    if(!uid||p_CFGetTypeID(uid)!=p_CFStringGetTypeID()||
+       !streams||p_CFGetTypeID(streams)!=p_CFArrayGetTypeID()||
+       p_CFArrayGetCount((CFArrayRef)streams)!=1)goto fail;
+    req=dict_new();params=dict_new();panel=dict_new();
+    panels=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
+    if(!req||!params||!panel||!panels)goto fail;
+    p_CFDictionarySetValue(panel,uidkey,uid);
+    key=s_cf("videoStreams");if(!key)goto fail;
+    p_CFDictionarySetValue(panel,key,streams);p_CFRelease(key);key=NULL;
+    if(physical && mibr_display_physical_dimensions(physical==20?"P20":
+       physical==30?"P30":physical==50?"P50":"BASE",&pw,&ph))goto fail;
+    for(i=0;i<4;i++){
+        key=s_cf(keys[i]);if(!key)goto fail;
+        err=-1;v=p_CFDictionaryGetInt64(original,key,&err);
+        p_CFRelease(key);key=NULL;
+        if(err||v<=0)goto fail;
+        if(physical && i==2)v=pw;
+        if(physical && i==3)v=ph;
+        if(set_i64(panel,keys[i],v))goto fail;
+    }
+    if(zoom && set_i64(panel,"zoomFactor",zoom))goto fail;
+    if(!zoom){
+        key=s_cf("zoomFactor");if(!key)goto fail;
+        {CFTypeRef x=p_CFDictionaryGetValue(original,key);
+         if(x)p_CFDictionarySetValue(panel,key,x);}
+        p_CFRelease(key);key=NULL;
+    }
+    p_CFArrayAppendValue(panels,panel);
+    key=s_cf("displayPanels");if(!key)goto fail;
+    p_CFDictionarySetValue(params,key,panels);p_CFRelease(key);key=NULL;
+    if(set_str(req,"type","updateDisplayPanels"))goto fail;
+    key=s_cf("params");if(!key)goto fail;
+    p_CFDictionarySetValue(req,key,params);
+    p_CFRelease(key);p_CFRelease(uidkey);p_CFRelease(streamkey);
+    p_CFRelease(panel);p_CFRelease(params);p_CFRelease(panels);
+    return req;
+fail:
+    if(key)p_CFRelease(key);
+    if(uidkey)p_CFRelease(uidkey);
+    if(streamkey)p_CFRelease(streamkey);
+    if(panel)p_CFRelease(panel);
+    if(params)p_CFRelease(params);
+    if(panels)p_CFRelease(panels);
+    if(req)p_CFRelease(req);
+    return NULL;
+}
+static void gen2_panel_receipt(const char *state,unsigned value,uint64_t seq,
+                               uint64_t generation,int status)
+{
+    char b[256];int fd,n;
+    n=snprintf(b,sizeof(b),"experiment=updateDisplayPanels\\nstate=%s\\nvalue=%u\\nsequence=%llu\\nsession_generation=%llu\\nos_status=%d\\nvisual_effect=UNKNOWN\\n",
+        state,value,(unsigned long long)seq,(unsigned long long)generation,status);
+    if(n<=0||n>=(int)sizeof(b))return;
+    fd=open(g2_panel_status,O_WRONLY|O_CREAT|O_TRUNC,0600);
+    if(fd>=0){(void)write(fd,b,(size_t)n);close(fd);}
+}
+struct gen2_panel_context {uint64_t sequence,generation;unsigned value;};
+static void gen2_panel_callback(OSStatus status,CFDictionaryRef response,void *opaque)
+{
+    struct gen2_panel_context *c=(struct gen2_panel_context *)opaque;
+    int current;
+    (void)response;
+    if(!c)return;
+    pthread_mutex_lock(&g2_panel_lock);
+    current=g2_panel_busy && c->sequence==g2_panel_sequence &&
+        c->generation==g2_panel_generation;
+    if(current){
+        g2_panel_busy=0;
+        gen2_panel_receipt(status==K_NO_ERR?"ACK_EFFECT_UNKNOWN":"REJECTED",
+            c->value,c->sequence,c->generation,status);
+    }
+    pthread_mutex_unlock(&g2_panel_lock);
+    logf_u2("GEN2 PANEL_POC reply seq=%llu gen=%llu os=%d current=%d effect=UNKNOWN",
+        (unsigned long long)c->sequence,(unsigned long long)c->generation,(int)status,current);
+    free(c);
+}
+static int gen2_panel_is_busy(void)
+{
+    int busy;
+    pthread_mutex_lock(&g2_panel_lock);
+    if(g2_panel_busy && monotonic_ms()>=g2_panel_deadline){
+        gen2_panel_receipt("TIMEOUT_EFFECT_UNKNOWN",0,g2_panel_sequence,g2_panel_generation,-1);
+        g2_panel_busy=0;
+    }
+    busy=g2_panel_busy;
+    pthread_mutex_unlock(&g2_panel_lock);
+    return busy;
+}
+/* Single worker: no additional IPC listener, service or persistent setting. */
+static void gen2_panel_tick(void)
+{
+    char b[40];int fd,n,zoom=0,physical=0,ready=0,rc=-1;
+    uint64_t generation=0,seq=0;
+    AirPlayReceiverSessionRef session=NULL;
+    CFDictionaryRef original=NULL;
+    CFMutableDictionaryRef req=NULL;
+    struct gen2_panel_context *ctx=NULL;
+    if(access(g2_panel_request,F_OK)!=0)return;
+    fd=open(g2_panel_request,O_RDONLY);
+    n=fd<0?-1:(int)read(fd,b,sizeof(b)-1);
+    if(fd>=0)close(fd);
+    unlink(g2_panel_request);
+    if(n<=0||n>=(int)sizeof(b))goto reject;
+    b[n]=0;if(b[n-1]=='\\n')b[--n]=0;
+    if(!strcmp(b,"ZOOM=70"))zoom=70;
+    else if(!strcmp(b,"ZOOM=85"))zoom=85;
+    else if(!strcmp(b,"ZOOM=100"))zoom=100;
+    else if(!strcmp(b,"ZOOM=125"))zoom=125;
+    else if(!strcmp(b,"ZOOM=150"))zoom=150;
+    else if(!strcmp(b,"PHYSICAL=BASE"))physical=100;
+    else if(!strcmp(b,"PHYSICAL=P20"))physical=20;
+    else if(!strcmp(b,"PHYSICAL=P30"))physical=30;
+    else if(!strcmp(b,"PHYSICAL=P50"))physical=50;
+    else goto reject;
+    if(access(g2_panel_enable,F_OK)!=0||gen2_panel_is_busy())goto reject;
+    pthread_mutex_lock(&g2_core_lock);
+    ready=g2_command_ready && g2_control_session &&
+        g2_control.active && g2_control.desired && g2_control.shown_ack &&
+        !g2_control.reacquiring && g2_control.pending.type==ALT111_CMD_NONE &&
+        g2_video.active && g2_video.config_valid;
+    generation=g2_control_session;
+    pthread_mutex_unlock(&g2_core_lock);
+    if(!ready)goto reject;
+    pthread_mutex_lock(&g_settings_lock);
+    if(g_settings_have_active && g_settings_active_confirmed &&
+       g_settings_active_control_generation==generation &&
+       g_settings_active_session && g2_panel_advertised &&
+       g2_panel_advertised_session==g_settings_active_session){
+        session=(AirPlayReceiverSessionRef)p_CFRetain(g_settings_active_session);
+        original=(CFDictionaryRef)p_CFRetain(g2_panel_advertised);
+    }
+    pthread_mutex_unlock(&g_settings_lock);
+    if(!session||!original||!g_sendcmd)goto reject;
+    req=gen2_panel_command(original,zoom,physical);
+    ctx=(struct gen2_panel_context *)calloc(1,sizeof(*ctx));
+    if(!req||!ctx)goto reject;
+    ctx->value=(unsigned)(zoom?zoom:physical);
+    ctx->generation=generation;
+    pthread_mutex_lock(&g2_panel_lock);
+    seq=++g2_panel_sequence;ctx->sequence=seq;
+    g2_panel_generation=generation;
+    g2_panel_busy=1;
+    g2_panel_deadline=monotonic_ms()+3000u;
+    gen2_panel_receipt("SUBMITTING",ctx->value,seq,generation,0);
+    pthread_mutex_unlock(&g2_panel_lock);
+    rc=(int)g_sendcmd(session,req,gen2_panel_callback,ctx);
+    if(rc==K_NO_ERR)ctx=NULL; /* completion owns the context */
+    else {
+        pthread_mutex_lock(&g2_panel_lock);
+        if(g2_panel_busy&&g2_panel_sequence==seq){
+            g2_panel_busy=0;
+            gen2_panel_receipt("SEND_FAILED",(unsigned)(zoom?zoom:physical),seq,generation,rc);
+        }
+        pthread_mutex_unlock(&g2_panel_lock);
+    }
+    logf_u2("GEN2 PANEL_POC send seq=%llu gen=%llu zoom=%d physical=%d os=%d effect=UNKNOWN",
+        (unsigned long long)seq,(unsigned long long)generation,zoom,physical,rc);
+    goto done;
+reject:
+    pthread_mutex_lock(&g2_panel_lock);
+    gen2_panel_receipt("REJECTED_INVALID_DISABLED_OR_BUSY",
+        (unsigned)(zoom?zoom:physical),g2_panel_sequence,generation,-1);
+    pthread_mutex_unlock(&g2_panel_lock);
+    logf_u2("GEN2 PANEL_POC reject zoom=%d physical=%d ready=%d",zoom,physical,ready);
+done:
+    if(ctx)free(ctx);
+    if(req)p_CFRelease(req);
+    if(original)p_CFRelease(original);
+    if(session)p_CFRelease(session);
 }
 
 static CFMutableDictionaryRef gen2_command_dictionary(const struct alt111_command *cmd)
@@ -4492,6 +4705,9 @@ static void *gen2_control_worker(void *arg)
         gen2_resync_poll();
         gen2_process_diag_markers();
         gen2_apply_selected_view();
+        gen2_panel_tick();
+        /* Pending POC callback owns the control plane until ACK or timeout. */
+        if(gen2_panel_is_busy()){usleep(10000);continue;}
 
         if(access(g2_reacquire_marker,F_OK)==0){
             unlink(g2_reacquire_marker);
