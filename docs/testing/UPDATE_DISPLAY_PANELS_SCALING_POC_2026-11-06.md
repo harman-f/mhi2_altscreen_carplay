@@ -20,7 +20,7 @@ POC is designed to produce actual evidence rather than assuming support.
 
 ## Code and safety boundary
 
-- Only the existing GEN2 `libaltscreen111_gen2.c` source is changed.
+- Only the existing GEN2 `libaltscreen111_gen2.c` runtime source is changed; supporting diagnostic shell scripts and the volatile-path allowlist are included.
 - The currently advertised, successful cluster `/info` descriptor is retained
   in memory. Both display UID and the original `initialVideoStreams` array
   are reused in the `updateDisplayPanels` command. The video stream list
@@ -35,7 +35,7 @@ POC is designed to produce actual evidence rather than assuming support.
 - A three-second completion timeout releases the worker. Session teardown
   invalidates the probe and discards the retained descriptor. A late callback
   cannot overwrite the current result.
-- No changes to the broker, settings registry, menu, installer or firmware.
+- No changes to the broker, persistent setting definitions, menu, installer or firmware. The three new volatile diagnostic paths are declared in the registry path allowlist for publication auditing.
   No process kill or forced reconnect.
 - All controls are volatile under `/tmp`; the POC starts **disabled**.
 
