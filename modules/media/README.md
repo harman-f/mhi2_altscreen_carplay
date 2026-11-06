@@ -29,3 +29,33 @@ gate. Existing navigation arrows/video and native audio sources remain unchanged
 
 Do not package copied reference sources into runtime `common/media/bin/`.
 A host `PASS` is **not** a working `VCInformation.jar` or an OEM ABI build.
+
+## V1 handoff into MIBR runtime (source-only)
+
+The unit root is `/mnt/app/root/mibr/` (M1 architecture), **not** the old
+`altscreen-u2` directory. This module currently installs nothing and
+stores no files. **Do not add another configuration parser or broker.**
+
+`source/mibr_media_ingress.[ch]` is the first-party platform-neutral
+contract for the *existing authenticated* iAP2 worker. It accepts a strictly
+increasing owner generation + session id and requires both exact input ABI
+and ASL thread-affinity proof. A fresh attach clears old track and artwork.
+Track and cover updates must match generation, session, transfer ID and
+track epoch. It exposes only a copyable state snapshot to a future
+**firmware-specific ASL-thread dispatcher**, which must preserve the OEM
+picture server. It neither calls BAP nor exposes its own socket/file IPC.
+
+Desired enable/disable must be confirmed through the **one MIBR/3 broker**.
+The current 48-setting/13-switch registry does **not** contain a functional
+Media control. Until the broker gains a verified setting and a real owner
+consumer, the adapter is NOT bound; testing the pure ingress with
+`enable(1)` only exercises policy, not a vehicle function. Add the control
+to `settings/registry.json` **once**, with generated native/J9 bindings and
+ACTION/ACK evidence, only in a dedicated follow-up PR.
+
+Profile-specific ABI manifests declare exact `/ifs/lsd.jxe` and
+`hmi.api_jar_sha256` matching the canonical `profile.json`; they retain
+`auto_install=false` and `compiled_artifact=null`. Source-only
+adapter tests live in `tests/`. Do not introduce an `mm-ipod` wrapper,
+second `dio_manager`, global image-provider replacement or raw album art
+in a MIBR/3 message.
