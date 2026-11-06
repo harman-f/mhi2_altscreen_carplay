@@ -17,6 +17,4 @@ status. Its [host-only validation gate](../tools/check_module_index.py) checks
 ownership conflicts and reports dependency-aware change impact; it does **not**
 claim full reproducible builds or a qualified multi-target release.
 
-**4 November source stage:** Media and Phone have independently tested host
-models and correctly attributed upstream reference sources only. Their firmware
-BAP/J9 adapters are deliberately absent; no installer may enable them yet.
+**P1/P2 source stage:** Media and Phone have generation-aware host-tested ingress, attributed OSS reference excerpts and three disabled exact-firmware bindings. No Java/QNX integration or installed runtime is claimed.
