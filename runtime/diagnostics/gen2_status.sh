@@ -60,6 +60,10 @@ echo "--- ports ---"
 netstat -an 2>/dev/null | grep -E '(:6031|:19820)' || true
 echo
 
+echo "--- updateDisplayPanels POC ---"
+[ -e /tmp/mibr-alt111-panel-poc.enabled ] && echo "panel_poc_enabled=1" || echo "panel_poc_enabled=0"
+[ -r /tmp/mibr-alt111-panel-poc.status ] && cat /tmp/mibr-alt111-panel-poc.status 2>/dev/null || echo "panel_poc_status=NO_TEST"
+echo
 echo "--- recent hook log ---"
 tail -120 /tmp/altscreen111.log 2>/dev/null || true
 echo
