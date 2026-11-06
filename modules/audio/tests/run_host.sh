@@ -6,4 +6,9 @@ trap 'rm -rf "$tmp"' EXIT
 "${CC:-cc}" -std=c99 -Wall -Wextra -Werror -pedantic \
   "$root/modules/audio/source/mibr_audio_gate.c" \
   "$root/modules/audio/tests/test_audio_gate.c" -o "$tmp/audio-gate"
+"${CC:-cc}" -std=c99 -Wall -Wextra -Werror -pedantic \
+  "$root/modules/audio/source/mibr_audio_gate.c" \
+  "$root/modules/audio/source/mibr_audio_owner.c" \
+  "$root/modules/audio/tests/test_audio_owner.c" -o "$tmp/audio-owner"
+"$tmp/audio-owner"
 "$tmp/audio-gate"
