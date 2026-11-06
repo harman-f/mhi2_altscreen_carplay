@@ -45,7 +45,12 @@ jobs:
                   assert d[key]['compiled_artifact'] is None
           print('MEDIA_PHONE_PROFILE_GATES=PASS')
           PY
+      - name: Canonical broker/runtime/profile and ZIP exclusion contracts
+        run: python3 -B modules/media/tests/check_integration_contracts.py
       - name: Source ownership and publication
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
         run: |
-          python3 tools/check_module_index.py --self-test
-          python3 tools/audit_public_repo.py
+          python3 -B tools/check_module_index.py --self-test
+          python3 -B tools/release/module_plan.py --self-test
+          python3 -B tools/audit_public_repo.py
