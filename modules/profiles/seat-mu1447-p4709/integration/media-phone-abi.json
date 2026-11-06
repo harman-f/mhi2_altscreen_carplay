@@ -42,5 +42,31 @@
     "no_hfp_disable": true,
     "known_reference": "Audi AU37x / K3346 / MHI2Q only; not confirmed on this profile"
   },
-  "notes": "P4709 JXE differs from P4708; SEAT render geometry requires own calibration"
+  "notes": "P4709 JXE differs from P4708; SEAT render geometry requires own calibration",
+  "integration_contract": {
+    "schema": "mibr-module-binding/1",
+    "project_runtime_root": "/mnt/app/root/mibr",
+    "profile_selector_source": "/ifs/lsd.jxe",
+    "profile_selector_sha256": "945586fbede2fe53b5b41d7c10490641ff71fcc9581fb237cf40328f450cb22e",
+    "hmi_api_jar_sha256": "203087feace6228dc6544f01d10552c369fff1bf2ea5782d324fa4db1ce39c88",
+    "control_plane": "MIBR/3",
+    "control_owner": "modules/broker/source/mibr-control",
+    "control_connection": "existing-authenticated-loopback-only",
+    "control_binding": "not-implemented",
+    "settings_registry": "settings/registry.json",
+    "registry_key": null,
+    "desired_enabled": "off",
+    "runtime_activation": "BLOCKED_PENDING_QUALIFIED_OWNER_ACK",
+    "data_plane": "existing-authenticated-iap2-owner",
+    "new_socket_service": false,
+    "new_iap2_session": false,
+    "media_ingress_source": "modules/media/source/mibr_media_ingress.c",
+    "phone_ingress_source": "modules/phone/source/mibr_phone_ingress.c",
+    "native_media_oem_sink": "pending-exact-asl-bap-api",
+    "native_phone_oem_sink": "pending-stock-delegate-and-bap-api",
+    "compiled_j9_adapter": null,
+    "build_recipe": null,
+    "unit_rollback_receipt": null,
+    "safe_behavior": "STOCK_UNMODIFIED"
+  }
 }
