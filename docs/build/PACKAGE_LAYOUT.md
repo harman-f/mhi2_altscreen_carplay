@@ -4,7 +4,8 @@ This document specifies the single **three-target beta** distribution: all three
 
 ```text
 package/
-  installer/                 install, check, and uninstall entrypoints
+  installer/                 mibr-install.ksh, mibr-uninstall.ksh, mibr-status.ksh, select-profile.ksh,
+                             lib/migrate-root.ksh, config/{profiles.list,root-migration.list}
   common/
     carplay/{bin,scripts,config}/
     broker/{bin,scripts,config}/
@@ -14,7 +15,9 @@ package/
       scripts/                shared menu loader
       icons/                  brand-neutral scrollbar assets only
     navigation/{bin,scripts,config}/
-    audio/{bin,scripts,config}/    # reserved P6, not staged in current beta ZIP
+    media/{bin,scripts,config}/    # optional P1 reservation; not built or staged
+    phone/{bin,scripts,config}/    # optional P2 reservation; not built or staged
+    audio/{bin,scripts,config}/    # optional P6 reservation; not built or staged
     config/                  shared defaults and configuration
   profiles/
     skoda-mu1440-p4526/{hmi,icons,display,input,integration}/
@@ -35,7 +38,9 @@ package/
   PACKAGE.sha256             runtime package hashes
 ```
 
-There is one `profiles/` directory. Shared implementations have one canonical owner under `common/`; profile directories hold target-specific HMI, icons, display, input, and integration data or outputs. Runtime binaries live in each `common/<module>/bin/`, with module scripts and configuration under `scripts/` and `config/`. The deployed standard menu is `common/menu/config/mibr-menu.conf`, its loader is under `common/menu/scripts/`, and support JARs are under `common/menu/bin/`. The menu editor exists once under `tools/menu-editor/`, and Java HMI source exists once under `source/hmi/`. Skoda-specific icons live in the Skoda profile; `common/menu/icons/` holds brand-neutral scrollbar assets only. A profile may contain a compiled target artifact when requirements produce distinct outputs, tied to its shared source and build recipe. Album-art handling is not included in this package layout. P6 Audio/Spatial UpMix is reserved as an **optional future** `common/audio/` module. The current beta must not package audio sources, altered QNX audio drivers, external amplifier firmware or runtime hooks. All three `profiles/*/integration/audio-abi.json` files keep `auto_install=false` and `compiled_artifact=null`; adding a directory here is not runtime approval. Firmware fingerprint matching alone never proves the fitted sound-system hardware or its multichannel route.
+P6 external-amplifier audio is likewise reserved as a source-only `common/audio` owner and is NOT staged in the current beta. All three `audio-abi.json` profiles require `auto_install=false`, `compiled_artifact=null`; no audio hooks, external amplifier firmware, PCM driver or DSP calibration may be packaged before exact-target qualification.
+
+There is one `profiles/` directory. Shared implementations have one canonical owner under `common/`; profile directories hold target-specific HMI, icons, display, input, and integration data or outputs. Runtime binaries live in each `common/<module>/bin/`, with module scripts and configuration under `scripts/` and `config/`. The deployed standard menu is `common/menu/config/mibr-menu.conf`, its loader is under `common/menu/scripts/`, and support JARs are under `common/menu/bin/`. The menu editor exists once under `tools/menu-editor/`, and Java HMI source exists once under `source/hmi/`. Skoda-specific icons live in the Skoda profile; `common/menu/icons/` holds brand-neutral scrollbar assets only. A profile may contain a compiled target artifact when requirements produce distinct outputs, tied to its shared source and build recipe. Album-art handling is not included in this package layout. P1 Media/Now Playing and P2 Phone are reserved as disabled source-stage modules. Neither is a runtime input of `tools/release/build_modular.py`, and none of their upstream reference sources, firmware-specific JVM artifacts or hooks belong in the current ZIP. All three `media-phone-abi.json` contracts require `auto_install=false`, `compiled_artifact=null`, with exact `/ifs/lsd.jxe` and Java API SHA checks; the canonical MIBR/3 broker does not yet expose a qualified enable/ACK control.
 
 Profile values describe differences that the implementation actually supports. A declarative mapping does not make hard-coded binary behavior configurable. Unsupported variation requires a profile-specific integration or build and must not be represented as a fictional runtime setting.
 
@@ -45,4 +50,25 @@ Runtime and source contents ship in the same ZIP and have separate manifests. Th
 
 If profile selection uses the original firmware executable, selection is based on an exact SHA-256 match to one profile. Unknown or ambiguous hashes stop before installation. Names, partial hashes, and inferred model labels are not selectors. Root convenience wrappers may delegate to the canonical installer entrypoints, but do not duplicate their behavior.
 
+**Single-profile scope (developer subset).** The three-profile requirement above is the default and is enforced whenever `package.json` has no `scope` key. A package may instead declare `"scope": "single-profile"` together with `"profiles": ["<one known profile id>"]` (for example `skoda-mu1440-p4526`); the gate then requires exactly that profile in `installer/config/profiles.list` and in `profiles/`, and rejects unknown profile ids or any other `scope` value. Whole-file OEM variants are never published. Each `profiles/<id>/integration/variants.list` row is `target stock_sha256 patched_sha256 transform_file transform_sha256 [mode]`: the transform file (`.awk`, `.sed`, `.block`, `.patch`, `.sh` or `.ksh`) lives under `profiles/<id>/integration/`, its SHA-256 is checked against `transform_sha256`, and the installer applies it only to an input matching `stock_sha256`, expecting `patched_sha256`. A variant file that is named like an OEM payload or whose bytes equal the stock or patched hash is rejected.
+
 Package validation checks manifest coverage and hashes, known profile identifiers, unique fail-closed profile selection, and the source/build relationship for profile artifacts. Run `python tools/validate_modular_package.py --self-test <package.zip>` before distributing an archive. The distribution includes this host gate under `tools/package/`. The CI self-test covers rejection of legacy/unsafe layouts; validating the actual final ZIP is a separate required step. Host checks describe packaging correctness only; they do not by themselves establish target compatibility or vehicle readiness.
+
+## Assembler and package manifest
+
+`tools/release/build_modular.py --native-dir <build-output> [--hmi-dir <dir>] --out <zip>` builds the
+single three-profile ZIP (`--profiles <id> --scope single-profile` builds an explicit test package;
+`build_mu1440_modular.py` is a wrapper for the MU1440 test package). Profiles come from
+`modules/profiles/*/profile.json`; a profile whose selector has `install_enabled=false` is packaged and
+marked `"install_enabled": false` in `package.json` and `installer/config/profiles.list`, and the installer
+refuses it. Native outputs use the build-output layout (`bin/mu1440-source`, `bin/gen2`,
+`bin/support-tools`, `bin/direct-ts-remux`); `SOURCE_COMMIT.txt`, `COMPILER.txt` and `IMAGE_SOURCE.txt`
+are recorded in `package.json` `native_build`, and every binary row carries its SHA-256 and
+`status: SOURCE_BUILD_PASS` (a host/CI build result, never vehicle-tested). The only renames are the explicit
+`RENAME` table of the assembler (the `-QNX65-ARMv7-NOT-INSTALL-READY` suffix of the four broker binaries);
+the original name stays in `renamed_from`. Per-profile HMI JARs come from `<hmi-dir>/<profile_id>/MIBR-CarPlay.jar`;
+a missing JAR or installer entrypoint is a `MISSING_INPUT` entry and the package status is `incomplete`
+(`--require-complete` turns that into a failure). `package.json` `status` uses `SOURCE_BUILD_PASS`,
+`PACKAGE_VALIDATED`, `UNIT_TESTED`, `VEHICLE_RELEASE_APPROVED` with `NOT_RUN`/`BLOCKED`;
+`VEHICLE_RELEASE_APPROVED` is never true. The ZIP is deterministic (fixed timestamps, sorted entries,
+modes from a fixed table). `tools/validate_modular_package.py` accepts the ZIP or an extracted directory.
