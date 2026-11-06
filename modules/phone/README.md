@@ -32,3 +32,28 @@ was stored.
 R3 intended distribution: `common/phone/` + target-specific profile adapters.
 All three target adapters stay `not-built` and `autoinstall=false` until
 source ABI, a reversible classpath overlay, package hashes and vehicle tests exist.
+
+## V1 handoff into MIBR runtime (source-only)
+
+`source/mibr_phone_ingress.[ch]` consumes phone events from the **existing**
+authenticated iAP2/CarPlay owner. Every active event must carry its owner
+generation, session and call ID. A new generation discards cached caller data;
+stale disconnects/events cannot change the current call. The exact-target
+phone/BAP and stock-delegate ABI must both be qualified before attach.
+
+The source permits a possible steering-wheel action **only** if the
+target's input adapter was separately qualified and the user has explicitly
+enabled the *broker-confirmed* feature; the current action/call is verified.
+This is a permission predicate only: it does NOT send any action or replace
+the factory HFP delegate. **Without an OEM call-control binding there is no
+accept/hang-up function.**
+
+Current MIBR/3 is the sole owner of settings and ACTION/ACK. There are no
+new `settings/registry.json` phone keys or extra phone daemon; the planned
+feature remains OFF. A future target wrapper must pass through to stock for
+every unowned call and preserve stock TEL button behavior. Caller name and
+number must never be sent to a broker log or persistent config.
+
+Installation root for future project-owned files is
+`/mnt/app/root/mibr/`; exact firmware/J9 API hashes and disabled
+module state are verified by the per-profile integration contract checker.
