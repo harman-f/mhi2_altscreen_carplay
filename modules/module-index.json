@@ -2,7 +2,7 @@
   "schema_version": 1,
   "contract": "docs/architecture/REPOSITORY_LAYOUT.md",
   "lifecycle": "migration-in-progress",
-  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable. P1 media and P2 phone are disabled source-stage modules; no runtime outputs or auto-install.",
+  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable. P1 Media and P2 Phone are source-only disabled modules with MIBR/3 integration contracts.",
   "modules": {
     "carplay": {
       "status": "indexed",
@@ -24,6 +24,7 @@
       "runtime": [
         "modules/carplay/runtime/auto-direct",
         "modules/carplay/runtime/parity",
+        "modules/carplay/runtime/cpvc",
         "modules/carplay/runtime/isotx2-gate"
       ],
       "build_scripts": [
