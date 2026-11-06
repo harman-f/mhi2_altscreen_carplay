@@ -3806,7 +3806,8 @@ static void gen2_panel_tick(void)
     CFDictionaryRef original=NULL;
     CFMutableDictionaryRef req=NULL;
     struct gen2_panel_context *ctx=NULL;
-    if(access(g2_panel_request,F_OK)!=0)return;
+    /* Leave a second request queued until the first completion/timeout. */
+    if(access(g2_panel_request,F_OK)!=0 || gen2_panel_is_busy())return;
     fd=open(g2_panel_request,O_RDONLY);
     n=fd<0?-1:(int)read(fd,b,sizeof(b)-1);
     if(fd>=0)close(fd);
@@ -4152,8 +4153,23 @@ static int gen2_control_projection_on(AirPlayReceiverSessionRef session)
 static void gen2_control_release(void)
 {
     uint64_t s;
+    CFDictionaryRef old_panel=NULL;
     AirPlayReceiverSessionRef previous_active=NULL,previous_advertised=NULL;
     int stop_handed_off = 0;
+    /* A disconnected session cannot own a pending display-configuration test. */
+    pthread_mutex_lock(&g2_panel_lock);
+    if(g2_panel_busy){
+        gen2_panel_receipt("CANCELLED_SESSION_ENDED",0,g2_panel_sequence,
+            g2_panel_generation,-1);
+        g2_panel_busy=0;
+    }
+    pthread_mutex_unlock(&g2_panel_lock);
+    pthread_mutex_lock(&g_settings_lock);
+    old_panel=g2_panel_advertised;
+    g2_panel_advertised=NULL;
+    g2_panel_advertised_session=NULL;
+    pthread_mutex_unlock(&g_settings_lock);
+    if(old_panel)p_CFRelease(old_panel);
     pthread_mutex_lock(&g2_core_lock);
     s=g2_control_session;
     alt111_zoom_end(&g2_zoom); /* invalidate outstanding zoom on ANY 111 release */
