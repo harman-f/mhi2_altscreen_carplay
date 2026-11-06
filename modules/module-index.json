@@ -2,7 +2,7 @@
   "schema_version": 1,
   "contract": "docs/architecture/REPOSITORY_LAYOUT.md",
   "lifecycle": "migration-in-progress",
-  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable. P6 audio is source-only, disabled, with three exact profile ABI gates and no package outputs.",
+  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable. P1 Media and P2 Phone are source-only disabled modules with MIBR/3 integration contracts. P6 Audio uses the existing stock audio owner and is disabled until exact QNX/amp ABI validation.",
   "modules": {
     "carplay": {
       "status": "indexed",
@@ -24,6 +24,7 @@
       "runtime": [
         "modules/carplay/runtime/auto-direct",
         "modules/carplay/runtime/parity",
+        "modules/carplay/runtime/cpvc",
         "modules/carplay/runtime/isotx2-gate"
       ],
       "build_scripts": [
@@ -109,6 +110,50 @@
       "outputs": [],
       "build_coverage": "target-specific-incomplete",
       "evidence": "docs/build/MU1440_MENU_RGI_SOURCE.md"
+    },
+    "media": {
+      "status": "indexed",
+      "distribution": "common/media",
+      "depends_on": [
+        "carplay",
+        "broker"
+      ],
+      "source": [
+        "modules/media/source",
+        "modules/media/reference"
+      ],
+      "runtime": [],
+      "support_tools": [
+        "modules/media/tests"
+      ],
+      "build_scripts": [
+        "modules/media/tests/run_host.sh"
+      ],
+      "outputs": [],
+      "build_coverage": "host-core-tested-only; OEM-ABI/J9 build absent",
+      "evidence": "modules/media/README.md"
+    },
+    "phone": {
+      "status": "indexed",
+      "distribution": "common/phone",
+      "depends_on": [
+        "carplay",
+        "broker"
+      ],
+      "source": [
+        "modules/phone/source",
+        "modules/phone/reference"
+      ],
+      "runtime": [],
+      "support_tools": [
+        "modules/phone/tests"
+      ],
+      "build_scripts": [
+        "modules/phone/tests/run_host.sh"
+      ],
+      "outputs": [],
+      "build_coverage": "host-core-tested-only; OEM-ABI/J9 build absent",
+      "evidence": "modules/phone/README.md"
     },
     "audio": {
       "status": "indexed",
