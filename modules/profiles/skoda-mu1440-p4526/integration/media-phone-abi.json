@@ -42,5 +42,31 @@
     "no_hfp_disable": true,
     "known_reference": "Audi AU37x / K3346 / MHI2Q only; not confirmed on this profile"
   },
-  "notes": "MU1440 libiap2client.so.1 pinned: c33021b21c5656886e64964efcf806fddb4259027c3c1ed396522e7a44adfdea"
+  "notes": "MU1440 libiap2client.so.1 pinned: c33021b21c5656886e64964efcf806fddb4259027c3c1ed396522e7a44adfdea",
+  "integration_contract": {
+    "schema": "mibr-module-binding/1",
+    "project_runtime_root": "/mnt/app/root/mibr",
+    "profile_selector_source": "/ifs/lsd.jxe",
+    "profile_selector_sha256": "a55d9cfb69c5756f8202b7f7aa4079d4d5b637ae4c2fd0fe723f1d6816cbeea8",
+    "hmi_api_jar_sha256": "57dc5e9313ef8a59403a17b3a6726f0852f6ac68cc72e42ef2a1ca530aba3ae7",
+    "control_plane": "MIBR/3",
+    "control_owner": "modules/broker/source/mibr-control",
+    "control_connection": "existing-authenticated-loopback-only",
+    "control_binding": "not-implemented",
+    "settings_registry": "settings/registry.json",
+    "registry_key": null,
+    "desired_enabled": "off",
+    "runtime_activation": "BLOCKED_PENDING_QUALIFIED_OWNER_ACK",
+    "data_plane": "existing-authenticated-iap2-owner",
+    "new_socket_service": false,
+    "new_iap2_session": false,
+    "media_ingress_source": "modules/media/source/mibr_media_ingress.c",
+    "phone_ingress_source": "modules/phone/source/mibr_phone_ingress.c",
+    "native_media_oem_sink": "pending-exact-asl-bap-api",
+    "native_phone_oem_sink": "pending-stock-delegate-and-bap-api",
+    "compiled_j9_adapter": null,
+    "build_recipe": null,
+    "unit_rollback_receipt": null,
+    "safe_behavior": "STOCK_UNMODIFIED"
+  }
 }
