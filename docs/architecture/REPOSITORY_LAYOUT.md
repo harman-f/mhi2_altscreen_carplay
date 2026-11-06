@@ -16,6 +16,7 @@ modules/
   broker/        source/ runtime/ tests/ build/
   menu/          source/ runtime/ tests/ build/
   navigation/    source/ runtime/ tests/ build/
+  audio/         source/ reference/ tests/ (source-only P6, no runtime)
   media/         source/ reference/ tests/ (source-only stage, no runtime)
   phone/         source/ reference/ tests/ (source-only stage, no runtime)
   profiles/      skoda-mu1440-p4526/

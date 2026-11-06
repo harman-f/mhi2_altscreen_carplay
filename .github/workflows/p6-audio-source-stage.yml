@@ -1,0 +1,68 @@
+name: P6 audio source-stage safety
+on:
+  pull_request:
+    paths:
+      - 'modules/audio/**'
+      - 'modules/module-index.json'
+      - 'modules/profiles/**/integration/audio-abi.json'
+      - 'docs/research/interface/P5_VEHICLE_DATA_COMPARISON_2026-11-05.md'
+      - '.github/workflows/p6-audio-source-stage.yml'
+  push:
+    branches: [ develop ]
+    paths:
+      - 'modules/audio/**'
+      - 'modules/profiles/**/integration/audio-abi.json'
+      - '.github/workflows/p6-audio-source-stage.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    name: P6 audio safety gate (host only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact PR revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test fail-closed capability source
+        run: bash modules/audio/tests/run_host.sh
+      - name: Verify all 3 firmware adapter gates are off
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          idx=json.loads(Path("modules/module-index.json").read_text())
+          m=idx["modules"]["audio"]
+          assert m["distribution"]=="common/audio"
+          assert not m["outputs"] and not m["runtime"]
+          profiles=("skoda-mu1440-p4526","seat-mu1409-p4708","seat-mu1447-p4709")
+          for p in profiles:
+              a=json.loads((Path("modules/profiles")/p/"integration/audio-abi.json").read_text())
+              assert a["profile"]==p
+              v=a["audio"]
+              assert v["status"]=="pending-exact-audio-abi"
+              assert v["compiled_artifact"] is None and v["auto_install"] is False
+              assert v["spatial_audio_enabled"] is False and v["stereo_upmix_enabled"] is False
+          print("AUDIO_3_PROFILE_FAIL_CLOSED=PASS")
+          PY
+      - name: Verify published upstream excerpts have pinned provenance
+        run: |
+          set -eu
+          test "$(git hash-object modules/audio/reference/luka/scene_engine.c)" = c662f0b977081e0895347d9cefed59633d1730f0
+          test "$(git hash-object modules/audio/reference/luka/scene_engine.h)" = b695e2d4b6c7e6ae5e26dcaacb19926f93660cca
+          test "$(git hash-object modules/audio/reference/k3346/mhi2_scene_adapter.c)" = 53b7b73e647553ecd7b1b9e4e2bd5df02620d211
+          test "$(git hash-object modules/audio/reference/k3346/mhi2_scene_adapter.h)" = 4ac87634ca92c8f62aece12cca700b6fda6d0683
+          test "$(git hash-object modules/audio/reference/k3346/nvidia_pcm_sink.c)" = dfe7dff8deae6861c4753f523e73a5f36150e4dc
+          test "$(git hash-object modules/audio/reference/k3346/nvidia_pcm_sink.h)" = 1de977ff93855b00b0ec0192294ad45c048e4b98
+          echo P6_UPSTREAM_BLOBS=PASS
+      - name: Canonical MIBR/3 and three-profile native audio contract
+        run: python3 -B modules/audio/tests/check_integration_contracts.py
+      - name: Validate public ownership and release-planner invariants
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python3 -B tools/check_module_index.py --self-test
+          python3 -B tools/release/module_plan.py --self-test
+          python3 -B tools/audit_public_repo.py

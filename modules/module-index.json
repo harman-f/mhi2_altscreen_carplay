@@ -2,7 +2,7 @@
   "schema_version": 1,
   "contract": "docs/architecture/REPOSITORY_LAYOUT.md",
   "lifecycle": "migration-in-progress",
-  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable. P1 Media and P2 Phone are source-only disabled modules with MIBR/3 integration contracts.",
+  "notes": "Canonical shared modules; three firmware profiles included equally in the beta release graph. Per-firmware Java bindings remain separately editable. P1 Media and P2 Phone are source-only disabled modules with MIBR/3 integration contracts. P6 Audio uses the existing stock audio owner and is disabled until exact QNX/amp ABI validation.",
   "modules": {
     "carplay": {
       "status": "indexed",
@@ -154,6 +154,28 @@
       "outputs": [],
       "build_coverage": "host-core-tested-only; OEM-ABI/J9 build absent",
       "evidence": "modules/phone/README.md"
+    },
+    "audio": {
+      "status": "indexed",
+      "distribution": "common/audio",
+      "depends_on": [
+        "carplay",
+        "broker"
+      ],
+      "source": [
+        "modules/audio/source",
+        "modules/audio/reference"
+      ],
+      "runtime": [],
+      "build_scripts": [
+        "modules/audio/tests/run_host.sh"
+      ],
+      "support_tools": [
+        "modules/audio/tests"
+      ],
+      "outputs": [],
+      "build_coverage": "host-capability-gate-only; DSP and per-profile QNX ABI unbuilt",
+      "evidence": "modules/audio/README.md"
     }
   },
   "profiles": [

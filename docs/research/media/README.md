@@ -6,6 +6,8 @@ This area studies the auxiliary H.264 media path, MPEG-TS/MOST output and extern
 
 ## Reference and comparator studies
 
+- **[CarPlay/MHI2 upstream lineage and watch](UPSTREAM_LINEAGE_WATCH_2026-11-05.md)** — public owners, exact code provenance and adoption-status rules.
+
 - **[Comparator findings](COMPARATOR_FINDINGS.md)** — architecture and portability traps across public alternatives.
 - **[Omonob 790/791 artifacts](OMONOB_790_791_ARTIFACT_AUDIT_2026-10-03.md)** — producer, frame/IDR handling and bridge behavior observed by static review.
 - **[MU1440 GEN2 hook map](MU1440_GEN2_HOOK_MAP.md)** — historical receiver/hook chain, ABI and interception points.
