@@ -18,7 +18,7 @@ help(){
   echo "zoom/physical  submit one-shot updateDisplayPanels, live session only"
   echo "status       show reply; ACK != visible scaling proof"
   echo "logs         show existing AltScreen log and POC result"
-  echo "collect      reuse gen2_collect_logs.sh (writes an SD-card report)"
+  echo "collect      reuse gen2_collect_logs.sh (default: internal report directory)"
 }
 case ${1:-help} in
   on)
