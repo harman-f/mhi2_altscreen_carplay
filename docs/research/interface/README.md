@@ -6,7 +6,9 @@ These notes concern OEM APIs, J9 build constraints, input events and media-contr
 
 ## Source and API investigations
 
-- **[Vehicle Data P5 / iAP2 acceptance comparison](P5_VEHICLE_DATA_COMPARISON_2026-11-05.md)** — exact LuKa/Kamgurgul lineage, stock-owner and phone Start/Stop evidence.
+- **[P5 Vehicle Data and iAP2 handshake comparison](P5_VEHICLE_DATA_COMPARISON_2026-11-05.md)** — LuKa source equivalence, subscription evidence and acceptance gaps.
+
+- **[P1-P5 source comparison](MEDIA_PHONE_P3_P5_DELTA_2026-11-04.md)** — media/telephone ABI and native navigation/Vehicle Data overlap.
 
 - **[IBM J9 / Java build notes](JAVA_J9_BUILD_NOTES.md)** — J9 API inputs, compilation constraints and build reproducibility; review together with current [Java source build](../../build/MU1440_MENU_RGI_SOURCE.md).
 - **[MU1440 button input API](MU1440_BUTTON_INPUT_API.md)** — native key and button event reference and outstanding mappings.
