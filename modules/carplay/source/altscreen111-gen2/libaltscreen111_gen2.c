@@ -3759,7 +3759,7 @@ static void gen2_panel_receipt(const char *state,unsigned value,uint64_t seq,
                                uint64_t generation,int status)
 {
     char b[256];int fd,n;
-    n=snprintf(b,sizeof(b),"experiment=updateDisplayPanels\\nstate=%s\\nvalue=%u\\nsequence=%llu\\nsession_generation=%llu\\nos_status=%d\\nvisual_effect=UNKNOWN\\n",
+    n=snprintf(b,sizeof(b),"experiment=updateDisplayPanels\nstate=%s\nvalue=%u\nsequence=%llu\nsession_generation=%llu\nos_status=%d\nvisual_effect=UNKNOWN\n",
         state,value,(unsigned long long)seq,(unsigned long long)generation,status);
     if(n<=0||n>=(int)sizeof(b))return;
     fd=open(g2_panel_status,O_WRONLY|O_CREAT|O_TRUNC,0600);
@@ -3812,7 +3812,7 @@ static void gen2_panel_tick(void)
     if(fd>=0)close(fd);
     unlink(g2_panel_request);
     if(n<=0||n>=(int)sizeof(b))goto reject;
-    b[n]=0;if(b[n-1]=='\\n')b[--n]=0;
+    b[n]=0;if(b[n-1]=='\n')b[--n]=0;
     if(!strcmp(b,"ZOOM=70"))zoom=70;
     else if(!strcmp(b,"ZOOM=85"))zoom=85;
     else if(!strcmp(b,"ZOOM=100"))zoom=100;
