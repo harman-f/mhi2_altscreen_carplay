@@ -8,7 +8,7 @@ This project is independent research. The repository's GPL-3.0-or-later license 
 
 The R38 GEN2/vehicle-data adapters, canonical settings core, source-time parity worker, R49 supervisor, R50 owner and its publication safety correction, R46 MIBR/3 controller, and R48 OEM-menu adapter are independently authored project source under GPL-3.0-or-later. Original public reference source is identified by commit `324b4f249883bb707e0d0a8995b2b6b5fe23be25` where applicable. The four flat-color scroll images have [separate first-party provenance](modules/menu/source/assets/scroll/README.md).
 
-IBM J9, original firmware/JAR APIs, locally prepared OEM class bodies, and OEM tile/skin artwork are external inputs and retain their owners' rights. They are not redistributed or relicensed here. The Java build's target-derived output remains local. This source publication includes neither proprietary DirectVCPolicy source bodies nor an inferred replacement for unresolved installed BootProbe lineage. See [source scope and exclusions](docs/build/MU1440_R50_SOURCE.md).
+IBM J9, original firmware/JAR APIs, locally prepared OEM class bodies, and OEM tile/skin artwork are external inputs and retain their owners' rights. They are not redistributed or relicensed here. The Java build's target-derived output remains local. This source publication includes no proprietary DirectVCPolicy source bodies. The P1 boot probe is independently authored and published as source under `modules/menu/source/extender-p1`; it ships no OEM class and needs the unit's own `lsd.jar` only as a local compile input. See [source scope and exclusions](docs/build/MU1440_R50_SOURCE.md).
 
 We try to distinguish three cases.
 
@@ -128,6 +128,28 @@ Root license observed upstream: **PolyForm Noncommercial License 1.0.0**.
 Because that license is materially different from this repository's GPL-3.0-or-later licensing,
 yuedizhibo/MHI2Q-CarPlay-AltScreen source/binaries are treated as **comparative research/prior art only**. They must not be copied
 into project-owned GPL source merely because they are publicly visible.
+
+### P1 media — omonob information module (source-only reference)
+
+Selected GPL-3.0 files are copied verbatim under
+[`modules/media/reference/omonob/`](modules/media/reference/PROVENANCE.md)
+from [omonob/MHI2-Carplay-Maps](https://github.com/omonob/MHI2-Carplay-Maps)
+commit `5ba6f7f579305960f8cae941fd4a4061f759b054`: the artwork
+helper, ASL dispatch helper, and artwork launcher. All exact upstream blob IDs
+are recorded in the provenance document. They are **not active runtime code**.
+No OEM JAR, original firmware binary, external decoder headers or `mm-ipod`
+replacement is included from this source.
+
+### P2 phone — ProManiFest2122 / K3346 source-only reference
+
+Selected independently written GPLv3 Java classes are copied verbatim under
+[`modules/phone/reference/k3346/`](modules/phone/reference/PROVENANCE.md)
+from [ProManiFest2122/mhi2-k3346-carplay-vc](https://github.com/ProManiFest2122/mhi2-k3346-carplay-vc)
+commit `1aaef38b1acd468702e05ffa21965cff682a22fc`.
+Upstream credits the luka-dev phone-gating approach. Original Audi OEM-derived
+`ServiceManagerPhone`, related OSGi binary inputs and compiled adapters are
+**not copied**. Our new platform-neutral `modules/phone/source/` is
+first-party source, independently written for this project.
 
 ### P6 — LuKa MHI2Q SCENE and yety-ua NVIDIA audio references (not runtime)
 
