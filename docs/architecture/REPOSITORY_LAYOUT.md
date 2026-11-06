@@ -17,6 +17,8 @@ modules/
   menu/          source/ runtime/ tests/ build/
   navigation/    source/ runtime/ tests/ build/
   audio/         source/ reference/ tests/ (source-only P6, no runtime)
+  media/         source/ reference/ tests/ (source-only stage, no runtime)
+  phone/         source/ reference/ tests/ (source-only stage, no runtime)
   profiles/      skoda-mu1440-p4526/
                  seat-mu1409-p4708/
                  seat-mu1447-p4709/
