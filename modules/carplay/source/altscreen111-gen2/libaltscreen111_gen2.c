@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
+#include "mibr_paths.h"
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -321,9 +322,10 @@ static int g_fps = 30;
 static int g_auto_show = 0;
 static int g_viewareas = 1;
 
-/* User-facing settings: /tmp wins over /mnt/app/root, then code default. */
+/* User-facing settings: /tmp wins over the persistent group files in the MIBR root
+ * (config/carplay), then code default. */
 #define MIBR_CFG_TEMP_ROOT "/tmp"
-#define MIBR_CFG_PERSIST_ROOT "/mnt/app/root"
+#define MIBR_CFG_PERSIST_ROOT MIBR_CARPLAY_CONFIG_DIR
 static const char *g_enabled_config_name = "mibr-carplay111-enabled";
 static const char *g_fps_config_name = "mibr-carplay111-fps";
 static const char *g_url_config_name = "mibr-carplay111-url";
@@ -1255,10 +1257,10 @@ static void viewareas_defaults(struct mibr_viewareas_config *cfg)
 
 /* Host tests point these at a temporary directory. */
 #ifndef MIBR_GEN2_SAFE_PATH_FMT
-#define MIBR_GEN2_SAFE_PATH_FMT "/mnt/app/root/altscreen-u2/config/%s.conf"
+#define MIBR_GEN2_SAFE_PATH_FMT MIBR_CONFIG_DIR "/cockpit/%s.conf"
 #endif
 #ifndef MIBR_GEN2_PLATFORM_DEFAULTS
-#define MIBR_GEN2_PLATFORM_DEFAULTS "/mnt/app/root/altscreen-u2/config/mibr-platform-defaults.conf"
+#define MIBR_GEN2_PLATFORM_DEFAULTS MIBR_CONFIG_DIR "/platform/defaults.conf"
 #endif
 
 /* 1 when a safe.* key of view i comes from a stored layer (persistent or
@@ -1317,8 +1319,8 @@ static void apply_safe_override(struct mibr_viewareas_config *cfg,int i,const ch
         close(fd);
         if(got<=0)return;
         plat[got]=0;
-        /* name is mibr-safe-<view>, the key safe_<view> */
-        snprintf(key,sizeof(key),"safe_%s=",name+10);
+        /* name is safe-<view> (config/cockpit/safe-<view>.conf), the key safe_<view> */
+        snprintf(key,sizeof(key),"safe_%s=",name+5);
         v=strstr(plat,key);
         if(!v||(v!=plat&&v[-1]!='\n'))return;
         v+=strlen(key);
@@ -1365,9 +1367,9 @@ static void load_viewareas_config(struct mibr_viewareas_config *cfg)
 
     if(cfg->count<1u||cfg->count>3u)cfg->count=2u;
     if(cfg->initial>=cfg->count)cfg->initial=0u;
-    apply_safe_override(cfg,0,"mibr-safe-wide");
-    apply_safe_override(cfg,1,"mibr-safe-voll");
-    apply_safe_override(cfg,2,"mibr-safe-center");
+    apply_safe_override(cfg,0,"safe-wide");
+    apply_safe_override(cfg,1,"safe-voll");
+    apply_safe_override(cfg,2,"safe-center");
     for(i=0;i<(int)cfg->count;++i){
         if(!mibr_rect_valid(cfg->view[i].x,cfg->view[i].y,
                             cfg->view[i].w,cfg->view[i].h,display.width,display.height)){
@@ -2663,7 +2665,7 @@ static void remove_key(CFMutableDictionaryRef d, const char *name)
 /* Display scaling is a descriptor property, independent of momentary map zoom.
  * One immutable settings snapshot is used for both cloned displays. The broker
  * is the only persistent writer; GEN2 only reads the shared finite format. */
-#define MIBR_SCALING_PROFILE "/mnt/app/root/altscreen-u2/config/display-scaling.conf"
+#define MIBR_SCALING_PROFILE MIBR_CONFIG_DIR "/cockpit/scaling.conf"
 static void scaling_log_display(const char *source, CFDictionaryRef display)
 {
     static const char *keys[]={"type","widthPixels","heightPixels",
@@ -4700,7 +4702,7 @@ static void *gen2_zoom_spi_worker(void *arg)
 #define G2_CALIB_MAX_AGE_S 600
 #define G2_CALIB_FRAME_US 33333
 static const char *g2_calib_marker = "/tmp/mibr-calib.enabled";
-static const char *g2_calib_clip = "/mnt/app/root/altscreen-u2/config/mibr-calib.avcc";
+static const char *g2_calib_clip = MIBR_BIN_DIR "/mibr-calib.avcc";
 static pthread_t g2_calib_thread;
 
 /* Reader thread: avcC -> SPS and PPS in 4-byte NAL lengths; nothing if the phone uses another length. */

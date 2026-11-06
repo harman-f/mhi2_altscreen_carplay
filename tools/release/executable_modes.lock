@@ -8,6 +8,13 @@ artifacts/mu1440/tee-compat/build-confirmed-current/tee
 deployment/mu1440/install.sh
 deployment/mu1440/status.sh
 deployment/mu1440/uninstall.sh
+installer/lib/migrate-root.ksh
+installer/mibr-install.ksh
+installer/mibr-status.ksh
+installer/mibr-uninstall.ksh
+installer/select-profile.ksh
+modules/broker/runtime/mibr-control/boot-guard.ksh
+modules/broker/runtime/mibr-control/boot.ksh
 modules/carplay/runtime/auto-direct/common.sh
 modules/carplay/runtime/auto-direct/direct_fps.sh
 modules/carplay/runtime/auto-direct/direct_ts_auto_enable.sh
@@ -16,11 +23,16 @@ modules/carplay/runtime/auto-direct/direct_ts_auto_supervisor.sh
 modules/carplay/runtime/auto-direct/patch_carplay.sh
 modules/carplay/runtime/auto-direct/restore_stock.sh
 modules/carplay/runtime/auto-direct/verify_carplay111_boot.sh
+modules/carplay/runtime/cpvc/cpvc_config.sh
 modules/carplay/runtime/isotx2-gate/install_preload.sh
 modules/carplay/runtime/isotx2-gate/restore_preload.sh
 modules/carplay/runtime/isotx2-gate/verify_preload_boot.sh
+modules/menu/source/extender-p1/tests/run_host.sh
+modules/menu/source/extender-p1/toolchain/build_p1.sh
+modules/menu/source/extender-p1/toolchain/verify_p1_jar.py
 modules/navigation/runtime/gen2_nav_config.sh
 modules/navigation/runtime/gen2_safearea.sh
+modules/navigation/runtime/mm-ipod-rgi.sh
 runtime/diagnostics/gen2_keyframes.sh
 runtime/diagnostics/gen2_resync.sh
 runtime/diagnostics/gen2_status.sh
@@ -31,4 +43,6 @@ tools/build_direct_ts_remux.sh
 tools/build_keypanel_native.sh
 tools/build_support_tools.sh
 tools/prepare_mu1440_sd.sh
+tools/release/build_mu1440_modular.py
+tools/release/build_modular.py
 tools/release/check_executable_modes.py

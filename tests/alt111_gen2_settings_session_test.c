@@ -63,7 +63,7 @@ static void test_safe_precedence(const char *root)
     int profile_x;
     snprintf(safe_path_fmt,sizeof(safe_path_fmt),"%s/%%s.conf",root);
     snprintf(platform_defaults_path,sizeof(platform_defaults_path),"%s/plat.conf",root);
-    snprintf(broker,sizeof(broker),"%s/mibr-safe-wide.conf",root);
+    snprintf(broker,sizeof(broker),"%s/safe-wide.conf",root);
     unlink(broker);unlink(platform_defaults_path);
 
     /* No files, nothing stored: compiled profile stays. */

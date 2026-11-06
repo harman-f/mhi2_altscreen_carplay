@@ -2,14 +2,15 @@
 
 This table separates **project goal** from **actual evidence**.
 
-For the detailed cross-brand cluster/transport matrix, including panel resolution vs. map viewport and MOST vs. LVDS architecture, see [MIB2-era cluster/display transport knowledge base](../research/MIB2_CLUSTER_DISPLAY_TRANSPORT_KNOWLEDGE_BASE.md).
+For the detailed cross-brand cluster/transport matrix, including panel resolution vs. map viewport and MOST vs. LVDS architecture, see [MIB2-era cluster/display transport knowledge base](../research/firmware/MIB2_CLUSTER_DISPLAY_TRANSPORT_KNOWLEDGE_BASE.md).
 
 ## Platform matrix
 
-The newer [three-profile research candidate](MULTI_PROFILE_TESTING.md) separates
-exact MU1409/P4708, MU1440/P4526 and MU1447/P4709 profiles. Its target builds and
-static checks do not change the vehicle-support classification below, and this
-page does not offer a complete multi-platform installer download.
+The [three integrated firmware profiles](MULTI_PROFILE_TESTING.md) separate exact
+MU1409/P4708, MU1440/P4526 and MU1447/P4709. Exact JXE hash matching and checked-in
+Java adapter source **do not** change the vehicle-support classification below;
+this page does not offer a complete validated multi-platform beta installer download.
+See [feature evidence](../status/FEATURE_STATUS.md) and [package status](../packages/README.md).
 
 | Platform | Firmware / baseline | Status | Evidence |
 | --- | --- | --- | --- |
@@ -19,7 +20,7 @@ page does not offer a complete multi-platform installer download.
 | SEAT/CUPRA MHI2 + Digital Cockpit | planned | Continental homologation data places several `5F0/5FJ...790` clusters in the same later-FPK lineage as Octavia/T-Roc/Tiguan-D; exact panel/viewport and vehicle behavior remain unvalidated | help wanted |
 | Volkswagen MHI2 + AID10-class | planned | unvalidated | help wanted |
 | Volkswagen 12.3-inch AID / other large AID revisions | separate target | **not assumed equivalent to AID10-class** | needs hardware/transport/layout audit + vehicle test |
-| Audi B9 MHI2 / AUG22 MU1438 + Virtual Cockpit | `MHI2_ER_AUG22_K3346_MU1438`, app50 + stage2/50 audited | **offline comparison complete; not supported / not vehicle-tested by this project** | 13 native pairs / 26 Ghidra inputs, focused Java and firmware JXE hash checks. Lifecycle prologue gates match; session fields and HMI/transport ownership differ. Audi LVDS presentation, productive context/geometry and runtime ABI remain open. See the [verified pair report](../research/MU1438_MU1440_OFFLINE_COMPARISON_2026-09-28.md). |
+| Audi B9 MHI2 / AUG22 MU1438 + Virtual Cockpit | `MHI2_ER_AUG22_K3346_MU1438`, app50 + stage2/50 audited | **offline comparison complete; not supported / not vehicle-tested by this project** | 13 native pairs / 26 Ghidra inputs, focused Java and firmware JXE hash checks. Lifecycle prologue gates match; session fields and HMI/transport ownership differ. Audi LVDS presentation, productive context/geometry and runtime ABI remain open. See the [verified pair report](../research/firmware/MU1438_MU1440_OFFLINE_COMPARISON_2026-09-28.md). |
 | MHI2Q / Qualcomm | comparator only | not this runtime target | public prior art exists |
 
 Reference MU1440 stock `libairplay.so` SHA-256:
@@ -48,10 +49,10 @@ Completed baselines:
 | `MHI2_ER_VWG13_K4525_MU1367` | profile-mapped; AirPlay/config/JXE strongly MU1440-related | not vehicle-tested |
 
 The main static findings are documented in
-[MHI2 cross-firmware implementation profile map](../research/MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md).
+[MHI2 cross-firmware implementation profile map](../research/firmware/MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md).
 
 Patch-by-patch engineering estimates are tracked separately in the
-[Patch-portability estimate](../research/MHI2_PATCH_PORTABILITY_ESTIMATE_2026-09-28.md), including
+[Patch-portability estimate](../research/firmware/MHI2_PATCH_PORTABILITY_ESTIMATE_2026-09-28.md), including
 GEN2/Stream-111, Direct-TS, the `isoTX2` gate, NavIgnore, Most20FPS and the Java Direct-VC policy.
 
 AU37X P5089/MU1326 has now been processed as a standalone seventh corpus profile. P5153/MU1326
@@ -107,7 +108,7 @@ MU1440 build on Audi on the strength of this table.
 
 ## Cluster-family capability summary
 
-This is the short operational view. See the [full cluster/display transport knowledge base](../research/MIB2_CLUSTER_DISPLAY_TRANSPORT_KNOWLEDGE_BASE.md) for evidence, sources and caveats.
+This is the short operational view. See the [full cluster/display transport knowledge base](../research/firmware/MIB2_CLUSTER_DISPLAY_TRANSPORT_KNOWLEDGE_BASE.md) for evidence, sources and caveats.
 
 | Family | Example part numbers | Native panel raster | Stock / known map-video surface | Direct-TS test guidance | Transport |
 | --- | --- | ---: | ---: | --- | --- |

@@ -19,13 +19,13 @@ import org.dsi.ifc.global.CarConstants;
 /**
  * HMI-side source for the classic iAP2 VehicleStatus (range km, outside temperature, range warning) of the
  * CarPlay vehicle-data module. Default OFF: nothing is attached unless
- * /mnt/app/root/altscreen-u2/config/vstatus.mode says shadow or send. It only READS the stock DSI values
+ * /mnt/app/root/mibr/config/vehicle/vstatus.mode says shadow or send. It only READS the stock DSI values
  * (DSICarKombi range/outside temperature, DSIGeneralVehicleStates TankInfo.fuelWarning) and publishes the
  * latest genuine values as a tiny key=value file for the native module inside dio_manager. A field that is
  * not valid is left out (never invented); all failures are swallowed.
  */
 public final class MibrVstatusSource {
-    private static final String MODE = "/mnt/app/root/altscreen-u2/config/vstatus.mode";
+    private static final String MODE = "/mnt/app/root/mibr/config/vehicle/vstatus.mode";
     private static final String OUT = "/tmp/mibr-vdata-status.vss";
     private static final String STATUS = "/tmp/mibr-vstatus-source.status";
     private static final long HEARTBEAT_MS = 30000L;

@@ -8,7 +8,8 @@ export LD_LIBRARY_PATH=/lib:/mnt/app/root/lib-target:/eso/lib:/mnt/app/usr/lib:/
 unset LD_PRELOAD
 export GEM=1
 # END_TARGET_ENV
-HELPER=/mnt/app/root/altscreen-u2/bin/alt111-settings
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+HELPER=$MIBR_ROOT/bin/alt111-settings
 [ -x "$HELPER" ] || { echo "result=APPLY_FAILED missing_settings_helper"; exit 10; }
 case "${1:-status}" in
   status) exec "$HELPER" status ;;

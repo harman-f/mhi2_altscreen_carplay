@@ -1,5 +1,8 @@
 # MU1440 steering-wheel adapter — omonob/MHI2-Carplay-Maps
 
+> **Research status · 2026-11-05:** **UNINSTALLED DESIGN OPTIONS.** Preserve source lineage and exact vehicle/event limitations; no installed patch is claimed. [Topic index](README.md) · [Current feature evidence](../../status/FEATURE_STATUS.md).
+
+
 Date: 2026-10-11. Target project: **[omonob/MHI2-Carplay-Maps](https://github.com/omonob/MHI2-Carplay-Maps)** by **omonob/QCDWJ**, published MHI2 package [MU1440_SKODA/790_AID10.5](https://github.com/omonob/MHI2-Carplay-Maps/tree/main/MU1440_SKODA/790_AID10.5). This is the specific MHI2 steering-control implementation discussed with the user. It is distinct from [yuedizhibo/MHI2Q-CarPlay-AltScreen](https://github.com/yuedizhibo/MHI2Q-CarPlay-AltScreen), which concerns Audi MHI2Q and is useful only as a separate architectural comparison.
 
 **Status: source/bytecode audit and patch design, not a compiled or installed patch.** Do not run two competing source111/isoTX2 producers. Raw private vehicle logs and third-party binaries are not republished.

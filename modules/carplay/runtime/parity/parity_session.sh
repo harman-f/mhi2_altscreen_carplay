@@ -8,7 +8,8 @@ export LD_LIBRARY_PATH=/lib:/mnt/app/root/lib-target:/eso/lib:/mnt/app/usr/lib:/
 unset LD_PRELOAD
 export GEM=1
 # END_TARGET_ENV
-BASE=/mnt/app/root/altscreen-u2
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+BASE=$MIBR_ROOT
 RUNNER=$BASE/bin/parity-session
 BRIDGE=$BASE/bin/direct-ts-parity
 HELPER=$BASE/bin/alt111-settings

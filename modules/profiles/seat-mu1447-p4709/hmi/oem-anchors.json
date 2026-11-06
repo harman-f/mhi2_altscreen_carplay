@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "profile_id": "seat-mu1447-p4709",
+  "adapter_class": "de.mibr.hmi.MibrSeatMu1447Profile",
+  "adapter_from": [
+    "seat-mu1409-p4708"
+  ],
+  "anchors_from": "seat-mu1409-p4708",
+  "pass_label": "MU1447_OEM_SOURCE_PATCH"
+}

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "profile_id": "seat-mu1447-p4709",
   "brand": "seat",
   "firmware": "MHI2_ER_SEG11_P4709_MU1447",
@@ -10,8 +10,29 @@
   "selector": {
     "source": "/ifs/lsd.jxe",
     "algorithm": "sha256",
-    "digest": "945586fbede2fe53b5b41d7c10490641ff71fcc9581fb237cf40328f450cb22e"
+    "digest": "945586fbede2fe53b5b41d7c10490641ff71fcc9581fb237cf40328f450cb22e",
+    "evidence": "firmware_corpus",
+    "install_enabled": true
   },
+  "firmware_check": {
+    "source": "e2p:3A0:19 (runtime/deployment/session.sh mibr_e2p_ascii)",
+    "expected": "MHI2_ER_SEG11_P4709_MU1447",
+    "status": "defined"
+  },
+  "hmi": {
+    "api_jar_sha256": "203087feace6228dc6544f01d10552c369fff1bf2ea5782d324fa4db1ce39c88",
+    "api_jar_status": "confirmed",
+    "adapter": null,
+    "adapter_from": "seat-mu1409-p4708",
+    "image_index_offset": 6
+  },
+  "evidence": [
+    {
+      "path": "/ifs/lsd.jxe",
+      "sha256": "945586fbede2fe53b5b41d7c10490641ff71fcc9581fb237cf40328f450cb22e",
+      "kind": "firmware_corpus"
+    }
+  ],
   "common_modules": [
     "carplay",
     "broker",
@@ -20,8 +41,9 @@
   ],
   "java": {
     "shared_source": "modules/menu/source",
-    "adapter_status": "java-adapter-improvements-expected",
-    "firmware_specific_updates_supported": true
+    "firmware_specific_updates_supported": true,
+    "adapter_status": "none",
+    "adapter_note": "java-adapter-improvements-expected"
   },
   "groups": [
     "hmi",

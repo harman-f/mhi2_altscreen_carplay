@@ -1,21 +1,22 @@
 #!/bin/ksh
 # SPDX-License-Identifier: GPL-3.0-or-later
-. /mnt/app/root/altscreen-u2/scripts/common.sh
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+. $MIBR_ROOT/scripts/common.sh
 runtime_init_durable || { echo "AUTO_DIRECT_ENABLE=FAIL_RUNTIME"; exit 3; }
 
-DSTBASE=/mnt/app/root/altscreen-u2
-ENABLED=/mnt/app/root/mibr-carplay-autodirect.enabled
-PARITY_ENABLED=/mnt/app/root/mibr-parity-drive.enabled
+DSTBASE=$MIBR_ROOT
+ENABLED=$MIBR_ROOT/config/features/mibr-carplay-autodirect.enabled
+PARITY_ENABLED=$MIBR_ROOT/config/features/mibr-parity-drive.enabled
 PARITY_LOCK=/tmp/mibr-parity-session.lock
 PARITY_SUP_PID=/tmp/mibr-parity-drive-supervisor.pid
-PARITY_RUNNER=/mnt/app/root/altscreen-u2/bin/parity-session
+PARITY_RUNNER=$MIBR_ROOT/bin/parity-session
 LSD=/mnt/app/eso/hmi/lsd/lsd.sh
 # Stage in the lsd.sh directory itself, not in /tmp (RAM): the final mv is
 # then a same-filesystem rename whatever the mount layout under /mnt/app is.
 TMP=/mnt/app/eso/hmi/lsd/lsd.sh.mibr-autodirect.$$
 MARKER_BEGIN="# MIBR AUTO-DIRECT BEGIN"
 MARKER_END="# MIBR AUTO-DIRECT END"
-BOOTCMD='/bin/ksh /mnt/app/root/altscreen-u2/scripts/direct_ts_auto_start.sh >/tmp/mibr-direct-auto-boot.log 2>&1 || true'
+BOOTCMD='/bin/ksh /mnt/app/root/mibr/scripts/direct_ts_auto_start.sh >/tmp/mibr-direct-auto-boot.log 2>&1 || true'
 APP_RW=0
 # Integrity gate for a rewritten lsd.sh before it replaces the original:
 # the J9 start-line count must be unchanged and BEGIN/END marker lines must
@@ -80,7 +81,7 @@ if [ "${MIBR_KEEP_MARKER_STATE:-0}" != "1" ] || [ -e "$ENABLED" ]; then
   fi
 fi
 
-mkdir -p "$DSTBASE/bin" "$DSTBASE/scripts" "$DSTBASE/config" "$DSTBASE/logs" "$DSTBASE/backup" || fail 24 "dst_create"
+mkdir -p "$DSTBASE/bin" "$DSTBASE/scripts" "$DSTBASE/config/carplay" "$DSTBASE/logs" "$DSTBASE/backup" || fail 24 "dst_create"
 
 if [ "$BASE" != "$DSTBASE" ]; then
   cp "$BASE/bin/direct-ts-remux" "$DSTBASE/bin/direct-ts-remux" || fail 25 "copy_bridge"
@@ -94,7 +95,8 @@ if [ "$BASE" != "$DSTBASE" ]; then
     DST="$DSTBASE/scripts/$N"
     [ -r "$SRC" ] || fail 26 "missing_source_$N"
     awk -v common="$DSTBASE/scripts/common.sh" '
-      NR == 2 && $0 ~ /^\. .*\/scripts\/common\.sh$/ {
+      !seen && $0 ~ /^\. .*\/scripts\/common\.sh$/ {
+        seen = 1
         print ". " common
         next
       }
@@ -104,11 +106,11 @@ if [ "$BASE" != "$DSTBASE" ]; then
     mv "$DST.new" "$DST" || fail 28 "install_$N"
   done
 
-  [ -r "$BASE/config/altscreen111.conf" ] && cp "$BASE/config/altscreen111.conf" "$DSTBASE/config/altscreen111.conf"
+  [ -r "$BASE/config/carplay/altscreen111.conf" ] && cp "$BASE/config/carplay/altscreen111.conf" "$DSTBASE/config/carplay/altscreen111.conf"
 fi
 
 chmod 755 "$DSTBASE/bin/direct-ts-remux" "$DSTBASE/scripts/"*.sh 2>/dev/null || true
-chmod 644 "$DSTBASE/config/"* 2>/dev/null || true
+chmod 644 "$DSTBASE/config/carplay/"* 2>/dev/null || true
 
 if [ ! -r "$DSTBASE/backup/lsd.sh.pre-autodirect" ]; then
   cp "$LSD" "$DSTBASE/backup/lsd.sh.pre-autodirect" || fail 29 "backup_lsd"
@@ -119,7 +121,7 @@ if ! grep -Fq "$MARKER_BEGIN" "$LSD" 2>/dev/null; then
     BEGIN { done=0 }
     !done && /^\$J9/ {
       print begin
-      print "if [ -e /mnt/app/root/mibr-carplay-autodirect.enabled ]; then"
+      print "if [ -e /mnt/app/root/mibr/config/features/mibr-carplay-autodirect.enabled ]; then"
       print "  " cmd
       print "fi"
       print end

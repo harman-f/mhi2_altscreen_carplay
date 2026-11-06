@@ -27,7 +27,7 @@ A displayed last frame may remain after the sender stops producing. Conversely, 
 | Source 111 still streaming but writer stopped | Check native gate proof, owner lock, current route/generation and stop/STOCK observation | The iPhone disconnected |
 | Source and remux advancing but no live picture | Verify accepted output, new config/IDR, actual VC screen route and fitted cluster | A log marked SHOW is physical presentation proof |
 
-The reference default source listener is TCP 6031 on `carplay0` with an existing narrow inbound PF exception. Actual negotiated port is authoritative. The local 19820 tee is separate from inbound phone transport. [Installation prerequisite](../INSTALLATION.md) and [protocol](../research/STREAM111_PROTOCOL.md) retain the complete verified operator notes.
+The reference default source listener is TCP 6031 on `carplay0` with an existing narrow inbound PF exception. Actual negotiated port is authoritative. The local 19820 tee is separate from inbound phone transport. [Installation prerequisite](../INSTALLATION.md) and [protocol](../research/carplay/STREAM111_PROTOCOL.md) retain the complete verified operator notes.
 
 ## Reproducible current problems
 

@@ -1,0 +1,6 @@
+# SHA-256 of the body (the lines between the BEGIN and END marker lines, each with its
+# newline) of an lsd.sh block that earlier package generations wrote. Such a block is
+# recognised as ours (replaced on install, removed on uninstall) by exact content even
+# without an ownership receipt.
+# Format: <body_sha256> <label>
+# No public data yet: entries are added only from a measured unit state. Never invent hashes.

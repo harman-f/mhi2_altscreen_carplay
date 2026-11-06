@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "alt111_settings.h"
+#include "mibr_paths.h"
 #include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -43,7 +44,7 @@ static void stored_result(const struct alt111_settings *s, const unsigned *ids, 
 
 int main(int argc, char **argv)
 {
-    struct alt111_settings_paths paths = {"/tmp", "/mnt/app/root"};
+    struct alt111_settings_paths paths = {"/tmp", MIBR_CARPLAY_CONFIG_DIR};
     struct alt111_settings *s;
     char error[256] = {0}, *batch = NULL;
     const char *key = NULL, *value = NULL, *input = NULL, *preset = NULL;

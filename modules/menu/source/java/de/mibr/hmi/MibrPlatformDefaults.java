@@ -8,7 +8,7 @@ import java.io.FileInputStream;
  * to another car changes this file instead of the code. Re-read when the file's mtime or size changes; a missing file gives no values.
  */
 final class MibrPlatformDefaults {
-    private static final String FILE="/mnt/app/root/altscreen-u2/config/mibr-platform-defaults.conf";
+    private static final String FILE="/mnt/app/root/mibr/config/platform/defaults.conf";
     /** Test seam; production keeps the constant. */
     static String path=FILE;
     private static String text,textPath;

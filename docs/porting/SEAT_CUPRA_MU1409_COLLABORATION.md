@@ -98,7 +98,7 @@ Keep original OEM firmware/classes, private Ghidra projects, credentials/keys, v
 ## Useful links
 
 - [Issue #47 — the original MU1409 vehicle report and contributor confirmations](https://github.com/harman-f/mhi2_altscreen_carplay/issues/47)
-- [Public firmware-profile map](../research/MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md) and [portability estimate](../research/MHI2_PATCH_PORTABILITY_ESTIMATE_2026-09-28.md)
+- [Public firmware-profile map](../research/firmware/MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md) and [portability estimate](../research/firmware/MHI2_PATCH_PORTABILITY_ESTIMATE_2026-09-28.md)
 - [Module architecture and SEAT/VW boundaries](../architecture/MODULE_BOUNDARIES_AND_PORTABILITY.md)
 - [HMI and single-controller specification](../architecture/NATIVE_HMI_AND_CONTROL_PLANE_2026-10-21.md)
 - [Optional vehicle-data design](../architecture/OPTIONAL_VEHICLE_DATA_FEATURE_OVERVIEW.md)

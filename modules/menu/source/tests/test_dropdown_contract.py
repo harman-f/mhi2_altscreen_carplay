@@ -100,7 +100,7 @@ class DropdownContract(unittest.TestCase):
             for token in ('"SelectDevice"', '"ConnectionType"', '(int)24786208'):
                 self.assertIn(token,s)
         for token in ('"SMI_SETUP_MAIN"', 'ROOT_TARGET_ID=24786208',
-                      'INTERNAL_VIEW_ID=982','"SelectDevice"','"ConnectionType"',
+                      'internalViewId()','"SelectDevice"','"ConnectionType"',
                       'unique(view,ROW_PLAIN,ListItem.class,0)',
                       'unique(view,ROW_VALUE,ListItem.class,0)',
                       'uniqueTarget(view,MAIN_LIST_TARGET_ID,WidgetList.class,0)',

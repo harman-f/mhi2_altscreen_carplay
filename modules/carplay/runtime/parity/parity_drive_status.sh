@@ -2,11 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 
-ENABLE=/mnt/app/root/mibr-parity-drive.enabled
+MIBR_ROOT=${MIBR_ROOT:-/mnt/app/root/mibr}
+ENABLE=$MIBR_ROOT/config/features/mibr-parity-drive.enabled
 STATUS_T=/tmp/mibr-parity-status-enabled
-STATUS_P=/mnt/app/root/mibr-parity-status-enabled
+STATUS_P=$MIBR_ROOT/config/features/mibr-parity-status-enabled
 STATS_T=/tmp/mibr-parity-statistics-enabled
-STATS_P=/mnt/app/root/mibr-parity-statistics-enabled
+STATS_P=$MIBR_ROOT/config/features/mibr-parity-statistics-enabled
 APP_RW=0
 
 usage(){

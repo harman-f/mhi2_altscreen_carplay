@@ -1,0 +1,396 @@
+{
+  "schema": 1,
+  "authority": "settings/registry.json (schema 3)",
+  "groups": {
+    "cockpit.cpvc_profile": {
+      "current": "/mnt/app/root/altscreen-u2/config/cpvc-r5.profile",
+      "target": "/mnt/app/root/mibr/config/cockpit/cpvc-r5.profile",
+      "format": "keyvalue",
+      "writer": "broker"
+    },
+    "cockpit.display_scaling": {
+      "current": "/mnt/app/root/altscreen-u2/config/display-scaling.conf",
+      "target": "/mnt/app/root/mibr/config/cockpit/scaling.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "carplay.calibration": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-calib.avcc",
+      "target": null,
+      "format": "binary",
+      "writer": "installer"
+    },
+    "broker.carplay_nav": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-carplay-nav.conf",
+      "target": "/mnt/app/root/mibr/config/navigation/carplay-nav.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "broker.expert_mode": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-expert-mode.conf",
+      "target": "/mnt/app/root/mibr/config/features/expert-mode.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "menu.language": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-menu-language.conf",
+      "target": "/mnt/app/root/mibr/config/menu/language.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "menu.layout": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-menu.conf",
+      "target": "/mnt/app/root/mibr/config/menu/layout.conf",
+      "format": "crc",
+      "writer": "mibr-menu"
+    },
+    "broker.nav_bottom": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-nav-bottom.conf",
+      "target": "/mnt/app/root/mibr/config/navigation/nav-bottom.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "broker.nav_display": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-nav-display.conf",
+      "target": "/mnt/app/root/mibr/config/navigation/nav-display.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "broker.nav_lanes": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-nav-lanes.conf",
+      "target": "/mnt/app/root/mibr/config/navigation/nav-lanes.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "broker.nav_line": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-nav-line.conf",
+      "target": "/mnt/app/root/mibr/config/navigation/nav-line.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "broker.nav_night": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-nav-night.conf",
+      "target": "/mnt/app/root/mibr/config/navigation/nav-night.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "broker.nav_side": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-nav-side.conf",
+      "target": "/mnt/app/root/mibr/config/navigation/nav-side.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "broker.nav_source": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-nav-source.conf",
+      "target": "/mnt/app/root/mibr/config/navigation/nav-source.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "platform.defaults": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-platform-defaults.conf",
+      "target": "/mnt/app/root/mibr/config/platform/defaults.conf",
+      "format": "keyvalue",
+      "writer": "installer"
+    },
+    "broker.safe_center": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-safe-center.conf",
+      "target": "/mnt/app/root/mibr/config/cockpit/safe-center.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "broker.safe_voll": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-safe-voll.conf",
+      "target": "/mnt/app/root/mibr/config/cockpit/safe-voll.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "broker.safe_wide": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-safe-wide.conf",
+      "target": "/mnt/app/root/mibr/config/cockpit/safe-wide.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "broker.sd_log": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-sd-log.conf",
+      "target": "/mnt/app/root/mibr/config/features/sd-log.conf",
+      "format": "cas",
+      "writer": "broker"
+    },
+    "boot.single_writer_gate": {
+      "current": "/mnt/app/root/altscreen-u2/config/mibr-v3-single-writer.enabled",
+      "target": null,
+      "format": "binary",
+      "writer": "operator"
+    },
+    "boot.kill_switch": {
+      "current": "/mnt/app/root/mibr-kit/disabled",
+      "target": "/mnt/app/root/mibr/state/boot/disabled",
+      "format": "presence",
+      "writer": "boot-guard"
+    },
+    "boot.counter": {
+      "current": "/mnt/app/root/mibr-kit/boot-count",
+      "target": "/mnt/app/root/mibr/state/boot/boot-count",
+      "format": "keyvalue",
+      "writer": "boot-guard"
+    },
+    "vehicle.data_mode": {
+      "current": "/mnt/app/root/altscreen-u2/config/vdata.mode",
+      "target": "/mnt/app/root/mibr/config/vehicle/vdata.mode",
+      "format": "keyvalue",
+      "writer": "none-in-source"
+    },
+    "vehicle.status_mode": {
+      "current": "/mnt/app/root/altscreen-u2/config/vstatus.mode",
+      "target": "/mnt/app/root/mibr/config/vehicle/vstatus.mode",
+      "format": "keyvalue",
+      "writer": "none-in-source"
+    },
+    "features.keyframe_policy": {
+      "current": "/mnt/app/root/mibr-alt111-keyframe-policy.enabled",
+      "target": "/mnt/app/root/mibr/config/features/mibr-alt111-keyframe-policy.enabled",
+      "format": "presence",
+      "writer": "installer"
+    },
+    "carplay.autodirect": {
+      "current": "/mnt/app/root/mibr-carplay-autodirect",
+      "target": "/mnt/app/root/mibr/config/carplay/auto-direct.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "features.autodirect": {
+      "current": "/mnt/app/root/mibr-carplay-autodirect.enabled",
+      "target": "/mnt/app/root/mibr/config/features/mibr-carplay-autodirect.enabled",
+      "format": "presence",
+      "writer": "auto-direct"
+    },
+    "backup.carplay111": {
+      "current": "/mnt/app/root/mibr-carplay111-backup",
+      "target": null,
+      "format": "binary",
+      "writer": "auto-direct"
+    },
+    "legacy.bit26_force_off": {
+      "current": "/mnt/app/root/mibr-carplay111-bit26.force-off",
+      "target": "/mnt/app/root/mibr/config/features/mibr-carplay111-bit26.force-off",
+      "format": "presence",
+      "writer": "none-in-source"
+    },
+    "legacy.bit26_force_on": {
+      "current": "/mnt/app/root/mibr-carplay111-bit26.force-on",
+      "target": "/mnt/app/root/mibr/config/features/mibr-carplay111-bit26.force-on",
+      "format": "presence",
+      "writer": "none-in-source"
+    },
+    "carplay.compat_profile": {
+      "current": "/mnt/app/root/mibr-carplay111-compat-profile",
+      "target": "/mnt/app/root/mibr/config/carplay/compat-profile.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "carplay.display": {
+      "current": "/mnt/app/root/mibr-carplay111-display.conf",
+      "target": "/mnt/app/root/mibr/config/carplay/display.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "carplay.enabled": {
+      "current": "/mnt/app/root/mibr-carplay111-enabled",
+      "target": "/mnt/app/root/mibr/config/carplay/enabled.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "carplay.fps": {
+      "current": "/mnt/app/root/mibr-carplay111-fps",
+      "target": "/mnt/app/root/mibr/config/carplay/fps.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "carplay.keyframes": {
+      "current": "/mnt/app/root/mibr-carplay111-keyframes.conf",
+      "target": "/mnt/app/root/mibr/config/carplay/keyframes.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "legacy.nav_query_enabled": {
+      "current": "/mnt/app/root/mibr-carplay111-nav-query.enabled",
+      "target": "/mnt/app/root/mibr/config/navigation/mibr-carplay111-nav-query.enabled",
+      "format": "presence",
+      "writer": "installer"
+    },
+    "carplay.nav": {
+      "current": "/mnt/app/root/mibr-carplay111-nav.conf",
+      "target": "/mnt/app/root/mibr/config/carplay/nav.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "legacy.nav_maneuver_layout": {
+      "current": "/mnt/app/root/mibr-carplay111-nav.maneuverLayout",
+      "target": "/mnt/app/root/mibr/config/navigation/mibr-carplay111-nav.maneuverLayout",
+      "format": "keyvalue",
+      "writer": "installer"
+    },
+    "legacy.nav_show_compass": {
+      "current": "/mnt/app/root/mibr-carplay111-nav.showCompass",
+      "target": "/mnt/app/root/mibr/config/navigation/mibr-carplay111-nav.showCompass",
+      "format": "keyvalue",
+      "writer": "installer"
+    },
+    "legacy.nav_show_eta": {
+      "current": "/mnt/app/root/mibr-carplay111-nav.showETA",
+      "target": "/mnt/app/root/mibr/config/navigation/mibr-carplay111-nav.showETA",
+      "format": "keyvalue",
+      "writer": "installer"
+    },
+    "legacy.nav_show_speed_limit": {
+      "current": "/mnt/app/root/mibr-carplay111-nav.showSpeedLimit",
+      "target": "/mnt/app/root/mibr/config/navigation/mibr-carplay111-nav.showSpeedLimit",
+      "format": "keyvalue",
+      "writer": "installer"
+    },
+    "legacy.nav_surface": {
+      "current": "/mnt/app/root/mibr-carplay111-nav.surface",
+      "target": "/mnt/app/root/mibr/config/navigation/mibr-carplay111-nav.surface",
+      "format": "keyvalue",
+      "writer": "installer"
+    },
+    "carplay.ownership": {
+      "current": "/mnt/app/root/mibr-carplay111-ownership.conf",
+      "target": "/mnt/app/root/mibr/config/carplay/ownership.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "legacy.safearea": {
+      "current": "/mnt/app/root/mibr-carplay111-safearea.conf",
+      "target": "/mnt/app/root/mibr/config/cockpit/mibr-carplay111-safearea.conf",
+      "format": "keyvalue",
+      "writer": "installer"
+    },
+    "carplay.sourceversion": {
+      "current": "/mnt/app/root/mibr-carplay111-sourceversion",
+      "target": "/mnt/app/root/mibr/config/carplay/sourceversion.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "carplay.ui_urls": {
+      "current": "/mnt/app/root/mibr-carplay111-ui-urls.conf",
+      "target": "/mnt/app/root/mibr/config/carplay/ui-urls.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "carplay.url": {
+      "current": "/mnt/app/root/mibr-carplay111-url",
+      "target": "/mnt/app/root/mibr/config/carplay/url.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "legacy.url_map_enabled": {
+      "current": "/mnt/app/root/mibr-carplay111-url-map.enabled",
+      "target": "/mnt/app/root/mibr/config/navigation/mibr-carplay111-url-map.enabled",
+      "format": "presence",
+      "writer": "none-in-source"
+    },
+    "carplay.viewarea_selected": {
+      "current": "/mnt/app/root/mibr-carplay111-viewarea-selected",
+      "target": "/mnt/app/root/mibr/config/carplay/viewarea-selected.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "carplay.viewareas": {
+      "current": "/mnt/app/root/mibr-carplay111-viewareas.conf",
+      "target": "/mnt/app/root/mibr/config/carplay/viewareas.conf",
+      "format": "registry_group",
+      "writer": "alt111-settings"
+    },
+    "features.view_areas": {
+      "current": "/mnt/app/root/mibr-carplay111-viewareas.enabled",
+      "target": "/mnt/app/root/mibr/config/features/mibr-carplay111-viewareas.enabled",
+      "format": "presence",
+      "writer": "none-in-source"
+    },
+    "receipt.most20_owned": {
+      "current": "/mnt/app/root/mibr-deploy-most20-owned",
+      "target": "/mnt/app/root/mibr/version/ownership/mibr-deploy-most20-owned",
+      "format": "presence",
+      "writer": "installer"
+    },
+    "receipt.navignore_owned": {
+      "current": "/mnt/app/root/mibr-deploy-navignore-owned",
+      "target": "/mnt/app/root/mibr/version/ownership/mibr-deploy-navignore-owned",
+      "format": "presence",
+      "writer": "installer"
+    },
+    "legacy.direct_output_fps": {
+      "current": "/mnt/app/root/mibr-direct-output-fps",
+      "target": "/mnt/app/root/mibr/config/carplay/mibr-direct-output-fps",
+      "format": "keyvalue",
+      "writer": "auto-direct"
+    },
+    "backup.gen2": {
+      "current": "/mnt/app/root/mibr-gen2-backup",
+      "target": null,
+      "format": "binary",
+      "writer": "gen2-prereq"
+    },
+    "backup.isotx2_gate": {
+      "current": "/mnt/app/root/mibr-isotx2-gate-backup",
+      "target": null,
+      "format": "binary",
+      "writer": "isotx2-gate"
+    },
+    "backup.isotx2_stock_preimage": {
+      "current": "/mnt/app/root/mibr-isotx2-gate-backup/startup.sh.stock",
+      "target": null,
+      "format": "binary",
+      "writer": "isotx2-gate"
+    },
+    "features.isotx2_gate": {
+      "current": "/mnt/app/root/mibr-isotx2-gate-disable",
+      "target": "/mnt/app/root/mibr/config/features/mibr-isotx2-gate-disable",
+      "format": "presence",
+      "writer": "isotx2-gate"
+    },
+    "version.components": {
+      "current": "/mnt/app/root/mibr-kit/components.manifest",
+      "target": "/mnt/app/root/mibr/version/components.manifest",
+      "format": "keyvalue",
+      "writer": "installer"
+    },
+    "version.installed": {
+      "current": "/mnt/app/root/mibr-kit/installed-version.properties",
+      "target": "/mnt/app/root/mibr/version/installed-version.properties",
+      "format": "keyvalue",
+      "writer": "installer"
+    },
+    "features.parity_drive": {
+      "current": "/mnt/app/root/mibr-parity-drive.enabled",
+      "target": "/mnt/app/root/mibr/config/features/mibr-parity-drive.enabled",
+      "format": "value01",
+      "writer": "parity-drive"
+    },
+    "features.parity_statistics": {
+      "current": "/mnt/app/root/mibr-parity-statistics-enabled",
+      "target": "/mnt/app/root/mibr/config/features/mibr-parity-statistics-enabled",
+      "format": "value01",
+      "writer": "parity-drive"
+    },
+    "features.parity_status": {
+      "current": "/mnt/app/root/mibr-parity-status-enabled",
+      "target": "/mnt/app/root/mibr/config/features/mibr-parity-status-enabled",
+      "format": "value01",
+      "writer": "parity-drive"
+    },
+    "features.rgi": {
+      "current": "/mnt/app/root/mibr-rgi/rgi.on",
+      "target": "/mnt/app/root/mibr/config/features/rgi.on",
+      "format": "presence",
+      "writer": "none-in-source"
+    },
+    "cockpit.view_state": {
+      "current": "/mnt/app/root/mibr-view",
+      "target": "/mnt/app/root/mibr/state/cockpit",
+      "format": "keyvalue",
+      "writer": "mibr-view"
+    }
+  }
+}

@@ -61,3 +61,21 @@ bash modules/menu/source/tests/run_view_model_test.sh
 Python host tests cover menu metadata generation and the guarded source transformations. The separate Java host test compiles and runs the R57 view-state/protocol model with a local JDK. These checks do not validate IBM J9 compilation, OEM widget rendering, installation, or runtime behavior. The generated catalog metadata differs from the reference R57 JAR because this source build uses the repository's canonical registry. The published build is not byte-identical proof for the reference JAR; its OEM toolchain inputs are intentionally not included here.
 
 Project-authored source is licensed under the repository's GPL-3.0-or-later terms. OEM APIs, firmware, SDKs and other third-party material retain their owners' rights; see [third-party notices](../../../THIRD_PARTY_NOTICES.md).
+
+## Building per firmware profile
+
+The menu core under `java/` is shared by all profiles. Firmware differences sit behind `de.mibr.hmi.MibrOemProfile`: stock setup view id, home tile geometry, tile renderer strategy, native dropdown availability strategy, accepted home animation table, native image index offset and listener lifecycle. `MibrOemProfiles.current()` returns the profile bound at compile time. One JAR is built per profile; `build.sh` generates `MibrProfileBinding`, which names the adapter class, and adds the profile's `modules/profiles/<id>/hmi/java` directory to the source path.
+
+```sh
+PROFILE=seat-mu1409-p4708 bash modules/menu/source/build.sh   # default: skoda-mu1440-p4526
+```
+
+| `PROFILE` | Adapter class | Source |
+| --- | --- | --- |
+| `skoda-mu1440-p4526` (default) | `MibrSkodaMu1440Profile` | shared core, behaviour unchanged |
+| `seat-mu1409-p4708` | `MibrSeatMu1409Profile` | `modules/profiles/seat-mu1409-p4708/hmi/java` |
+| `seat-mu1447-p4709` | `MibrSeatMu1447Profile` (MU1409 adapter, image index offset 6) | its own and the MU1409 `hmi/java` |
+
+Each profile carries its OEM patch anchors as data in `modules/profiles/<id>/hmi/oem-anchors.json`; `prepare_oem_sources.py --profile <id>` applies them (default Skoda output is unchanged and checked against a frozen copy of the previous patcher). The SEAT gear overlay PNG named by `MibrSeatGearOverlayImage` is a profile asset that is not part of this source tree yet.
+
+Status: the SEAT profiles are source only. No J9 build of any SEAT JAR and no device test has been run; the exact per-firmware `lsd.jar` and OEM source inputs are local-only. Host checks: `python3 modules/menu/source/check_java12_syntax.py` (Java 1.2 syntax lint, no compiler needed) and the unit tests above.

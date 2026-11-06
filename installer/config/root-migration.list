@@ -1,0 +1,89 @@
+# M1 root-migration map (location only, never a format change).
+# Format: <legacy_rel> <new_rel> <kind> [m2-pending]   kind = file | presence
+#   m2-pending marks a row copied with UNCHANGED basename and format; the
+#   rename / format change is a later (M2) step, not part of M1.
+#   legacy_rel is relative to $APP/root and must lie inside a legacy root
+#   (altscreen-u2/, mibr-kit/, mibr-v3/, mibr-rgi/), match mibr-*.enabled, or
+#   be an exact file in the LEGACY_SINGLES allowlist of migrate-root.ksh.
+#   new_rel is relative to $APP/root/mibr. Bytes are copied verbatim.
+# Source of each row: tools/release/storage_destination_plan.py (A3 MIGRATE
+# rows, targets rebased from altscreen-u2/ to mibr/) and
+# docs/architecture/UNIT_STORAGE_AND_NAMING_CONTRACT.md.
+# mibr-kit/disabled is NOT mapped: kill-switch handling is steps c/h of run.
+
+# plan: A3 MIGRATE, display-scaling (preserve-native)
+altscreen-u2/config/display-scaling.conf config/cockpit/scaling.conf file
+# plan: A3 MIGRATE, menu-language (preserve-native)
+altscreen-u2/config/mibr-menu-language.conf config/menu/language.conf file
+# plan: A3 MIGRATE, menu-layout (preserve-crc)
+altscreen-u2/config/mibr-menu.conf config/menu/layout.conf file
+# plan: A3 MIGRATE, platform-defaults (preserve-native)
+altscreen-u2/config/mibr-platform-defaults.conf config/platform/defaults.conf file
+# plan: A3 MIGRATE, broker durable switches (preserve-magic-revision-CAS)
+altscreen-u2/config/mibr-carplay-nav.conf config/navigation/carplay-nav.conf file
+altscreen-u2/config/mibr-expert-mode.conf config/features/expert-mode.conf file
+altscreen-u2/config/mibr-nav-bottom.conf config/navigation/nav-bottom.conf file
+altscreen-u2/config/mibr-nav-display.conf config/navigation/nav-display.conf file
+altscreen-u2/config/mibr-nav-lanes.conf config/navigation/nav-lanes.conf file
+altscreen-u2/config/mibr-nav-line.conf config/navigation/nav-line.conf file
+altscreen-u2/config/mibr-nav-night.conf config/navigation/nav-night.conf file
+altscreen-u2/config/mibr-nav-side.conf config/navigation/nav-side.conf file
+altscreen-u2/config/mibr-nav-source.conf config/navigation/nav-source.conf file
+altscreen-u2/config/mibr-safe-center.conf config/cockpit/safe-center.conf file
+altscreen-u2/config/mibr-safe-voll.conf config/cockpit/safe-voll.conf file
+altscreen-u2/config/mibr-safe-wide.conf config/cockpit/safe-wide.conf file
+# task M1: boot counter carried verbatim (same single-line format)
+mibr-kit/boot-count state/boot/boot-count file
+
+# plan: broker:sd_log (BLOCKED_INPUT reader; location only)
+altscreen-u2/config/mibr-sd-log.conf config/features/sd-log.conf file
+# plan: KEEP_AT_LEGACY cpvc-r5.profile; planned name kept
+altscreen-u2/config/cpvc-r5.profile config/cockpit/cpvc-r5.profile file
+# plan: BLOCKED_INPUT version receipts (location only, same basename)
+mibr-kit/components.manifest version/components.manifest file
+mibr-kit/installed-version.properties version/installed-version.properties file
+# plan: MIGRATE installer ownership receipts (preserve-presence)
+mibr-deploy-most20-owned version/ownership/mibr-deploy-most20-owned presence
+mibr-deploy-navignore-owned version/ownership/mibr-deploy-navignore-owned presence
+
+# ---- Rows whose planned target implies a name/format change: copied with
+# ---- unchanged basename and format, marked m2-pending.
+# plan: convert-presence
+mibr-carplay-autodirect.enabled config/features/mibr-carplay-autodirect.enabled presence m2-pending
+mibr-alt111-keyframe-policy.enabled config/features/mibr-alt111-keyframe-policy.enabled presence m2-pending
+mibr-carplay111-viewareas.enabled config/features/mibr-carplay111-viewareas.enabled presence m2-pending
+mibr-rgi/rgi.on config/features/rgi.on presence m2-pending
+# plan: convert-inverted-presence
+mibr-isotx2-gate-disable config/features/mibr-isotx2-gate-disable presence m2-pending
+# source: mibr-cpvc.enabled (read by the CPVC boot path; no plan row)
+mibr-cpvc.enabled config/features/mibr-cpvc.enabled presence m2-pending
+# plan: preserve-scalar / value-boolean (absence means ON for the two parity ones)
+mibr-parity-drive.enabled config/features/mibr-parity-drive.enabled file m2-pending
+mibr-parity-statistics-enabled config/features/mibr-parity-statistics-enabled file m2-pending
+mibr-parity-status-enabled config/features/mibr-parity-status-enabled file m2-pending
+mibr-direct-output-fps config/carplay/mibr-direct-output-fps file m2-pending
+# plan: vehicle data/status modes (name change planned)
+altscreen-u2/config/vdata.mode config/vehicle/vdata.mode file m2-pending
+altscreen-u2/config/vstatus.mode config/vehicle/vstatus.mode file m2-pending
+# plan: legacy navigation shell store and bit26 markers (hold-alias / hold-conflict)
+mibr-carplay111-nav-query.enabled config/navigation/mibr-carplay111-nav-query.enabled presence m2-pending
+mibr-carplay111-url-map.enabled config/navigation/mibr-carplay111-url-map.enabled presence m2-pending
+mibr-carplay111-nav.maneuverLayout config/navigation/mibr-carplay111-nav.maneuverLayout file m2-pending
+mibr-carplay111-nav.showCompass config/navigation/mibr-carplay111-nav.showCompass file m2-pending
+mibr-carplay111-nav.showETA config/navigation/mibr-carplay111-nav.showETA file m2-pending
+mibr-carplay111-nav.showSpeedLimit config/navigation/mibr-carplay111-nav.showSpeedLimit file m2-pending
+mibr-carplay111-nav.surface config/navigation/mibr-carplay111-nav.surface file m2-pending
+mibr-carplay111-safearea.conf config/cockpit/mibr-carplay111-safearea.conf file m2-pending
+mibr-carplay111-bit26.force-off config/features/mibr-carplay111-bit26.force-off presence m2-pending
+mibr-carplay111-bit26.force-on config/features/mibr-carplay111-bit26.force-on presence m2-pending
+
+# ---- not_migrated: plan candidates deliberately not copied.
+# not_migrated: altscreen-u2/config/mibr-calib.avcc | payload asset reinstalled by the package, not state
+# not_migrated: altscreen-u2/config/mibr-v3-single-writer.enabled | early-boot safety gate, never created or moved by a migration
+# not_migrated: mibr-carplay111-backup | boot-restore backup directory, stays at its legacy path
+# not_migrated: mibr-gen2-backup | boot-restore backup directory, stays at its legacy path
+# not_migrated: mibr-isotx2-gate-backup | boot-restore backup directory, stays at its legacy path
+# not_migrated: mibr-isotx2-gate-backup/startup.sh.stock | exact stock preimage for boot restore, stays at its legacy path
+# not_migrated: mibr-pr93-visual-rollback.ksh | test-only script, not state
+# not_migrated: mibr-kit/disabled | kill switch, carried by the dedicated kill-switch step (E4), never copied as data
+# not_migrated: mibr-rgi | RGI payload directory, reinstalled by the package into bin/; its rgi.on switch is mapped separately

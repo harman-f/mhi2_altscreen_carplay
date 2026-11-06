@@ -1,6 +1,6 @@
 # Published source coverage
 
-**23 October 2026 — source-only MU1440 R57 baseline, with documented exclusions.** The repository now contains the real OEM-menu adapter, central controller and source-time parity implementation. The [complete build/status guide](../build/MU1440_R57_SOURCE.md) distinguishes source, host checks, QNX/J9 builds, exact artifact reproduction and physical vehicle acceptance.
+**Current source inventory checked 5 November 2026.** The earlier 23 October MU1440 R57 source baseline is preserved in the [R57 build/status guide](../build/MU1440_R57_SOURCE.md). Since then, the modular **MIB Runtime** source (three firmware profiles, common Java plus OEM adapter sources, settings registry v3, installer/root migration and three-profile assembler) has been integrated into public `main`. Source or CI availability is not an end-to-end J9 build, final installer ZIP or vehicle acceptance. [Current feature and target matrix](FEATURE_STATUS.md) · [Packages](../packages/README.md).
 
 | Subsystem | Public implementation | Evidence / remaining limit |
 | --- | --- | --- |
@@ -14,9 +14,12 @@
 | UI assets | [Four owned scroll images](../../modules/menu/source/assets/scroll/README.md) | Hash-checked first-party artwork; eight OEM tile images excluded |
 | Optional speed / status | [Vehicle-data source](../../modules/carplay/source/vehicle-data/) | Installed GEN2 includes these adapters; experimental sender/phone acceptance remains open |
 | Other public modules | [Legacy remux](../../modules/carplay/source/direct-ts-remux/), [keypanel](../../modules/broker/source/keypanel/), [HMI protocol/model smoke test](../../modules/menu/source/tests/PublicProtocolSmokeTest.java), [MIBR/3 contract model](../../tests/mibr-control/api_v3_contract.py) | Retained reference/tooling; models are not competing runtime services |
-| SEAT/CUPRA | [Collaboration](../porting/SEAT_CUPRA_MU1409_COLLABORATION.md) and [local setup](../porting/SEAT_CUPRA_MU1409_LOCAL_ENVIRONMENT.md) | Public source is available as a port starting point; no validated MU1409 installer |
+| SEAT/CUPRA | [Exact profiles](../../modules/profiles/), [adapter source](../../modules/profiles/seat-mu1409-p4708/hmi/) and [testing matrix](../testing/MULTI_PROFILE_TESTING.md) | MU1409/MU1447 firmware hashes and profile adapters in source; no qualified J9/menu-in-car result or final beta ZIP |
 
-This is **partial vehicle-matched source publication**, not every installed byte. Exact DirectVCPolicy/BootProbe lineage, several legacy shell variants, legacy remux build identity, original OEM startup/config/artwork, and the R57 J9 rebuild have individual blockers or redistribution exclusions. The native source builds without private-repository access; the target Java build legitimately requires externally supplied OEM/SDK inputs. See the build guide for the precise exclusions and hashes.
+| Shared configuration and storage | [Registry v3](../../settings/registry.json), [MIB Runtime root contract](../architecture/FIRMWARE_PROFILES_AND_CONFIGURATION.md) | Shared settings/13 switches and migration paths implemented in source; unit cutover and writer M2 gates still open |
+| Modular package and installer | [Installer](../../installer/), [assembler](../../tools/release/build_modular.py), [package rules](../build/PACKAGE_LAYOUT.md) | Host and native CI evidence; complete validated three-J9-profile ZIP and vehicle installation not claimed |
+
+This is **partial vehicle-matched source publication**, not every installed byte. Exact DirectVCPolicy lineage (the P1 boot probe source is published, byte-exact J9 rebuild open), several legacy shell variants, legacy remux build identity, original OEM startup/config/artwork, and the R57 J9 rebuild have individual blockers or redistribution exclusions. The native source builds without private-repository access; the target Java build legitimately requires externally supplied OEM/SDK inputs. See the build guide for the precise exclusions and hashes.
 
 The switchable lockout requirement remains semantically unresolved; this publication does not silently equate it with pause or claim a complete configuration surface. The R57 view helper's preferences remain outside the canonical layered registry, a documented settings-model gap. Physical input, independent ACTIVE/visible route confirmation, source reconnect/recovery, optional phone vehicle-data acceptance and combined vehicle qualification remain separate gates. No new control, default or core-boundary design is introduced by publishing these source snapshots.
 

@@ -80,6 +80,8 @@ vehicle acceptance. No automatic release publication is enabled.
 python3 tools/release/module_plan.py --self-test
 python3 tools/release/module_plan.py --all
 python3 tools/release/qnx_scripts.py --self-test --canonical
+python3 tools/release/build_modular.py --self-test
+python3 -m unittest tests.release.test_build_modular
 python3 tools/release/audit_legacy.py --self-test
 python3 -I -B tools/release/check_executable_modes.py --self-test
 tools/prepare_mu1440_sd.sh /tmp/mu1440-legacy-audit
@@ -124,7 +126,7 @@ Run `python3 tools/release/source_defaults_inventory.py --self-test --json-out s
 
 The generator reads the **canonical** CarPlay registry, broker durable-switch C declarations/header, menu layout/catalog and required firmware-profile index. It validates unique settings/fields, per-preset default values and apply boundaries, broker switch count and source-defined defaults, and menu/catalog references. It records source-file SHA-256, the current 48 CarPlay settings in 13 file groups, 13 broker switches with their separate revision/CAS storage contract, and menu entries that have no directly matching registry key.
 
-A separate lexical scan records literal `/mnt/app/root/mibr*`, `/mnt/app/root/altscreen-u2*` and `/tmp/mibr*` references in project-owned C/Java/shell/Python source, with source file and line. It intentionally does **not** infer a reader, writer, safe migration mapping or comprehensive handling of dynamically concatenated paths. No file is moved and no unit state is touched.
+A separate lexical scan records literal `/mnt/app/root/mibr*` (legacy locations are mapped back through the M1 map) and `/tmp/mibr*` references in project-owned C/Java/shell/Python source, with source file and line. It intentionally does **not** infer a reader, writer, safe migration mapping or comprehensive handling of dynamically concatenated paths. No file is moved and no unit state is touched.
 
 The three CarPlay compatibility **presets** are not the three firmware **profiles**. The tool does not select a CarPlay preset for an installer, resolve user-persistent/platform overrides or assert a live effective value. A future multi-profile packager must supply an explicit selected preset and verified per-firmware overrides and fail its own final-package gate if these remain unresolved. Host inventory PASS is not an install or vehicle test.
 
@@ -276,7 +278,7 @@ per-file ownership decisions belong to the next A2.3/A3 source PRs.
 `python3 tools/release/legacy_navigation_storage_contract.py --self-test --json-out legacy-nav-storage.json`
 checks the 8 shell-composed persistent navigation paths and selected local
 read/write semantics from `gen2_nav_config.sh` and `gen2_safearea.sh`, then
-matches each path against the earlier 63-candidate access graph. The
+matches each path against the earlier 66-candidate access graph. The
 publication audit uploads the report and runs negative fixtures for renamed
 paths, missing reader/writer operations, altered format, and previously unseen
 persistent filenames. The generator is excluded from the target-path source
@@ -300,7 +302,7 @@ verifies the exact source layout and selected local access semantics for all
 13 revisioned broker-CAS files, the Java `MibrDurableSwitch` read path,
 the CRC32 menu layout loaded by `mibr-menu.ksh`, and the shared
 `mibr-platform-defaults.conf` override. It reuses the canonical
-C↔Java inventory and 63-candidate storage graph, emits source SHA receipts,
+C↔Java inventory and 66-candidate storage graph, emits source SHA receipts,
 and adds negative mutations for CAS, CRC, Java cache, stage and default changes.
 The CI artifact is a source review receipt, **not** a firmware acceptance.
 
@@ -324,10 +326,10 @@ closed; A2.3.2b and B2 are not done from this host audit alone.
 ## A2/A3 proposed destination names and source owner separation (host-only)
 
 Run `python3 tools/release/storage_destination_plan.py --self-test --json-out storage-destination-plan.json`.
-The planner consumes the existing 63-candidate `storage_access_graph.py` output:
+The planner consumes the existing 66-candidate `storage_access_graph.py` output:
 13 grouped CarPlay registry files, 13 native broker CAS/revision files and
 37 separately classified additional path candidates. It supplies collision-
-checked **candidate** target names under `/mnt/app/root/altscreen-u2/`,
+checked **candidate** target names under `/mnt/app/root/mibr/`,
 including separate namespaces for CarPlay registry values, navigation,
 menu, cockpit, feature intent, receipts and exact stock backups.
 

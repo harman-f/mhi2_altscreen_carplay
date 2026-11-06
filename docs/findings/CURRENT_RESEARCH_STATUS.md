@@ -3,7 +3,7 @@
 # Historical research status — 2026-10-03
 
 > [!NOTE]
-> For the newest cross-track findings after this status snapshot, see the [current research preview](../research/CURRENT_RESEARCH_PREVIEW_2026-10-05.md), especially the source-timestamp/keyframe design, DMDT-vs-writev ownership distinction, HMI WidgetFactory seam and steering-wheel input work.
+> For the newest cross-track findings after this status snapshot, see the [current research preview](../research/archive/CURRENT_RESEARCH_PREVIEW_2026-10-05.md), especially the source-timestamp/keyframe design, DMDT-vs-writev ownership distinction, HMI WidgetFactory seam and steering-wheel input work.
 
 Last major architecture review: **2026-10-03**
 
@@ -173,7 +173,7 @@ Before another firmware family is admitted, the remaining P5089 evidence-closure
 
 The canonical AUG22/MU1438 corpus target remains `MHI2_ER_AUG22_K3346_MU1438`.
 
-See [MHI2 cross-firmware implementation profile map](../research/MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md).
+See [MHI2 cross-firmware implementation profile map](../research/firmware/MHI2_FIRMWARE_PROFILE_MAP_2026-09-28.md).
 
 ---
 
@@ -265,7 +265,7 @@ instead of repeating earlier speculation.
 ## 2026-10-03 cluster research closeout
 
 The LIVI/current-iOS/CarPlay-Ultra follow-up is consolidated in
-[CARPLAY_CLUSTER_ULTRA_CLOSEOUT_2026-10-03.md](../research/CARPLAY_CLUSTER_ULTRA_CLOSEOUT_2026-10-03.md).
+[CARPLAY_CLUSTER_ULTRA_CLOSEOUT_2026-10-03.md](../research/carplay/CARPLAY_CLUSTER_ULTRA_CLOSEOUT_2026-10-03.md).
 
 For the current milestone, the static-research questions around classic cluster URL roles,
 ViewArea/SafeArea semantics and LIVI's restart behavior are closed. The optional local
