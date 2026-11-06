@@ -50,3 +50,28 @@ Intended eventual package owner: `common/audio/` + target-specific
 Unverified assumptions: presence of an *external* amp is not confirmation of
 its six-channel CarPlay input format; amplifier brand may be Canton, Dynaudio
 or another SKU and affects routing, DSP matrices and controls.
+
+## Same-owner integration seam and canonical storage (2026-11-06)
+
+`source/mibr_audio_owner.[ch]` is a C99 **pure-data** gate prepared for
+the current unit's original music/audio owner. Only a strictly increasing
+owner-generation can attach; it resets all previously accumulated capability
+evidence at reconnect. Music must own audio focus; any Siri, call or
+announcement activity forces **STOCK** output. A stale owner cannot restore
+multichannel playback or clear a newer connection.
+
+The single configuration authority is the existing authenticated loopback
+**MIBR/3** service, using `settings/registry.json`. No audio setting or
+native action endpoint exists there today; `explicit_opt_in=1` in a host
+fixture is not evidence of a working broker switch. A target integration
+must wait for an independently qualified broker feature key, durable
+value/version, readback, applied/ACTIVE receipt and reversible owner callback.
+No extra sound daemon, second CarPlay owner or direct HMI configuration writer
+may be introduced.
+
+Future project-owned runtime files belong under **`/mnt/app/root/mibr/`**,
+not legacy `altscreen-u2`. The three
+`modules/profiles/*/integration/audio-abi.json` records additionally bind
+their exact JXE/HMI API JAR SHA-256 from the canonical `profile.json`;
+`mibr_audio_owner` remains unconnected until actual firmware/amp ABI proof.
+This branch has **no deployable six-channel audio path**.
