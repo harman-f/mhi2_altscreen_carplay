@@ -66,7 +66,10 @@ file mode when creating a new file).
 
 The existing HMI switch **Logs auf SD-Karte** remains unchanged. The
 `logs` subcommand acts as a one-click log viewer, and `collect`
-reuses `gen2_collect_logs.sh`, including the new POC result. The
+reuses `gen2_collect_logs.sh`, including the new POC result. Its
+default output is on internal storage (/mnt/app/root/mibr-gen2-reports);
+MIBR_REPORT_DIR may override the destination to a verified writable SD mount.
+The
 production HMI is deliberately not extended for a protocol proof of concept.
 
 Direct one-shot marker format for testing without the helper:
