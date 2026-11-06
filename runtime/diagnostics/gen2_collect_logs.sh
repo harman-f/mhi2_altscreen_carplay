@@ -15,6 +15,7 @@ STATUS_SNAPSHOT=$OUTDIR/gen2-status-$STAMP.txt
 
 [ -r /tmp/altscreen111.log ] && cp /tmp/altscreen111.log "$FULL_ALT" 2>/dev/null || true
 [ -r /tmp/mibr-alt111-gen2.status ] && cp /tmp/mibr-alt111-gen2.status "$STATUS_SNAPSHOT" 2>/dev/null || true
+[ -r /tmp/mibr-alt111-panel-poc.status ] && cp /tmp/mibr-alt111-panel-poc.status "$OUTDIR/panel-poc-$STAMP.status" 2>/dev/null || true
 
 {
   echo "=== GEN2 REPORT ==="
@@ -37,6 +38,13 @@ STATUS_SNAPSHOT=$OUTDIR/gen2-status-$STAMP.txt
     fi
   done
 
+  echo
+  echo "=== updateDisplayPanels scaling POC ==="
+  if [ -r /tmp/mibr-alt111-panel-poc.status ]; then
+    cat /tmp/mibr-alt111-panel-poc.status 2>/dev/null || true
+  else
+    echo "panel_poc_status=NO_TEST"
+  fi
   echo
   echo "=== recent AltScreen log ==="
   tail -400 /tmp/altscreen111.log 2>/dev/null || true
