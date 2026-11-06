@@ -5,7 +5,7 @@ on:
       - 'modules/audio/**'
       - 'modules/module-index.json'
       - 'modules/profiles/**/integration/audio-abi.json'
-      - 'docs/research/P5_VEHICLE_DATA_COMPARISON_2026-11-05.md'
+      - 'docs/research/interface/P5_VEHICLE_DATA_COMPARISON_2026-11-05.md'
       - '.github/workflows/p6-audio-source-stage.yml'
   push:
     branches: [ develop ]
@@ -57,6 +57,8 @@ jobs:
           test "$(git hash-object modules/audio/reference/k3346/nvidia_pcm_sink.c)" = dfe7dff8deae6861c4753f523e73a5f36150e4dc
           test "$(git hash-object modules/audio/reference/k3346/nvidia_pcm_sink.h)" = 1de977ff93855b00b0ec0192294ad45c048e4b98
           echo P6_UPSTREAM_BLOBS=PASS
+      - name: Canonical MIBR/3 and three-profile native audio contract
+        run: python3 -B modules/audio/tests/check_integration_contracts.py
       - name: Validate public ownership and release-planner invariants
         env:
           PYTHONDONTWRITEBYTECODE: '1'
