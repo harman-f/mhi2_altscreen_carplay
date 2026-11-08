@@ -62,7 +62,11 @@ def validate_profile(pid, doc):
         chk(fc.get("source") is None, "firmware_check.source must be null when to_define")
     if en is True:
         chk(fc.get("status") == "defined", "install_enabled requires a defined firmware_check")
-    chk(fc.get("expected") in (None, doc.get("firmware")), "firmware_check.expected differs from firmware")
+    # EEPROM 3A0 (0x19 bytes) holds the train without the "_MUxxxx" software suffix
+    # (unit-measured on MU1440 2026-11-05: "MHI2_ER_SKG13_P4526").
+    fw = doc.get("firmware")
+    train = re.sub(r"_MU[0-9]{4}$", "", fw) if isinstance(fw, str) else None
+    chk(fc.get("expected") in (None, train), "firmware_check.expected must be the firmware id without _MUxxxx")
     hmi = doc.get("hmi")
     hmi = hmi if isinstance(hmi, dict) else {}
     jar = hmi.get("api_jar_sha256")

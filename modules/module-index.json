@@ -107,7 +107,11 @@
       "build_scripts": [
         "modules/navigation/source/build.sh"
       ],
-      "outputs": [],
+      "outputs": [
+        "libmibr_rgi_ipod.so",
+        "mibr-rgi",
+        "mibr-calib.avcc"
+      ],
       "build_coverage": "target-specific-incomplete",
       "evidence": "docs/build/MU1440_MENU_RGI_SOURCE.md"
     }

@@ -37,6 +37,7 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/java/de/mibr/hmi/MibrV3Client.java" \
   "$MODULE/java/de/mibr/hmi/MibrV3Session.java" \
   "$MODULE/java/de/mibr/hmi/MibrViewState.java" \
+  "$MODULE/java/de/mibr/hmi/MibrDropdownFrame.java" \
   "$OUT/generated/MibrSettingsCatalog.java" \
   "$OUT/generated/MibrMenuDefinition.java" \
   "$MODULE/tests/MibrViewStateTest.java" \
@@ -46,7 +47,9 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/tests/MibrV3BusyTest.java" \
   "$MODULE/tests/MibrV3QueueTest.java" \
   "$MODULE/tests/MibrV3ShowTest.java" \
-  "$MODULE/tests/MibrDurableRevisionTest.java"
+  "$MODULE/tests/MibrDurableRevisionTest.java" \
+  "$MODULE/tests/MibrDropdownFrameTest.java" \
+  "$MODULE/tests/MibrMenuRestoredNoticeTest.java"
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrViewStateTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrCanonicalElementMenuTest
 "$JAVA" -Dmibr.menu.standard="$(cd "$MODULE/../../.." && pwd)/tools/menu-editor/standard-menu.txt" \
@@ -56,3 +59,5 @@ python3 "$MODULE/generate_catalog.py" \
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3QueueTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3ShowTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrDurableRevisionTest
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrDropdownFrameTest
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrMenuRestoredNoticeTest

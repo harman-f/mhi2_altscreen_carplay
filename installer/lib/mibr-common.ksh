@@ -10,6 +10,17 @@
 #   /mnt/app -> $MIBR_APP   /mnt/system -> $MIBR_SYSTEM   /mnt/app/eso -> $MIBR_ESO
 #   /ifs     -> $MIBR_IFS
 
+# Environment bootstrap, M.I.B. pattern (docs/MHI2_SHELL_RUNTIME_CONVENTION.md: every entry
+# point sets its own PATH / LD_LIBRARY_PATH and drops LD_PRELOAD; never trust the login shell).
+# The SSH login PATH lacks /mnt/app/armle/usr/bin, where the unit's awk lives. Package helpers
+# (sha256sum) come first. MIBR_TOOL_DIRS replaces the unit dirs in host tests.
+TOOL_DIRS=${MIBR_TOOL_DIRS:-/proc/boot:/bin:/usr/bin:/usr/sbin:/sbin:/mnt/app/media/gracenote/bin:/mnt/app/armle/bin:/mnt/app/armle/sbin:/mnt/app/armle/usr/bin:/mnt/app/armle/usr/sbin}
+PATH=$PKG/installer/bin:$PKG/common/bin:$TOOL_DIRS
+export PATH
+LD_LIBRARY_PATH=${MIBR_LD_DIRS:-/lib:/eso/lib:/mnt/app/usr/lib:/mnt/app/armle/lib:/mnt/app/armle/lib/dll:/mnt/app/armle/usr/lib}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH
+unset LD_PRELOAD
+
 APP=${MIBR_APP:-/mnt/app}
 SYSTEM=${MIBR_SYSTEM:-/mnt/system}
 ESO=${MIBR_ESO:-$APP/eso}
@@ -115,11 +126,18 @@ acquire_lock(){
   return 1
 }
 
+# mkwork: private work directory. On QNX MU1440 /tmp (= /dev/shmem) holds no directories,
+# so prefer /ramdisk, then /fs/tmpfs (data only; nothing is executed from it).
 mkwork(){
-  W=${TMPDIR:-/tmp}/mibr-install.$$
-  rm -rf "$W"
-  mkdir "$W" 2>/dev/null || { W=; return 1; }
-  return 0
+  for _wd in ${TMPDIR:-} /ramdisk /fs/tmpfs /tmp; do
+    [ -n "$_wd" ] && [ -d "$_wd" ] || continue
+    W=$_wd/mibr-install.$$
+    rm -rf "$W" 2>/dev/null
+    if mkdir "$W" 2>/dev/null && : > "$W/.probe" 2>/dev/null; then rm -f "$W/.probe"; return 0; fi
+    rm -rf "$W" 2>/dev/null
+  done
+  W=
+  return 1
 }
 
 # ---------------------------------------------------------------- small helpers
@@ -130,7 +148,9 @@ find_cmd(){
     *)
       _old=$IFS
       IFS=:
-      for _d in /proc/boot:/bin:/usr/bin:/usr/sbin:/sbin:/mnt/app/armle/bin:/mnt/app/armle/usr/bin:$PATH; do
+      # ksh splits only expansion results on IFS, so the list must come from a variable.
+      _sp=$TOOL_DIRS:$PATH
+      for _d in $_sp; do
         [ -n "$_d" ] || continue
         if [ -x "$_d/$_c" ]; then IFS=$_old; echo "$_d/$_c"; return 0; fi
       done
@@ -140,6 +160,29 @@ find_cmd(){
 }
 
 if [ -x /bin/ksh ]; then SH_BIN=/bin/ksh; else SH_BIN=sh; fi
+
+# out LINE: write one line verbatim. The unit's ksh has no printf (builtin or binary) and its
+# echo interprets backslashes: use print -r when the shell has it, else a here-document
+# (expansion results inside a here-document are not re-scanned for backslashes).
+if [ "$( (print -r -- '-n a\\tb') 2>/dev/null)" = '-n a\\tb' ]; then
+  out(){ print -r -- "$1"; }
+  OUT_IMPL=print
+else
+  out(){
+    cat <<MIBR_OUT_EOF
+$1
+MIBR_OUT_EOF
+  }
+  OUT_IMPL=heredoc
+fi
+OUT_OK=0
+_out_probe='-n a\\tb\\\\c %s $x'
+[ "$(out "$_out_probe")" = "$_out_probe" ] && OUT_OK=1
+
+# Tools the installer runs outside the shell (preflight in step 1). awk is looked up lazily
+# (train, transforms). Never: printf, sed, tr, find, sort, cut, date (absent or unproven).
+NEED_TOOLS="cat cp mv rm chmod ls mkdir grep df sync mount head tail sleep"
+
 
 is_sha(){
   case $1 in
@@ -175,11 +218,6 @@ find_sha(){
   if [ -z "$SHA" ]; then
     for _c in "$PKG/installer/bin/sha256sum" "$PKG/installer/sha256sum" "$PKG/installer/lib/sha256sum" "$PKG/common/bin/sha256sum"; do
       if [ -x "$_c" ]; then SHA=$_c; break; fi
-    done
-  fi
-  if [ -z "$SHA" ]; then
-    for _c in sha256sum /usr/bin/sha256sum /bin/sha256sum; do
-      if command -v "$_c" >/dev/null 2>&1; then SHA=$_c; break; fi
     done
   fi
   [ -n "$SHA" ] || return 1
@@ -320,9 +358,9 @@ lsd_scan(){
 }
 
 emit_block(){
-  printf '%s\n' "$BEGIN_NEW $BLOCKVER"
-  while IFS= read -r _b || [ -n "$_b" ]; do printf '%s\n' "$_b"; done < "$BLOCKFILE"
-  printf '%s\n' "$END_NEW"
+  out "$BEGIN_NEW $BLOCKVER"
+  while IFS= read -r _b || [ -n "$_b" ]; do out "$_b"; done < "$BLOCKFILE"
+  out "$END_NEW"
 }
 
 # lsd_filter IN OUT MODE DSI: copy IN to OUT, handling only our MIBR block(s).
@@ -351,7 +389,7 @@ lsd_filter(){
       '$J9 '*)
         if [ "$_mode" = install ] && [ "$_placed" = 0 ]; then emit_block >> "$_out"; _placed=1; fi ;;
     esac
-    printf '%s\n' "$_ln" >> "$_out"
+    out "$_ln" >> "$_out"
   done < "$_in"
   [ "$_skip" = 0 ]
 }
@@ -364,7 +402,7 @@ lsd_body_sha(){
   while IFS= read -r _ln || [ -n "$_ln" ]; do
     if [ "$_in" = 1 ]; then
       case $_ln in "$END_NEW"*|"$END_OLD"*) break ;; esac
-      printf '%s\n' "$_ln" >> "$W/body"
+      out "$_ln" >> "$W/body"
       continue
     fi
     case $_ln in

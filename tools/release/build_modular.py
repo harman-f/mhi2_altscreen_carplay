@@ -38,6 +38,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
+VERSION_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._+-")
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 import source_defaults_inventory as inv  # noqa: E402
@@ -129,14 +130,29 @@ NATIVE = [
      [N + "mu1440-source/mibr-control/mibr-v3-genkey" + BUILD_SUFFIX], [APP + "/bin/mibr-v3-genkey"]),
     ("common/broker/bin/mibr-key40d",
      [N + "mu1440-source/mibr-control/mibr-key40d" + BUILD_SUFFIX], [APP + "/bin/mibr-key40d"]),
+    # route guidance (RGI): modules/navigation/source/build.sh (clang/lld + MU1440 libiap2client.so.1).
+    # mm-ipod-rgi (repo script) preloads the library and starts the helper from $APP/bin.
+    ("common/navigation/bin/libmibr_rgi_ipod.so", [N + "navigation/libmibr_rgi_ipod.so"],
+     [APP + "/bin/libmibr_rgi_ipod.so"]),
+    ("common/navigation/bin/mibr-rgi", [N + "navigation/mibr-rgi"], [APP + "/bin/mibr-rgi"]),
+    # calibration clip read by GEN2 from $APP/bin (navigation/source/tools/make_calib_clip.py output)
+    ("common/navigation/assets/mibr-calib.avcc", [N + "navigation/mibr-calib.avcc"],
+     [APP + "/bin/mibr-calib.avcc"]),
     # host-side helpers used by the installer before anything is deployed
-    ("common/bin/sha256sum", [N + "support-tools/sha256sum"], []),
-    ("common/bin/tee", [N + "support-tools/tee"], []),
+    # also installed: the runtime (carplay/auto-direct common.sh) runs $BASE/bin/sha256sum and tee
+    ("common/bin/sha256sum", [N + "support-tools/sha256sum"], [APP + "/bin/sha256sum"]),
+    ("common/bin/tee", [N + "support-tools/tee"], [APP + "/bin/tee"]),
 ]
 
-BROKER_SCRIPTS = ("mibr-engine.ksh", "mibr-menu.ksh", "mibr-v3-boot.ksh",
+# boot.ksh / boot-guard.ksh are called by the lsd.sh block (installer/config/lsd-block.txt).
+BROKER_SCRIPTS = ("boot.ksh", "boot-guard.ksh", "mibr-engine.ksh", "mibr-menu.ksh", "mibr-v3-boot.ksh",
                   "mibr-view.ksh", "mibr-watch.ksh")
-CARPLAY_RUNTIME = ("auto-direct", "parity", "isotx2-gate")
+# cpvc holds cpvc_config.sh, called by boot.ksh.
+CARPLAY_RUNTIME = ("auto-direct", "parity", "isotx2-gate", "cpvc")
+# The boot classpath of the lsd.sh block loads these from $BASE_DIR/lsd/jars.
+LSD_JARS = "/mnt/app/eso/hmi/lsd/jars/"
+# Own (non-OEM) J9 JAR built with the menu toolchain: <hmi-dir>/common/<name>.
+EXTENDER_JAR = "MIBR-Extender-P1-BootProbe.jar"
 SCROLL = ("mibr_scroll_thumb.png", "mibr_scroll_thumb_v2.png",
           "mibr_scroll_track.png", "mibr_scroll_track_v2.png")
 SUPPORT_JARS = ("artifacts/mu1440/navignore/vehicle-tested-2026-09-27/MIBR-NavIgnore.jar",
@@ -308,6 +324,45 @@ def native_provenance(native):
     return prov
 
 
+# Inputs of the prebuilt artifacts. An artifact is reused only while none of its inputs changed
+# since the commit it was built from (REPOSITORY_LAYOUT: do not rebuild unchanged artifacts, but
+# never ship a stale one). Native: every QNX module source and build script; HMI: the Java menu.
+NATIVE_INPUT_MODULES = ("carplay", "broker", "navigation")
+NATIVE_INPUT_EXTRA = ("tools/qnx65-image.lock", "tools/ci_qnx65_image.sh", "settings/registry.json")
+NATIVE_RUNTIME_DATA_EXCLUDE = ":(exclude)modules/navigation/source/platform-defaults"
+HMI_INPUTS = ("modules/menu/source", ":(glob)modules/profiles/*/hmi/**", "settings/registry.json")
+
+
+def native_inputs(repo):
+    index = json.loads((Path(repo) / "modules/module-index.json").read_text())
+    paths = list(NATIVE_INPUT_EXTRA)
+    for name in NATIVE_INPUT_MODULES:
+        spec = index["modules"][name]
+        for key in ("source", "build_scripts", "support_tools"):
+            paths += spec.get(key) or []
+    # Per-car platform defaults are runtime data copied into the profile (see assemble), never a
+    # compiler input; a new or changed car must not mark the prebuilt native binaries stale.
+    return sorted(set(paths)) + [NATIVE_RUNTIME_DATA_EXCLUDE]
+
+
+def stale_inputs(repo, commit, paths):
+    """Files under paths that differ between the artifact's source commit and the work tree HEAD."""
+    try:
+        git(repo, "cat-file", "-e", commit + "^{commit}")
+    except subprocess.CalledProcessError:
+        return ["<source commit %s not in this repository>" % commit]
+    out = git(repo, "diff", "--name-only", commit, "HEAD", "--", *paths)
+    return [l for l in out.split("\n") if l]
+
+
+def check_fresh(repo, kind, commit, paths, allow_stale):
+    stale = stale_inputs(repo, commit, paths)
+    if stale and not allow_stale:
+        raise AssembleError("%s artifacts are stale (built from %s, changed since: %s); rebuild them"
+                            % (kind, commit[:12], ", ".join(stale[:8])))
+    return {"built_from": commit, "stale_inputs": stale}
+
+
 def select_profiles(repo, wanted):
     docs = check_profiles.load_profiles(repo)
     errors = check_profiles.validate_all(docs)
@@ -320,7 +375,7 @@ def select_profiles(repo, wanted):
 
 
 def assemble(native, repo=ROOT, installer=None, hmi_dir=None, profiles=None, scope=None,
-             allow_dirty=False, menu_jar=None):
+             allow_dirty=False, menu_jar=None, allow_stale=False, version=None):
     """Return (zip entries {name: (bytes, mode)}, package metadata)."""
     native, repo = Path(native), Path(repo)
     installer = Path(installer) if installer is not None else repo / "installer"
@@ -338,6 +393,13 @@ def assemble(native, repo=ROOT, installer=None, hmi_dir=None, profiles=None, sco
         raise AssembleError("repository has uncommitted tracked changes (use --allow-dirty)")
     verify_native_sums(native)
     build_prov = native_provenance(native)
+    freshness = {"native": check_fresh(repo, "native", build_prov["source_commit"],
+                                       native_inputs(repo), allow_stale)}
+    hmi_commit = Path(hmi_dir) / "SOURCE_COMMIT.txt" if hmi_dir is not None else None
+    if hmi_commit is not None and hmi_commit.is_file():
+        freshness["hmi"] = check_fresh(repo, "HMI", hmi_commit.read_text().strip(), list(HMI_INPUTS), allow_stale)
+    elif hmi_dir is not None and not allow_stale:
+        raise AssembleError("--hmi-dir needs SOURCE_COMMIT.txt (the commit the JARs were built from)")
     files, prov, missing, hard = {}, {}, [], []
     manifest, profile_manifests, binaries = [], {}, []
 
@@ -382,17 +444,38 @@ def assemble(native, repo=ROOT, installer=None, hmi_dir=None, profiles=None, sco
     manifest.append((sha(files["common/menu/config/mibr-menu.conf"][0]), "644",
                      APP + "/config/menu/layout.conf", "common/menu/config/mibr-menu.conf"))
     for name in SCROLL:
-        read_repo_file(repo, "modules/menu/source/assets/scroll/" + name, files, prov,
-                       "common/menu/icons/" + name)
+        pkg = "common/menu/icons/" + name
+        read_repo_file(repo, "modules/menu/source/assets/scroll/" + name, files, prov, pkg)
+        # MibrIconState.ROOT
+        manifest.append((sha(files[pkg][0]), "644", "/mnt/app/eso/hmi/lsd/mibr/icons/" + name, pkg))
     for rel in SUPPORT_JARS:
-        read_repo_file(repo, rel, files, prov, "common/menu/bin/" + Path(rel).name)
+        pkg = "common/menu/bin/" + Path(rel).name
+        read_repo_file(repo, rel, files, prov, pkg)
+        manifest.append((sha(files[pkg][0]), "644", LSD_JARS + Path(rel).name, pkg))
+    ext = Path(hmi_dir) / "common" / EXTENDER_JAR if hmi_dir is not None else None
+    if ext is not None and ext.is_file():
+        pkg = "common/menu/bin/" + EXTENDER_JAR
+        add(files, prov, pkg, ext.read_bytes(), {"origin": "hmi-input"})
+        manifest.append((sha(files[pkg][0]), "644", LSD_JARS + EXTENDER_JAR, pkg))
+    else:
+        missing.append("common/menu/bin/" + EXTENDER_JAR)
     for name in ("gen2_nav_config.sh", "gen2_safearea.sh"):
-        read_repo_file(repo, "modules/navigation/runtime/" + name, files, prov,
-                       "common/navigation/scripts/" + name)
+        pkg = "common/navigation/scripts/" + name
+        read_repo_file(repo, "modules/navigation/runtime/" + name, files, prov, pkg)
+        manifest.append((sha(files[pkg][0]), "755", APP + "/scripts/" + name, pkg))
+    # the mm-ipod wrapper selected by the usblauncher_otg.lua variant (lua-rgi.awk)
+    pkg = "common/navigation/scripts/mm-ipod-rgi.sh"
+    read_repo_file(repo, "modules/navigation/runtime/mm-ipod-rgi.sh", files, prov, pkg)
+    manifest.append((sha(files[pkg][0]), "755", APP + "/bin/mm-ipod-rgi", pkg))
     for name in EDITOR:
         read_repo_file(repo, "tools/menu-editor/" + name, files, prov, "tools/menu-editor/" + name)
     read_repo_file(repo, "tools/validate_modular_package.py", files, prov,
                    "tools/package/validate_modular_package.py")
+    read_repo_file(repo, "tools/check_mu1440_target_shell.py", files, prov,
+                   "tools/package/check_mu1440_target_shell.py")
+    # guide for testers and their AI agents: where the source is, how to report and fix
+    if git(repo, "ls-files", "release/PACKAGE_AGENTS.md"):
+        read_repo_file(repo, "release/PACKAGE_AGENTS.md", files, prov, "AGENTS.md")
     for rel, pkg in (("LICENSE", "docs/LICENSE"), ("THIRD_PARTY_NOTICES.md", "docs/THIRD_PARTY_NOTICES.md"),
                      ("THIRD_PARTY/NavIgnore/LICENSE-MIT.txt", "docs/third_party/NavIgnore-LICENSE-MIT.txt"),
                      ("THIRD_PARTY/Most20FPS/LICENSE-MIT.txt", "docs/third_party/Most20FPS-LICENSE-MIT.txt")):
@@ -424,19 +507,25 @@ def assemble(native, repo=ROOT, installer=None, hmi_dir=None, profiles=None, sco
         gen(root + "hmi/expected-inputs.json", json.dumps(
             {"jar": "MIBR-CarPlay.jar", "source": "source/hmi", "oem_derived": True},
             indent=2, sort_keys=True) + "\n")
-        gen(root + "integration/variants.list", "# target stock-sha expected-patched-sha "
-            "transform-file transform-sha mode (no entries in this package revision; "
-            "no OEM bytes are shipped)\n")
-        gen(root + "payload.manifest", "# sha256 mode target source\n" + "".join(
-            "%s %s %s %s\n" % row for row in sorted(pm, key=lambda r: r[2])))
+        # OEM integration rows are maintained with the profile (measured stock/patched hashes,
+        # transform hash of the committed bytes) and copied by the loop above; the installer
+        # re-checks every hash on the unit. Without a committed list an empty one is generated.
+        if root + "integration/variants.list" not in files:
+            gen(root + "integration/variants.list", "# target stock-sha expected-patched-sha "
+                "transform-file transform-sha mode (no entries in this package revision; "
+                "no OEM bytes are shipped)\n")
         jar = Path(hmi_dir) / pid / "MIBR-CarPlay.jar" if hmi_dir is not None else None
         if jar is None and menu_jar is not None and len(selected) == 1:
             jar = Path(menu_jar)
         if jar is not None and jar.is_file():
             add(files, prov, root + "hmi/MIBR-CarPlay.jar", jar.read_bytes(),
                 {"origin": "hmi-input"})
+            pm.append((sha(files[root + "hmi/MIBR-CarPlay.jar"][0]), "644",
+                       LSD_JARS + "MIBR-CarPlay.jar", root + "hmi/MIBR-CarPlay.jar"))
         else:
             missing.append(root + "hmi/MIBR-CarPlay.jar")
+        gen(root + "payload.manifest", "# sha256 mode target source\n" + "".join(
+            "%s %s %s %s\n" % row for row in sorted(pm, key=lambda r: r[2])))
 
     listing = generate_profiles_list.render_list(selected)
     disk = installer / "config/profiles.list"
@@ -500,6 +589,7 @@ def assemble(native, repo=ROOT, installer=None, hmi_dir=None, profiles=None, sco
         "status": {"SOURCE_BUILD_PASS": True, "PACKAGE_VALIDATED": "NOT_RUN",
                    "UNIT_TESTED": "NOT_RUN", "VEHICLE_RELEASE_APPROVED": False},
         "native_build": dict(build_prov, sha256sums_verified=True),
+        "input_freshness": freshness,
         "binaries": sorted(binaries, key=lambda r: r["path"]),
         "source": source["repo"],
         "profiles_list_sha256": sha(files["installer/config/profiles.list"][0]),
@@ -508,6 +598,15 @@ def assemble(native, repo=ROOT, installer=None, hmi_dir=None, profiles=None, sco
     }
     if scope:
         meta["scope"] = scope
+    # Product version (release/VERSION, committed) and the exact source commit; the installer
+    # copies both into version/installed-version.properties for the menu's version page.
+    if version is None and git(repo, "ls-files", "release/VERSION"):
+        version = git(repo, "show", "HEAD:release/VERSION").strip()
+    if version is not None:
+        if not version or len(version) > 40 or any(c not in VERSION_CHARS for c in version):
+            raise AssembleError("release/VERSION is not a plain version string: %r" % version)
+        meta["version"] = version
+    meta["source_commit"] = git(repo, "rev-parse", "HEAD")
     files["package.json"] = (json.dumps(meta, indent=2, sort_keys=True).encode() + b"\n", 0o644)
     files["PACKAGE.sha256"] = ("".join("%s  %s\n" % (sha(d), n) for n, (d, _) in sorted(files.items())
                                        ).encode(), 0o644)
@@ -539,9 +638,12 @@ def check_docs(files, repo=ROOT):
     problems = []
     try:
         meta = json.loads(files["package.json"])
-        menu = files["common/menu/config/mibr-menu.conf"].decode()
-        if menu != inv.read(Path(repo), inv.MENU):
+        menu_bytes = files["common/menu/config/mibr-menu.conf"]
+        # Compare exact packaged bytes. read_text() normalizes CRLF on Windows,
+        # while the ZIP correctly preserves the checked-in source bytes.
+        if menu_bytes != (Path(repo) / inv.MENU).read_bytes():
             problems.append("staged menu differs from tools/menu-editor/standard-menu.txt")
+        menu = menu_bytes.decode()
         selected = select_profiles(Path(repo), meta["profiles"])
         wanted = {README: render_readme(Path(repo), menu, bool(meta["complete"]), selected,
                                         meta.get("scope")),
@@ -562,7 +664,8 @@ def fake_native(base):
     for rel in ("gen2/libaltscreen111.so", "mu1440-source/alt111-settings",
                 "mu1440-source/direct-ts-parity", "mu1440-source/parity-session",
                 "mu1440-source/libmibr_isotx2_gate.so", "mu1440-source/libmibr_isotx2_guard.so",
-                "direct-ts-remux/direct-ts-remux", "support-tools/sha256sum", "support-tools/tee"):
+                "direct-ts-remux/direct-ts-remux", "support-tools/sha256sum", "support-tools/tee",
+                "navigation/libmibr_rgi_ipod.so", "navigation/mibr-rgi"):
         p = base / "bin" / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(b"\x7fELF" + rel.encode())
@@ -570,6 +673,8 @@ def fake_native(base):
         p = base / ("bin/mu1440-source/mibr-control/%s%s" % (n, BUILD_SUFFIX))
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(b"\x7fELF" + n.encode())
+    clip = base / "bin/navigation/mibr-calib.avcc"
+    clip.write_bytes(b"\x00\x00\x00\x04synthetic-avcc")
     (base / "SOURCE_COMMIT.txt").write_text("0123456789abcdef0123456789abcdef01234567\n")
     (base / "COMPILER.txt").write_text("synthetic-gcc 0.0\n")
     (base / "IMAGE_SOURCE.txt").write_text("IMAGE_SOURCE=synthetic\n")
@@ -583,6 +688,8 @@ def fake_installer(base, repo=ROOT):
 
 
 def fake_hmi(base):
+    (base / "common").mkdir(parents=True)
+    (base / "common" / EXTENDER_JAR).write_bytes(b"PK synthetic extender jar")
     for pid in check_profiles.load_profiles():
         (base / pid).mkdir(parents=True)
         (base / pid / "MIBR-CarPlay.jar").write_bytes(b"PK synthetic jar " + pid.encode())
@@ -603,7 +710,7 @@ def self_test():
         fake_native(native)
         fake_installer(inst)
         fake_hmi(hmi)
-        kw = dict(allow_dirty=True, installer=inst)
+        kw = dict(allow_dirty=True, installer=inst, allow_stale=True)
         # determinism
         a, meta = assemble(native, hmi_dir=hmi, **kw)
         b, _ = assemble(native, hmi_dir=hmi, **kw)
@@ -611,7 +718,8 @@ def self_test():
         assert ha == hb and (tmp / "a.zip").read_bytes() == (tmp / "sub/b.zip").read_bytes()
         assert meta["complete"] and meta["package_status"] == "complete" and meta["missing_inputs"] == []
         assert "scope" not in meta and len(meta["profiles"]) == 3
-        assert meta["profile_info"]["seat-mu1409-p4708"]["install_enabled"] is False
+        assert meta["profile_info"]["seat-mu1409-p4708"]["install_enabled"] is \
+            check_profiles.load_profiles()["seat-mu1409-p4708"]["selector"]["install_enabled"]
         assert all(r["status"] == "SOURCE_BUILD_PASS" for r in meta["binaries"])
         assert any(r.get("renamed_from") == "mibrctl-v3" + BUILD_SUFFIX for r in meta["binaries"])
         with zipfile.ZipFile(tmp / "a.zip") as z:
@@ -622,7 +730,8 @@ def self_test():
                 assert m == mode_for(i.filename[len(PREFIX):], data), i.filename
             assert [i.filename for i in z.infolist()] == sorted(i.filename for i in z.infolist())
         files = load_zip(tmp / "a.zip")
-        assert check_docs(files) == []
+        doc_problems = check_docs(files)
+        assert doc_problems == [], doc_problems
         bad = dict(files)
         bad[MATRIX] = files[MATRIX].replace(b"`40`", b"`41`", 1)
         assert bad[MATRIX] != files[MATRIX] and check_docs(bad) == ["drift: " + MATRIX]
@@ -630,7 +739,7 @@ def self_test():
         bad[README] = files[README] + b"extra\n"
         assert check_docs(bad) == ["drift: " + README]
         # incomplete (no HMI dir, no installer entrypoints)
-        inc, im = assemble(native, allow_dirty=True, installer=tmp / "none")
+        inc, im = assemble(native, allow_dirty=True, installer=tmp / "none", allow_stale=True)
         assert im["package_status"] == "incomplete" and not im["installable"]
         assert any(m.endswith("MIBR-CarPlay.jar") for m in im["missing_inputs"])
         assert "installer/mibr-install.ksh" in im["missing_inputs"]
@@ -668,7 +777,10 @@ def main(argv=None, default_profiles=None, default_scope=None):
     ap.add_argument("--require-complete", action="store_true",
                     help="exit 2 when any input is missing")
     ap.add_argument("--allow-incomplete", action="store_true", help="accepted for compatibility")
+    ap.add_argument("--version", help="product version written to package.json (default: release/VERSION), [A-Za-z0-9._+-]+")
     ap.add_argument("--allow-dirty", action="store_true")
+    ap.add_argument("--allow-stale", action="store_true",
+                    help="tests only: accept prebuilt artifacts whose inputs changed since their build")
     ap.add_argument("--check", type=Path, metavar="ZIP",
                     help="fail if README/matrix in ZIP drift from registry and inventory")
     ap.add_argument("--self-test", action="store_true")
@@ -685,7 +797,7 @@ def main(argv=None, default_profiles=None, default_scope=None):
         ap.error("--native-dir and --out are required")
     try:
         files, meta = assemble(args.native_dir, args.repo, args.installer_dir, args.hmi_dir,
-                               args.profiles, args.scope, args.allow_dirty, args.menu_jar)
+                               args.profiles, args.scope, args.allow_dirty, args.menu_jar, args.allow_stale, args.version)
     except MissingInput as exc:
         for item in exc.items:
             print("MISSING_INPUT: " + item, file=sys.stderr)

@@ -96,6 +96,7 @@ class Base(unittest.TestCase):
             "/mnt/system/etc/boot/startup.sh %s %s %sintegration/si.awk %s 755\n"
             % (sh(STARTUP_STOCK), sh(self.patched), root, sh(AWK))).encode()
         files[root + "integration/known-states.list"] = b"# header only\n"
+        files["package.json"] = b'{\n  "package_status": "complete"\n}\n'
         files.update(extra or {})
         self.files = files
         self.seal()
@@ -258,6 +259,16 @@ class TestInstall(Base):
         self.assertIn("PACKAGE_UNLISTED", r.stdout)
         self.assertEqual(before, self.unit_tree())
 
+    def test_incomplete_package_no_write(self):
+        before = self.unit_tree()
+        self.files["package.json"] = b'{\n  "package_status": "incomplete"\n}\n'
+        self.seal()
+        for mode in ("--check", "--apply"):
+            r = self.run_inst(mode)
+            self.assertEqual(r.returncode, 4, r.stdout)
+            self.assertIn("package is not complete", r.stdout)
+        self.assertEqual(before, self.unit_tree())
+
     def test_transform_wrong_result_blocks(self):
         files = dict(self.files)
         files["profiles/%s/integration/si.awk" % PROFILE] = b'{ print } END { print "# other" }\n'
@@ -287,11 +298,55 @@ class TestInstall(Base):
             self.assertIn(needle, r.stdout)
             self.assertEqual(before, self.unit_tree())
 
-    def test_single_writer_flag_blocks(self):
-        before = self.unit_tree()
+    def test_version_identity_from_package_json(self):
+        # menu version page: product_version, source_commit, verified stage (2026-11-08)
+        commit = "0123456789abcdef0123456789abcdef01234567"
+        self.files["package.json"] = (
+            '{\n  "package_status": "complete",\n  "profiles": [\n    "x"\n  ],\n'
+            '  "source": {\n    "commit": "ffff"\n  },\n  "source_commit": "%s",\n'
+            '  "version": "1.5.0-beta.9"\n}\n' % commit).encode()
+        self.seal()
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        props = (self.new / "version/installed-version.properties").read_text()
+        self.assertIn("product_version=1.5.0-beta.9\n", props)
+        self.assertIn("source_commit=%s\n" % commit, props)
+        self.assertIn("identity_stage=INSTALLED_VERIFIED\n", props)
+
+    def test_single_writer_flag_creates_gate(self):
+        # owner decision 2026-11-05: the gate lives in the new root, created only on request
+        gate = self.new / "config/features/mibr-v3-single-writer.enabled"
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertFalse(gate.exists(), "a plain --apply must not create the single-writer gate")
         r = self.apply_with("--authorize-single-writer")
-        self.assertEqual(r.returncode, 10, r.stdout)
-        self.assertEqual(before, self.unit_tree())
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(gate.read_bytes(), b"1\n")
+        self.assertIn("created /mnt/app/root/mibr/config/features/mibr-v3-single-writer.enabled", r.stdout)
+        r = self.apply_with("--authorize-single-writer")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("single-writer gate already present", r.stdout)
+
+    def test_uninstall_removes_unchanged_gate_keeps_changed(self):
+        gate = self.new / "config/features/mibr-v3-single-writer.enabled"
+        r = self.apply_with("--authorize-single-writer")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        rec = (self.new / "version/install-created.receipt").read_text()
+        self.assertIn("created /mnt/app/root/mibr/config/features/mibr-v3-single-writer.enabled " + sh(b"1\n"), rec)
+        r = self.run_inst("--uninstall")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(gate.exists())
+        self.assertFalse((self.new / "version/install-created.receipt").exists())
+        # a user-changed gate stays
+        self.assertEqual(self.apply_with("--authorize-single-writer").returncode, 0)
+        gate.write_bytes(b"0\n")
+        self.assertEqual(self.run_inst("--uninstall").returncode, 0)
+        self.assertEqual(gate.read_bytes(), b"0\n")
+
+    def test_legacy_single_writer_warns(self):
+        self.wr(self.app / "root/altscreen-u2/config/mibr-v3-single-writer.enabled", b"1\n")
+        r = self.run_inst("--check")
+        self.assertIn("single-writer gate is on in the legacy tree", r.stdout)
 
     def apply_with(self, *a):
         return self.run_inst("--apply", *a)
@@ -302,6 +357,23 @@ class TestInstall(Base):
         self.assertEqual((self.new / "config/mibr-menu.conf").read_bytes(), b"user edited\n")
         self.assertEqual(self.run_inst("--uninstall").returncode, 0)
         self.assertEqual((self.new / "config/mibr-menu.conf").read_bytes(), b"user edited\n")
+
+    def test_package_config_updates_unless_user_edited(self):
+        # 2026-11-08: a config still equal to what the previous install wrote gets the new
+        # package default (e.g. new platform-default keys); a user-edited one is kept.
+        conf = self.new / "config/mibr-menu.conf"
+        self.assertEqual(self.apply().returncode, 0)
+        self.files["common/menu/config/mibr-menu.conf"] = b"menu-default-v2\n"
+        self.seal()
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(conf.read_bytes(), b"menu-default-v2\n")
+        self.wr(conf, b"user edited\n")
+        self.files["common/menu/config/mibr-menu.conf"] = b"menu-default-v3\n"
+        self.seal()
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(conf.read_bytes(), b"user edited\n")
 
     def test_lock_busy(self):
         self.lock.write_text(str(os.getpid()))
@@ -404,6 +476,8 @@ class TestUninstallRollback(Base):
         self.wr(self.app / "root/mibr-kit/boot-count", "2\n")
         self.wr(self.app / "root/mibr-kit/disabled", "boot loop detected\n")
         self.wr(self.app / "root/mibr-kit/installed.manifest", "abc /x\n")
+        self.wr(self.app / "root/mibr-kit/installed-version.properties", "product=MIBR-KIT\nproduct_version=1.4.0\n")
+        self.wr(self.app / "root/mibr-kit/components.manifest", "MIBR_COMPONENTS/1\nend=1\n")
         legacy = LSD_STOCK.replace(b"$J9", b"# MIBR-KIT BEGIN 1.4.0\necho legacy hook\n# MIBR-KIT END\n$J9") \
             .replace(b"DSITRACER_ACTIVATED=no", b"DSITRACER_ACTIVATED=yes")
         self.wr(self.eso / "hmi/lsd/lsd.sh", legacy, 0o755)
@@ -425,6 +499,9 @@ class TestUninstallRollback(Base):
         self.assertEqual(lsd.count("MIBR-KIT"), 0)
         self.assertEqual(lsd.count("# MIBR-RUNTIME BEGIN"), 1)
         self.assertNotIn("legacy hook", lsd)
+        self.assertNotIn("MIBR_MIGRATE_VERIFY=FAIL", r.stdout)  # r3 2026-11-05: rewritten receipts
+        self.assertNotIn("empty (sub)expression", r.stdout + r.stderr)
+        self.assertIn("product=MIBR-CarPlay", (self.new / "version/installed-version.properties").read_text())
         self.assertFalse((self.new / "config/features/mibr-cpvc.enabled").exists())  # no defaults on upgrade
         self.assertIn("legacy-install-present", (self.new / "version/install-defaults.receipt").read_text())
         # rollback restores the legacy hook bytes exactly, legacy trees untouched
@@ -438,6 +515,26 @@ class TestUninstallRollback(Base):
         self.assertIn("state=rolled-back", (self.new / "version" / ("install-%s.receipt" % iid)).read_text())
         # idempotent
         self.assertEqual(self.run_inst("--rollback", iid).returncode, 0)
+
+    def test_reapply_after_legacy_upgrade_keeps_new_root(self):
+        # r3 SD test 2026-11-05: a second --apply over a migrated unit blocked with
+        # MIBR_MIGRATE_PLAN=CONFLICT because the planner migrated the legacy trees again.
+        self.legacy_unit()
+        self.assertEqual(self.apply().returncode, 0)
+        before = self.legacy_tree()
+        lang = self.new / "config/menu/language.conf"
+        lang.write_text("MAGIC lang=en\n")  # changed later by the menu
+        r = self.run_inst("--check")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn("CONFLICT", r.stdout)
+        self.assertIn("already done", r.stdout)
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("skipped: already migrated", r.stdout)
+        self.assertNotIn("MIBR_MIGRATE_VERIFY=FAIL", r.stdout)
+        self.assertEqual(lang.read_text(), "MAGIC lang=en\n")
+        self.assertEqual(self.legacy_tree(), before)
+        self.assertEqual(len(list((self.new / "version").glob("migration-*.receipt"))), 1)
 
     def test_rollback_blocks_when_changed(self):
         self.assertEqual(self.apply().returncode, 0)
@@ -528,6 +625,188 @@ class TestManifestMode(Base):
             "%s 0755 /mnt/system/etc/evil common/carplay/bin/alt-tool\n" % sh(b"binary-v1\n")).encode()
         self.seal(files)
         self.assertEqual(self.apply().returncode, 10)
+
+LIB_T = "/mnt/app/eso/lib/libmibr_carplay111.so"
+
+
+class TestOriginContract(Base):
+    """--uninstall returns the unit to the original pre-MIBR state; --rollback stays one step back.
+    (No ksh on the host: these run the installer under the host sh.)"""
+
+    def pkg_with_lib(self, data, extra=None):
+        files = dict(self.files)
+        files["common/carplay/lib/libsrc.so"] = data
+        files["installer/config/payload.manifest"] = (
+            "%s 0755 /mnt/app/root/mibr/bin/alt-tool common/carplay/bin/alt-tool\n"
+            "%s 0755 %s common/carplay/lib/libsrc.so\n" % (sh(b"binary-v1\n"), sh(data), LIB_T)).encode()
+        files.update(extra or {})
+        self.seal(files)
+
+    def lib(self):
+        return self.eso / "lib/libmibr_carplay111.so"
+
+    def iids(self):
+        return sorted(p.name[len("install-"):-len(".receipt")] for p in (self.new / "version").glob("install-p*.receipt"))
+
+    def test_chain_uninstall_goes_to_original_state(self):
+        pre = self.unit_tree()
+        self.pkg_with_lib(b"lib-A\n")
+        self.assertEqual(self.apply().returncode, 0)
+        a_id = self.iids()[0]
+        self.assertEqual(self.lib().read_bytes(), b"lib-A\n")
+        self.pkg_with_lib(b"lib-B\n", {"common/menu/config/mibr-menu.conf": b"menu-default-2\n"})
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.lib().read_bytes(), b"lib-B\n")
+        b_id = [i for i in self.iids() if i != a_id][0]
+        # rollback of B (one step back) still restores A's bytes; checked on a copy of the unit state
+        snap = self.tmp / "snap"
+        shutil.copytree(self.unit, snap, symlinks=True)
+        r = self.run_inst("--rollback", b_id)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.lib().read_bytes(), b"lib-A\n")
+        shutil.rmtree(self.unit)
+        shutil.copytree(snap, self.unit, symlinks=True)
+        r = self.run_inst("--uninstall")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(self.lib().exists())
+        self.assertEqual(self.startup(), STARTUP_STOCK)
+        self.assertEqual(self.lsd(), LSD_STOCK)
+        post = self.unit_tree()
+        self.assertEqual(pre, {k: v for k, v in post.items() if k in pre})
+
+    def test_rollback_then_reapply_succeeds(self):
+        self.pkg_with_lib(b"lib-A\n")
+        self.assertEqual(self.apply().returncode, 0)
+        a_id = self.iids()[0]
+        self.pkg_with_lib(b"lib-B\n")
+        self.assertEqual(self.apply().returncode, 0)
+        b_id = [i for i in self.iids() if i != a_id][0]
+        self.assertEqual(self.run_inst("--rollback", b_id).returncode, 0)
+        self.assertEqual(self.lib().read_bytes(), b"lib-A\n")
+        before = self.unit_tree()
+        r = self.run_inst("--check")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(before, self.unit_tree())
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.lib().read_bytes(), b"lib-B\n")
+        # origin still carried: uninstall returns to the original state
+        self.assertEqual(self.run_inst("--uninstall").returncode, 0)
+        self.assertFalse(self.lib().exists())
+
+    def test_rollback_of_first_install_then_reapply(self):
+        self.pkg_with_lib(b"lib-A\n")
+        self.assertEqual(self.apply().returncode, 0)
+        a_id = self.iids()[0]
+        self.assertEqual(self.run_inst("--rollback", a_id).returncode, 0)
+        self.assertFalse(self.lib().exists())
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.lib().read_bytes(), b"lib-A\n")
+
+    def test_legacy_patched_variant_restored_to_stock(self):
+        self.legacy_setup()
+        self.wr(self.system / "etc/boot/startup.sh", self.patched, 0o755)   # patched by the old kit
+        self.wr(self.app / "root/mibr-kit/backup/mnt/system/etc/boot/startup.sh", STARTUP_STOCK, 0o755)
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.startup(), self.patched)
+        self.assertTrue(list((self.new / "version/ownership").glob("*startup*.owned")))
+        r = self.run_inst("--uninstall")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.startup(), STARTUP_STOCK)
+
+    def test_legacy_patched_variant_without_stock_warns(self):
+        self.legacy_setup()
+        self.wr(self.system / "etc/boot/startup.sh", self.patched, 0o755)
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("cannot restore", r.stdout)
+        self.assertFalse(list((self.new / "version/ownership").glob("*startup*.owned")))
+
+    def legacy_setup(self):
+        self.wr(self.app / "root/mibr-kit/installed.manifest", "abc /x\n")
+        self.wr(self.app / "root/mibr-kit/installed-version.properties", "product=MIBR-KIT\nproduct_version=1.4.0\n")
+
+    def test_check_does_not_adopt(self):
+        self.legacy_setup()
+        self.wr(self.system / "etc/boot/startup.sh", self.patched, 0o755)
+        self.wr(self.app / "root/mibr-kit/backup/mnt/system/etc/boot/startup.sh", STARTUP_STOCK, 0o755)
+        before = self.unit_tree()
+        self.assertEqual(self.run_inst("--check").returncode, 0)
+        self.assertEqual(before, self.unit_tree())
+
+    def test_own_earlier_build_is_new_not_replaced(self):
+        old = b"own-earlier-dev-build\n"
+        self.wr(self.lib(), old, 0o755)
+        known = (b"# header only\n" + ("%s %s dev-test\n" % (LIB_T, sh(old))).encode())
+        self.pkg_with_lib(b"lib-A\n", {"profiles/%s/integration/known-states.list" % PROFILE: known})
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.lib().read_bytes(), b"lib-A\n")
+        mf = (self.new / "version/installed.manifest").read_text()
+        row = [l for l in mf.splitlines() if LIB_T in l][0].split()
+        self.assertEqual(row[3], "new", row)
+        r = self.run_inst("--uninstall")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(self.lib().exists())
+
+    def test_old_replaced_row_with_own_origin_is_folded_to_new(self):
+        # units installed before the origin rule carry "replaced <own earlier build>" rows
+        old = b"own-earlier-dev-build\n"
+        known = (b"# header only\n" + ("%s %s dev-test\n" % (LIB_T, sh(old))).encode())
+        ks = {"profiles/%s/integration/known-states.list" % PROFILE: known}
+        self.pkg_with_lib(b"lib-A\n", ks)
+        self.assertEqual(self.apply().returncode, 0)
+        mfp = self.new / "version/installed.manifest"
+        lines = mfp.read_text().splitlines()
+        for i, l in enumerate(lines):
+            f = l.split()
+            if len(f) == 6 and f[2] == LIB_T:
+                f[3:6] = ["replaced", "backup/gone/oem/lib", sh(old)]
+                lines[i] = " ".join(f)
+        mfp.write_text("\n".join(lines) + "\n")
+        self.pkg_with_lib(b"lib-B\n", ks)
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        row = [l for l in mfp.read_text().splitlines() if LIB_T in l][0].split()
+        self.assertEqual(row[3], "new", row)
+        r = self.run_inst("--uninstall")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(self.lib().exists())
+
+    def test_unknown_preexisting_file_still_replaced_and_restored(self):
+        # a foreign file there blocks (not known), so use a known state only for replaced bookkeeping check
+        self.pkg_with_lib(b"lib-A\n")
+        self.wr(self.lib(), b"foreign\n", 0o755)
+        self.assertEqual(self.apply().returncode, 10)
+
+    def test_late_migration_skips_version_rows(self):
+        self.legacy_setup()
+        self.wr(self.app / "root/mibr-kit/components.manifest", "MIBR_COMPONENTS/1\nend=1\n")
+        self.assertEqual(self.apply().returncode, 0)
+        (self.new / "version/components.manifest").unlink()
+        (self.new / "version/installed-version.properties").unlink()
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn("late-migrated", r.stdout)
+        self.assertIn("product=MIBR-CarPlay", (self.new / "version/installed-version.properties").read_text())
+
+    def test_late_migrated_file_is_recorded_and_uninstalled(self):
+        self.assertEqual(self.apply().returncode, 0)
+        self.wr(self.app / "root/mibr-kit/installed.manifest", "abc /x\n")
+        late = self.new / "config/cockpit/scaling.conf"
+        self.assertFalse(late.exists())
+        self.wr(self.app / "root/altscreen-u2/config/display-scaling.conf", b"scale=1\n")
+        r = self.run_inst("--check")
+        self.assertIn("late addition", r.stdout)
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue(late.exists())
+        self.assertIn("/config/cockpit/scaling.conf", (self.new / "version/install-created.receipt").read_text())
+        self.assertEqual(self.run_inst("--uninstall").returncode, 0)
+        self.assertFalse(late.exists())
 
 
 if __name__ == "__main__":

@@ -39,6 +39,8 @@ mibr-kit/boot-count state/boot/boot-count file
 altscreen-u2/config/mibr-sd-log.conf config/features/sd-log.conf file
 # plan: KEEP_AT_LEGACY cpvc-r5.profile; planned name kept
 altscreen-u2/config/cpvc-r5.profile config/cockpit/cpvc-r5.profile file
+# zoom boot autostart (cpvc_config.sh ZOOM_AUTOSTART=$BASE/config/cockpit/cpvc-r5-zoom.autostart); added 2026-11-05
+altscreen-u2/config/cpvc-r5-zoom.autostart config/cockpit/cpvc-r5-zoom.autostart file
 # plan: BLOCKED_INPUT version receipts (location only, same basename)
 mibr-kit/components.manifest version/components.manifest file
 mibr-kit/installed-version.properties version/installed-version.properties file

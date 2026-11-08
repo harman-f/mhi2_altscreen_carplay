@@ -277,6 +277,17 @@ public final class MibrNativeDropdownEditor {
             model.setAvailable(nativeDropdownAvailable(stock));
             stock.options.setListItemTransfer(this);
         }
+        /** Popup frame insets {top,bottom}, or null when the popup does not expose them. */
+        private static int[] popupInsets(DropDown popup) {
+            try {
+                de.vw.mib.properties.values.LayoutAttribs a=popup.get_layoutAttribs();
+                if(a==null)return null;
+                return new int[]{a.getInsetTop(),a.getInsetBottom()};
+            } catch(Throwable t) {
+                return null;
+            }
+        }
+
         public void prepare(DropDownButton button,int key) {
             close();
             if(button.get_dropDownRef()!=stock.popup || button.get_inactiveAreaRef()==null ||
@@ -292,13 +303,14 @@ public final class MibrNativeDropdownEditor {
             // Frame padding comes from the stock popup: the option list sits
             // inside the DropDown frame at its own offset, so a fixed padding
             // let the last options paint below the frame.
-            int chrome=originalPopupHeight-originalOptionsHeight;
-            int available=stock.view.get_height()-24-chrome;
-            if(sample.get_font()==null || sample.get_width()<=0 || rowHeight<=0 ||
-               values.length==0 || chrome<0 || available<rowHeight || stock.popup.get_width()<=0 ||
+            int measured=originalPopupHeight-originalOptionsHeight;
+            int[] insets=measured<0?popupInsets(stock.popup):null;
+            int chrome=MibrDropdownFrame.chrome(measured,insets!=null,
+                insets==null?0:insets[0],insets==null?0:insets[1]);
+            if(sample.get_font()==null || sample.get_width()<=0 || stock.popup.get_width()<=0 ||
                stock.popup.get_width()>stock.view.get_width())
                 throw new IllegalStateException("MIBR_SSM_OPTION_VIEW_BOUNDS");
-            int visibleRows=Math.min(values.length,Math.max(1,available/rowHeight));
+            int visibleRows=MibrDropdownFrame.rows(stock.view.get_height(),rowHeight,values.length,chrome);
             int height=visibleRows*rowHeight+chrome;
             stock.popup.set_height(height);
             stock.popup.set_y(Math.max(12,Math.min(originalPopupY,stock.view.get_height()-height-12)));

@@ -14,7 +14,7 @@ OWN=$VER/ownership
 if [ ! -d "$NEW" ]; then echo "MIBR_STATUS=NOT_INSTALLED"; exit 0; fi
 echo "root=$LNEW"
 if [ -f "$VER/installed-version.properties" ]; then
-  for k in product product_version target_profile_id package_sha256 install_id; do echo "$k=$(getkey "$VER/installed-version.properties" $k)"; done
+  for k in product product_version source_commit identity_stage target_profile_id package_sha256 install_id; do echo "$k=$(getkey "$VER/installed-version.properties" $k)"; done
 else echo "installed-version.properties=absent"; fi
 for f in "$VER"/install-*.receipt; do [ -f "$f" ] && echo "receipt $(basename "$f") state=$(getkey "$f" state)"; done
 if [ -f "$NEW/state/boot/disabled" ]; then read -r l < "$NEW/state/boot/disabled"; echo "kill_switch=PRESENT ($l)"; else echo "kill_switch=absent"; fi
