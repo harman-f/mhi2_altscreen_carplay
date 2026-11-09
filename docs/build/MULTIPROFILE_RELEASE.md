@@ -1,30 +1,54 @@
 # Three-profile beta package build
 
-The release workflow `.github/workflows/multiprofile-beta-release.yml` builds the
-three-profile ZIP from the current main revision on a dedicated, protected Linux
-runner. It must not run on pull requests or untrusted branches. Both the pinned
-QNX 6.5 compiler image and locally provisioned private build inputs are required.
-It compiles the profile-specific menu JARs with the IBM J9 SDK and builds the
-native components. It then runs the modular assembler and validates the actual
-ZIP. The job uploads the ZIP, its SHA-256 file and the three resulting menu JARs;
-no original OEM build inputs or J9 SDK are uploaded. This is a beta build, not
-proof of vehicle acceptance.
+The beta package workflow `.github/workflows/multiprofile-beta-release.yml`
+assembles the current `main` revision on a dedicated, protected Linux runner.
+It does **not** run for pull requests and does **not** publish a GitHub Release.
+Only final ZIP, SHA-256 and menu artifacts are uploaded as 30-day Actions artifacts.
+Its main-push trigger remains disabled until repository variable
+`MIBR_RELEASE_RUNNER_ENABLED=true`.
 
-The runner needs the private profile `lsd.jar`, `Activator.java` and
-`WidgetFactoryImpl.java` inputs, an IBM J9 SDK, a QNX target sysroot, the
-hash-pinned iAP2 library, Clang/LLD and FFmpeg with libx264. The workflow lists
-all required environment secrets and tool hashes; the build script checks them
-before compiling. The three original OEM input sets and the toolchain must be
-provisioned outside the public repository. Set the repository variable
-`MIBR_RELEASE_RUNNER_ENABLED` to `true` only when the dedicated runner and
-protected environment are configured. The workflow is triggered by a main push
-or manually and does not push commits to main or publish a GitHub Release.
+## Two different build inputs
 
-The owner-authorized checked-in menu JARs are reference artifacts, not hidden
-build inputs: the workflow compiles the JARs again. The assembler excludes the
-reference copies from the ZIP so there is one installable JAR per profile.
-SHA-256 and the tested-vehicle scope of the reference files are documented in
-[MENU_PREBUILT_PROVENANCE.md](../../modules/profiles/MENU_PREBUILT_PROVENANCE.md).
+- **QNX cross-compiler image (GHCR):** `ghcr.io/harman-f/mhi2-qnx65-armv7`
+  is a host-side Docker build environment (GCC 4.9.4 / QNX 6.5 / ARMv7),
+  **not a CarPlay application release**. The immutable digest in
+  `tools/qnx65-image.lock` is required by existing native CI and the package
+  builder. Do not delete it while this lockfile references the image.
+- **OEM/J9 menu classes:** The three owner-approved, profile-specific
+  `MIBR-CarPlay.jar` files are checked into
+  `modules/profiles/<id>/hmi/prebuilt/`. They are the default inputs
+  (`MIBR_MENU_JAR_MODE=prebuilt`); they are **not** rebuilt for every
+  ordinary package run. Each must have the pinned SHA-256 and class major 46.
+  `tools/release/stage_prebuilt_menu.py` rejects reuse when any shared
+  Java/menu, exact profile HMI/API or settings-registry input differs from
+  the reviewed public source baseline
+  `420fc46c63594a1a0274ddf6a3da7fb19c33b294`.
+  It creates the `hmi/SOURCE_COMMIT.txt` receipt required by the assembler.
+
+When those sources change, build the affected profile JARs **outside the public
+CI**, against the exact IBM J9 toolchain, exact profile API `lsd.jar` and
+private OEM source inputs. The old JARs are then **stale**: do not bump the
+baseline alone. Independently check the new JAR contents/class versions,
+update the three pinned SHA-256 values and source-baseline provenance after
+review, and only then enable package assembly again. The optional
+`MIBR_MENU_JAR_MODE=rebuild` can still rebuild all three profile JARs
+on the secured runner if it has every input; that mode writes the exact
+current source commit receipt.
+
+**Remaining private build blockers:** The current script still builds the
+`MIBR-Extender-P1-BootProbe.jar` with J9 and the matching Škoda API;
+it also compiles navigation components using a private QNX target sysroot,
+exact iAP2 library and pinned Clang/LLD/FFmpeg. Therefore adopting prebuilt
+profile menu JARs **does not eliminate the dedicated runner** or make a full
+package runnable on GitHub-hosted CI yet. The extender/navigation artifacts
+need their own reviewed, source-fresh prebuilt contract before they could
+be reused instead. Never substitute arbitrary or stale binaries.
+
+The QNX host builds use the checked-in immutable image digest. All native
+output, extender, prebuilt menu JARs and final ZIP must pass build provenance,
+freshness and package validation. Host success is not vehicle acceptance;
+Škoda's historical installed menu evidence does not qualify newly compiled
+native outputs or the two SEAT targets.
 
 ## Reference comparison
 
@@ -39,6 +63,13 @@ native rebuild produced both matching and differing binary hashes, so it must
 be treated as a new build rather than silently called the vehicle-tested bytes.
 
 ## Runner provisioning
+
+The private J9 inputs remain necessary **today** for the separately built
+extender even when the three profile menu JARs are reused. Only the
+`rebuild` mode recompiles all three menu JARs. The existing runner and
+protected environment must not be opened to untrusted branches.
+
+
 
 Provision a dedicated Linux x64 runner with label `mibr-private-release-j9-qnx`
 and restrict it to this repository. Never use this runner for untrusted pull
