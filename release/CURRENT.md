@@ -2,7 +2,7 @@
 
 ## Current three-profile beta build status (2026-11-09)
 
-The MIB Runtime `1.5.0-beta.12` source on `main` includes all three owner-approved menu JARs and the [opt-in beta package pipeline](../docs/build/MULTIPROFILE_RELEASE.md). The checked-in Java artifacts may be reused only while the pinned public menu/profile/registry source baseline is unchanged; new Java changes require separately validated local J9 rebuilds and updated provenance. The separate `ghcr.io/harman-f/mhi2-qnx65-armv7` **package is a pinned QNX cross-compiler Docker image**, not a deployable CarPlay release, and must remain available to CI while `tools/qnx65-image.lock` references it.
+The MIB Runtime `1.5.0-beta.12` source on `main` includes all three owner-approved menu JARs and the [opt-in beta package pipeline](../docs/build/MULTIPROFILE_RELEASE.md). The checked-in Java artifacts may be reused only while the reviewed Git-object content lock for menu/profile/registry sources is unchanged; new Java changes require separately validated local J9 rebuilds and updated provenance. The separate `ghcr.io/harman-f/mhi2-qnx65-armv7` **package is a pinned QNX cross-compiler Docker image**, not a deployable CarPlay release, and must remain available to CI while `tools/qnx65-image.lock` references it.
 
 This beta workflow still requires a private runner for the extender and native navigation dependencies. It uploads only time-limited Actions artifacts when enabled. **No new GitHub Release or complete end-to-end pipeline build has been published at this point.** The frozen historical MU1440 developer package described below remains a distinct release lineage; do not silently transfer its vehicle acceptance to the beta.
 
