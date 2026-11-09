@@ -77,6 +77,8 @@ jobs:
           python3 -B tools/verify_profile_menu_artifacts.py
           # Fail closed if the checked-in JARs are reused after Java/API/registry changes.
           python3 -B tools/release/stage_prebuilt_menu.py --check-only
+          # Fail closed on stale native Research fingerprints, without accessing private bytes.
+          python3 -B tools/release/stage_research_prebuilts.py --check-sources
           bash -n tools/release/build_hmi_and_package.sh
           python3 -B tools/check_registry.py --check --scan-paths
           python3 -B -m unittest discover -s tests/settings -p 'test_*.py' -v

@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "reference_version": "1.5.0-beta.11",
+  "archive_sha256": "f238143916a977ec24f1d6d9361194924b19852846c147d3f31c28c537f60248",
+  "research_commit": "f733de43f58c71e4c7743dbda438b906959bce66",
+  "research_archive_path": "MIBR-CarPlay-beta-3profile-r11b.zip",
+  "research_blob": "621a0a89bf3369ae6718109760bf7964b4aea590",
+  "reviewed_public_source_commit": "420fc46c63594a1a0274ddf6a3da7fb19c33b294",
+  "profiles": [
+    "skoda-mu1440-p4526",
+    "seat-mu1409-p4708",
+    "seat-mu1447-p4709"
+  ],
+  "git_objects": {
+    "modules/carplay/source": "a2c65c72cc722c12ef0b891d81cec4d6ade18cd8",
+    "modules/broker/source": "fc13c6557c8b608d59ff19b15274c757d1707b46",
+    "modules/navigation/source/src": "83c15c21fd9b6f293d88dae58fe3b6063432e98a",
+    "modules/navigation/source/third_party": "67dec5a1dd6b1437daea3719737fbf65d51c8de4",
+    "modules/navigation/source/tools": "9c1b70c473223aa2eeb48177e1c3f768b8075eaf",
+    "modules/navigation/source/build.sh": "71f86d4885b58087a791226186f2412fed819f09",
+    "tools/build_mu1440_source.sh": "981436db69766db4383a23d8fd162558b78c5987",
+    "tools/build_alt111_settings.sh": "d11a2d3f0d1d96ab6325a887d26f0cc036837080",
+    "tools/build_altscreen111_gen2.sh": "5f9161b700041618e67f35db5f366a023d8a2f4f",
+    "tools/build_direct_ts_parity.sh": "217337762aa17516f8e92baef6f2ee259e78071b",
+    "tools/build_direct_ts_remux.sh": "dbd755c8d2863ae01b94787421a7b5a038fab6a2",
+    "tools/build_native_isotx2_guard.sh": "fabc92ee446cdef849456759a02e2b14a9eca7e8",
+    "tools/build_mibr_control.sh": "d4b66106c6c28ba2e4169e55ea9c93966e5f01a8",
+    "tools/build_keypanel_native.sh": "514d4430c9c71a78c8c9345613a795daf5311e04",
+    "tools/build_support_tools.sh": "5d5bbc3992447d333d1e3e9e0c4fd55d3765749b",
+    "tools/ci_qnx65_image.sh": "11ac40ee99d2c3cb7f84152f4667938430c37340",
+    "tools/qnx65-image.lock": "6304e13a38bbe5ca2f306ba820dcebc8a8cacc64",
+    "modules/module-index.json": "34a453af1df99419b112a246cda608b1bf7f1a95",
+    "settings/registry.json": "73be7b9876ceb692b7031af3f1cf0c15aa729e2d"
+  }
+}

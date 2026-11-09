@@ -1,63 +1,79 @@
 # Three-profile beta package build
 
-The beta package workflow `.github/workflows/multiprofile-beta-release.yml`
-assembles the current `main` revision on a dedicated, protected Linux runner.
-It does **not** run for pull requests and does **not** publish a GitHub Release.
-Only final ZIP, SHA-256 and menu artifacts are uploaded as 30-day Actions artifacts.
-Its main-push trigger remains disabled until repository variable
-`MIBR_RELEASE_RUNNER_ENABLED=true`.
+The canonical pipeline is `.github/workflows/multiprofile-beta-release.yml`.
+It reassembles the **current public `main`** with exactly pinned, reviewed
+build outputs from private Research on **GitHub-hosted `ubuntu-24.04`**.
+No dedicated self-hosted QNX/J9 runner is needed for this **prebuilt** mode.
+It is a **build-and-validation pipeline**, not a new native compilation and
+not an automatic GitHub Release. An archived Research binary is not thereby
+vehicle-tested or legally approved for public redistribution.
 
-## Two different build inputs
+## Two independent release gates
 
-- **QNX cross-compiler image (GHCR):** `ghcr.io/harman-f/mhi2-qnx65-armv7`
-  is a host-side Docker build environment (GCC 4.9.4 / QNX 6.5 / ARMv7),
-  **not a CarPlay application release**. The immutable digest in
-  `tools/qnx65-image.lock` is required by existing native CI and the package
-  builder. Do not delete it while this lockfile references the image.
-- **OEM/J9 menu classes:** The three owner-approved, profile-specific
-  `MIBR-CarPlay.jar` files are checked into
-  `modules/profiles/<id>/hmi/prebuilt/`. They are the default inputs
-  (`MIBR_MENU_JAR_MODE=prebuilt`); they are **not** rebuilt for every
-  ordinary package run. Each must have the pinned SHA-256 and class major 46.
-  `tools/release/stage_prebuilt_menu.py` checks the exact Git **tree/blob
-  object identities** in `modules/profiles/MENU_SOURCE_LOCK.json` for the
-  shared Java/menu, profile HMI/API and settings registry. This content lock
-  works even when new changes are squash-merged or CI uses a shallow checkout.
-  It stages the current source snapshot as `hmi/SOURCE_COMMIT.txt` for the
-  assembler; that receipt is **not** a claim that the historical prebuilt
-  JAR archives were compiled at this checkout commit.
+1. The no-secret `source-locks` job checks
+   `modules/profiles/MENU_SOURCE_LOCK.json` for the three previously approved
+   firmware-specific `MIBR-CarPlay.jar` files (J9 class major 46). A new Java,
+   profile-HMI or settings-registry input rejects those JARs. Only a separately
+   reviewed Research/J9 build may renew the lock.
+2. Native CarPlay, Broker, QNX support and Navigation outputs plus the
+   `MIBR-Extender-P1-BootProbe.jar` come from the **exact r11b Research ZIP**,
+   identified by `tools/release/RESEARCH_PREBUILT_LOCK.json`. That lock pins
+   the Research commit and whole ZIP SHA-256, and **19 public Git object
+   fingerprints** for QNX/native sources, build scripts, compiler image lock,
+   module index and settings registry. The staging script checks the original
+   complete ZIP, SHA-256 inventory, native binary manifest, original compiler
+   provenance and staged file hashes before the assembler runs. Source drift
+   requires rebuilding the changed components privately, reviewing their
+   complete provenance and updating the archive + locks together. It never
+   uses `--allow-stale`.
 
-When those sources change, build the affected profile JARs **outside the public
-CI**, against the exact IBM J9 toolchain, exact profile API `lsd.jar` and
-private OEM source inputs. The old JARs are then **stale**: never update the source-content lock alone.
-Independently check the new JAR contents and class versions, update the
-`git_objects` and `menu_jars` pins in
-`modules/profiles/MENU_SOURCE_LOCK.json` **together** with the new JARs
-and provenance note, and only then enable package assembly again. The optional
-`MIBR_MENU_JAR_MODE=rebuild` can still rebuild all three profile JARs
-on the secured runner if it has every input; that mode writes the exact
-current source commit receipt.
+Research builds have their own commit history. The assembler's new
+`--use-research-prebuilts` mode verifies a dedicated Research receipt instead
+of mislabelling the binary's source commit as the current public commit.
+`package.json.native_build.source_commit` retains the actual Research
+build provenance, `input_freshness.native` reports the validated public
+source lock, while `package.json.source_commit` records the exact newly
+assembled public checkout. The historic compiled bytes remain historic.
 
-**Remaining private build blockers:** By default the separately required
-`MIBR-Extender-P1-BootProbe.jar` is still built with J9. The protected runner
-may alternatively receive a locally compiled and independently reviewed
-`MIBR_PREBUILT_EXTENDER_JAR` and exact
-`MIBR_PREBUILT_EXTENDER_SHA256` secret. That supplied file must not be
-checked into the public tree, must pass the P1 JAR verifier, and is accepted
-only while the public J9 source-content lock passes. With those two secrets
-the release step no longer needs to rebuild any Java; without them the
-matching J9/Škoda API inputs are still mandatory.
+The three approved profile menu JARs are staged from
+`modules/profiles/<profile>/hmi/prebuilt/MIBR-CarPlay.jar`. The separately
+built Extender is extracted from the exact locked private reference package
+and checked by `verify_p1_jar.py` (two Java class files, class major 46).
 
-Native navigation still requires the private QNX target sysroot, exact iAP2
-library and pinned Clang/LLD/FFmpeg. Therefore reusing prebuilt Java does
-**not eliminate the dedicated runner** or make a full package runnable
-on GitHub-hosted CI yet. Do not substitute arbitrary or stale binaries.
+## Release operation and protected access
 
-The QNX host builds use the checked-in immutable image digest. All native
-output, extender, prebuilt menu JARs and final ZIP must pass build provenance,
-freshness and package validation. Host success is not vehicle acceptance;
-Škoda's historical installed menu evidence does not qualify newly compiled
-native outputs or the two SEAT targets.
+- The source lock job runs on public `main` without private credentials.
+- The packaging job runs only on public `main`, when repository variable
+  `MIBR_RESEARCH_PREBUILT_RELEASE_ENABLED=true`. The
+  `multiprofile-private-build` environment supplies
+  `MIBR_RESEARCH_READ_TOKEN`, a narrow, read-only GitHub token with **only**
+  the protected source repository contents access. Configure its exact
+  `owner/repo` identifier as protected secret `MIBR_RESEARCH_REPO`. The job reads the exact
+  archived `MIBR-CarPlay-beta-3profile-r11b.zip` from commit
+  `f733de43f58c71e4c7743dbda438b906959bce66`.
+- The ZIP is reconstructed and both validators run; SHA-256 of the new ZIP
+  is recorded. Java, QNX cross-compiler, licensed firmware and native
+  navigation are **not** recompiled on that runner.
+- **Publication is a separate decision.** The Research reference explicitly
+  says PRIVATE-RESEARCH. The resulting combined ZIP must **not** be uploaded
+  to public GitHub Actions unless its OEM/native/Extender distribution
+  rights and contents have been independently approved. Accordingly the
+  public Actions artifact upload requires a second protected repository
+  variable: `MIBR_PUBLIC_BETA_ARTIFACT_APPROVED=true`. Until then, only the
+  passing/failing validation logs are visible and the checked ZIP remains
+  ephemeral inside the job.
+- Even after upload approval, the workflow creates a 30-day Actions artifact
+  only. It does **not** create a release, tag, or GitHub Package.
+
+The original `tools/release/build_hmi_and_package.sh` is kept as an explicit
+**private full-rebuild** path, not invoked by this workflow. Its J9,
+QNX-target, Clang/LLD, iAP2 and FFmpeg requirements remain applicable when
+source changes demand fresh binaries. The QNX cross-compiler image stored
+in GHCR is a toolchain dependency, **not** a CarPlay application release,
+and must not be deleted while other build workflows require its digest.
+
+A successful host/package test is not on-unit validation. Škoda runtime
+history and the SEAT untested status remain unchanged.
 
 ## HTML editor and packaged configuration
 
@@ -86,54 +102,23 @@ automatically adapted. The installer selects by the exact
 vehicle serial number or a guess from the brand. See
 `config/README.md` and `modules/profiles/README.md`.
 
-## Reference comparison
+## Research-native provenance and migration notes
 
-The beta.11 r11b archive was reconstructed byte-for-byte from its documented
-assembler inputs; its complete 292-file, three-profile ZIP also passed the
-current package validator. The later merged installer entrypoints and runtime
-scripts matched the reference package; selected configuration comments and host
-test files differ. Recompiling the three menu JARs with the documented J9 and
-profile API inputs produced the same file and class bytes as the reference JARs;
-JAR archive hashes changed because packaging metadata differs. A subsequent
-native rebuild produced both matching and differing binary hashes, so it must
-be treated as a new build rather than silently called the vehicle-tested bytes.
-
-## Runner provisioning
-
-Private J9 inputs are required only when rebuilding the profile menu JARs
-(`MIBR_MENU_JAR_MODE=rebuild`) or when no validated prebuilt extender is
-provided. With a locally prebuilt extender, provision the two additional
-secrets `MIBR_PREBUILT_EXTENDER_JAR` (restricted absolute path) and
-`MIBR_PREBUILT_EXTENDER_SHA256` (its independently reviewed digest). The existing runner and
-protected environment must not be opened to untrusted branches.
-
-
-
-Provision a dedicated Linux x64 runner with label `mibr-private-release-j9-qnx`
-and restrict it to this repository. Never use this runner for untrusted pull
-requests. Configure the protected environment `multiprofile-private-build` with
-these secrets (paths refer only to that runner):
-
-- `MIBR_PRIVATE_J9_HOME`: IBM J9 SDK home. Set `MIBR_J9_JAVAC_SHA256` and
-  `MIBR_J9_JAR_SHA256` to the SHA-256 of its `bin/javac` and `bin/jar`.
-- `MIBR_PRIVATE_INPUT_ROOT`: private directory with `<profile>/lsd.jar`,
-  `<profile>/Activator.java` and `<profile>/WidgetFactoryImpl.java` for each
-  of the three profile IDs. Supply its `SHA256SUMS` and pin the SHA-256 of that
-  file in `MIBR_PRIVATE_INPUT_MANIFEST_SHA256`. Generate the manifest with
-  `sha256sum <profile>/<file> ... > SHA256SUMS` from the input root.
-- `MIBR_QNX_TARGET`: the QNX 6.5 `target/qnx6` sysroot. Provision
-  `MIBR_TARGET_SHA256SUMS` in that directory and pin its SHA-256 as
-  `MIBR_QNX_TARGET_MANIFEST_SHA256`.
-- `MIBR_IAP2_LIB`: the exact private MU1440 iAP2 library required by the
-  navigation build; its expected hash is checked by that build script.
-- `MIBR_CLANG`, `MIBR_LLD`, `MIBR_FFMPEG`: executable paths, with SHA-256
-  pins `MIBR_CLANG_SHA256`, `MIBR_LLD_SHA256` and `MIBR_FFMPEG_SHA256`.
-  FFmpeg must include libx264; Docker must be available to the runner. When the
-  runner is not root, it also needs non-interactive sudo for restoring build-output
-  ownership after the Docker builds.
-
-The workflow reads the QNX compiler image from the repository lock and logs in
-to GHCR with its read-only job token. Provisioning these dependencies and runner
-registration is an explicit operational step; simply merging the workflow does
-not make an unavailable runner start. Keep private input files, generated OEM
-sources and the J9 SDK out of repository commits and uploaded artifacts.
+- Research r11b reference: private branch
+  `the protected private source repository:build-output/165-beta-pkg`, immutable
+  ZIP SHA-256 `f238143916a977ec24f1d6d9361194924b19852846c147d3f31c28c537f60248`.
+  The original 292-file, three-profile package passed the package validator.
+- Source snapshot for the reviewed public locks:
+  `420fc46c63594a1a0274ddf6a3da7fb19c33b294`. This is a content reference,
+  **not** a statement that Research J9/native binaries were built on that commit.
+- The existing `MIBR_RELEASE_RUNNER_ENABLED` flag, self-hosted label
+  `mibr-private-release-j9-qnx` and private filesystem path secrets no longer
+  control the hosted prebuilt workflow; they belong exclusively to the
+  preserved full-rebuild procedure.
+- For Java modifications: rebuild the affected menu JAR in Research using
+  the exact private J9/firmware classpath; review the new archive and update
+  `MENU_SOURCE_LOCK.json` with matching source objects and hashes.
+  For C/QNX/Navigation/Extender changes: rebuild in the private environment,
+  produce new input and per-binary SHA-256 provenance, approve an immutable
+  reference archive and regenerate `RESEARCH_PREBUILT_LOCK.json`. Never
+  only adjust the lock fingerprints to silence a stale-source failure.
