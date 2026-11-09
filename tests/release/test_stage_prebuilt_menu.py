@@ -23,7 +23,7 @@ class MenuPrebuiltFreshnessTest(unittest.TestCase):
         (self.repo / "menu/Adapter.java").write_text("class Adapter {}\n", encoding="utf-8")
         self.run_git("add", "menu/Adapter.java")
         self.run_git("commit", "-qm", "initial menu sources")
-        self.baseline = self.run_git("rev-parse", "HEAD").strip()
+        self.expected = {"menu": self.run_git("rev-parse", "HEAD:menu").strip()}
 
     def run_git(self, *args):
         return subprocess.run(
@@ -32,7 +32,7 @@ class MenuPrebuiltFreshnessTest(unittest.TestCase):
         ).stdout
 
     def changed(self):
-        return module.changed_paths(self.repo, self.baseline, ("menu",))
+        return module.changed_inputs(self.repo, self.expected)
 
     def test_unchanged_public_inputs_pass(self):
         self.assertEqual(self.changed(), [])
@@ -41,7 +41,7 @@ class MenuPrebuiltFreshnessTest(unittest.TestCase):
         (self.repo / "menu/Adapter.java").write_text("class Adapter { int v; }\n")
         self.run_git("add", "menu/Adapter.java")
         self.run_git("commit", "-qm", "modify Java")
-        self.assertIn("menu/Adapter.java", self.changed())
+        self.assertTrue(any("menu" in p for p in self.changed()))
 
     def test_uncommitted_or_new_java_blocks_reference(self):
         (self.repo / "menu/Adapter.java").write_text("class Adapter { int v; }\n")
