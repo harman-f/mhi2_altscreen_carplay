@@ -19,18 +19,21 @@ Its main-push trigger remains disabled until repository variable
   `modules/profiles/<id>/hmi/prebuilt/`. They are the default inputs
   (`MIBR_MENU_JAR_MODE=prebuilt`); they are **not** rebuilt for every
   ordinary package run. Each must have the pinned SHA-256 and class major 46.
-  `tools/release/stage_prebuilt_menu.py` rejects reuse when any shared
-  Java/menu, exact profile HMI/API or settings-registry input differs from
-  the reviewed public source baseline
-  `420fc46c63594a1a0274ddf6a3da7fb19c33b294`.
-  It creates the `hmi/SOURCE_COMMIT.txt` receipt required by the assembler.
+  `tools/release/stage_prebuilt_menu.py` checks the exact Git **tree/blob
+  object identities** in `modules/profiles/MENU_SOURCE_LOCK.json` for the
+  shared Java/menu, profile HMI/API and settings registry. This content lock
+  works even when new changes are squash-merged or CI uses a shallow checkout.
+  It stages the current source snapshot as `hmi/SOURCE_COMMIT.txt` for the
+  assembler; that receipt is **not** a claim that the historical prebuilt
+  JAR archives were compiled at this checkout commit.
 
 When those sources change, build the affected profile JARs **outside the public
 CI**, against the exact IBM J9 toolchain, exact profile API `lsd.jar` and
-private OEM source inputs. The old JARs are then **stale**: do not bump the
-baseline alone. Independently check the new JAR contents/class versions,
-update the three pinned SHA-256 values and source-baseline provenance after
-review, and only then enable package assembly again. The optional
+private OEM source inputs. The old JARs are then **stale**: never update the source-content lock alone.
+Independently check the new JAR contents and class versions, update the
+`git_objects` and `menu_jars` pins in
+`modules/profiles/MENU_SOURCE_LOCK.json` **together** with the new JARs
+and provenance note, and only then enable package assembly again. The optional
 `MIBR_MENU_JAR_MODE=rebuild` can still rebuild all three profile JARs
 on the secured runner if it has every input; that mode writes the exact
 current source commit receipt.
@@ -41,7 +44,7 @@ may alternatively receive a locally compiled and independently reviewed
 `MIBR_PREBUILT_EXTENDER_JAR` and exact
 `MIBR_PREBUILT_EXTENDER_SHA256` secret. That supplied file must not be
 checked into the public tree, must pass the P1 JAR verifier, and is accepted
-only while the public J9 source-baseline gate passes. With those two secrets
+only while the public J9 source-content lock passes. With those two secrets
 the release step no longer needs to rebuild any Java; without them the
 matching J9/Škoda API inputs are still mandatory.
 
