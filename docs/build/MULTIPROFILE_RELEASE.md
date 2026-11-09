@@ -47,7 +47,8 @@ and checked by `verify_p1_jar.py` (two Java class files, class major 46).
   `MIBR_RESEARCH_PREBUILT_RELEASE_ENABLED=true`. The
   `multiprofile-private-build` environment supplies
   `MIBR_RESEARCH_READ_TOKEN`, a narrow, read-only GitHub token with **only**
-  `CaneTLOTW/M.I.B._Research` contents access. The job reads the exact
+  the protected source repository contents access. Configure its exact
+  `owner/repo` identifier as protected secret `MIBR_RESEARCH_REPO`. The job reads the exact
   archived `MIBR-CarPlay-beta-3profile-r11b.zip` from commit
   `f733de43f58c71e4c7743dbda438b906959bce66`.
 - The ZIP is reconstructed and both validators run; SHA-256 of the new ZIP
@@ -104,7 +105,7 @@ vehicle serial number or a guess from the brand. See
 ## Research-native provenance and migration notes
 
 - Research r11b reference: private branch
-  `CaneTLOTW/M.I.B._Research:build-output/165-beta-pkg`, immutable
+  `the protected private source repository:build-output/165-beta-pkg`, immutable
   ZIP SHA-256 `f238143916a977ec24f1d6d9361194924b19852846c147d3f31c28c537f60248`.
   The original 292-file, three-profile package passed the package validator.
 - Source snapshot for the reviewed public locks:
