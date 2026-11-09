@@ -50,6 +50,33 @@ freshness and package validation. Host success is not vehicle acceptance;
 Škoda's historical installed menu evidence does not qualify newly compiled
 native outputs or the two SEAT targets.
 
+## HTML editor and packaged configuration
+
+The deterministic ZIP includes all four current editor files from
+`tools/menu-editor/`: `mibr-menu-editor.html`,
+`function-catalog.json`, `standard-menu.txt` and
+`MENU_FILE_FORMAT.md`. The standard menu is also packaged as
+`common/menu/config/mibr-menu.conf` and installed at
+`/mnt/app/root/mibr/config/menu/layout.conf`.
+
+Each firmware profile supplies its own `profile.json`,
+`hmi/oem-anchors.json`, integration transforms/`variants.list` and
+`display/mibr-platform-defaults.conf` (from the platform-specific
+`modules/navigation/source/platform-defaults/*.conf`).
+`installer/config/profiles.list` is generated from the three exact
+`profile.json` selector hashes. The package also includes a generated
+`docs/configuration/DEFAULT_CONFIGURATION_MATRIX.md` based on
+`settings/registry.json`; the registry is a *source* definition rather
+than a separate user-editable on-unit configuration file.
+
+The checked-in standard menu currently has `brand=skoda` even for a
+multi-profile package. It is **not yet a separately generated SEAT
+menu layout**; do not claim that all brand presentation details are
+automatically adapted. The installer selects by the exact
+`/ifs/lsd.jxe` SHA-256 and firmware-train cross-check, **not** VIN,
+vehicle serial number or a guess from the brand. See
+`config/README.md` and `modules/profiles/README.md`.
+
 ## Reference comparison
 
 The beta.11 r11b archive was reconstructed byte-for-byte from its documented
