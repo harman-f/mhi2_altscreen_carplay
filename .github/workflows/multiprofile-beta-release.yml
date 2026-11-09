@@ -47,14 +47,18 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.MIBR_RESEARCH_READ_TOKEN }}
+          RESEARCH_REPO: ${{ secrets.MIBR_RESEARCH_REPO }}
         run: |
           set -euo pipefail
           test -n "${GH_TOKEN:-}" || { echo 'MIBR_RESEARCH_READ_TOKEN missing'; exit 1; }
-          # A narrow fine-grained, read-only token for CaneTLOTW/M.I.B._Research.
+          [[ "${RESEARCH_REPO:-}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || {
+            echo 'MIBR_RESEARCH_REPO must be a protected owner/repository identifier'; exit 1;
+          }
+          # Read-only access limited to the protected source repository.
           # Never download on PRs or untrusted branches. The SHA-256 is checked
           # by stage_research_prebuilts.py before any byte is staged.
           gh api -H 'Accept: application/vnd.github.raw+json' \
-            '/repos/CaneTLOTW/M.I.B._Research/contents/MIBR-CarPlay-beta-3profile-r11b.zip?ref=f733de43f58c71e4c7743dbda438b906959bce66' \
+            '/repos/$RESEARCH_REPO/contents/MIBR-CarPlay-beta-3profile-r11b.zip?ref=f733de43f58c71e4c7743dbda438b906959bce66' \
             > "$RUNNER_TEMP/research-r11b.zip"
           test -s "$RUNNER_TEMP/research-r11b.zip"
           sha256sum "$RUNNER_TEMP/research-r11b.zip"
