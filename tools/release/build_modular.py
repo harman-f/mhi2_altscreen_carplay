@@ -376,7 +376,8 @@ def select_profiles(repo, wanted):
 
 
 def assemble(native, repo=ROOT, installer=None, hmi_dir=None, profiles=None, scope=None,
-             allow_dirty=False, menu_jar=None, allow_stale=False, version=None):
+             allow_dirty=False, menu_jar=None, allow_stale=False, version=None,
+             use_research_prebuilts=False):
     """Return (zip entries {name: (bytes, mode)}, package metadata)."""
     native, repo = Path(native), Path(repo)
     installer = Path(installer) if installer is not None else repo / "installer"
@@ -394,8 +395,24 @@ def assemble(native, repo=ROOT, installer=None, hmi_dir=None, profiles=None, sco
         raise AssembleError("repository has uncommitted tracked changes (use --allow-dirty)")
     verify_native_sums(native)
     build_prov = native_provenance(native)
-    freshness = {"native": check_fresh(repo, "native", build_prov["source_commit"],
-                                       native_inputs(repo), allow_stale)}
+    if use_research_prebuilts:
+        # Research provenance uses a commit in the private repository. Verify
+        # its immutable archive receipt, exact staged payload bytes and a
+        # reviewed public source-content lock instead of faking a main commit.
+        if allow_stale:
+            raise AssembleError("research prebuilt mode cannot bypass source freshness")
+        if hmi_dir is None:
+            raise AssembleError("research prebuilt mode requires an HMI staging directory")
+        from stage_research_prebuilts import PrebuiltError, verify_staged
+        try:
+            native_gate = verify_staged(repo, native, hmi_dir)
+        except (PrebuiltError, OSError, ValueError) as exc:
+            raise AssembleError("RESEARCH_NATIVE_PREBUILT_BLOCKED: " + str(exc)) from exc
+        build_prov["research_reference_sha256"] = native_gate["reference_archive_sha256"]
+    else:
+        native_gate = check_fresh(repo, "native", build_prov["source_commit"],
+                                  native_inputs(repo), allow_stale)
+    freshness = {"native": native_gate}
     hmi_commit = Path(hmi_dir) / "SOURCE_COMMIT.txt" if hmi_dir is not None else None
     if hmi_commit is not None and hmi_commit.is_file():
         freshness["hmi"] = check_fresh(repo, "HMI", hmi_commit.read_text().strip(), list(HMI_INPUTS), allow_stale)
@@ -786,6 +803,8 @@ def main(argv=None, default_profiles=None, default_scope=None):
     ap.add_argument("--allow-dirty", action="store_true")
     ap.add_argument("--allow-stale", action="store_true",
                     help="tests only: accept prebuilt artifacts whose inputs changed since their build")
+    ap.add_argument("--use-research-prebuilts", action="store_true",
+                    help="verify immutable private Research archive receipt and Git object source lock")
     ap.add_argument("--check", type=Path, metavar="ZIP",
                     help="fail if README/matrix in ZIP drift from registry and inventory")
     ap.add_argument("--self-test", action="store_true")
@@ -802,7 +821,8 @@ def main(argv=None, default_profiles=None, default_scope=None):
         ap.error("--native-dir and --out are required")
     try:
         files, meta = assemble(args.native_dir, args.repo, args.installer_dir, args.hmi_dir,
-                               args.profiles, args.scope, args.allow_dirty, args.menu_jar, args.allow_stale, args.version)
+                               args.profiles, args.scope, args.allow_dirty, args.menu_jar, args.allow_stale,
+                                args.version, args.use_research_prebuilts)
     except MissingInput as exc:
         for item in exc.items:
             print("MISSING_INPUT: " + item, file=sys.stderr)
