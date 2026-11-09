@@ -58,7 +58,7 @@ jobs:
           # Never download on PRs or untrusted branches. The SHA-256 is checked
           # by stage_research_prebuilts.py before any byte is staged.
           gh api -H 'Accept: application/vnd.github.raw+json' \
-            '/repos/$RESEARCH_REPO/contents/MIBR-CarPlay-beta-3profile-r11b.zip?ref=f733de43f58c71e4c7743dbda438b906959bce66' \
+            "/repos/$RESEARCH_REPO/contents/MIBR-CarPlay-beta-3profile-r11b.zip?ref=f733de43f58c71e4c7743dbda438b906959bce66" \
             > "$RUNNER_TEMP/research-r11b.zip"
           test -s "$RUNNER_TEMP/research-r11b.zip"
           sha256sum "$RUNNER_TEMP/research-r11b.zip"
