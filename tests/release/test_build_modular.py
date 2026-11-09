@@ -53,6 +53,10 @@ class BuildModularZip(unittest.TestCase):
         vmp.validate(out)                      # extracted tree
         vmp.validate(self.t / "a.zip", True)   # the ZIP itself
         listing = bm.load_zip(self.t / "a.zip")
+        # Reference JARs live in Git but only the fresh HMI inputs belong in the ZIP.
+        for pid in meta["profiles"]:
+            self.assertIn("profiles/%s/hmi/MIBR-CarPlay.jar" % pid, listing)
+            self.assertNotIn("profiles/%s/hmi/prebuilt/MIBR-CarPlay.jar" % pid, listing)
         self.assertEqual(bm.check_docs(listing), [])
         for name in (bm.README, bm.MATRIX):
             text = listing[name].decode()

@@ -495,6 +495,10 @@ def assemble(native, repo=ROOT, installer=None, hmi_dir=None, profiles=None, sco
         pm = profile_manifests.setdefault(pid, [])
         for rel in git(repo, "ls-files", "modules/profiles/" + pid).split("\n"):
             sub = rel[len("modules/profiles/%s/" % pid):]
+            # The checked-in reference JAR is not a second package payload.
+            # Package only the freshly built profile JAR supplied via --hmi-dir.
+            if sub.startswith("hmi/prebuilt/"):
+                continue
             pkg = root + sub
             read_repo_file(repo, rel, files, prov, pkg)
             if sub.startswith("hmi/java/"):

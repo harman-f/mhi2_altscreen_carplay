@@ -2,6 +2,8 @@
 
 ## Public repository role (binding)
 
+**Owner exception (2026-11-09):** The three finished profile-specific `MIBR-CarPlay.jar` menu artifacts are explicitly authorized in this repository and its release packages. This exception does not cover the OEM firmware, original JARs/classes, proprietary build inputs, or their redistribution. Preserve source/build provenance and identify vehicle-tested versus newly rebuilt outputs.
+
 This is the **curated public source/product repository**, not the development team's coordination or forensic workspace. Publish only independently authored, provenance-checked source with actual dependencies/build checks; current capabilities, accurate support/test evidence, public documentation and external contributor changes. Never place internal audits, research task/handoff reports, private issue or pull request references, raw captures, extracted OEM/phone code, personal provenance, private names/paths or experimental branch diaries here.
 
 Internal implementation experiments, audits, QA logs, reviewer handoffs, prompts and progress tracking stay in private development management. **Do not open a public Issue or Draft PR to relay internal work**, even when the feature eventually ships publicly. Public Issues are for real outside bug/compatibility reports and release-source regressions; public PRs are small independently reviewable release/publication candidates. No stacked public development PRs, source-only file copies without dependent code or undocumented build assumptions. A public code publication requires an exact change set, origin/license and disclosure review, build and appropriate evidence classification, then CI; never equate host/source PASS with a vehicle-ready installer.
