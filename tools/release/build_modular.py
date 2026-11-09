@@ -330,7 +330,8 @@ def native_provenance(native):
 NATIVE_INPUT_MODULES = ("carplay", "broker", "navigation")
 NATIVE_INPUT_EXTRA = ("tools/qnx65-image.lock", "tools/ci_qnx65_image.sh", "settings/registry.json")
 NATIVE_RUNTIME_DATA_EXCLUDE = ":(exclude)modules/navigation/source/platform-defaults"
-HMI_INPUTS = ("modules/menu/source", ":(glob)modules/profiles/*/hmi/**", "settings/registry.json")
+HMI_INPUTS = ("modules/menu/source", ":(glob)modules/profiles/*/hmi/**",
+              ":(glob)modules/profiles/*/profile.json", "settings/registry.json")
 
 
 def native_inputs(repo):
