@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Stage owner-approved profile menu JARs only when their public build inputs are unchanged.
+"""Stage reviewed profile menu JARs only when their source Git objects still match.
 
-This is an artifact-to-source *freshness* gate, not evidence of deterministic J9
-archive bytes or vehicle acceptance. On Java/registry/profile changes, rebuild
-locally with exact private firmware/J9 inputs and review new artifacts and pins.
+Git tree/blob IDs are content fingerprints: unlike a baseline commit diff,
+they work with shallow checkouts and after squash merges. This proves *source
+freshness*, not an OEM/J9 deterministic rebuild or vehicle approval.
 """
 import argparse
 from pathlib import Path
@@ -13,56 +13,46 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
-from verify_profile_menu_artifacts import EXPECTED, main as verify_jars  # noqa: E402
-
-# Release baseline whose public Java inputs were reconciled with the r11b
-# reference artifacts. Update only together with independently rebuilt,
-# reviewed profile JARs, updated hashes, and an explicit provenance review.
-PUBLIC_SOURCE_BASELINE = "420fc46c63594a1a0274ddf6a3da7fb19c33b294"
-
-# Conservative: profile.json also pins the exact API JAR and adapter lineage.
-# Include all profile HMI trees (including checked-in reference artifacts) to
-# detect any changes before blindly reusing the same baseline.
-SOURCE_INPUTS = (
-    "modules/menu/source",
-    "settings/registry.json",
-    "modules/profiles/skoda-mu1440-p4526/hmi",
-    "modules/profiles/seat-mu1409-p4708/hmi",
-    "modules/profiles/seat-mu1447-p4709/hmi",
-    "modules/profiles/skoda-mu1440-p4526/profile.json",
-    "modules/profiles/seat-mu1409-p4708/profile.json",
-    "modules/profiles/seat-mu1447-p4709/profile.json",
-)
+from verify_profile_menu_artifacts import EXPECTED, LOCK, main as verify_jars  # noqa: E402
 
 
 def git(repo, *args):
     return subprocess.run(
-        ["git", "-C", str(repo), *args], text=True, capture_output=True,
-        check=True,
+        ["git", "-C", str(repo), *args], text=True, capture_output=True, check=True,
     ).stdout.strip()
 
 
-def changed_paths(repo, baseline=PUBLIC_SOURCE_BASELINE, inputs=SOURCE_INPUTS):
-    git(repo, "cat-file", "-e", baseline + "^{commit}")
-    paths = git(repo, "diff", "--name-only", baseline, "HEAD", "--", *inputs)
-    dirty = git(repo, "status", "--porcelain", "--untracked-files=all", "--", *inputs)
-    return [p for p in paths.splitlines() if p] + [
-        "uncommitted: " + p for p in dirty.splitlines() if p
-    ]
+def changed_inputs(repo, expected_objects):
+    """Compare complete tracked HMI/profile inputs, without needing an old commit."""
+    if not expected_objects:
+        raise ValueError("MENU_SOURCE_LOCK_EMPTY")
+    changes = []
+    for path, expected in sorted(expected_objects.items()):
+        if not isinstance(path, str) or not isinstance(expected, str) or len(expected) != 40:
+            raise ValueError("MENU_SOURCE_LOCK_INVALID_ENTRY")
+        try:
+            actual = git(repo, "rev-parse", "--verify", "HEAD:" + path)
+        except subprocess.CalledProcessError:
+            actual = "<missing>"
+        if actual != expected:
+            changes.append(path + " (expected " + expected[:12] + ", actual " + actual[:12] + ")")
+    dirty = git(repo, "status", "--porcelain", "--untracked-files=all", "--", *expected_objects)
+    changes.extend("uncommitted: " + p for p in dirty.splitlines() if p)
+    return changes
 
 
 def stage(repo, out, check_only=False):
-    stale = changed_paths(repo)
+    stale = changed_inputs(repo, LOCK["git_objects"])
     if stale:
         raise ValueError(
-            "MENU_PREBUILT_STALE: menu sources/profile/API/registry changed since "
-            + PUBLIC_SOURCE_BASELINE[:12] + ": " + ", ".join(stale[:12])
-            + "; rebuild affected profile JARs locally with exact private inputs "
-            "and update pins/baseline after review"
+            "MENU_PREBUILT_STALE: reviewed Java/profile/API/registry content differs: "
+            + ", ".join(stale[:12])
+            + "; rebuild the affected profile JARs with the matching private J9 inputs, "
+              "verify exact classes and update approved Git object + SHA-256 pins together"
         )
     verify_jars()
     if check_only:
-        print("MENU_PREBUILT_SOURCE=PASS commit=" + PUBLIC_SOURCE_BASELINE)
+        print("MENU_PREBUILT_SOURCE=PASS locked_git_objects=" + str(len(LOCK["git_objects"])))
         return
     if out is None:
         raise ValueError("output directory required unless --check-only")
@@ -77,8 +67,10 @@ def stage(repo, out, check_only=False):
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
         print("MENU_PREBUILT_STAGED profile=" + profile + " sha256=" + EXPECTED[profile])
-    (target / "SOURCE_COMMIT.txt").write_text(PUBLIC_SOURCE_BASELINE + "\n")
-    print("MENU_PREBUILT_SOURCE=PASS commit=" + PUBLIC_SOURCE_BASELINE)
+    # The assembler's source freshness receipt identifies the *checked* checkout
+    # snapshot, not the historic time each prebuilt archive was compiled.
+    (target / "SOURCE_COMMIT.txt").write_text(git(repo, "rev-parse", "HEAD") + "\n")
+    print("MENU_PREBUILT_SOURCE=PASS exact_checkout_with_reviewed_git_objects")
 
 
 def main():
