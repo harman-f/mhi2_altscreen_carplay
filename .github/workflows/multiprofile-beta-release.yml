@@ -1,0 +1,68 @@
+name: Build three-profile beta package (private J9 inputs)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: multiprofile-beta-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'harman-f/mhi2_altscreen_carplay' && github.ref == 'refs/heads/main' && vars.MIBR_RELEASE_RUNNER_ENABLED == 'true'
+    environment: multiprofile-private-build
+    runs-on: [self-hosted, linux, x64, mibr-private-release-j9-qnx]
+    timeout-minutes: 180
+    steps:
+      - name: Assert trusted dispatch context
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch || "$GITHUB_EVENT_NAME" == push ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$GITHUB_REPOSITORY" == harman-f/mhi2_altscreen_carplay ]]
+
+      - name: Checkout exact main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Build all profile JARs and assemble complete beta ZIP
+        shell: bash
+        env:
+          J9_HOME: ${{ secrets.MIBR_PRIVATE_J9_HOME }}
+          MIBR_PRIVATE_INPUT_ROOT: ${{ secrets.MIBR_PRIVATE_INPUT_ROOT }}
+          MIBR_PRIVATE_INPUT_MANIFEST_SHA256: ${{ secrets.MIBR_PRIVATE_INPUT_MANIFEST_SHA256 }}
+          QNX65_GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          QNX_TARGET: ${{ secrets.MIBR_QNX_TARGET }}
+          MIBR_QNX_TARGET_MANIFEST_SHA256: ${{ secrets.MIBR_QNX_TARGET_MANIFEST_SHA256 }}
+          IAP2_LIB: ${{ secrets.MIBR_IAP2_LIB }}
+          CLANG: ${{ secrets.MIBR_CLANG }}
+          LLD: ${{ secrets.MIBR_LLD }}
+          FFMPEG: ${{ secrets.MIBR_FFMPEG }}
+          MIBR_J9_JAVAC_SHA256: ${{ secrets.MIBR_J9_JAVAC_SHA256 }}
+          MIBR_J9_JAR_SHA256: ${{ secrets.MIBR_J9_JAR_SHA256 }}
+          MIBR_CLANG_SHA256: ${{ secrets.MIBR_CLANG_SHA256 }}
+          MIBR_LLD_SHA256: ${{ secrets.MIBR_LLD_SHA256 }}
+          MIBR_FFMPEG_SHA256: ${{ secrets.MIBR_FFMPEG_SHA256 }}
+          OUT: ${{ runner.temp }}/mibr-multiprofile-beta-${{ github.run_id }}-${{ github.run_attempt }}
+        run: bash tools/release/build_hmi_and_package.sh
+
+      - name: Upload only built JARs and final ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: MIBR-CarPlay-three-profile-beta-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/mibr-multiprofile-beta-${{ github.run_id }}-${{ github.run_attempt }}/hmi/*/MIBR-CarPlay.jar
+            ${{ runner.temp }}/mibr-multiprofile-beta-${{ github.run_id }}-${{ github.run_attempt }}/MIBR-CarPlay-three-profile-beta.zip
+            ${{ runner.temp }}/mibr-multiprofile-beta-${{ github.run_id }}-${{ github.run_attempt }}/MIBR-CarPlay-three-profile-beta.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
