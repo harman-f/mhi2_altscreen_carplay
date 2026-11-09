@@ -8,6 +8,12 @@ ROOT_REAL="$(cd "$ROOT" && pwd -P)"
 BUILD_SCRIPT="$ROOT/modules/menu/source/build.sh"
 PROFILES=(skoda-mu1440-p4526 seat-mu1409-p4708 seat-mu1447-p4709)
 
+MIBR_MENU_JAR_MODE="${MIBR_MENU_JAR_MODE:-prebuilt}"
+case "$MIBR_MENU_JAR_MODE" in
+  prebuilt|rebuild) ;;
+  *) echo "MIBR_MENU_JAR_MODE_INVALID: expected prebuilt or rebuild" >&2; exit 18 ;;
+esac
+
 : "${J9_HOME:?MISSING_INPUT: set J9_HOME to the locally provisioned IBM J9 SDK}"
 : "${MIBR_PRIVATE_INPUT_ROOT:?MISSING_INPUT: set private input root (not a GitHub artifact or repository path)}"
 : "${MIBR_PRIVATE_INPUT_MANIFEST_SHA256:?MISSING_TOOLCHAIN_PIN: set private input manifest SHA-256}"
@@ -124,38 +130,47 @@ DOCKER_ARGS=(docker run --rm --platform=linux/amd64 -v "$ROOT:/src" -v "$OUT:/re
 "${DOCKER_ARGS[@]}" bash -lc 'bash tools/build_support_tools.sh /release-out/native/bin/support-tools'
 "${DOCKER_ARGS[@]}" bash -lc 'bash tools/build_direct_ts_remux.sh modules/carplay/source/direct-ts-remux/direct_ts_remux.c /release-out/native/bin/direct-ts-remux/direct-ts-remux'
 
-for profile in "${PROFILES[@]}"; do
-  private_profile="$MIBR_PRIVATE_INPUT_ROOT/$profile"
-  lsd="$private_profile/lsd.jar"
-  activator="$private_profile/Activator.java"
-  widget_factory="$private_profile/WidgetFactoryImpl.java"
-
-  profile_out="$WORK/$profile"
-  mkdir -p "$profile_out"
-  echo "HMI_BUILD_START profile=$profile source_commit=$(git -C "$ROOT" rev-parse HEAD)"
-  if ! (
-    cd "$ROOT"
-    J9_HOME="$J9_HOME" \
-      LSD_JAR="$lsd" \
-      OEM_ACTIVATOR_SOURCE="$activator" \
-      OEM_WIDGET_FACTORY_SOURCE="$widget_factory" \
-      PROFILE="$profile" \
-      OUT="$profile_out" \
-      bash "$BUILD_SCRIPT"
-  ) > "$profile_out/private-compiler.log" 2>&1; then
-    cat "$profile_out/private-compiler.log" >> "$PRIVATE_LOG"
-    echo "HMI_BUILD=FAIL profile=$profile; compiler details retained only on the restricted runner" >&2
-    exit 1
-  fi
-
-  built="$profile_out/MIBR-HMI-CarPlay-Settings-Home.jar"
-  [[ -s "$built" ]] || { echo "HMI_BUILD_OUTPUT_MISSING profile=$profile" >&2; exit 29; }
-  python3 "$ROOT/modules/menu/source/verify_class_major.py" "$built" --major 46
-  mkdir -p "$OUT/hmi/$profile"
-  install -m 0644 "$built" "$OUT/hmi/$profile/MIBR-CarPlay.jar"
-  sha256sum "$OUT/hmi/$profile/MIBR-CarPlay.jar"
-  echo "HMI_BUILD=PASS profile=$profile class_major=46"
-done
+if [[ "$MIBR_MENU_JAR_MODE" == "prebuilt" ]]; then
+  # Reuse only hash-pinned reference JARs when every tracked public J9 input
+  # is unchanged from their source baseline. Do not bypass the stale gate.
+  python3 "$ROOT/tools/release/stage_prebuilt_menu.py" --out "$OUT/hmi"
+  echo "PROFILE_MENU_MODE=PREBUILT_SOURCE_MATCH"
+else
+  for profile in "${PROFILES[@]}"; do
+    private_profile="$MIBR_PRIVATE_INPUT_ROOT/$profile"
+    lsd="$private_profile/lsd.jar"
+    activator="$private_profile/Activator.java"
+    widget_factory="$private_profile/WidgetFactoryImpl.java"
+  
+    profile_out="$WORK/$profile"
+    mkdir -p "$profile_out"
+    echo "HMI_BUILD_START profile=$profile source_commit=$(git -C "$ROOT" rev-parse HEAD)"
+    if ! (
+      cd "$ROOT"
+      J9_HOME="$J9_HOME" \
+        LSD_JAR="$lsd" \
+        OEM_ACTIVATOR_SOURCE="$activator" \
+        OEM_WIDGET_FACTORY_SOURCE="$widget_factory" \
+        PROFILE="$profile" \
+        OUT="$profile_out" \
+        bash "$BUILD_SCRIPT"
+    ) > "$profile_out/private-compiler.log" 2>&1; then
+      cat "$profile_out/private-compiler.log" >> "$PRIVATE_LOG"
+      echo "HMI_BUILD=FAIL profile=$profile; compiler details retained only on the restricted runner" >&2
+      exit 1
+    fi
+  
+    built="$profile_out/MIBR-HMI-CarPlay-Settings-Home.jar"
+    [[ -s "$built" ]] || { echo "HMI_BUILD_OUTPUT_MISSING profile=$profile" >&2; exit 29; }
+    python3 "$ROOT/modules/menu/source/verify_class_major.py" "$built" --major 46
+    mkdir -p "$OUT/hmi/$profile"
+    install -m 0644 "$built" "$OUT/hmi/$profile/MIBR-CarPlay.jar"
+    sha256sum "$OUT/hmi/$profile/MIBR-CarPlay.jar"
+    echo "HMI_BUILD=PASS profile=$profile class_major=46"
+  done
+  git -C "$ROOT" rev-parse HEAD > "$OUT/hmi/SOURCE_COMMIT.txt"
+  echo "PROFILE_MENU_MODE=REBUILT_FROM_CURRENT_SOURCE"
+fi
 
 skoda_lsd="$MIBR_PRIVATE_INPUT_ROOT/skoda-mu1440-p4526/lsd.jar"
 [[ -s "$skoda_lsd" ]] || { echo 'PRIVATE_SKODA_LSD_MISSING_FOR_EXTENDER' >&2; exit 30; }
@@ -227,4 +242,4 @@ python3 "$ROOT/tools/validate_modular_package.py" \
 sha256sum "$OUT/MIBR-CarPlay-three-profile-beta.zip" \
   > "$OUT/MIBR-CarPlay-three-profile-beta.zip.sha256"
 (cd "$OUT" && sha256sum --check --strict MIBR-CarPlay-three-profile-beta.zip.sha256 >/dev/null)
-echo "MULTIPROFILE_BETA_PACKAGE=PASS source_commit=$(git -C "$ROOT" rev-parse HEAD)"
+echo "MULTIPROFILE_BETA_PACKAGE=PASS menu_mode=$MIBR_MENU_JAR_MODE source_commit=$(git -C "$ROOT" rev-parse HEAD)"
