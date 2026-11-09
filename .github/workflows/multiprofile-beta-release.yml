@@ -1,4 +1,4 @@
-name: Build three-profile beta package (private J9 inputs)
+name: Build three-profile beta package (pinned menu JARs)
 
 on:
   push:
@@ -35,9 +35,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Build all profile JARs and assemble complete beta ZIP
+      - name: Verify/reuse pinned menu JARs and assemble complete beta ZIP
         shell: bash
         env:
+          MIBR_MENU_JAR_MODE: prebuilt
           J9_HOME: ${{ secrets.MIBR_PRIVATE_J9_HOME }}
           MIBR_PRIVATE_INPUT_ROOT: ${{ secrets.MIBR_PRIVATE_INPUT_ROOT }}
           MIBR_PRIVATE_INPUT_MANIFEST_SHA256: ${{ secrets.MIBR_PRIVATE_INPUT_MANIFEST_SHA256 }}
@@ -56,7 +57,7 @@ jobs:
           OUT: ${{ runner.temp }}/mibr-multiprofile-beta-${{ github.run_id }}-${{ github.run_attempt }}
         run: bash tools/release/build_hmi_and_package.sh
 
-      - name: Upload only built JARs and final ZIP
+      - name: Upload validated menu JARs and final ZIP
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: MIBR-CarPlay-three-profile-beta-${{ github.sha }}
