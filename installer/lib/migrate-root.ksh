@@ -11,8 +11,15 @@
 #      /tmp/mibr-install.lock), MIBR_MIGRATE_FAIL_AT=c|d|e|f|h1|h2 (tests).
 
 case $0 in */*) SELF_DIR=${0%/*} ;; *) SELF_DIR=. ;; esac
-SHA=${MIBR_SHA256:-$SELF_DIR/sha256sum}
-[ -x "$SHA" ] || SHA=${MIBR_SHA256:-sha256sum}
+# The unit has no sha256sum of its own: the package helper, or MIBR_SHA256 (host tests).
+SHA=${MIBR_SHA256:-}
+if [ -z "$SHA" ]; then
+  for _c in "$SELF_DIR/sha256sum" "$SELF_DIR/../bin/sha256sum" "$SELF_DIR/../../common/bin/sha256sum"; do
+    if [ -x "$_c" ]; then SHA=$_c; break; fi
+  done
+fi
+# Tools this script needs beyond the shell: cat cp mv rm mkdir grep mount sync sleep kill.
+# No printf, sed, tr, awk, sort, uniq or find (absent from the MU1440 PATH).
 LOCK=${MIBR_LOCK_FILE:-/tmp/mibr-install.lock}
 APP=/mnt/app
 ID=
@@ -34,6 +41,10 @@ mibr-carplay111-safearea.conf"
 # every boot until consumers are switched, so it legitimately changes.
 VERIFY_SKIP="mibr-kit/boot-count"
 VSKIP=
+# Migrated targets the installer rewrites in step [9] (receipts): the legacy
+# copy is migrated first, then replaced by the new identity, so verify must not
+# compare them with the legacy hash. The legacy bytes stay in the backup snapshot.
+VERIFY_TARGET_SKIP="version/installed-version.properties version/components.manifest"
 
 LOCKED=0
 MOUNTED=0
@@ -62,6 +73,34 @@ hashf(){
   echo "$1"
 }
 
+# out LINE: one line verbatim (no printf on the unit; echo interprets backslashes).
+if [ "$( (print -r -- '-n a\tb') 2>/dev/null)" = '-n a\tb' ]; then
+  out(){ print -r -- "$1"; }
+else
+  out(){
+    cat <<MIBR_OUT_EOF
+$1
+MIBR_OUT_EOF
+  }
+fi
+
+# kv FILE KEY: value of the first KEY=value line (empty if absent).
+kv(){
+  _kv=
+  while IFS= read -r _kl || [ -n "$_kl" ]; do
+    case $_kl in "$2="*) _kv=${_kl#*=}; break ;; esac
+  done < "$1" 2>/dev/null
+  out "$_kv"
+}
+
+# walkf DIR: every regular file below DIR (symlinks skipped), like find DIR -type f.
+walkf(){
+  for _e in "$1"/* "$1"/.[!.]*; do
+    if [ -L "$_e" ]; then continue; fi
+    if [ -d "$_e" ]; then ( walkf "$_e" ); elif [ -f "$_e" ]; then out "$_e"; fi
+  done
+}
+
 first_line(){
   _l=
   read -r _l < "$1" 2>/dev/null
@@ -87,8 +126,14 @@ ROOT=$APP/root
 NEW=$ROOT/mibr
 DIS=$NEW/state/boot/disabled
 
-TMPD=${TMPDIR:-/tmp}/mibr-migrate.$$
-mkdir "$TMPD" 2>/dev/null || { TMPD=; die 2 "cannot create temp dir"; }
+# /tmp on QNX MU1440 (= /dev/shmem) holds no directories: prefer /ramdisk, then /fs/tmpfs.
+TMPD=
+for _td in ${TMPDIR:-} /ramdisk /fs/tmpfs /tmp; do
+  [ -n "$_td" ] && [ -d "$_td" ] || continue
+  if mkdir "$_td/mibr-migrate.$$" 2>/dev/null; then TMPD=$_td/mibr-migrate.$$; break; fi
+done
+[ -n "$TMPD" ] || die 2 "cannot create temp dir"
+[ -n "$SHA" ] || die 2 "no sha256 helper (package ships one; host: MIBR_SHA256)"
 
 need_id(){
   [ -n "$ID" ] || die 2 "$CMD needs --id"
@@ -117,7 +162,7 @@ legacy_ok(){
 # Validate the map and write $TMPD/map.list ("legacy new kind" per line).
 load_map(){
   [ -r "$MAP" ] || die 2 "map not readable: $MAP"
-  : > "$TMPD/map.list"
+  : > "$TMPD/map.list"; : > "$TMPD/map.c1"; : > "$TMPD/map.c2"
   while read -r m1 m2 m3 m4 m5; do
     case $m1 in ''|'#'*) continue ;; esac
     [ -n "$m3" ] && [ -z "$m5" ] || die 2 "map: bad line: $m1 $m2 $m3 $m4 $m5"
@@ -127,21 +172,19 @@ load_map(){
     safe_rel "$m2" || die 2 "map: unsafe new path: $m2"
     legacy_ok "$m1" || die 2 "map: legacy path outside legacy roots: $m1"
     case $m2 in version/migration-*) die 2 "map: reserved target $m2" ;; esac
-    echo "$m1 $m2 $m3" >> "$TMPD/map.list"
+    grep -qxF -- "$m1" "$TMPD/map.c1" && die 2 "map: duplicate legacy path"
+    grep -qxF -- "$m2" "$TMPD/map.c2" && die 2 "map: duplicate new path"
+    out "$m1" >> "$TMPD/map.c1"
+    out "$m2" >> "$TMPD/map.c2"
+    out "$m1 $m2 $m3" >> "$TMPD/map.list"
   done < "$MAP"
-  if [ -n "$(awk '{print $1}' "$TMPD/map.list" | sort | uniq -d)" ]; then
-    die 2 "map: duplicate legacy path"
-  fi
-  if [ -n "$(awk '{print $2}' "$TMPD/map.list" | sort | uniq -d)" ]; then
-    die 2 "map: duplicate new path"
-  fi
 }
 
 # Relative list of every legacy file into $TMPD/legacy.list.
 list_legacy(){
   : > "$TMPD/legacy.abs"
   for d in altscreen-u2 mibr-kit mibr-v3 mibr-rgi; do
-    if [ -d "$ROOT/$d" ]; then find "$ROOT/$d" -type f >> "$TMPD/legacy.abs"; fi
+    if [ -d "$ROOT/$d" ] && [ ! -L "$ROOT/$d" ]; then walkf "$ROOT/$d" >> "$TMPD/legacy.abs"; fi
   done
   for f in "$ROOT"/mibr-*.enabled; do
     if [ -f "$f" ]; then echo "$f" >> "$TMPD/legacy.abs"; fi
@@ -150,11 +193,10 @@ list_legacy(){
     if [ -f "$ROOT/$f" ]; then echo "$ROOT/$f" >> "$TMPD/legacy.abs"; fi
   done
   : > "$TMPD/legacy.list"
-  while read -r p; do
-    echo "${p#"$ROOT"/}" >> "$TMPD/legacy.list"
+  while IFS= read -r p; do
+    r=${p#"$ROOT"/}
+    grep -qxF -- "$r" "$TMPD/legacy.list" || out "$r" >> "$TMPD/legacy.list"
   done < "$TMPD/legacy.abs"
-  sort -u "$TMPD/legacy.list" > "$TMPD/legacy.sorted"
-  mv "$TMPD/legacy.sorted" "$TMPD/legacy.list"
 }
 
 # Relative paths that are neither mapped nor the handled kill switch.
@@ -162,7 +204,7 @@ list_unmapped(){
   : > "$TMPD/unmapped.list"
   while read -r u; do
     [ "$u" = "mibr-kit/disabled" ] && continue
-    if awk -v p="$u" '$1==p{f=1} END{exit !f}' "$TMPD/map.list"; then continue; fi
+    if grep -qxF -- "$u" "$TMPD/map.c1"; then continue; fi
     echo "$u" >> "$TMPD/unmapped.list"
   done < "$TMPD/legacy.list"
 }
@@ -219,22 +261,22 @@ write_disabled(){
   [ -d "$NEW/state/boot" ] || return 1
   wt=$DIS.tmp.$$
   if [ $# -ge 2 ]; then
-    printf '%s\n%s\n' "$1" "$2" > "$wt" || { rm -f "$wt"; return 1; }
+    { out "$1"; out "$2"; } > "$wt" || { rm -f "$wt"; return 1; }
   else
-    printf '%s\n' "$1" > "$wt" || { rm -f "$wt"; return 1; }
+    out "$1" > "$wt" || { rm -f "$wt"; return 1; }
   fi
   mv "$wt" "$DIS" || { rm -f "$wt"; return 1; }
   sync
-  we=$(printf '%s\n' "$@")
+  we=$(for wl in "$@"; do out "$wl"; done)
   wa=$(cat "$DIS" 2>/dev/null)
   [ "$we" = "$wa" ]
 }
 
 # Final kill-switch state from the receipt, then drop staging.
 finalize(){
-  ld=$(sed -n 's/^legacy_disabled=//p' "$RC" | sed -n 1p)
+  ld=$(kv "$RC" legacy_disabled)
   if [ "$ld" = 1 ]; then
-    txt=$(sed -n 's/^legacy_disabled_text=//p' "$RC" | sed -n 1p)
+    txt=$(kv "$RC" legacy_disabled_text)
     write_disabled "migrated-disabled $ID: $txt" || die 10 "cannot write final kill switch"
   else
     rm -f "$DIS"
@@ -245,18 +287,50 @@ finalize(){
   sync
 }
 
+# done_id: install id of a completed migration receipt, empty if none.
+# The legacy trees are kept as migration source only (E4); once one migration
+# completed, the new root is authoritative and is never migrated again.
+done_id(){
+  for _r in "$NEW"/version/migration-*.receipt; do
+    [ -f "$_r" ] || continue
+    grep -x 'state=complete' "$_r" >/dev/null 2>&1 || continue
+    _i=${_r##*/migration-}; echo "${_i%.receipt}"; return 0
+  done
+  return 1
+}
+
 do_plan(){
   load_map
   list_legacy
   list_unmapped
   conf=0
-  ld=0
+  ld=0; pl=
   [ -e "$ROOT/mibr-kit/disabled" ] && ld=1
   if [ -e "$DIS" ]; then
     pl=$(first_line "$DIS")
     case $pl in install-in-progress*) ;; *) ld=1 ;; esac
   fi
   echo "legacy_disabled=$ld"
+  # An interrupted run (receipt complete, kill switch still install-in-progress)
+  # is not done yet: run --id finalizes it through its idempotence path.
+  # The same holds for a leftover staging dir (interrupted after the kill switch
+  # was finalized).
+  case ${pl:-} in install-in-progress*) _ip=1 ;; *) _ip=0 ;; esac
+  for _s in "$NEW"/.staging-*; do [ -e "$_s" ] && _ip=1; done
+  if [ $_ip = 0 ] && _done=$(done_id); then
+    echo "already-migrated $_done"
+    # Map rows added after that migration: legacy source present, new target absent.
+    # The installer copies these once (never over an existing target).
+    while read -r l n k; do
+      [ "$k" = file ] || continue
+      # identity/receipt files belong to the current install, never to a late copy
+      case $n in version/*) continue ;; esac
+      [ -f "$ROOT/$l" ] && [ ! -L "$ROOT/$l" ] || continue
+      [ -e "$NEW/$n" ] || [ -L "$NEW/$n" ] || echo "late $l $n"
+    done < "$TMPD/map.list"
+    echo "MIBR_MIGRATE_PLAN=DONE id=$_done"
+    return 0
+  fi
   while read -r l n k; do
     [ -f "$ROOT/$l" ] || continue
     if [ -e "$NEW/$n" ] || [ -L "$NEW/$n" ]; then
@@ -308,7 +382,7 @@ do_run(){
     cur=$(first_line "$DIS")
     case $cur in
       install-in-progress*)
-        PRIOR=$(sed -n 's/^prior=//p' "$DIS" 2>/dev/null | sed -n 1p) ;;
+        PRIOR=$(kv "$DIS" prior) ;;
       *) PRIOR=${cur:-disabled} ;;
     esac
     if [ -n "$PRIOR" ]; then
@@ -381,7 +455,8 @@ do_run(){
     echo "legacy_disabled=$LEGACY_DISABLED"
     [ "$LEGACY_DISABLED" = 1 ] && echo "legacy_disabled_text=$DTEXT"
     while read -r l n h; do echo "migrated $l $n $h"; done < "$TMPD/staged.list"
-    echo "unmapped=$(awk 'END{print NR}' "$TMPD/unmapped.list")"
+    _nu=0; while read -r u; do _nu=$((_nu + 1)); done < "$TMPD/unmapped.list"
+    echo "unmapped=$_nu"
     while read -r u; do echo "unmapped $u"; done < "$TMPD/unmapped.list"
   } > "$RC.tmp.$$" && mv "$RC.tmp.$$" "$RC" || die 30 "cannot write receipt"
   sync
@@ -400,6 +475,7 @@ do_verify(){
   else
     while read -r w l n h; do
       [ "$w" = migrated ] || continue
+      case " $VERIFY_TARGET_SKIP " in *" $n "*) continue ;; esac
       t=$(hashf "$NEW/$n") || t=
       [ "$t" = "$h" ] || { echo "target mismatch $n"; vf=1; }
     done < "$RC"
@@ -410,7 +486,7 @@ do_verify(){
   fi
   VSKIP=$VERIFY_SKIP
   verify_sums "$ROOT" "$NEW/backup/$ID/SHA256SUMS" > "$TMPD/v.out" || {
-    sed 's/^/legacy /' "$TMPD/v.out"; vf=1; }
+    while IFS= read -r vo; do out "legacy $vo"; done < "$TMPD/v.out"; vf=1; }
   if [ $vf = 0 ]; then echo "MIBR_MIGRATE_VERIFY=OK id=$ID"; return 0; fi
   echo "MIBR_MIGRATE_VERIFY=FAIL id=$ID"
   return 1

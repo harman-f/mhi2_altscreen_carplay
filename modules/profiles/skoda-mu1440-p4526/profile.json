@@ -16,7 +16,7 @@
   },
   "firmware_check": {
     "source": "e2p:3A0:19 (runtime/deployment/session.sh mibr_e2p_ascii)",
-    "expected": "MHI2_ER_SKG13_P4526_MU1440",
+    "expected": "MHI2_ER_SKG13_P4526",
     "status": "defined"
   },
   "hmi": {

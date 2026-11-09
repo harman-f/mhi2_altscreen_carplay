@@ -14,8 +14,8 @@ if [ -z "$SHA" ]; then
   # The unit has no sha256sum of its own; the package ships one (like
   # deployment/mu1440/install.sh: $PAYLOAD/sha256sum). Prefer the copy next
   # to this script, then PATH (host tests).
-  for C in "${0%/*}/sha256sum" "${0%/*}/../common/bin/sha256sum" sha256sum /usr/bin/sha256sum /bin/sha256sum; do
-    if command -v "$C" >/dev/null 2>&1; then SHA=$C; break; fi
+  for C in "${0%/*}/sha256sum" "${0%/*}/bin/sha256sum" "${0%/*}/../common/bin/sha256sum"; do
+    if [ -x "$C" ]; then SHA=$C; break; fi
   done
 fi
 

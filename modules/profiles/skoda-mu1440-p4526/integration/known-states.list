@@ -1,5 +1,16 @@
-# Targets in a known previous state, accepted as upgrade sources by the installer.
-# Format: <target> <sha256> <label>     (target = unit path, e.g. /mnt/app/root/mibr/bin/<file>)
-# For an OEM file the installer additionally needs the stock bytes (own ownership receipt
-# or a verified legacy backup); otherwise it blocks. No public data yet: add rows only
-# from measured unit states, never invent hashes.
+/mnt/app/eso/lib/libmibr_carplay111.so 0a17e8a1af8dac1b7f96376fc21b9f6a603abc0649d00354654733dd21edae40 dev-gen2-r2r3
+/mnt/app/eso/lib/libmibr_carplay111.so 304b5079374a08ed9a763528217476b29ad49e000ba25d0372ed4147cbb9a705 kit-1.x
+/mnt/app/eso/lib/libmibr_isotx2_gate.so db42f8f4da0ba7010b0818b22da52c5488c2f06bb610c37d9acb0d0b6c6e2f14 dev-unit
+/mnt/app/eso/lib/libmibr_isotx2_gate.so 05673010a88c25022145ffb4e75d3715eaf686f4127ac188e91a52f512b9d957 kit-1.x
+/mnt/app/eso/lib/libmibr_isotx2_guard.so 1c8da42fc7f8deb52734a761b87f28ba3056bb31e76eec5157ad461819d96463 dev-r3e
+/mnt/app/eso/lib/libmibr_isotx2_guard.so cad06d69c698c8940dec9596b96c6b90ec822bdd437c4b0d02a35881ad71fae4 kit-1.x
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 5016cd2d70f65c3cf6554252e2c5fa0ad066772650907462279720176d4c6282 dev-unit-menu
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar fd819551856c93fc6fe4760f4c8a154717ed0d718abb62cc2ef61912de54c109 kit-rc3
+/mnt/app/eso/hmi/lsd/jars/MIBR-Extender-P1-BootProbe.jar 1b47814a2e27b8566813ad6f1490882cf4f4c7be2188b38ad810146d6508c303 kit-p1
+/mnt/system/etc/usblauncher_otg.lua 059d51788f7f407612fda9247d804b754527ecd86041e7803ad27a1a94448d26 dev-rgi-r2
+/mnt/app/eso/lib/libmibr_carplay111.so 8e8a8692f502b263ccc9e9c175d642208494c29a5a22c73c24976d582ff1493d pkg-beta-r3-r5
+/mnt/app/eso/lib/libmibr_carplay111.so 1ffb74d89d01a98188ddb0851aa4367fd75626627fb7f8cab7f466cf9632dcb7 pkg-beta-r8
+/mnt/app/eso/lib/libmibr_carplay111.so 9fdac467521eec5a99185ff93720769279fdb081e9425fb41614cc99aa69e19f pkg-beta-r9-r11
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 692f5b6623dadfa7a49e101f003a2e99c9c03340b12960935fae8d3c662c06ca pkg-beta-r3-r8
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar fc9ea93c78ebd9c544b33669d1debe2f7362b8ee6cccdb8c98f4a5fc13fc52eb pkg-beta-r9-r10
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 65d5dfd250d040f28e8bf0fa7f552d90f9d5cfd634026370092cd55ea6fb0035 pkg-beta-r10b

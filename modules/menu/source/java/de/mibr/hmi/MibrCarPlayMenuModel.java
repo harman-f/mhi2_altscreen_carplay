@@ -17,6 +17,8 @@ public final class MibrCarPlayMenuModel {
 
     private final View view;
     private MibrMenuLayout layout;
+    /** One-shot "default menu restored" row; kept for the life of this model so it survives re-renders. */
+    private String restoredNotice;
     private int layoutGeneration;
     private MibrMenuLayout.Node page;
     private MibrMenuLayout.Node[] nodes = new MibrMenuLayout.Node[0];
@@ -153,6 +155,9 @@ public final class MibrCarPlayMenuModel {
     private void visibleNodes() {
         Vector out=new Vector();
         boolean expert=MibrExpert.on();
+        if(restoredNotice==null)restoredNotice=MibrMenuLayout.restoredNotice();
+        if(page==layout.root&&restoredNotice!=null)
+            out.addElement(new MibrMenuLayout.Node("restored",MibrMenuLayout.NOTE,-1,-1,false,page,restoredNotice,restoredNotice));
         if(page==layout.root&&MibrMenuLayout.recoveryNote()!=null)
             out.addElement(new MibrMenuLayout.Node("recovery",MibrMenuLayout.NOTE,-1,-1,false,page,
                 MibrMenuLayout.recoveryNote(),MibrMenuLayout.recoveryNote()));

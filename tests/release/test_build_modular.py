@@ -36,6 +36,7 @@ class BuildModularZip(unittest.TestCase):
 
     def build(self, name, **kw):
         kw.setdefault("hmi_dir", self.hmi)
+        kw.setdefault("allow_stale", True)  # synthetic inputs have no real source commit
         files, meta = bm.assemble(self.native, ROOT, self.inst, allow_dirty=True, **kw)
         return bm.write_zip(files, self.t / name), meta
 
@@ -58,11 +59,21 @@ class BuildModularZip(unittest.TestCase):
             self.assertIn("/mnt/app/root/mibr", text)
             self.assertNotIn("altscreen-u2", text)
         profiles_list = listing["installer/config/profiles.list"].decode()
-        self.assertIn("seat-mu1409-p4708 MHI2_ER_SEG11_P4708_MU1409 1", profiles_list)
+        self.assertIn("seat-mu1409-p4708 MHI2_ER_SEG11_P4708 1", profiles_list)
         pj = json.loads(listing["package.json"])
         self.assertTrue(all(r["status"] == "SOURCE_BUILD_PASS" for r in pj["binaries"]))
         self.assertTrue(all(pj["native_build"][k] for k in ("source_commit", "compiler", "image_source")))
         self.assertFalse(any(n.endswith(bm.BUILD_SUFFIX) for n in listing))
+
+    def test_version_and_source_commit_in_package_json(self):
+        _, meta = self.build("v.zip", version="1.5.0-beta.7")
+        self.assertEqual(meta["version"], "1.5.0-beta.7")
+        self.assertRegex(meta["source_commit"], r"^[0-9a-f]{40}$")
+        pj = json.loads(bm.load_zip(self.t / "v.zip")["package.json"])
+        self.assertEqual((pj["version"], pj["source_commit"]), (meta["version"], meta["source_commit"]))
+        for bad in ("", "1 2", "1.0;x", "a/b"):
+            with self.assertRaises(bm.AssembleError):
+                self.build("bad.zip", version=bad)
 
     def test_input_change_changes_zip(self):
         a, _ = self.build("c.zip")
@@ -73,11 +84,20 @@ class BuildModularZip(unittest.TestCase):
             (self.hmi / SINGLE / "MIBR-CarPlay.jar").write_bytes(b"PK synthetic jar " + SINGLE.encode())
         self.assertNotEqual(a, b)
 
+    def test_stale_prebuilt_artifacts_rejected(self):
+        # native built from a commit whose QNX sources differ from HEAD -> refuse to reuse
+        with self.assertRaises(bm.AssembleError) as cm:
+            self.build("stale.zip", allow_stale=False)
+        self.assertIn("stale", str(cm.exception))
+        head = bm.git(ROOT, "rev-parse", "HEAD")
+        self.assertEqual(bm.stale_inputs(ROOT, head, bm.native_inputs(ROOT)), [])
+
     def test_incomplete_package(self):
         digest, meta = self.build("inc.zip", hmi_dir=None)
         self.assertEqual(meta["package_status"], "incomplete")
         self.assertEqual(sorted(m for m in meta["missing_inputs"]),
-                         sorted("profiles/%s/hmi/MIBR-CarPlay.jar" % p for p in meta["profiles"]))
+                         sorted(["common/menu/bin/" + bm.EXTENDER_JAR] +
+                                ["profiles/%s/hmi/MIBR-CarPlay.jar" % p for p in meta["profiles"]]))
         vmp.validate(self.t / "inc.zip")
         with self.assertRaises(vmp.PackageError):
             vmp.validate(self.t / "inc.zip", True)
@@ -89,7 +109,7 @@ class BuildModularZip(unittest.TestCase):
         out = self.t / "wrapper.zip"
         r = subprocess.run([sys.executable, "-B", str(ROOT / "tools/release/build_mu1440_modular.py"),
                             "--native-dir", str(self.native), "--hmi-dir", str(self.hmi),
-                            "--installer-dir", str(self.inst), "--allow-dirty", "--out", str(out)],
+                            "--installer-dir", str(self.inst), "--allow-dirty", "--allow-stale", "--out", str(out)],
                            capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(json.loads(bm.load_zip(out)["package.json"])["profiles"], [SINGLE])
@@ -97,7 +117,7 @@ class BuildModularZip(unittest.TestCase):
 
     def test_subset_without_scope_refused(self):
         with self.assertRaises(bm.AssembleError):
-            bm.assemble(self.native, ROOT, self.inst, hmi_dir=self.hmi, profiles=[SINGLE],
+            bm.assemble(self.native, ROOT, self.inst, hmi_dir=self.hmi, profiles=[SINGLE], allow_stale=True,
                         allow_dirty=True)
 
 

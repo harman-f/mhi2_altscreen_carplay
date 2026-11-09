@@ -77,7 +77,10 @@ jobs:
           python3 -B tools/check_registry.py --check --scan-paths
           python3 -B -m unittest discover -s tests/settings -p 'test_*.py' -v
           python3 -B -m unittest discover -s tests/deployment -p 'test_*.py' -v
-          python3 -B -m unittest discover -s tests/installer -p 'test_*.py' -v
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mksh
+          MIBR_TEST_KSH=mksh python3 -B -m unittest discover -s tests/installer -p 'test_*.py' -v
+          python3 -B tools/release/build_modular.py --self-test
           python3 -I -B tools/release/check_executable_modes.py --self-test
 
       - name: Upload source-defined inventory (host evidence only)

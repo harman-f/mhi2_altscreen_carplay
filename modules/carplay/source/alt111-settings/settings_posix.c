@@ -37,13 +37,33 @@ static const char *group_name(unsigned group)
     return NULL;
 }
 
+/* Shared-memory filesystems can transiently report these errors while lock paths
+ * are concurrently created or removed. Retry boundedly before treating them as
+ * hard failures. */
+static int transient_errno(int e)
+{
+    return e == EINVAL || e == EOVERFLOW || e == EINTR;
+}
+
+#define TRANSIENT_RETRIES 500u /* one millisecond per retry */
+
+static int lstat_retry(const char *path, struct stat *st)
+{
+    unsigned i;
+    for (i = 0; ; ++i) {
+        if (!lstat(path, st)) return 0;
+        if (!transient_errno(errno) || i + 1u >= TRANSIENT_RETRIES) return -1;
+        (void)usleep(1000);
+    }
+}
+
 /* 1 means absent; every other read failure is invalid, not a fallback. */
 static int read_file(const char *path, char *out, size_t cap, size_t *size)
 {
     struct stat before, opened;
     size_t used = 0;
     int fd;
-    if (lstat(path, &before)) return errno == ENOENT ? 1 : -1;
+    if (lstat_retry(path, &before)) return errno == ENOENT ? 1 : -1;
     if (!S_ISREG(before.st_mode) || before.st_size < 1 || (uint64_t)before.st_size >= cap) return -1;
     fd = open(path, O_RDONLY);
     if (fd < 0) return -1;
@@ -66,7 +86,7 @@ static int read_file(const char *path, char *out, size_t cap, size_t *size)
 static int sync_volatile_fd(int fd)
 {
     if (!fsync(fd)) return 0;
-    /* Vehicle probe on MU1440 /tmp -> /dev/shmem: fsync() returns ENOSYS. */
+    /* Some volatile filesystems do not implement fsync. */
     return errno == ENOSYS ? 0 : -1;
 }
 
@@ -82,13 +102,9 @@ static int write_full_fd(int fd, const char *data, size_t size)
     return 0;
 }
 
-/*
- * MU1440 vehicle probe: native rename() inside /tmp -> /dev/shmem fails with
- * errno=EXDEV ("Improper link"), while flat O_TRUNC rewrites are supported.
- * All callers hold the settings lock. Active settings are rewritten only
- * after the transaction journal has been armed, so an interrupted write is
- * recoverable from the pre-mutation backup.
- */
+/* All callers hold the settings lock. Active settings are rewritten only after
+ * the transaction journal has been armed, so an interrupted write is recoverable
+ * from the pre-mutation backup. */
 static int write_file_direct(const char *path, const char *data, size_t size)
 {
     struct stat before, opened;
@@ -237,12 +253,17 @@ static int lock_settings(const struct alt111_settings_paths *paths, int write_lo
             return fd;
         }
 
+        if (errno == ENOENT || transient_errno(errno)) {
+            /* the name raced with an unlink (QNX shmem): compete again */
+            (void)usleep(1000);
+            continue;
+        }
         if (errno != EEXIST)
-            return fail(error, cap, "APPLY_FAILED lock_open");
+            return fail(error, cap, "APPLY_FAILED lock_open errno=%d", errno);
 
-        if (lstat(path, &st)) {
+        if (lstat_retry(path, &st)) {
             if (errno == ENOENT) continue;
-            return fail(error, cap, "APPLY_FAILED lock_stat");
+            return fail(error, cap, "APPLY_FAILED lock_stat errno=%d", errno);
         }
         if (!S_ISREG(st.st_mode))
             return fail(error, cap, "INVALID_VALUE lock_file_type");
@@ -282,24 +303,32 @@ static void unlock_settings(const struct alt111_settings_paths *paths, int fd)
     char path[512];
     struct stat held, current;
 
+    int have_held;
+
     if (fd < 0) return;
-    if (fstat(fd, &held)) {
+    if (!paths || path_for(path, sizeof(path), paths->temp,
+                           "mibr-alt111-settings.lock-v2")) {
         (void)close(fd);
         return;
     }
-    (void)close(fd);
-
-    if (!paths || path_for(path, sizeof(path), paths->temp,
-                           "mibr-alt111-settings.lock-v2"))
-        return;
-
     /*
-     * Do not unlink a replacement path if external interference occurred.
-     * Normal operation sees the same inode that this process acquired.
+     * The fd stays open until the name is gone, so the held inode number cannot be
+     * reused by a new lock file (QNX shmem reuses inode numbers immediately).
+     * Do not unlink a replacement path if external interference occurred: a
+     * readable, different inode under the name is left alone. While this process
+     * holds the lock no other process can create the name (O_EXCL), so a name that
+     * stays unreadable through the transient lstat errors is still ours and is
+     * removed; skipping it here made the lock permanent (vehicle 2026-11-05).
      */
-    if (!lstat(path, &current) &&
-        held.st_dev == current.st_dev && held.st_ino == current.st_ino)
+    have_held = !fstat(fd, &held);
+    if (!lstat_retry(path, &current)) {
+        if (!have_held ||
+            (held.st_dev == current.st_dev && held.st_ino == current.st_ino))
+            (void)unlink(path);
+    } else if (errno != ENOENT) {
         (void)unlink(path);
+    }
+    (void)close(fd);
 }
 
 static int journal_path(const struct alt111_settings_paths *p, char out[512])

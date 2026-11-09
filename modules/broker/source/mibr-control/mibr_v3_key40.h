@@ -16,4 +16,7 @@ enum mibr_key40_event mibr_key40_feed(struct mibr_key40 *k,
 /* r57: the same gesture machine for another push key of keyboard 4 (KEY44 = left roller push). */
 enum mibr_key40_event mibr_key40_feed_key(struct mibr_key40 *k,
     int keyboard,int key,int state,int wanted_key);
+/* Same machine for any keyboard/key pair (platform defaults key.*). */
+enum mibr_key40_event mibr_key40_feed_code(struct mibr_key40 *k,
+    int keyboard,int key,int state,int wanted_kbd,int wanted_key);
 #endif
