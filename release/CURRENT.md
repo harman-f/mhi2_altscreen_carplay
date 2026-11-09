@@ -1,5 +1,12 @@
 # MU1440 / AID10 developer test — current
 
+## Current three-profile beta build status (2026-11-09)
+
+The MIB Runtime `1.5.0-beta.12` source on `main` includes all three owner-approved menu JARs and the [opt-in beta package pipeline](../docs/build/MULTIPROFILE_RELEASE.md). The checked-in Java artifacts may be reused only while the pinned public menu/profile/registry source baseline is unchanged; new Java changes require separately validated local J9 rebuilds and updated provenance. The separate `ghcr.io/harman-f/mhi2-qnx65-armv7` **package is a pinned QNX cross-compiler Docker image**, not a deployable CarPlay release, and must remain available to CI while `tools/qnx65-image.lock` references it.
+
+This beta workflow still requires a private runner for the extender and native navigation dependencies. It uploads only time-limited Actions artifacts when enabled. **No new GitHub Release or complete end-to-end pipeline build has been published at this point.** The frozen historical MU1440 developer package described below remains a distinct release lineage; do not silently transfer its vehicle acceptance to the beta.
+
+
 This is the currently pinned **MU1440-specific developer prerelease**, not the newest experimental source line. Documentation-only main-branch updates do not mutate the already published ZIP or retroactively re-qualify its binary hashes. See [current integration status](../docs/status/INTEGRATION_STATUS_2026-10-21.md), [latest known issues](../docs/findings/KNOWN_ISSUES.md) and [dated vehicle test evidence](../docs/status/MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md).
 
 The 29 September Most20/D2 update (kept at the end of this file as a historical implementation note) is already incorporated into the consolidated statements below; later release-tag decisions require their own verification.
