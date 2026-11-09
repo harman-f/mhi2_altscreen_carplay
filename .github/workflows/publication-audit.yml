@@ -75,6 +75,9 @@ jobs:
           python3 tools/release/storage_destination_plan.py --self-test --json-out "$RUNNER_TEMP/storage-destination-plan.json"
           python3 -I -B tools/release/storage_destination_plan.py --self-test
           python3 -B tools/verify_profile_menu_artifacts.py
+          # Fail closed if the checked-in JARs are reused after Java/API/registry changes.
+          python3 -B tools/release/stage_prebuilt_menu.py --check-only
+          bash -n tools/release/build_hmi_and_package.sh
           python3 -B tools/check_registry.py --check --scan-paths
           python3 -B -m unittest discover -s tests/settings -p 'test_*.py' -v
           python3 -B -m unittest discover -s tests/deployment -p 'test_*.py' -v
