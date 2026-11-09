@@ -99,7 +99,11 @@ jobs:
           (cd "$OUT" && sha256sum --check --strict MIBR-CarPlay-three-profile-beta.zip.sha256)
           echo "MULTIPROFILE_BETA_PACKAGE=PASS source_commit=$GITHUB_SHA"
 
-      - name: Upload validated beta ZIP (not a GitHub Release)
+      # The Research archive is marked PRIVATE-RESEARCH and contains
+      # firmware-derived native/Java content. Never expose it through a public
+      # Actions artifact until a separate owner/legal publication review passes.
+      - name: Upload publicly approved beta ZIP (not a GitHub Release)
+        if: vars.MIBR_PUBLIC_BETA_ARTIFACT_APPROVED == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: MIBR-CarPlay-three-profile-beta-${{ github.sha }}
