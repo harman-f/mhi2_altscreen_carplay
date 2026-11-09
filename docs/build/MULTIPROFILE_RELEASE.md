@@ -35,14 +35,20 @@ review, and only then enable package assembly again. The optional
 on the secured runner if it has every input; that mode writes the exact
 current source commit receipt.
 
-**Remaining private build blockers:** The current script still builds the
-`MIBR-Extender-P1-BootProbe.jar` with J9 and the matching Škoda API;
-it also compiles navigation components using a private QNX target sysroot,
-exact iAP2 library and pinned Clang/LLD/FFmpeg. Therefore adopting prebuilt
-profile menu JARs **does not eliminate the dedicated runner** or make a full
-package runnable on GitHub-hosted CI yet. The extender/navigation artifacts
-need their own reviewed, source-fresh prebuilt contract before they could
-be reused instead. Never substitute arbitrary or stale binaries.
+**Remaining private build blockers:** By default the separately required
+`MIBR-Extender-P1-BootProbe.jar` is still built with J9. The protected runner
+may alternatively receive a locally compiled and independently reviewed
+`MIBR_PREBUILT_EXTENDER_JAR` and exact
+`MIBR_PREBUILT_EXTENDER_SHA256` secret. That supplied file must not be
+checked into the public tree, must pass the P1 JAR verifier, and is accepted
+only while the public J9 source-baseline gate passes. With those two secrets
+the release step no longer needs to rebuild any Java; without them the
+matching J9/Škoda API inputs are still mandatory.
+
+Native navigation still requires the private QNX target sysroot, exact iAP2
+library and pinned Clang/LLD/FFmpeg. Therefore reusing prebuilt Java does
+**not eliminate the dedicated runner** or make a full package runnable
+on GitHub-hosted CI yet. Do not substitute arbitrary or stale binaries.
 
 The QNX host builds use the checked-in immutable image digest. All native
 output, extender, prebuilt menu JARs and final ZIP must pass build provenance,
@@ -91,9 +97,11 @@ be treated as a new build rather than silently called the vehicle-tested bytes.
 
 ## Runner provisioning
 
-The private J9 inputs remain necessary **today** for the separately built
-extender even when the three profile menu JARs are reused. Only the
-`rebuild` mode recompiles all three menu JARs. The existing runner and
+Private J9 inputs are required only when rebuilding the profile menu JARs
+(`MIBR_MENU_JAR_MODE=rebuild`) or when no validated prebuilt extender is
+provided. With a locally prebuilt extender, provision the two additional
+secrets `MIBR_PREBUILT_EXTENDER_JAR` (restricted absolute path) and
+`MIBR_PREBUILT_EXTENDER_SHA256` (its independently reviewed digest). The existing runner and
 protected environment must not be opened to untrusted branches.
 
 
