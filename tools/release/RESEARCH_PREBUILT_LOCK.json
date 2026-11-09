@@ -26,7 +26,7 @@
     "tools/build_native_isotx2_guard.sh": "fabc92ee446cdef849456759a02e2b14a9eca7e8",
     "tools/build_mibr_control.sh": "d4b66106c6c28ba2e4169e55ea9c93966e5f01a8",
     "tools/build_keypanel_native.sh": "514d4430c9c71a78c8c9345613a795daf5311e04",
-    "tools/build_support_tools.sh": "5d5bbc3992447d333d1e9e0c4fd55d3765749b",
+    "tools/build_support_tools.sh": "5d5bbc3992447d333d1e3e9e0c4fd55d3765749b",
     "tools/ci_qnx65_image.sh": "11ac40ee99d2c3cb7f84152f4667938430c37340",
     "tools/qnx65-image.lock": "6304e13a38bbe5ca2f306ba820dcebc8a8cacc64",
     "modules/module-index.json": "34a453af1df99419b112a246cda608b1bf7f1a95",
