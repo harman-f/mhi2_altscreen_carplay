@@ -14,9 +14,23 @@ case "$MIBR_MENU_JAR_MODE" in
   *) echo "MIBR_MENU_JAR_MODE_INVALID: expected prebuilt or rebuild" >&2; exit 18 ;;
 esac
 
-: "${J9_HOME:?MISSING_INPUT: set J9_HOME to the locally provisioned IBM J9 SDK}"
-: "${MIBR_PRIVATE_INPUT_ROOT:?MISSING_INPUT: set private input root (not a GitHub artifact or repository path)}"
-: "${MIBR_PRIVATE_INPUT_MANIFEST_SHA256:?MISSING_TOOLCHAIN_PIN: set private input manifest SHA-256}"
+# In prebuilt mode the three profile JARs always come from pinned Git
+# artifacts. The separately required extender may also be supplied as an
+# independently built, hash-pinned local binary. Otherwise J9 is still needed.
+NEEDS_PRIVATE_J9=1
+if [[ "$MIBR_MENU_JAR_MODE" == "prebuilt" && -n "${MIBR_PREBUILT_EXTENDER_JAR:-}" ]]; then
+  NEEDS_PRIVATE_J9=0
+  : "${MIBR_PREBUILT_EXTENDER_SHA256:?MISSING_EXTENDER_PIN: set the reviewed extender JAR SHA-256}"
+  [[ "$MIBR_PREBUILT_EXTENDER_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+    echo 'MIBR_PREBUILT_EXTENDER_BAD_SHA256' >&2; exit 20;
+  }
+else
+  : "${J9_HOME:?MISSING_INPUT: set J9_HOME to the locally provisioned IBM J9 SDK}"
+  : "${MIBR_PRIVATE_INPUT_ROOT:?MISSING_INPUT: set private input root (not a GitHub artifact or repository path)}"
+  : "${MIBR_PRIVATE_INPUT_MANIFEST_SHA256:?MISSING_TOOLCHAIN_PIN: set private input manifest SHA-256}"
+  : "${MIBR_J9_JAVAC_SHA256:?MISSING_TOOLCHAIN_PIN: set the approved J9 javac SHA-256}"
+  : "${MIBR_J9_JAR_SHA256:?MISSING_TOOLCHAIN_PIN: set the approved J9 jar SHA-256}"
+fi
 : "${QNX65_GHCR_TOKEN:?MISSING_INPUT: QNX image read-only token is required}"
 : "${QNX_TARGET:?MISSING_INPUT: private QNX 6.5 target sysroot is required for route guidance}"
 : "${MIBR_QNX_TARGET_MANIFEST_SHA256:?MISSING_TOOLCHAIN_PIN: set QNX target manifest SHA-256}"
@@ -24,8 +38,6 @@ esac
 : "${CLANG:?MISSING_INPUT: provisioned Clang executable is required for route guidance}"
 : "${LLD:?MISSING_INPUT: provisioned LLD executable is required for route guidance}"
 : "${FFMPEG:?MISSING_INPUT: pinned ffmpeg executable is required for calibration clip}"
-: "${MIBR_J9_JAVAC_SHA256:?MISSING_TOOLCHAIN_PIN: set the approved J9 javac SHA-256}"
-: "${MIBR_J9_JAR_SHA256:?MISSING_TOOLCHAIN_PIN: set the approved J9 jar SHA-256}"
 : "${MIBR_CLANG_SHA256:?MISSING_TOOLCHAIN_PIN: set the approved Clang SHA-256}"
 : "${MIBR_LLD_SHA256:?MISSING_TOOLCHAIN_PIN: set the approved LLD SHA-256}"
 : "${MIBR_FFMPEG_SHA256:?MISSING_TOOLCHAIN_PIN: set the approved ffmpeg SHA-256}"
@@ -41,47 +53,56 @@ ensure_private_path_outside_repo() {
   resolved="$(realpath -e "$1")" || { echo 'PRIVATE_INPUT_PATH_UNRESOLVABLE' >&2; exit 19; }
   case "$resolved" in "$ROOT_REAL"|"$ROOT_REAL"/*) echo 'PRIVATE_INPUT_INSIDE_CHECKOUT' >&2; exit 19 ;; esac
 }
-ensure_private_path_outside_repo "$J9_HOME"
-ensure_private_path_outside_repo "$MIBR_PRIVATE_INPUT_ROOT"
+if [[ "$NEEDS_PRIVATE_J9" == 1 ]]; then
+  ensure_private_path_outside_repo "$J9_HOME"
+  ensure_private_path_outside_repo "$MIBR_PRIVATE_INPUT_ROOT"
+else
+  ensure_private_path_outside_repo "$MIBR_PREBUILT_EXTENDER_JAR"
+fi
 ensure_private_path_outside_repo "$QNX_TARGET"
 ensure_private_path_outside_repo "$IAP2_LIB"
 ensure_private_path_outside_repo "$CLANG"
 ensure_private_path_outside_repo "$LLD"
 ensure_private_path_outside_repo "$FFMPEG"
 
-for executable in "$J9_HOME/bin/javac" "$J9_HOME/bin/jar"; do
-  [[ -x "$executable" ]] || { echo "J9_EXECUTABLE_MISSING=$executable" >&2; exit 21; }
-done
 check_tool_hash() {
   local file="$1" expected="$2" actual
   actual="$(sha256sum "$file" | awk '{print $1}')"
   [[ "$actual" == "$expected" ]] || { echo 'PINNED_TOOL_HASH_MISMATCH' >&2; exit 20; }
 }
-check_tool_hash "$J9_HOME/bin/javac" "$MIBR_J9_JAVAC_SHA256"
-check_tool_hash "$J9_HOME/bin/jar" "$MIBR_J9_JAR_SHA256"
 check_tool_hash "$CLANG" "$MIBR_CLANG_SHA256"
 check_tool_hash "$LLD" "$MIBR_LLD_SHA256"
 check_tool_hash "$FFMPEG" "$MIBR_FFMPEG_SHA256"
-[[ -d "$MIBR_PRIVATE_INPUT_ROOT" ]] || { echo 'PRIVATE_INPUT_ROOT_MISSING' >&2; exit 22; }
-[[ -s "$MIBR_PRIVATE_INPUT_ROOT/SHA256SUMS" ]] || { echo 'PRIVATE_INPUT_MANIFEST_MISSING' >&2; exit 21; }
-check_tool_hash "$MIBR_PRIVATE_INPUT_ROOT/SHA256SUMS" "$MIBR_PRIVATE_INPUT_MANIFEST_SHA256"
-(cd "$MIBR_PRIVATE_INPUT_ROOT" && sha256sum --check --strict SHA256SUMS >/dev/null) || {
-  echo 'PRIVATE_INPUT_MANIFEST_MISMATCH' >&2
-  exit 22
-}
-for profile in "${PROFILES[@]}"; do
-  for filename in lsd.jar Activator.java WidgetFactoryImpl.java; do
-    grep -Eq "^[0-9a-f]{64}  $profile/$filename$" "$MIBR_PRIVATE_INPUT_ROOT/SHA256SUMS" || {
-      echo 'PRIVATE_INPUT_MANIFEST_INCOMPLETE' >&2
-      exit 22
-    }
-    input="$MIBR_PRIVATE_INPUT_ROOT/$profile/$filename"
-    [[ -f "$input" && -s "$input" && ! -L "$input" ]] || {
-      echo 'PRIVATE_BUILD_INPUT_MISSING' >&2
-      exit 22
-    }
+if [[ "$NEEDS_PRIVATE_J9" == 1 ]]; then
+  for executable in "$J9_HOME/bin/javac" "$J9_HOME/bin/jar"; do
+    [[ -x "$executable" ]] || { echo "J9_EXECUTABLE_MISSING=$executable" >&2; exit 21; }
   done
-done
+  check_tool_hash "$J9_HOME/bin/javac" "$MIBR_J9_JAVAC_SHA256"
+  check_tool_hash "$J9_HOME/bin/jar" "$MIBR_J9_JAR_SHA256"
+  [[ -d "$MIBR_PRIVATE_INPUT_ROOT" ]] || { echo 'PRIVATE_INPUT_ROOT_MISSING' >&2; exit 22; }
+  [[ -s "$MIBR_PRIVATE_INPUT_ROOT/SHA256SUMS" ]] || { echo 'PRIVATE_INPUT_MANIFEST_MISSING' >&2; exit 21; }
+  check_tool_hash "$MIBR_PRIVATE_INPUT_ROOT/SHA256SUMS" "$MIBR_PRIVATE_INPUT_MANIFEST_SHA256"
+  (cd "$MIBR_PRIVATE_INPUT_ROOT" && sha256sum --check --strict SHA256SUMS >/dev/null) || {
+    echo 'PRIVATE_INPUT_MANIFEST_MISMATCH' >&2; exit 22;
+  }
+  for profile in "${PROFILES[@]}"; do
+    for filename in lsd.jar Activator.java WidgetFactoryImpl.java; do
+      grep -Eq "^[0-9a-f]{64}  $profile/$filename$" "$MIBR_PRIVATE_INPUT_ROOT/SHA256SUMS" || {
+        echo 'PRIVATE_INPUT_MANIFEST_INCOMPLETE' >&2; exit 22;
+      }
+      input="$MIBR_PRIVATE_INPUT_ROOT/$profile/$filename"
+      [[ -f "$input" && -s "$input" && ! -L "$input" ]] || {
+        echo 'PRIVATE_BUILD_INPUT_MISSING' >&2; exit 22;
+      }
+    done
+  done
+else
+  [[ -f "$MIBR_PREBUILT_EXTENDER_JAR" && -s "$MIBR_PREBUILT_EXTENDER_JAR" &&
+    ! -L "$MIBR_PREBUILT_EXTENDER_JAR" ]] || {
+    echo 'PREBUILT_EXTENDER_MISSING_OR_SYMLINK' >&2; exit 22;
+  }
+  check_tool_hash "$MIBR_PREBUILT_EXTENDER_JAR" "$MIBR_PREBUILT_EXTENDER_SHA256"
+fi
 [[ -d "$QNX_TARGET/armle-v7" ]] || { echo 'PRIVATE_QNX_TARGET_MISSING' >&2; exit 23; }
 [[ -s "$QNX_TARGET/MIBR_TARGET_SHA256SUMS" ]] || { echo 'PRIVATE_QNX_TARGET_MANIFEST_MISSING' >&2; exit 23; }
 target_manifest_sha="$(sha256sum "$QNX_TARGET/MIBR_TARGET_SHA256SUMS" | awk '{print $1}')"
@@ -172,24 +193,33 @@ else
   echo "PROFILE_MENU_MODE=REBUILT_FROM_CURRENT_SOURCE"
 fi
 
-skoda_lsd="$MIBR_PRIVATE_INPUT_ROOT/skoda-mu1440-p4526/lsd.jar"
-[[ -s "$skoda_lsd" ]] || { echo 'PRIVATE_SKODA_LSD_MISSING_FOR_EXTENDER' >&2; exit 30; }
-extender_out="$WORK/extender"
-mkdir -p "$extender_out"
-if ! (
-  cd "$ROOT"
-  J9_HOME="$J9_HOME" LSD_JAR="$skoda_lsd" SRC="$ROOT/modules/menu/source/extender-p1" \
-    OUT="$extender_out" sh modules/menu/source/extender-p1/toolchain/build_p1.sh
-) > "$extender_out/private-compiler.log" 2>&1; then
-  cat "$extender_out/private-compiler.log" >> "$PRIVATE_LOG"
-  echo 'EXTENDER_BUILD=FAIL; compiler details retained only on the restricted runner' >&2
-  exit 1
+if [[ "$NEEDS_PRIVATE_J9" == 0 ]]; then
+  mkdir -p "$OUT/hmi/common"
+  install -m 0644 "$MIBR_PREBUILT_EXTENDER_JAR" "$OUT/hmi/common/MIBR-Extender-P1-BootProbe.jar"
+  python3 -I "$ROOT/modules/menu/source/extender-p1/toolchain/verify_p1_jar.py" \
+    "$OUT/hmi/common/MIBR-Extender-P1-BootProbe.jar"
+  echo 'EXTENDER_MODE=PREBUILT_HASH_PINNED_SOURCE_BASELINE_CHECKED'
+else
+  skoda_lsd="$MIBR_PRIVATE_INPUT_ROOT/skoda-mu1440-p4526/lsd.jar"
+  [[ -s "$skoda_lsd" ]] || { echo 'PRIVATE_SKODA_LSD_MISSING_FOR_EXTENDER' >&2; exit 30; }
+  extender_out="$WORK/extender"
+  mkdir -p "$extender_out"
+  if ! (
+    cd "$ROOT"
+    J9_HOME="$J9_HOME" LSD_JAR="$skoda_lsd" SRC="$ROOT/modules/menu/source/extender-p1" \
+      OUT="$extender_out" sh modules/menu/source/extender-p1/toolchain/build_p1.sh
+  ) > "$extender_out/private-compiler.log" 2>&1; then
+    cat "$extender_out/private-compiler.log" >> "$PRIVATE_LOG"
+    echo 'EXTENDER_BUILD=FAIL; compiler details retained only on the restricted runner' >&2
+    exit 1
+  fi
+  extender_jar="$extender_out/MIBR-Extender-P1-BootProbe.jar"
+  [[ -s "$extender_jar" ]] || { echo 'EXTENDER_BUILD_OUTPUT_MISSING' >&2; exit 31; }
+  python3 -I "$ROOT/modules/menu/source/extender-p1/toolchain/verify_p1_jar.py" "$extender_jar"
+  mkdir -p "$OUT/hmi/common"
+  install -m 0644 "$extender_jar" "$OUT/hmi/common/MIBR-Extender-P1-BootProbe.jar"
+  echo 'EXTENDER_MODE=J9_REBUILT'
 fi
-extender_jar="$extender_out/MIBR-Extender-P1-BootProbe.jar"
-[[ -s "$extender_jar" ]] || { echo 'EXTENDER_BUILD_OUTPUT_MISSING' >&2; exit 31; }
-python3 -I "$ROOT/modules/menu/source/extender-p1/toolchain/verify_p1_jar.py" "$extender_jar"
-mkdir -p "$OUT/hmi/common"
-install -m 0644 "$extender_jar" "$OUT/hmi/common/MIBR-Extender-P1-BootProbe.jar"
 
 NATIVE="$OUT/native"
 mkdir -p "$NATIVE/bin/navigation"
