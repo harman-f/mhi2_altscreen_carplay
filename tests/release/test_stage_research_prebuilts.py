@@ -47,7 +47,7 @@ class ResearchPrebuiltTest(unittest.TestCase):
         binary_rows, sha_rows = [], []
         with zipfile.ZipFile(self.archive, "w", zipfile.ZIP_DEFLATED) as z:
             for rel, member in sorted(stage.native_map().items()):
-                content = "b\x7fELF synthetic " + rel.encode()
+                content = bytes([0x7f, 0x45, 0x4c, 0x46]) + b" synthetic " + rel.encode()
                 digest = hashlib.sha256(content).hexdigest()
                 z.writestr(member, content)
                 inside = member[len(stage.PREFIX):]
