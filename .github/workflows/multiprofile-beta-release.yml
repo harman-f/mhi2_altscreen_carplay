@@ -39,6 +39,9 @@ jobs:
         shell: bash
         env:
           MIBR_MENU_JAR_MODE: prebuilt
+          # Optional trusted, separately built J9 extender; when absent it is rebuilt on the private runner.
+          MIBR_PREBUILT_EXTENDER_JAR: ${{ secrets.MIBR_PREBUILT_EXTENDER_JAR }}
+          MIBR_PREBUILT_EXTENDER_SHA256: ${{ secrets.MIBR_PREBUILT_EXTENDER_SHA256 }}
           J9_HOME: ${{ secrets.MIBR_PRIVATE_J9_HOME }}
           MIBR_PRIVATE_INPUT_ROOT: ${{ secrets.MIBR_PRIVATE_INPUT_ROOT }}
           MIBR_PRIVATE_INPUT_MANIFEST_SHA256: ${{ secrets.MIBR_PRIVATE_INPUT_MANIFEST_SHA256 }}
