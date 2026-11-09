@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Check the owner-approved, vehicle-profile menu JAR reference artifacts."""
 import hashlib
+import json
 from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED = {
-    "seat-mu1409-p4708": "4877e37eabea093f765cd81775728fcad088c981ce541ec61350f5d9cdcdeb6a",
-    "seat-mu1447-p4709": "4f7786d3aa3f6c70f3b2b93858569081634ed7aeb3e3e9c0c50ab60ed8a8e177",
-    "skoda-mu1440-p4526": "5f63fcddfa267bc7dd134b3c548a9a0e300d57a625aac3fbf472164706884a39",
-}
+LOCK = json.loads((ROOT / "modules/profiles/MENU_SOURCE_LOCK.json").read_text(encoding="utf-8"))
+if LOCK.get("schema") != 1:
+    raise SystemExit("MENU_REFERENCE_LOCK_SCHEMA_INVALID")
+EXPECTED = LOCK["menu_jars"]
 
 
 def main():
