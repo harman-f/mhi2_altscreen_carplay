@@ -11,6 +11,8 @@ PROFILES=(skoda-mu1440-p4526 seat-mu1409-p4708 seat-mu1447-p4709)
 : "${J9_HOME:?MISSING_INPUT: set J9_HOME to the locally provisioned IBM J9 SDK}"
 : "${MIBR_PRIVATE_INPUT_ROOT:?MISSING_INPUT: set private input root (not a GitHub artifact or repository path)}"
 : "${MIBR_PRIVATE_INPUT_MANIFEST_SHA256:?MISSING_TOOLCHAIN_PIN: set private input manifest SHA-256}"
+: "${MIBR_SUPPORT_JAR_DIR:?MISSING_INPUT: provision private support JAR directory}"
+: "${MIBR_SUPPORT_JAR_MANIFEST_SHA256:?MISSING_INPUT: pin private support JAR SHA256SUMS}"
 : "${QNX65_GHCR_TOKEN:?MISSING_INPUT: QNX image read-only token is required}"
 : "${QNX_TARGET:?MISSING_INPUT: private QNX 6.5 target sysroot is required for route guidance}"
 : "${MIBR_QNX_TARGET_MANIFEST_SHA256:?MISSING_TOOLCHAIN_PIN: set QNX target manifest SHA-256}"
@@ -37,6 +39,7 @@ ensure_private_path_outside_repo() {
 }
 ensure_private_path_outside_repo "$J9_HOME"
 ensure_private_path_outside_repo "$MIBR_PRIVATE_INPUT_ROOT"
+ensure_private_path_outside_repo "$MIBR_SUPPORT_JAR_DIR"
 ensure_private_path_outside_repo "$QNX_TARGET"
 ensure_private_path_outside_repo "$IAP2_LIB"
 ensure_private_path_outside_repo "$CLANG"
@@ -58,6 +61,21 @@ check_tool_hash "$LLD" "$MIBR_LLD_SHA256"
 check_tool_hash "$FFMPEG" "$MIBR_FFMPEG_SHA256"
 [[ -d "$MIBR_PRIVATE_INPUT_ROOT" ]] || { echo 'PRIVATE_INPUT_ROOT_MISSING' >&2; exit 22; }
 [[ -s "$MIBR_PRIVATE_INPUT_ROOT/SHA256SUMS" ]] || { echo 'PRIVATE_INPUT_MANIFEST_MISSING' >&2; exit 21; }
+[[ -s "$MIBR_SUPPORT_JAR_DIR/SHA256SUMS" && ! -L "$MIBR_SUPPORT_JAR_DIR/SHA256SUMS" ]] || {
+  echo 'PRIVATE_SUPPORT_MANIFEST_MISSING' >&2; exit 22;
+}
+check_tool_hash "$MIBR_SUPPORT_JAR_DIR/SHA256SUMS" "$MIBR_SUPPORT_JAR_MANIFEST_SHA256"
+(cd "$MIBR_SUPPORT_JAR_DIR" && sha256sum --check --strict SHA256SUMS >/dev/null) || {
+  echo 'PRIVATE_SUPPORT_MANIFEST_MISMATCH' >&2; exit 22;
+}
+for name in MIBR-NavIgnore.jar MIBR-Most20FPS.jar; do
+  grep -Eq "^[0-9a-f]{64}  $name$" "$MIBR_SUPPORT_JAR_DIR/SHA256SUMS" || {
+    echo 'PRIVATE_SUPPORT_INPUT_MANIFEST_INCOMPLETE' >&2; exit 22;
+  }
+  [[ -s "$MIBR_SUPPORT_JAR_DIR/$name" && ! -L "$MIBR_SUPPORT_JAR_DIR/$name" ]] || {
+    echo 'PRIVATE_SUPPORT_JAR_MISSING' >&2; exit 22;
+  }
+done
 check_tool_hash "$MIBR_PRIVATE_INPUT_ROOT/SHA256SUMS" "$MIBR_PRIVATE_INPUT_MANIFEST_SHA256"
 (cd "$MIBR_PRIVATE_INPUT_ROOT" && sha256sum --check --strict SHA256SUMS >/dev/null) || {
   echo 'PRIVATE_INPUT_MANIFEST_MISMATCH' >&2
@@ -176,6 +194,12 @@ python3 -I "$ROOT/modules/menu/source/extender-p1/toolchain/verify_p1_jar.py" "$
 mkdir -p "$OUT/hmi/common"
 install -m 0644 "$extender_jar" "$OUT/hmi/common/MIBR-Extender-P1-BootProbe.jar"
 
+# Support classes are sourced exclusively from the verified private input bundle,
+# never from historical public artifacts/mu1440/ copies.
+mkdir -p "$OUT/hmi/common"
+for name in MIBR-NavIgnore.jar MIBR-Most20FPS.jar; do
+  install -m 0644 "$MIBR_SUPPORT_JAR_DIR/$name" "$OUT/hmi/common/$name"
+done
 NATIVE="$OUT/native"
 mkdir -p "$NATIVE/bin/navigation"
 QNX_TARGET="$QNX_TARGET" IAP2_LIB="$IAP2_LIB" CLANG="$CLANG" LLD="$LLD" \

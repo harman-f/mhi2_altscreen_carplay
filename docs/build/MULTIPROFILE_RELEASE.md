@@ -40,3 +40,7 @@ firmware-derived profile menu JARs, Extender binary, native outputs, licensed
 firmware, and private toolchain inputs are supplied and verified by the private
 release pipeline. They are not stored as active binary inputs in this public
 repository.
+
+## Privately staged legacy support JARs
+
+The compiled `MIBR-NavIgnore.jar` and `MIBR-Most20FPS.jar` are staged by the private HARMAN-F builder from the verified `mibr-inputs-r11b` release package as `hmi/common/*.jar`. The modular assembler requires those staged files; it does not read the historical `artifacts/mu1440/*` copies as active release inputs. That historical tree is retained for earlier vehicle-test provenance and legacy tooling until separately reviewed. The full-source rebuild requires those same exact JARs as hash-pinned private support inputs, not silent reuse of public binary copies.

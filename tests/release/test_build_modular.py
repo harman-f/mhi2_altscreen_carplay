@@ -53,7 +53,7 @@ class BuildModularZip(unittest.TestCase):
         vmp.validate(out)                      # extracted tree
         vmp.validate(self.t / "a.zip", True)   # the ZIP itself
         listing = bm.load_zip(self.t / "a.zip")
-        # Reference JARs live in Git but only the fresh HMI inputs belong in the ZIP.
+        # Both profile and support JARs are supplied by private HMI staging, not public artifact copies.
         for pid in meta["profiles"]:
             self.assertIn("profiles/%s/hmi/MIBR-CarPlay.jar" % pid, listing)
             self.assertNotIn("profiles/%s/hmi/prebuilt/MIBR-CarPlay.jar" % pid, listing)
@@ -88,6 +88,21 @@ class BuildModularZip(unittest.TestCase):
             (self.hmi / SINGLE / "MIBR-CarPlay.jar").write_bytes(b"PK synthetic jar " + SINGLE.encode())
         self.assertNotEqual(a, b)
 
+    def test_support_jars_from_hmi_staging_not_public_git(self):
+        name = bm.SUPPORT_JARS[0]
+        staged = self.hmi / "common" / name
+        before = staged.read_bytes()
+        a, _ = self.build("support-before.zip")
+        staged.write_bytes(b"PK modified private support payload")
+        try:
+            b, _ = self.build("support-after.zip")
+            with zipfile.ZipFile(self.t / "support-after.zip") as z:
+                self.assertEqual(z.read("MIBR-CarPlay/common/menu/bin/" + name),
+                                 b"PK modified private support payload")
+        finally:
+            staged.write_bytes(before)
+        self.assertNotEqual(a, b)
+
     def test_stale_prebuilt_artifacts_rejected(self):
         # native built from a commit whose QNX sources differ from HEAD -> refuse to reuse
         with self.assertRaises(bm.AssembleError) as cm:
@@ -101,6 +116,7 @@ class BuildModularZip(unittest.TestCase):
         self.assertEqual(meta["package_status"], "incomplete")
         self.assertEqual(sorted(m for m in meta["missing_inputs"]),
                          sorted(["common/menu/bin/" + bm.EXTENDER_JAR] +
+                                ["common/menu/bin/" + name for name in bm.SUPPORT_JARS] +
                                 ["profiles/%s/hmi/MIBR-CarPlay.jar" % p for p in meta["profiles"]]))
         vmp.validate(self.t / "inc.zip")
         with self.assertRaises(vmp.PackageError):
