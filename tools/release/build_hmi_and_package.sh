@@ -136,11 +136,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Image-defined QNX compiler PATH must survive shell startup. A login shell
+# (bash -lc) resets that PATH and makes the verified ARMv7 compiler invisible.
 DOCKER_ARGS=(docker run --rm --platform=linux/amd64 -v "$ROOT:/src" -v "$OUT:/release-out" -w /src "$IMAGE")
-"${DOCKER_ARGS[@]}" bash -lc 'QNX_CC=arm-unknown-nto-qnx6.5.0eabi-gcc bash tools/build_mu1440_source.sh /release-out/native/bin/mu1440-source'
-"${DOCKER_ARGS[@]}" bash -lc 'QCC=arm-unknown-nto-qnx6.5.0eabi-gcc bash tools/build_altscreen111_gen2.sh /release-out/native/bin/gen2/libaltscreen111.so'
-"${DOCKER_ARGS[@]}" bash -lc 'bash tools/build_support_tools.sh /release-out/native/bin/support-tools'
-"${DOCKER_ARGS[@]}" bash -lc 'bash tools/build_direct_ts_remux.sh modules/carplay/source/direct-ts-remux/direct_ts_remux.c /release-out/native/bin/direct-ts-remux/direct-ts-remux'
+"${DOCKER_ARGS[@]}" bash -c 'QNX_CC=arm-unknown-nto-qnx6.5.0eabi-gcc bash tools/build_mu1440_source.sh /release-out/native/bin/mu1440-source'
+"${DOCKER_ARGS[@]}" bash -c 'QCC=arm-unknown-nto-qnx6.5.0eabi-gcc bash tools/build_altscreen111_gen2.sh /release-out/native/bin/gen2/libaltscreen111.so'
+"${DOCKER_ARGS[@]}" bash -c 'bash tools/build_support_tools.sh /release-out/native/bin/support-tools'
+"${DOCKER_ARGS[@]}" bash -c 'bash tools/build_direct_ts_remux.sh modules/carplay/source/direct-ts-remux/direct_ts_remux.c /release-out/native/bin/direct-ts-remux/direct-ts-remux'
 
 for profile in "${PROFILES[@]}"; do
   private_profile="$MIBR_PRIVATE_INPUT_ROOT/$profile"
