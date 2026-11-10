@@ -1,10 +1,19 @@
 # MU1440 / AID10 developer test — current
 
-## Current three-profile beta build status (2026-11-09)
+## Current three-profile beta build status (2026-11-10)
 
-The MIB Runtime `1.5.0-beta.12` source on `main` includes all three owner-approved menu JARs and the [opt-in beta package pipeline](../docs/build/MULTIPROFILE_RELEASE.md). The checked-in Java artifacts may be reused only while the reviewed Git-object content lock for menu/profile/registry sources is unchanged; new Java changes require separately validated local J9 rebuilds and updated provenance. The separate `ghcr.io/harman-f/mhi2-qnx65-armv7` **package is a pinned QNX cross-compiler Docker image**, not a deployable CarPlay release, and must remain available to CI while `tools/qnx65-image.lock` references it.
+The public product repository contains source and publication checks only. Its
+Research-download and beta-assembly workflow has been removed. The private
+HARMAN-F build repository is the sole active producer of three-profile release
+packages; see [release ownership and source boundaries](../docs/build/MULTIPROFILE_RELEASE.md).
+The public publication audit verifies source locks without private credentials.
+The separately pinned `ghcr.io/harman-f/mhi2-qnx65-armv7` package is a QNX
+cross-compiler image, not a deployable CarPlay release, and remains available
+while `tools/qnx65-image.lock` references it.
 
-This beta workflow still requires a private runner for the extender and native navigation dependencies. It uploads only time-limited Actions artifacts when enabled. **No new GitHub Release or complete end-to-end pipeline build has been published at this point.** The frozen historical MU1440 developer package described below remains a distinct release lineage; do not silently transfer its vehicle acceptance to the beta.
+This cutover does not create or replace a GitHub Release and does not change
+the historical MU1440 developer package described below. It does not extend
+that package's vehicle acceptance to any new source or binary output.
 
 
 This is the currently pinned **MU1440-specific developer prerelease**, not the newest experimental source line. Documentation-only main-branch updates do not mutate the already published ZIP or retroactively re-qualify its binary hashes. See [current integration status](../docs/status/INTEGRATION_STATUS_2026-10-21.md), [latest known issues](../docs/findings/KNOWN_ISSUES.md) and [dated vehicle test evidence](../docs/status/MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md).

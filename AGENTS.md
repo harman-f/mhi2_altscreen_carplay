@@ -2,7 +2,7 @@
 
 ## Public repository role (binding)
 
-**Owner exception (2026-11-09):** The three finished profile-specific `MIBR-CarPlay.jar` menu artifacts are explicitly authorized in this repository and its release packages. This exception does not cover the OEM firmware, original JARs/classes, proprietary build inputs, or their redistribution. Preserve source/build provenance and identify vehicle-tested versus newly rebuilt outputs.
+**Owner cutover (2026-11-10):** Active profile menu JARs and release packaging are owned by the private HARMAN-F build infrastructure. Do not add release binaries to this public source repository. The prior 2026-11-09 public JAR exception is superseded; historical Git objects are preserved.
 
 This is the **curated public source/product repository**, not the development team's coordination or forensic workspace. Publish only independently authored, provenance-checked source with actual dependencies/build checks; current capabilities, accurate support/test evidence, public documentation and external contributor changes. Never place internal audits, research task/handoff reports, private issue or pull request references, raw captures, extracted OEM/phone code, personal provenance, private names/paths or experimental branch diaries here.
 
