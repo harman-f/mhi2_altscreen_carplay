@@ -15,13 +15,14 @@ class FullRebuildContainerShellTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_all_native_build_invocations_use_nonlogin_shell(self):
+        prefix = '"${DOCKER_ARGS[@]}" bash '
         lines = [
             line.strip() for line in SCRIPT.read_text(encoding="utf-8").splitlines()
-            if line.strip().startswith('"''${DOCKER_ARGS[@]}''" bash ')
+            if line.strip().startswith(prefix)
         ]
         self.assertEqual(len(lines), 4, "all four native build commands must be checked")
         for line in lines:
-            self.assertTrue(line.startswith('"''${DOCKER_ARGS[@]}''" bash -c '), line)
+            self.assertTrue(line.startswith(prefix + "-c '"), line)
             self.assertNotIn("bash -lc", line)
 
 
