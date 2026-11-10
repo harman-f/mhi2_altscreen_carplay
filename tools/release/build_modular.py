@@ -155,8 +155,9 @@ LSD_JARS = "/mnt/app/eso/hmi/lsd/jars/"
 EXTENDER_JAR = "MIBR-Extender-P1-BootProbe.jar"
 SCROLL = ("mibr_scroll_thumb.png", "mibr_scroll_thumb_v2.png",
           "mibr_scroll_track.png", "mibr_scroll_track_v2.png")
-SUPPORT_JARS = ("artifacts/mu1440/navignore/vehicle-tested-2026-09-27/MIBR-NavIgnore.jar",
-                "artifacts/mu1440/most20fps/vehicle-tested-2026-09-29/MIBR-Most20FPS.jar")
+# Versioned binaries come from the protected, SHA-pinned HMI staging root.
+# Historical vehicle-test copies in artifacts/ are reference evidence only.
+SUPPORT_JARS = ("MIBR-NavIgnore.jar", "MIBR-Most20FPS.jar")
 EDITOR = ("mibr-menu-editor.html", "MENU_FILE_FORMAT.md", "function-catalog.json",
           "standard-menu.txt")
 
@@ -466,10 +467,15 @@ def assemble(native, repo=ROOT, installer=None, hmi_dir=None, profiles=None, sco
         read_repo_file(repo, "modules/menu/source/assets/scroll/" + name, files, prov, pkg)
         # MibrIconState.ROOT
         manifest.append((sha(files[pkg][0]), "644", "/mnt/app/eso/hmi/lsd/mibr/icons/" + name, pkg))
-    for rel in SUPPORT_JARS:
-        pkg = "common/menu/bin/" + Path(rel).name
-        read_repo_file(repo, rel, files, prov, pkg)
-        manifest.append((sha(files[pkg][0]), "644", LSD_JARS + Path(rel).name, pkg))
+    for name in SUPPORT_JARS:
+        pkg = "common/menu/bin/" + name
+        support = Path(hmi_dir) / "common" / name if hmi_dir is not None else None
+        if support is None or not support.is_file() or support.is_symlink():
+            missing.append(pkg)
+            continue
+        data = support.read_bytes()
+        add(files, prov, pkg, data, {"origin": "hmi-input", "input": "common/" + name})
+        manifest.append((sha(data), "644", LSD_JARS + name, pkg))
     ext = Path(hmi_dir) / "common" / EXTENDER_JAR if hmi_dir is not None else None
     if ext is not None and ext.is_file():
         pkg = "common/menu/bin/" + EXTENDER_JAR
@@ -712,6 +718,8 @@ def fake_installer(base, repo=ROOT):
 def fake_hmi(base):
     (base / "common").mkdir(parents=True)
     (base / "common" / EXTENDER_JAR).write_bytes(b"PK synthetic extender jar")
+    for name in SUPPORT_JARS:
+        (base / "common" / name).write_bytes(b"PK synthetic support jar " + name.encode())
     for pid in check_profiles.load_profiles():
         (base / pid).mkdir(parents=True)
         (base / pid / "MIBR-CarPlay.jar").write_bytes(b"PK synthetic jar " + pid.encode())
