@@ -1,6 +1,7 @@
 // Browser-level regression smoke test for the P0.4 standalone menu editor.
 // Usage: npm install --no-save jsdom@24 && node tools/menu-editor/test-p04.cjs
 const fs = require("node:fs");
+const {TextEncoder,TextDecoder} = require("node:util");
 const path = require("node:path");
 const assert = require("node:assert/strict");
 const {JSDOM, VirtualConsole} = require("jsdom");
@@ -14,6 +15,8 @@ const dom = new JSDOM(html, {
   runScripts:"dangerously",
   virtualConsole:vc,
   beforeParse(window){
+    window.TextEncoder=TextEncoder;
+    window.TextDecoder=TextDecoder;
     window.matchMedia = () => ({matches:false, addEventListener(){},removeEventListener(){}});
     window.scrollTo = () => {};
     window.confirm = () => true;
