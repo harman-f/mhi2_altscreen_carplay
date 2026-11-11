@@ -196,13 +196,19 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
   body.sheet .wrap{padding-bottom:75dvh}
   .tools button.fl{flex:1 1 auto}
 }
+/* Consolidated editor layout and user-selected theme */
+:root[data-theme="light"]{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
+#app[data-tab="nav"]{grid-template-columns:minmax(0,1fr)}
+#app[data-tab="nav"] #treePane,#app[data-tab="nav"] #panel{display:none!important}
+#app[data-tab="nav"] #viewPane{position:static!important;max-height:none!important;overflow:visible!important;width:100%}
 </style>
 </head>
 <body>
 <div id="notice" role="status" aria-live="polite"></div>
 <div class="wrap">
   <header>
-    <div class="head"><h1 id="appTitle"></h1><span id="status"></span><div class="seg" id="langSeg"><button data-l="de">DE</button><button data-l="en">EN</button></div></div>
+    <div class="head"><h1 id="appTitle"></h1><span id="status"></span><div class="seg" id="langSeg"><button data-l="de">DE</button><button data-l="en">EN</button></div><div class="seg" id="themeSeg" role="group" aria-label="Day and night mode"><button data-theme-choice="light">☀ Tag</button><button data-theme-choice="dark">☾ Nacht</button><button data-theme-choice="auto">Auto</button></div></div>
     <div class="tools" id="tools1">
       <button id="undo" class="fl" disabled></button>
       <button id="addPage" class="fl"></button>
@@ -889,7 +895,7 @@ var S18={
 de:{
  appTitle:"MIBR Menü-Editor",undo:"Rückgängig",addPage:"+ Ebene",addHint:"+ Hinweis",expandAll:"Aufklappen",collapseAll:"Zuklappen",
  brand:"Marke",name:"Dateiname (frei)",save:"Datei speichern",load:"Datei laden",copy:"Text kopieren",
- tabTree:"Menü",tabPreview:"Vorschau",tabFile:"Datei",tabChanges:"Änderungen",tabHelp:"Hilfe",tabSafe:"Safe Area",
+ tabTree:"Menü",tabPreview:"Vorschau",tabFile:"Datei",tabChanges:"Änderungen",tabHelp:"Hilfe",tabSafe:"Safe Area",tabNav:"Navigation pro View",
  stLocal:"In diesem Browser gespeichert",stShared:"Gespeichert, auf allen Geräten",stSaving:"Speichert…",stNone:"Noch keine Änderungen",
  stNoConn:"Keine Verbindung, nur in diesem Browser",stLost:"Verbindung getrennt ({0}), neu laden",stNotShared:"Nicht geteilt ({0}), nur in diesem Browser",stError:"Fehler",
  chipOk:"Prüfung ok",chipErr:"{0} Fehler",chipWarn:"{0} Hinweise",
@@ -963,7 +969,7 @@ de:{
 en:{
  appTitle:"MIBR menu editor",undo:"Undo",addPage:"+ Level",addHint:"+ Note",expandAll:"Expand",collapseAll:"Collapse",
  brand:"Brand",name:"File name (free)",save:"Save file",load:"Load file",copy:"Copy text",
- tabTree:"Menu",tabPreview:"Preview",tabFile:"File",tabChanges:"Changes",tabHelp:"Help",tabSafe:"Safe area",
+ tabTree:"Menu",tabPreview:"Preview",tabFile:"File",tabChanges:"Changes",tabHelp:"Help",tabSafe:"Safe area",tabNav:"Navigation per view",
  stLocal:"Saved in this browser",stShared:"Saved, on all devices",stSaving:"Saving…",stNone:"No changes yet",
  stNoConn:"No connection, this browser only",stLost:"Connection lost ({0}), reload",stNotShared:"Not shared ({0}), this browser only",stError:"error",
  chipOk:"Checks ok",chipErr:"{0} errors",chipWarn:"{0} notices",
@@ -1715,6 +1721,18 @@ function renderHelp(host){
     box.appendChild(el("h3","",sec[0]));sec[1].forEach(function(p){box.appendChild(el("p","",p))});
   });
   host.appendChild(box);
+  var sources=el("div","help");
+  sources.appendChild(el("h3","",lang==="de"?"Projekt, Herkunft und Lizenzen":"Project, provenance and licenses"));
+  function addSource(label,url,desc){
+    var p=el("p",""),a=el("a","",label);a.href=url;a.target="_blank";a.rel="noopener noreferrer";
+    p.appendChild(a);p.appendChild(document.createTextNode(" — "+desc));sources.appendChild(p);
+  }
+  addSource("HARMAN-F / MIB Runtime","https://github.com/harman-f/mhi2_altscreen_carplay",lang==="de"?"Projekt-Repository.":"Project repository.");
+  addSource("Original HTML-Menü-Editor","https://github.com/harman-f/mhi2_altscreen_carplay/blob/main/tools/menu-editor/mibr-menu-editor.html",lang==="de"?"Unveränderte Ausgangsbasis.":"Original editor baseline.");
+  addSource("LICENSE (GPL-3.0-or-later)","https://github.com/harman-f/mhi2_altscreen_carplay/blob/main/LICENSE",lang==="de"?"Projektlizenz, keine Freigabe für OEM- oder Fremdsoftware.":"Project license, not a license for OEM or third-party software.");
+  addSource("THIRD_PARTY_NOTICES.md","https://github.com/harman-f/mhi2_altscreen_carplay/blob/main/THIRD_PARTY_NOTICES.md",lang==="de"?"Upstream-Projekte, Lizenzen und technische Vorarbeiten. Referenz bedeutet nicht Codeübernahme.":"Upstream projects, licenses and prior art. A reference does not imply copied code.");
+  sources.appendChild(el("p","",lang==="de"?"Unabhängiges Forschungsvorhaben ohne Herstellerfreigabe. View-Profile sind experimentell; kein Fahrzeug-Loader enthalten.":"Independent research without manufacturer endorsement. View profiles are experimental; no vehicle loader is included."));
+  host.appendChild(sources);
 }
 /* ================= safe area tool ================= */
 var KEYS="mibr-menu-editor/2:safe",SVGNS="http://www.w3.org/2000/svg";
@@ -1830,13 +1848,15 @@ function renderSafe(host){
 }
 function renderViews(){
   var checks=runChecks();lastChecks=checks;
-  var host=$("vbody"),tb=tab;
+  var host=$("vbody"),tb=tab,navv=document.getElementById("navv-layer");
+  if(navv&&navv.parentNode===host){document.body.appendChild(navv);navv.hidden=true}
   if(!isNarrow()&&tb==="tree")tb="preview";
   if(tb==="preview")renderPreview(host);
   else if(tb==="safe")renderSafe(host);
   else if(tb==="file")renderFile(host);
   else if(tb==="changes")renderChanges(host);
   else if(tb==="help")renderHelp(host);
+  else if(tb==="nav"&&navv){host.textContent="";navv.hidden=false;host.appendChild(navv)}
   else host.textContent="";
   var errs=checks.filter(function(c){return c.sev==="err"}).length,warns=checks.length-errs;
   var chip=$("chip");
@@ -1849,7 +1869,7 @@ function renderViews(){
 }
 function renderTabs(){
   var tabs=$("tabs");tabs.textContent="";
-  [["tree",t("tabTree")],["preview",t("tabPreview")],["safe",t("tabSafe")],["file",t("tabFile")],["changes",t("tabChanges")],["help",t("tabHelp")]].forEach(function(a){
+  [["tree",t("tabTree")],["preview",t("tabPreview")],["nav",t("tabNav")],["safe",t("tabSafe")],["file",t("tabFile")],["changes",t("tabChanges")],["help",t("tabHelp")]].forEach(function(a){
     var b=el("button",a[0]===tab||(!isNarrow()&&a[0]==="preview"&&tab==="tree")?"on":"",a[1]);b.type="button";b.dataset.t=a[0];b.setAttribute("role","tab");
     if(a[0]==="changes")b.appendChild(el("span","n",String(changeItems().length+metaChanges().length)));
     b.addEventListener("click",function(){tab=a[0];$("app").dataset.tab=tab;renderTabs();renderViews();if(isNarrow())window.scrollTo(0,0)});
@@ -2062,6 +2082,17 @@ connect();
 #navv-layer td,#navv-layer th{text-align:left;border-bottom:1px solid #e0e8e2;padding:10px}
 #navv-input{display:none}
 @media(max-width:820px){.navv-grid{grid-template-columns:1fr}#navv-body{padding:10px}#navv-cluster{border-width:6px}#navv-layer header{padding:10px}#navv-open{bottom:8px;right:8px}}
+/* Navigation is now an integrated tab; colors follow editor theme. */
+#navv-open{display:none!important}
+#navv-layer{position:static;inset:auto;z-index:auto;overflow:visible;background:var(--bg);color:var(--text)}
+#navv-layer header{display:none!important}
+#navv-body{max-width:none;padding:12px 2px}
+#navv-layer .navv-card{background:var(--surface);border-color:var(--line);color:var(--text)}
+#navv-layer .navv-note{color:var(--muted)}
+#navv-layer .navv-row{border-bottom-color:var(--line)}
+#navv-layer .navv-menu button,#navv-layer .navv-views button,#navv-layer .navv-buttons button,#navv-layer .navv-row select{background:var(--surface);color:var(--text);border-color:var(--line)}
+#navv-layer .navv-menu button[aria-pressed=true],#navv-layer .navv-views button[aria-pressed=true]{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+#navv-layer #navv-out{background:var(--raised);color:var(--text)}
 </style>
 <button type="button" id="navv-open">🧭 Navigation pro View · Mock-up</button>
 <div id="navv-layer" hidden role="dialog" aria-label="Cockpit Navigation pro View">
@@ -2168,5 +2199,25 @@ render();
 })();
 </script>
 
+<script id="mibr-theme">
+(function(){
+  var storageKey="mibr-menu-editor/3:theme",mode="auto";
+  try{var p=localStorage.getItem(storageKey);if(p==="light"||p==="dark"||p==="auto")mode=p}catch(e){}
+  function render(){
+    if(mode==="auto")document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme",mode);
+    var en=document.documentElement.lang==="en";
+    Array.from(document.querySelectorAll("#themeSeg button")).forEach(function(b){
+      var v=b.dataset.themeChoice;b.classList.toggle("on",v===mode);b.setAttribute("aria-pressed",String(v===mode));
+      b.textContent=v==="light"?(en?"☀ Day":"☀ Tag"):v==="dark"?(en?"☾ Night":"☾ Nacht"):"Auto";
+    });
+  }
+  Array.from(document.querySelectorAll("#themeSeg button")).forEach(function(b){b.addEventListener("click",function(){
+    mode=b.dataset.themeChoice;try{localStorage.setItem(storageKey,mode)}catch(e){}render();
+  })});
+  document.getElementById("langSeg").addEventListener("click",function(){setTimeout(render,0)});
+  render();
+})();
+</script>
 </body>
 </html>
