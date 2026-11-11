@@ -40,6 +40,10 @@ async function main(){
     assert.ok(html.includes(source),"Embedded "+profile+" SVG must exactly match its source");
   }
   assert.ok(w.MIBR_project,"Unified project API");
+  assert.equal(w.MIBR_views.activeView(),"center","New project opens Center view");
+  assert.equal(w.MIBR_safe.activeView(),"center","Calibration initially follows active cockpit view");
+  assert.ok($("#navv-guidance-advanced").tagName==="DETAILS","Experimental mapping stays available but collapsed");
+  assert.equal($("#navv-guidance-advanced").open,false,"Guidance mapping is secondary");
   assert.equal($$("#tabs button").length,4,"Four top tabs");
   assert.ok($("#navv-view-workspace").children[0].classList.contains("navv-view-selector"),"Full width view selector first");
   assert.ok($("#navv-view-workspace").children[1].classList.contains("navv-view-preview"),"Single preview comes before settings");
@@ -89,6 +93,7 @@ async function main(){
 
   // Wide: angled side modules and right-hand native guidance, not enlarged Center circles.
   click('[data-navv-view=wide]');
+  assert.equal(w.MIBR_safe.activeView(),"wide","Wide selection also selects Wide calibration");
   assert.equal($("#navv-center-svg").style.display,"none","Center SVG hidden on Wide in Safari");
   assert.equal($("#navv-full-svg").style.display,"none","Full SVG hidden on Wide in Safari");
   assert.equal($("#navv-wide-svg").style.display,"block","Wide SVG visible");
@@ -122,6 +127,7 @@ async function main(){
 
   // Full: the photo shows one continuous map without a separate right tube.
   click('[data-navv-view=full]');
+  assert.equal(w.MIBR_safe.activeView(),"full","Full selection also selects Full calibration");
   assert.equal($("#navv-center-svg").style.display,"none","Center SVG hidden on Full");
   assert.equal($("#navv-wide-svg").style.display,"none","Wide SVG hidden on Full");
   assert.equal($("#navv-full-svg").style.display,"block","Full SVG visible");
@@ -175,9 +181,20 @@ async function main(){
 
   click('#tabs [data-t=safe]');
   assert.ok($(".sa-views")&&$(".sa-menu"),"Dedicated Safe Area controls");
+  assert.equal(w.MIBR_safe.activeView(),"center","Safe Area follows selected cockpit view");
+  $$(".sa-views button")[1].click(); // Wide calibration context
+  assert.equal(w.MIBR_views.activeView(),"wide","Safe Area selection updates View configurator");
+  assert.equal(w.MIBR_safe.activeView(),"wide","Same active Wide in both workspaces");
+  assert.equal($$(".sa-views button")[1].getAttribute("aria-pressed"),"true","Wide calibration active");
   $$(".sa-views button")[2].click(); // Center calibration geometry
+  assert.equal(w.MIBR_views.activeView(),"center","Returning to Center synchronizes both workspaces");
   set("#sa-x","400","input");
   assert.equal(w.MIBR_project.capture().viewProfiles.views.center.safeArea.x,400,"Safe area in project");
+  click('#tabs [data-t=nav]');click('[data-navv-view=full]');click("#navv-edit-safe");
+  assert.equal($("#app").dataset.tab,"safe","Shortcut opens Safe Area workspace");
+  assert.equal(w.MIBR_safe.activeView(),"full","Shortcut preserves Full calibration view");
+  assert.equal($$(".sa-views button")[0].getAttribute("aria-pressed"),"true","Full calibration selected via shortcut");
+  click('#tabs [data-t=nav]');click('[data-navv-view=center]');
 
   const before=clone(w.MIBR_project.capture());
   assert.equal(before.viewProfiles.views.center.mockup.background,"grid");

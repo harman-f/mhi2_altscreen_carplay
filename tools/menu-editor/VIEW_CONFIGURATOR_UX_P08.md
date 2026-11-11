@@ -42,3 +42,15 @@ Die von der AID10 bekannte Zahl von insgesamt fünf Cockpit-Ansichten ist damit 
 ## Prüfungen
 
 CI-Suite `test-p04.cjs` und `test-p05.cjs`: Menüeditor, View-Auswahl, sichtbares SVG, Hintergrund, Zielprofilkopie, Vererbung, sichere Geometrie, JSON-Speicherung, native Menüdatei mit CRC32, ZIP- und SD-Schreibpfad.
+
+## P0.8-Folgeaudit: gemeinsamer aktiver View-Kontext (11.11.2026)
+
+- View-Konfigurator und Safe-Area-Reiter verwenden dieselbe aktive Auswahl `center`/`wide`/`full` (im älteren Safe-Area-Speicher wird `full` weiterhin `voll` genannt). Auswahlwechsel aus einem der beiden Bereiche aktualisieren den anderen; die Geometrie wird **nicht** durch bloße Auswahl verändert.
+- Ein separater `localStorage`-Schlüssel merkt sich die aktive Ansicht. Dies ist **kein** neues Feld in `mibr-project/1` oder `mibr.nav-view-profiles/2`. JSON-, .conf- und native Menü-Exporte bleiben unverändert.
+- Eine direkte Aktion im View-Konfigurator öffnet den Safe-Area-Reiter für die aktive Ansicht.
+- `Guidance-Mapping` ist standardmäßig eingeklappt und als experimentelle Dateninterpretation beschriftet. **Keine Schemafelder entfernt.** `carplay.eta`, `native.bottomEta` und `guidance.bottom` sowie Lane-Schalter können visuell ähnliche Ergebnisse haben, aber unterschiedliche Modellbedeutungen. Vor einer Zusammenlegung sind reale Runtime-/BAP-Belege nötig.
+- Browser-Regressionen prüfen die Auswahl in beide Richtungen, den direkten Wechsel zur Safe Area und die Ein-SVG-Sichtbarkeit. Der visuelle iPhone-Safari-Test bleibt ausstehend.
+
+### Noch nicht als Fahrzeugfunktion freigegeben
+
+Die individuellen nativen Schalter repräsentieren Mock-up-Ebenen. Rechter Pfeil, obere Pfeile, Lane-Anzeige und Zeitfelder sind erst nach Runtime-/BAP-Nachweis als unabhängig programmierbar zu bezeichnen. Native SD-Ausgabe bleibt ausschließlich `MIBR_MENU/1`.
