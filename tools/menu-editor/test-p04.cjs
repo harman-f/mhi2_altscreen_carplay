@@ -66,6 +66,7 @@ async function main(){
 
   click('#tabs [data-t=safe]');
   assert.ok(query(".sa-menu"),"Dedicated Safe Area is missing");
+  document.querySelectorAll(".sa-views button")[2].click(); // Select Center, not default Full
   change("#sa-x","400","input");
   assert.equal(w.MIBR_views.get().views.center.safeArea.x,400,"Standalone Safe Area should update project state");
   click('#tabs [data-t=nav]');
