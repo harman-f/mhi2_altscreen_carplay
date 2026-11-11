@@ -48,6 +48,20 @@ async function main(){
   assert.ok($("#center-top-lanes"),"Upper lanes");
   assert.ok($("#center-dial-lanes"),"Right dial lanes");
   assert.ok($("#center-bottom-distance")&&$("#center-bottom-eta"),"Bottom guidance");
+  assert.ok($("#center-map-route"),"Layered route geometry");
+  const scaleLabels=$("#center-left-dial .c-gauge-labels text, #center-right-dial .c-gauge-labels text");
+  assert.ok(scaleLabels.length>=17,"Stable individual gauge numbers");
+  assert.ok(scaleLabels.every(n=>!n.hasAttribute("transform")),"Gauge numerals must be upright, not tangentially distorted");
+  assert.ok($("#center-speed")&&$("#center-left-info"),"Dedicated static instrument layers");
+  assert.ok($("#center-top-status")&&$("#center-footer"),"Independent upper and lower status layers");
+  click("#navv-preview-zoom");
+  assert.ok($("#navv-center-preview").classList.contains("preview-expanded"),"Large preview opens");
+  click("#navv-preview-close");
+  assert.ok(!$("#navv-center-preview").classList.contains("preview-expanded"),"Large preview closes");
+  set('[data-navv-section="native"][data-navv-key="topSymbol"]',"lanes");
+  assert.notEqual($("#center-top-lanes").style.display,"none","Top lanes enable");
+  set('[data-navv-section="native"][data-navv-key="topSymbol"]',"off");
+  assert.equal($("#center-top-lanes").style.display,"none","Top lanes hide");
   set('[data-navv-section="native"][data-navv-key="topText"]',"distance");
   assert.notEqual($("#center-top-text").style.display,"none","Upper text enables");
   set('[data-navv-section="native"][data-navv-key="tube"]',"off");
@@ -57,8 +71,10 @@ async function main(){
   assert.equal($("#center-dial-lanes").style.display,"none","Right lane strip hides");
   set("#navv-bgmode","plain");
   assert.equal($("#center-grid").style.display,"none","Grid hides");
+  assert.equal($("#center-map-route").style.display,"none","Neutral background also hides route");
   set("#navv-bgmode","grid");
   assert.notEqual($("#center-grid").style.display,"none","Grid shows");
+  assert.notEqual($("#center-map-route").style.display,"none","Map route returns");
 
   click('#tabs [data-t=safe]');
   assert.ok($(".sa-views")&&$(".sa-menu"),"Dedicated Safe Area controls");
