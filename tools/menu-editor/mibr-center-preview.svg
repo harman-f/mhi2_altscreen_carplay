@@ -1,0 +1,113 @@
+<svg id="navv-center-svg" viewBox="0 0 1010 376" role="img" aria-label="Center Virtual Cockpit Preview: modular AID10 geometry" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+<defs>
+  <linearGradient id="c-back" x2=".1" y2="1"><stop offset="0%" stop-color="#1d2540"/><stop offset="60%" stop-color="#0c1223"/><stop offset="100%" stop-color="#07090f"/></linearGradient>
+  <linearGradient id="c-dial" x1=".2" y1=".1" x2=".7" y2=".9"><stop stop-color="#253049"/><stop offset="46%" stop-color="#11182b"/><stop offset="100%" stop-color="#070b16"/></linearGradient>
+  <radialGradient id="c-inner"><stop stop-color="#343d53"/><stop offset=".65" stop-color="#1d2436"/><stop offset="1" stop-color="#0f1421"/></radialGradient>
+  <linearGradient id="c-guidance" x1="0" y1="1" x2="0" y2="0"><stop stop-color="#00bd09"/><stop offset=".5" stop-color="#58f534"/><stop offset="1" stop-color="#fff"/></linearGradient>
+  <pattern id="c-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" stroke="#aab8c9" stroke-opacity=".26" stroke-width=".55" fill="none"/></pattern>
+  <pattern id="c-grid-major" width="100" height="50" patternUnits="userSpaceOnUse"><path d="M100 0H0V50" stroke="#d9e3f2" stroke-opacity=".48" stroke-width="1.4" fill="none"/></pattern>
+  <clipPath id="c-mainclip"><rect x="125" y="26" width="760" height="334" rx="17"/></clipPath>
+  <filter id="c-glow"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<rect x="3" y="3" width="1004" height="370" rx="53" fill="#050608" stroke="#161c27" stroke-width="5"/>
+<g clip-path="url(#c-mainclip)">
+ <rect x="125" y="26" width="760" height="334" fill="url(#c-back)"/>
+ <g id="center-grid">
+  <rect x="160" y="74" width="690" height="255" fill="url(#c-grid)"/>
+  <rect x="160" y="74" width="690" height="255" fill="url(#c-grid-major)"/>
+  <g fill="#e7e9ee" font-weight="750" font-size="15" font-family="system-ui,Arial,sans-serif">
+   <text x="339" y="162">300<tspan fill="#ffd639">50</tspan></text><text x="437" y="162">400<tspan fill="#ffd639">50</tspan></text><text x="535" y="162">500<tspan fill="#ffd639">50</tspan></text><text x="635" y="162">600<tspan fill="#ffd639">50</tspan></text>
+   <text x="339" y="215">300<tspan fill="#ffd639">100</tspan></text><text x="437" y="215">400<tspan fill="#ffd639">100</tspan></text><text x="535" y="215">500<tspan fill="#ffd639">100</tspan></text><text x="635" y="215">600<tspan fill="#ffd639">100</tspan></text>
+   <text x="339" y="265">300<tspan fill="#ffd639">150</tspan></text><text x="437" y="265">400<tspan fill="#ffd639">150</tspan></text><text x="535" y="265">500<tspan fill="#ffd639">150</tspan></text><text x="635" y="265">600<tspan fill="#ffd639">150</tspan></text>
+  </g>
+  <path d="M505 178v38m-19-19h38" stroke="#ff4242" stroke-width="2"/>
+ </g>
+ <g id="center-map-visual" style="display:none">
+  <rect x="337" y="83" width="333" height="252" fill="#273e4a"/>
+  <path d="M344 320C415 287 472 287 521 240S578 176 664 160M340 155Q430 202 510 132T674 91" fill="none" stroke="#526779" stroke-width="31"/>
+  <path d="M344 320C415 287 472 287 521 240S578 176 664 160" fill="none" stroke="#849ca8" stroke-width="9"/>
+  <path d="M500 325Q500 275 521 241Q548 200 592 188" stroke="#69e6bb" stroke-width="5" fill="none" stroke-linecap="round"/>
+ </g>
+ <rect x="125" y="26" width="760" height="370" fill="url(#c-back)" opacity=".06"/>
+</g>
+<g id="center-top-status" font-family="system-ui,Arial,sans-serif" fill="#fafcff">
+ <text x="396" y="57" font-size="22" font-weight="650">▲W</text>
+ <text x="505" y="57" text-anchor="middle" font-size="33" font-weight="650">23:22</text>
+ <text x="622" y="55" font-size="20" font-weight="600"><tspan fill="#34ccfb">❄</tspan> 4.0°C</text>
+ <path d="M384 74H461l8 7h71l9-7h77" fill="none" stroke="#c8d4de" opacity=".8" stroke-width="2"/>
+</g>
+<g id="center-top-text" font-family="system-ui,Arial,sans-serif" text-anchor="middle">
+ <rect x="378" y="86" width="254" height="30" fill="#0b1020" opacity=".8" rx="2"/>
+ <text id="center-top-label" x="505" y="108" fill="#fff" font-size="18" font-weight="650">200 m · Hauptstraße</text>
+</g>
+<g id="center-top-lanes" fill="none" stroke="#e8edf2" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+ <path d="M467 119v25M531 119v25"/>
+ <path d="M480 124l14 14m0-14l-14 14M507 124l14 14m0-14l-14 14" stroke-width="2.7"/>
+ <path d="M548 143v-14h13m-8-7l8 7-8 7" stroke="#fff" stroke-width="3"/>
+</g>
+<g id="center-left-dial" font-family="system-ui,Arial,sans-serif" fill="#f4f7fd">
+ <circle cx="250" cy="187" r="157" fill="url(#c-dial)" stroke="#c6d2db" stroke-width="4.8"/>
+ <circle cx="250" cy="187" r="148" fill="none" stroke="#758da7" stroke-width="4" opacity=".5"/>
+ <circle cx="250" cy="187" r="152" fill="none" stroke="#c7d5dd" stroke-width="2" stroke-dasharray="1.8 9" opacity=".4"/>
+ <path d="M126 283L110 300" stroke="#eaf3fd" stroke-width="6" stroke-linecap="round"/>
+ <g font-size="24" text-anchor="middle" font-weight="500">
+  <text x="154" y="266" transform="rotate(-53 154 266)">10</text><text x="121" y="200" transform="rotate(-70 121 200)">20</text>
+  <text x="155" y="106" transform="rotate(-41 155 106)">30</text><text x="254" y="65">40</text>
+  <text x="338" y="100" transform="rotate(36 338 100)">50</text><text x="379" y="184" transform="rotate(65 379 184)">60</text>
+  <text x="374" y="260" transform="rotate(62 374 260)" fill="#ff3b44">70</text>
+ </g>
+ <circle cx="250" cy="187" r="92" fill="url(#c-inner)" stroke="#d4e0ed" stroke-width="3.4"/>
+ <path d="M250 135h-10l-6 38h32l-6-38h-10m0 6v27" fill="#f7fafc" stroke="#f7fafc" stroke-width="2"/>
+ <text x="250" y="214" text-anchor="middle" font-size="18" font-weight="600">0 km</text>
+ <text x="250" y="239" text-anchor="middle" font-size="16">Ab Start</text>
+</g>
+<g id="center-right-dial" font-family="system-ui,Arial,sans-serif" fill="#f4f7fd">
+ <circle cx="760" cy="187" r="157" fill="url(#c-dial)" stroke="#c6d2db" stroke-width="4.8"/>
+ <circle cx="760" cy="187" r="148" fill="none" stroke="#758da7" stroke-width="4" opacity=".5"/>
+ <circle cx="760" cy="187" r="152" fill="none" stroke="#c7d5dd" stroke-width="2" stroke-dasharray="1.8 9" opacity=".4"/>
+ <g font-size="24" text-anchor="middle" font-weight="500">
+  <text x="651" y="266" transform="rotate(-60 651 266)">40</text><text x="632" y="193" transform="rotate(-74 632 193)">60</text>
+  <text x="669" y="109" transform="rotate(-42 669 109)">80</text><text x="764" y="65">100</text>
+  <text x="850" y="106" transform="rotate(35 850 106)">140</text><text x="896" y="195" transform="rotate(72 896 195)">180</text>
+  <text x="856" y="281" transform="rotate(46 856 281)">220</text>
+ </g>
+ <circle cx="760" cy="187" r="92" fill="url(#c-inner)" stroke="#d4e0ed" stroke-width="3.4"/>
+ <path d="M644 299l-18 19" stroke="#eaf3fd" stroke-width="6" stroke-linecap="round"/>
+ <text x="760" y="320" text-anchor="middle" font-size="14" fill="#c4d0df">km/h</text>
+ <text x="760" y="348" text-anchor="middle" font-size="30" font-weight="650">0</text>
+</g>
+<g id="center-dial-lanes" fill="none" stroke="#f2f5fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+ <path d="M728 121v17m13-18v18m14-17v18m15-18v17m14-17v18"/>
+ <path d="M734 125l9 9m0-9l-9 9M758 125l9 9m0-9l-9 9"/>
+ <path d="M778 135v-11h12m-6-7l7 7-7 7" stroke-width="2.8"/>
+</g>
+<g id="center-right-turn">
+ <path d="M754 228v-32l17-28h36v-10l20 16-20 16v-11h-31l-9 21v28z" fill="url(#c-guidance)" opacity=".95"/>
+ <path d="M755 206v-39h35v-12l25 18-25 17v-11h-23v29" fill="#f1f7fb"/>
+</g>
+<g id="center-dial-distance" font-family="system-ui,Arial,sans-serif" fill="#fff">
+ <text x="760" y="275" text-anchor="middle" font-size="22" font-weight="600">200 m</text>
+</g>
+<g id="center-bottom-info" font-family="system-ui,Arial,sans-serif" fill="#e2ebf5" font-size="18">
+ <g id="center-bottom-distance"><text x="438" y="319" text-anchor="middle">◎ 1.3 km</text></g>
+ <g id="center-bottom-eta"><text id="center-bottom-eta-label" x="566" y="319" text-anchor="middle">23:23 ◷</text></g>
+</g>
+<g id="center-footer" font-family="system-ui,Arial,sans-serif">
+ <path d="M340 330H670" stroke="#aebccf" stroke-width="1.4" opacity=".7"/>
+ <rect x="337" y="334" width="336" height="30" rx="3" fill="#0d1320" opacity=".75"/>
+ <text x="370" y="354" font-size="15" fill="#dce6ed">trip 5936.7 km</text>
+ <path d="M500 343l-8 18m25-18l8 18" fill="none" stroke="#c5d0df" stroke-width="2"/>
+ <path d="M558 353l6-10 6 10m9 0l6-10 6 10" fill="none" stroke="#ffd73d" stroke-width="2"/>
+ <text x="607" y="354" fill="#cfd6df" font-size="12">-- km/h</text>
+</g>
+<g id="center-side-metrics" font-family="system-ui,Arial,sans-serif" fill="#d3e4f4" font-size="14">
+ <text x="70" y="122">130</text><text x="70" y="192">90</text><text x="72" y="292">50</text>
+ <text x="941" y="122">1/1</text><text x="943" y="192">1/2</text><text x="941" y="292">R</text>
+ <path d="M54 138h25m-25 55h25m-25 65h25M934 140h23m-23 55h23m-23 65h23" stroke="#738395" stroke-width="3" opacity=".65"/>
+</g>
+<g id="center-carplay-overlay" style="display:none">
+ <rect x="438" y="205" width="144" height="57" rx="7" fill="#1b2533" stroke="#73b8de" stroke-width="1.5"/>
+ <text x="451" y="225" fill="#fff" font-family="system-ui" font-size="12">CarPlay-Manöver</text>
+ <text x="452" y="248" fill="#aef4d0" font-family="system-ui" font-size="16">↱ 200 m</text>
+</g>
+</svg>
