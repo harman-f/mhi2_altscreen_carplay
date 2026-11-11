@@ -1,0 +1,82 @@
+<svg id="navv-full-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="AID10 Voll: durchgehende Kartenansicht, obere Navigation und untere Cockpit-Statusleiste">
+<defs>
+<style>#navv-full-svg{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-variant-numeric:tabular-nums}.f-main{fill:#f5f8ff;font-weight:600}.f-sub{fill:#d4dce9;font-weight:500}</style>
+<linearGradient id="f-display" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#283248"/><stop offset=".38" stop-color="#182538"/><stop offset="1" stop-color="#090e19"/></linearGradient>
+<linearGradient id="f-mapbg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#1f3045"/><stop offset=".7" stop-color="#121f32"/><stop offset="1" stop-color="#0b1525"/></linearGradient>
+<linearGradient id="f-cutout" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#111a2a"/><stop offset="1" stop-color="#060911"/></linearGradient>
+<pattern id="f-grid-fine" width="11" height="11" patternUnits="userSpaceOnUse"><path d="M11 0H0V11" stroke="#aebbc9" stroke-opacity=".18" stroke-width=".75" fill="none"/></pattern>
+<pattern id="f-grid-major" width="91" height="49" patternUnits="userSpaceOnUse"><path d="M91 0H0V49" stroke="#b7c7d6" stroke-opacity=".39" stroke-width="1.25" fill="none"/></pattern>
+<clipPath id="f-mainclip"><path d="M97 30Q97 25 105 25H899Q911 25 911 37V303H842L790 338H237L171 306H97Z"/></clipPath>
+</defs>
+<rect x="2" y="2" width="1006" height="372" rx="52" fill="#04070b" stroke="#1b2736" stroke-width="3"/>
+<path d="M101 24H909Q944 24 946 64V316Q942 353 904 353H105Q68 353 64 316V67Q67 24 101 24Z" fill="url(#f-display)"/>
+<g id="full-map-surface" clip-path="url(#f-mainclip)">
+ <rect x="90" y="24" width="830" height="330" fill="url(#f-mapbg)"/>
+ <g id="full-grid"><rect x="90" y="24" width="830" height="330" fill="url(#f-grid-fine)"/><rect x="90" y="24" width="830" height="330" fill="url(#f-grid-major)"/>
+   <path d="M496 167v28m-14-14h28" stroke="#e14c55" stroke-width="2" fill="none" opacity=".75"/>
+ </g>
+ <g id="full-map-visual" style="display:none">
+   <rect x="90" y="24" width="830" height="330" fill="#263b48"/>
+   <path d="M110 82H915M106 157H914M101 247H920M190 20V353M325 20V356M462 20V351M619 20V353M756 20V355M862 20V355" stroke="#667e8d" stroke-width="27" fill="none"/>
+   <path d="M110 82H915M106 157H914M101 247H920M190 20V353M325 20V356M462 20V351M619 20V353M756 20V355M862 20V355" stroke="#aec0cc" stroke-opacity=".7" stroke-width="2.3" fill="none"/>
+   <rect x="218" y="177" width="70" height="42" rx="4" fill="#374e5a"/><rect x="656" y="178" width="71" height="48" rx="4" fill="#344c59"/>
+ </g>
+ <g id="full-map-route">
+   <path d="M500 336V230Q500 210 524 195Q552 181 592 181H795" fill="none" stroke="#101827" stroke-width="19" stroke-linecap="round"/>
+   <path d="M500 336V230Q500 210 524 195Q552 181 592 181H795" fill="none" stroke="#f2cc15" stroke-width="7.5" stroke-linecap="round"/>
+   <path d="M785 172l18 9-18 9v-6h-20v-6h20z" fill="#fff1a3"/>
+   <path d="M500 292l-13 21 13-8 13 8z" stroke="#fff" stroke-width="2.7" fill="#ed383f"/>
+ </g>
+</g>
+<g id="full-top-status" fill="#f7fbff">
+ <path d="M392 33l-7 13h14z" fill="#e4eefa"/><text x="404" y="44" font-size="19" font-weight="650">W</text>
+ <text x="505" y="45" text-anchor="middle" font-size="29" font-weight="650">23:22</text>
+ <g stroke="#28c6eb" stroke-width="1.8" stroke-linecap="round" transform="translate(628 36)"><path d="M0-8V8M-7-4L7 4M-7 4L7-4"/></g>
+ <text x="644" y="44" font-size="19" font-weight="600">4.0°C</text>
+ <path d="M419 59H473l8 7h53l8-7h55" fill="none" stroke="#deecf8" stroke-width="1.4" opacity=".85"/>
+</g>
+<g id="full-top-text">
+ <rect x="386" y="76" width="240" height="30" rx="3" fill="#0c1321" opacity=".86"/>
+ <text id="full-top-label" x="505" y="97" text-anchor="middle" font-size="19" font-weight="650" fill="#f7faff">100 m · Hauptstraße</text>
+</g>
+<g id="full-top-lanes" fill="none" stroke="#f1f5fc" stroke-width="2.2" stroke-linecap="square">
+ <path d="M449 112v23m31-23v23m31-23v23m33-23v23" stroke-opacity=".7"/>
+ <path d="M455 116l14 14m0-14l-14 14M487 116l14 14m0-14l-14 14"/>
+ <path d="M526 131v-15h12m-6-6l8 6-8 6" stroke-width="3"/>
+</g>
+<g id="full-lower-corners">
+ <path d="M95 274H178Q210 274 239 302L317 355H99Q67 351 65 317V276Z" fill="url(#f-cutout)"/>
+ <path d="M916 274H841Q811 274 783 301L705 355H913Q944 351 945 317V276Z" fill="url(#f-cutout)"/>
+ <path d="M173 275Q205 275 236 302L317 355M839 275Q807 276 782 302L705 355" fill="none" stroke="#dce9f5" stroke-width="2" opacity=".93"/>
+</g>
+<g id="full-bottom-info" fill="#eff7ff" font-size="17" font-weight="600">
+ <g id="full-bottom-distance">
+   <circle cx="402" cy="315" r="7.5" fill="none" stroke="#e5f0fa" stroke-width="1.6"/><path d="M402 303v24m-12-12h24" fill="none" stroke="#e5f0fa" stroke-width="1.1"/>
+   <text x="418" y="321">1.2 km</text>
+ </g>
+ <g id="full-bottom-eta"><text id="full-bottom-eta-label" x="553" y="321">23:23</text><circle cx="604" cy="314" r="8.4" stroke="#d7e7f4" stroke-width="1.7" fill="none"/><path d="M604 309v5l5 4" fill="none" stroke="#d7e7f4" stroke-width="1.5"/></g>
+</g>
+<g id="full-footer" fill="#d8e2ef" font-size="12.5">
+ <path d="M334 337H681" stroke="#b8c9d8" stroke-opacity=".7" stroke-width="1.3"/>
+ <rect x="341" y="340" width="333" height="24" fill="#0c1828" opacity=".73"/>
+ <text x="352" y="356">trip 5936.7 km</text>
+ <path d="M483 360l-7-21h9l6 21m9-21h9l-6 21" fill="#b5c1ce" opacity=".75"/>
+ <path d="M550 357l6-13 6 13m8 0l6-13 6 13" stroke="#f2d83b" fill="none" stroke-width="2"/>
+ <text x="604" y="355" font-size="10.5">-- km/h</text>
+</g>
+<g id="full-speed" fill="#fff">
+ <text x="838" y="337" text-anchor="middle" font-size="30" font-weight="650">0</text>
+ <text x="839" y="354" text-anchor="middle" font-size="12.5">km/h</text>
+</g>
+<g id="full-side-metrics" fill="#d9e8f9" font-size="13.5" font-weight="600">
+ <text x="30" y="113">130</text><text x="42" y="194">90</text><text x="41" y="290">50</text>
+ <path d="M40 135h24m-24 56h24m-24 73h24" stroke="#8596aa" stroke-width="2.6" opacity=".57"/>
+ <text x="949" y="112">1/1</text><text x="948" y="194">1/2</text><text x="957" y="290">R</text>
+ <path d="M942 133h28m-28 57h28m-28 74h28" stroke="#e5eef9" stroke-width="3.5"/>
+</g>
+<g id="full-carplay-overlay" style="display:none">
+ <rect x="426" y="218" width="186" height="58" rx="8" fill="#152337" stroke="#76aac3" stroke-width="1.5"/>
+ <text x="440" y="239" fill="#ecf8ff" font-size="13">CarPlay-Manöverkarte</text>
+ <text x="441" y="260" fill="#aaf8c9" font-size="18" font-weight="650">↱ 100 m</text>
+</g>
+</svg>
