@@ -31,6 +31,10 @@ function clone(x){return JSON.parse(JSON.stringify(x))}
 async function main(){
   await delay(40);
   assert.deepEqual(errors,[],"Startup errors");
+  const sourceJS=fs.readFileSync(path.join(__dirname,"mibr-project-controller.js"),"utf8").trim();
+  const sourceSVG=fs.readFileSync(path.join(__dirname,"mibr-center-preview.svg"),"utf8").trim();
+  assert.equal($("#mibr-project-controller").textContent.trim(),sourceJS,"Standalone HTML project controller matches its source");
+  assert.ok(html.includes(sourceSVG),"Standalone HTML Center SVG matches its source");
   assert.ok(w.MIBR_project,"Unified project API");
   assert.equal($$("#tabs button").length,4,"Four top tabs");
   assert.equal(w.MIBR_project.capture().schema,"mibr-project/1");
