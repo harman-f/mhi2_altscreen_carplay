@@ -75,3 +75,9 @@ not legacy `altscreen-u2`. The three
 their exact JXE/HMI API JAR SHA-256 from the canonical `profile.json`;
 `mibr_audio_owner` remains unconnected until actual firmware/amp ABI proof.
 This branch has **no deployable six-channel audio path**.
+
+## Cross-module contracts
+
+[One-owner Media/Phone/Vehicle Data/Audio handoff](CROSS_MODULE_INTEGRATION.md)
+records the MIBR/3 control/data boundary and the shared source-stage
+session/voice-priority integration test; it is not a deployed dispatcher.
