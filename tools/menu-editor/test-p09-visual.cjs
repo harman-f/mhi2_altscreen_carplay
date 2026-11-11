@@ -7,8 +7,8 @@ const {pathToFileURL} = require("node:url");
 const {chromium} = require("playwright-core");
 
 const source=path.join(__dirname,"mibr-menu-editor-nav-views-mockup.html");
-const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p091.html");
-assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.1 standalone review HTML must match canonical source");
+const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p092.html");
+assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.2 standalone review HTML must match canonical source");
 const output=path.join(process.cwd(),"p09-visual-artifacts");
 fs.mkdirSync(output,{recursive:true});
 const chromeCandidates=[process.env.CHROME_PATH,process.env.CHROMIUM_PATH,
@@ -55,7 +55,14 @@ function overlap(a,b){
       };
     },view);
     assert.deepEqual(common,{clockX:"505",clockSize:"24",temperatureX:"640",roadX:"505",distanceX:"437",etaX:"550",footerX:"387"},view+" shared layout");
-    const active=page.locator("#navv-"+view+"-svg");
+    assert.equal(await page.locator("#"+view+"-seatbelt-warning").count(),1,view+" seatbelt SVG");
+    assert.equal(await page.locator("#"+view+"-yellow-road-guidance path").count(),2,view+" two yellow road paths");
+    if(view==="wide"){
+      const turn=page.locator("#wide-right-turn");
+      assert.equal(await turn.locator("path").count(),1,"Wide uses one arrow silhouette");
+      assert.equal(await page.locator("#wide-turn-silhouette").getAttribute("stroke"),"#f7fcff");
+    }
+        const active=page.locator("#navv-"+view+"-svg");
     assert.equal(await active.isVisible(),true,view+" visible");
     for(const other of views.filter(x=>x!==view))assert.equal(await page.locator("#navv-"+other+"-svg").isVisible(),false,other+" hidden");
     for(const surface of surfaces){
