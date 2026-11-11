@@ -2335,17 +2335,19 @@ connect();
     <path d="M556 174l18 9-18 9v-6h-18v-6h18z" fill="#fff5ac"/>
     <path d="M507 280l-12 17 12-6 12 6z" fill="#ff3a41" stroke="#f5f8ff" stroke-width="2.8"/>
   </g>
+ <g id="center-app-placeholder" style="display:none"><rect x="416" y="157" width="180" height="67" rx="7" fill="#0c1728" stroke="#527891" stroke-opacity=".6"/><text x="506" y="185" fill="#d8e7f5" text-anchor="middle" font-size="15" font-weight="600">CarPlay-App</text><text x="506" y="205" fill="#94acbd" text-anchor="middle" font-size="11">Vorschau · nur Editor</text></g>
+ <g id="center-off-placeholder" style="display:none"><text x="506" y="182" fill="#8ea4ba" text-anchor="middle" font-size="14" font-weight="600">CarPlay aus</text><text x="506" y="203" fill="#6f8398" text-anchor="middle" font-size="11">nur Editor</text></g>
 </g>
 <g id="center-top-status" fill="#f8fbff">
-  <path d="M425 29l-6 14h12z" fill="#e8f2fb"/><text x="437" y="42" font-size="19" font-weight="650">W</text>
-  <text x="506" y="42" font-size="28" font-weight="650" text-anchor="middle" letter-spacing=".25">23:22</text>
+  <path d="M425 29l-6 14h12z" fill="#e8f2fb"/><text x="437" y="42" font-size="16.5" font-weight="650">W</text>
+  <text x="506" y="42" font-size="25" font-weight="650" text-anchor="middle" letter-spacing=".25">23:22</text>
   <g stroke="#25c4ec" stroke-width="1.9" stroke-linecap="round" transform="translate(615 31)"><path d="M0-8V8M-7-4L7 4M-7 4L7-4"/></g>
-  <text x="631" y="41" font-size="18.5" font-weight="600">4.0°C</text>
+  <text x="631" y="41" font-size="16.5" font-weight="600">4.0°C</text>
   <path d="M410 59H459l8 5h73l8-5h55" stroke="#dce9f5" fill="none" stroke-width="1.5" opacity=".84"/>
 </g>
 <g id="center-top-text" fill="#f8faff" text-anchor="middle">
   <rect x="397" y="73" width="217" height="28" rx="3" fill="#090f1d" opacity=".88"/>
-  <text id="center-top-label" x="506" y="93" font-size="17.5" font-weight="600">200 m · Hauptstraße</text>
+  <text id="center-top-label" x="506" y="93" font-size="16.5" font-weight="600">200 m · Hauptstraße</text>
 </g>
 <g id="center-top-lanes" stroke="#f3f7fd" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" fill="none">
   <path d="M464 109V132M495 109V132M527 109V132M560 109V132" stroke-opacity=".72"/>
@@ -2387,30 +2389,32 @@ connect();
   <path d="M774 139v-13q0-4 4-4h11m-6-5l7 5-7 5" stroke-width="2.9"/>
 </g>
 <g id="center-right-turn">
-  <path d="M748 220V188Q748 160 778 160H790V150L813 169L790 188V177H780Q768 177 768 193V220Z" fill="url(#c-turn)"/>
-  <path d="M749 187Q749 155 780 155H789V149L813 169L790 188V176H779Q767 176 767 190" stroke="#f7fcff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M749 221H767" stroke="#10a42a" stroke-width="4"/>
+  <g transform="translate(78 18.5) scale(.9)">
+    <path d="M748 220V188Q748 160 778 160H790V150L813 169L790 188V177H780Q768 177 768 193V220Z" fill="url(#c-turn)"/>
+    <path d="M748 188Q748 160 778 160H790V150L813 169L790 188V177H780Q768 177 768 193" stroke="#f7fcff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M748 220H768" stroke="#10a42a" stroke-width="3"/>
+  </g>
 </g>
 <g id="center-dial-distance" text-anchor="middle" fill="#f7fbff">
   <text x="757" y="256" font-size="20.5" font-weight="600">200 m</text>
 </g>
-<g id="center-bottom-info" font-size="16.5" font-weight="600" fill="#f1f6ff">
-  <g id="center-bottom-distance"><circle cx="429" cy="312" r="7.5" stroke="#dce7f3" fill="none" stroke-width="1.6"/><path d="M429 300v24m-12-12h24" stroke="#dce7f3" fill="none" stroke-width="1.1"/><text x="444" y="319">1.3 km</text></g>
-  <g id="center-bottom-eta"><text id="center-bottom-eta-label" x="553" y="319">23:23</text><circle cx="599" cy="312" r="8" fill="none" stroke="#eef3fb" stroke-width="1.6"/><path d="M599 307v5l4 3" stroke="#eef3fb" fill="none" stroke-width="1.5"/></g>
+<g id="center-bottom-info" font-size="14.5" font-weight="600" fill="#f1f6ff">
+  <g id="center-bottom-distance"><circle cx="429" cy="312" r="7.5" stroke="#dce7f3" fill="none" stroke-width="1.6"/><path d="M429 300v24m-12-12h24" stroke="#dce7f3" fill="none" stroke-width="1.1"/><text x="444" y="317">1.3 km</text></g>
+  <g id="center-bottom-eta"><text id="center-bottom-eta-label" x="553" y="317">23:23</text><circle cx="599" cy="312" r="8" fill="none" stroke="#eef3fb" stroke-width="1.6"/><path d="M599 307v5l4 3" stroke="#eef3fb" fill="none" stroke-width="1.5"/></g>
 </g>
-<g id="center-footer" font-size="12.5" font-weight="500" fill="#ccd6e4">
+<g id="center-footer" font-size="11.5" font-weight="500" fill="#ccd6e4">
  <path d="M377 332H635" stroke="#d4e2ef" stroke-width="1.2" opacity=".54"/>
  <rect x="385" y="334" width="252" height="24" rx="2" fill="#0c1524" opacity=".64"/>
  <text x="393" y="350">trip 5936.7 km</text>
  <path d="M492 356l6-20h9l6 20" fill="#74879f" opacity=".9"/>
  <path d="M498 336l-7 20m16-20l7 20" stroke="#bcc7d6" stroke-width="1.7"/>
- <path d="M545 350l6-13 6 13m8 0l6-13 6 13" stroke="#ffe12e" stroke-width="2" fill="none"/>
+ <path d="M548 350l5-10 5 10m7 0l5-10 5 10" stroke="#ffe12e" stroke-width="1.6" opacity=".82" fill="none"/>
  <text x="580" y="350" font-size="10">--- km/h</text>
 </g>
 <g id="center-side-metrics" fill="#d7e6f7" font-size="13.5" font-weight="600">
- <text x="36" y="111">130</text><text x="42" y="185">90</text><text x="42" y="289">50</text>
+ <g text-anchor="end" dominant-baseline="middle"><text x="31" y="129">130</text><text x="31" y="178">90</text><text x="31" y="266">50</text></g>
  <path d="M37 129H68M37 178H68M37 266H68" stroke="#4d6076" stroke-width="3" opacity=".65"/>
- <text x="944" y="111">1/1</text><text x="943" y="184">1/2</text><text x="951" y="288">R</text>
+ <g text-anchor="start" dominant-baseline="middle"><text x="982" y="130">1/1</text><text x="982" y="181">1/2</text><text x="982" y="268">R</text></g>
  <path d="M945 130H976M945 181H976M945 268H976" stroke="#dbe4ec" stroke-width="4" opacity=".74"/>
 </g>
 <g id="center-carplay-overlay" style="display:none" font-size="12" font-weight="600">
@@ -2447,6 +2451,8 @@ connect();
    <path d="M503 326V241Q503 206 523 190L601 129" stroke="#f7d325" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
    <path d="M494 302l9-16 9 16-9-4z" fill="#f53a3b" stroke="#fff" stroke-width="2"/>
  </g>
+ <g id="wide-app-placeholder" style="display:none"><rect x="404" y="150" width="202" height="76" rx="8" fill="#0c1728" stroke="#527891" stroke-opacity=".6"/><text x="505" y="183" fill="#d8e7f5" text-anchor="middle" font-size="17" font-weight="600">CarPlay-App</text><text x="505" y="206" fill="#94acbd" text-anchor="middle" font-size="12">Vorschau · nur Editor</text></g>
+ <g id="wide-off-placeholder" style="display:none"><text x="505" y="185" fill="#8ea4ba" text-anchor="middle" font-size="18" font-weight="600">CarPlay aus</text><text x="505" y="209" fill="#6f8398" text-anchor="middle" font-size="12">nur Editor</text></g>
 </g>
 <g id="wide-side-panels">
  <path d="M90 25H283L331 330Q328 348 294 352H98Q74 352 70 326V60Q71 25 90 25Z" fill="url(#w-panel)" stroke="#8795aa" stroke-width="1.3"/>
@@ -2455,28 +2461,28 @@ connect();
  <path d="M284 26L331 330M724 26L683 331" stroke="#ebf2fb" stroke-width="3" opacity=".84"/>
 </g>
 <g id="wide-top-status" fill="#f6f8fe">
- <path d="M389 32l-7 13h14z" fill="#dbe6f4"/><text x="403" y="44" font-size="19" font-weight="600">W</text>
- <text x="504" y="45" text-anchor="middle" font-size="29" font-weight="650">23:22</text>
+ <path d="M389 32l-7 13h14z" fill="#dbe6f4"/><text x="403" y="44" font-size="16.5" font-weight="600">W</text>
+ <text x="504" y="45" text-anchor="middle" font-size="25" font-weight="650">23:22</text>
  <path d="M612 32v15m-7-11l14 8m0-8l-14 8" stroke="#29cdf2" stroke-width="1.8" stroke-linecap="round"/>
- <text x="626" y="44" font-size="18.5" font-weight="600">4.0°C</text>
+ <text x="626" y="44" font-size="16.5" font-weight="600">4.0°C</text>
  <path d="M393 62H473l8 7h50l8-7h71" stroke="#d2dfec" stroke-width="1.7" fill="none" opacity=".77"/>
 </g>
-<g id="wide-top-text"><rect x="395" y="78" width="221" height="27" rx="3" fill="#0b1323" opacity=".81"/><text id="wide-top-label" x="505" y="97" text-anchor="middle" font-size="18" font-weight="650" fill="#fff">300 m · Hauptstraße</text></g>
+<g id="wide-top-text"><rect x="395" y="78" width="221" height="27" rx="3" fill="#0b1323" opacity=".81"/><text id="wide-top-label" x="505" y="97" text-anchor="middle" font-size="16.5" font-weight="650" fill="#fff">300 m · Hauptstraße</text></g>
 <g id="wide-top-lanes" fill="none" stroke="#edf5fc" stroke-width="2.2" stroke-linecap="square">
  <path d="M459 112v23m29-23v23m29-23v23m32-23v23" opacity=".85"/>
  <path d="M464 117l14 14m0-14l-14 14M494 117l14 14m0-14l-14 14"/>
  <path d="M533 132v-15h12m-6-6l7 6-7 6" stroke-width="3"/>
 </g>
 <g id="wide-left-info">
- <text x="129" y="101" font-size="15.5" class="w-primary">7:20 h</text>
+ <text x="129" y="101" font-size="14.5" class="w-primary">7:20 h</text>
  <text x="129" y="122" font-size="14" class="w-sub">Ab Start</text>
  <path d="M185 202h-21l-8 44h38z" fill="#f3f7fc"/>
  <path d="M175 206v36" stroke="#1b293a" stroke-width="2.2" stroke-dasharray="6 6"/>
- <text x="178" y="279" text-anchor="middle" font-size="20" class="w-primary">0 km</text>
+ <text x="178" y="279" text-anchor="middle" font-size="18.5" class="w-primary">0 km</text>
  <text x="178" y="300" text-anchor="middle" font-size="14" class="w-sub">Ab Start</text>
 </g>
 <g id="wide-right-media">
- <text x="815" y="100" text-anchor="middle" font-size="15" class="w-primary">Bluetooth-Audio</text>
+ <text x="815" y="100" text-anchor="middle" font-size="14" class="w-primary">Bluetooth-Audio</text>
  <g stroke="#d7e1ef" stroke-width="2" fill="none"><path d="M818 133l9 6v13l-9 6zM816 137v17M834 140q8 8 0 16"/></g>
 </g>
 <g id="wide-dial-lanes" fill="none" stroke="#e7effa" stroke-width="2">
@@ -2484,28 +2490,28 @@ connect();
  <path d="M772 179l12 11m0-11l-12 11M797 179l12 11m0-11l-12 11"/>
  <path d="M822 188v-9h12m-6-6l7 6-7 6" stroke-width="2.8"/>
 </g>
-<g id="wide-right-turn">
+<g id="wide-right-turn" transform="translate(49.2 13.9) scale(.94)">
  <path d="M803 262v-33q0-14 16-14h11v-12l25 19-25 18v-11h-10v33z" fill="url(#w-turn)"/>
  <path d="M807 246v-20q0-16 17-16h8v-10l24 20-24 20v-12h-6q-5 0-5 6v12" stroke="#f7fcff" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 </g>
-<g id="wide-dial-distance" fill="#f4f8ff"><text x="821" y="296" text-anchor="middle" font-size="21" font-weight="650">300 m</text></g>
+<g id="wide-dial-distance" fill="#f4f8ff"><text x="821" y="296" text-anchor="middle" font-size="19" font-weight="650">300 m</text></g>
 <g id="wide-speed" fill="#f6f9ff"><text x="846" y="332" text-anchor="middle" font-size="29" font-weight="650">0</text><text x="846" y="348" text-anchor="middle" font-size="13">km/h</text></g>
-<g id="wide-bottom-info" fill="#eef5ff" font-size="16.5" font-weight="600">
- <g id="wide-bottom-distance"><circle cx="415" cy="315" r="7" stroke="#e5f0fa" stroke-width="1.5" fill="none"/><path d="M415 304v22m-11-11h22" stroke="#e5f0fa" stroke-width="1"/><text x="431" y="321">1.4 km</text></g>
- <g id="wide-bottom-eta"><text id="wide-bottom-eta-label" x="541" y="321">23:22</text><circle cx="586" cy="314" r="8" stroke="#e5f0fa" stroke-width="1.5" fill="none"/><path d="M586 309v5l4 3" stroke="#e5f0fa" stroke-width="1.5" fill="none"/></g>
+<g id="wide-bottom-info" fill="#eef5ff" font-size="14.5" font-weight="600">
+ <g id="wide-bottom-distance"><circle cx="415" cy="315" r="7" stroke="#e5f0fa" stroke-width="1.5" fill="none"/><path d="M415 304v22m-11-11h22" stroke="#e5f0fa" stroke-width="1"/><text x="431" y="319">1.4 km</text></g>
+ <g id="wide-bottom-eta"><text id="wide-bottom-eta-label" x="541" y="319">23:22</text><circle cx="586" cy="314" r="8" stroke="#e5f0fa" stroke-width="1.5" fill="none"/><path d="M586 309v5l4 3" stroke="#e5f0fa" stroke-width="1.5" fill="none"/></g>
 </g>
-<g id="wide-footer" fill="#d3dfeb" font-size="12.5">
+<g id="wide-footer" fill="#d3dfeb" font-size="11.5">
  <path d="M365 336H656" stroke="#a8bbcf" stroke-opacity=".59" stroke-width="1.4"/>
  <rect x="371" y="338" width="292" height="27" fill="#0c1724" opacity=".67"/>
  <text x="391" y="356">trip 5936.7 km</text>
  <path d="M500 360l-8-20h8l4 20m12-20h8l-8 20" fill="#8f9caf" opacity=".84"/>
- <path d="M559 356l7-13 7 13m6 0l7-13 7 13" stroke="#ffd738" stroke-width="2" fill="none"/>
+ <path d="M563 355l5-10 5 10m7 0l5-10 5 10" stroke="#ffd738" stroke-width="1.6" opacity=".82" fill="none"/>
  <text x="604" y="355" font-size="10">-- km/h</text>
 </g>
 <g id="wide-side-metrics" fill="#dbe9f8" font-size="14" font-weight="550">
- <text x="32" y="112">130</text><text x="40" y="190">90</text><text x="43" y="287">50</text>
+ <g text-anchor="end" dominant-baseline="middle"><text x="32" y="133">130</text><text x="32" y="183">90</text><text x="32" y="268">50</text></g>
  <path d="M39 133h27m-27 50h27m-27 85h27" stroke="#8699ad" stroke-width="2.5" opacity=".6"/>
- <text x="949" y="111">1/1</text><text x="948" y="190">1/2</text><text x="957" y="287">R</text>
+ <g text-anchor="start" dominant-baseline="middle"><text x="979" y="130">1/1</text><text x="979" y="179">1/2</text><text x="979" y="270">R</text></g>
  <path d="M943 130h29m-29 49h29m-29 91h29" stroke="#dfeaf9" stroke-width="3.3"/>
 </g>
 <g id="wide-carplay-overlay" style="display:none">
@@ -2521,7 +2527,7 @@ connect();
 <linearGradient id="f-cutout" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#111a2a"/><stop offset="1" stop-color="#060911"/></linearGradient>
 <pattern id="f-grid-fine" width="11" height="11" patternUnits="userSpaceOnUse"><path d="M11 0H0V11" stroke="#aebbc9" stroke-opacity=".18" stroke-width=".75" fill="none"/></pattern>
 <pattern id="f-grid-major" width="91" height="49" patternUnits="userSpaceOnUse"><path d="M91 0H0V49" stroke="#b7c7d6" stroke-opacity=".39" stroke-width="1.25" fill="none"/></pattern>
-<clipPath id="f-mainclip"><path d="M97 30Q97 25 105 25H899Q911 25 911 37V303H842L790 338H237L171 306H97Z"/></clipPath>
+<clipPath id="f-mainclip"><path d="M97 30Q97 25 105 25H899Q911 25 911 37V274H841Q811 274 783 301L705 355H317L239 302Q210 274 178 274H97Z"/></clipPath>
 </defs>
 <rect x="2" y="2" width="1006" height="372" rx="52" fill="#04070b" stroke="#1b2736" stroke-width="3"/>
 <path d="M101 24H909Q944 24 946 64V316Q942 353 904 353H105Q68 353 64 316V67Q67 24 101 24Z" fill="url(#f-display)"/>
@@ -2542,17 +2548,19 @@ connect();
    <path d="M785 172l18 9-18 9v-6h-20v-6h20z" fill="#fff1a3"/>
    <path d="M500 292l-13 21 13-8 13 8z" stroke="#fff" stroke-width="2.7" fill="#ed383f"/>
  </g>
+ <g id="full-app-placeholder" style="display:none"><rect x="389" y="145" width="234" height="85" rx="10" fill="#0c1728" stroke="#527891" stroke-opacity=".6"/><text x="506" y="180" fill="#d8e7f5" text-anchor="middle" font-size="18" font-weight="600">CarPlay-App</text><text x="506" y="204" fill="#94acbd" text-anchor="middle" font-size="12">Vorschau · nur Editor</text></g>
+ <g id="full-off-placeholder" style="display:none"><text x="506" y="183" fill="#8ea4ba" text-anchor="middle" font-size="19" font-weight="600">CarPlay aus</text><text x="506" y="209" fill="#6f8398" text-anchor="middle" font-size="12">nur Editor</text></g>
 </g>
 <g id="full-top-status" fill="#f7fbff">
- <path d="M392 33l-7 13h14z" fill="#e4eefa"/><text x="404" y="44" font-size="19" font-weight="650">W</text>
- <text x="505" y="45" text-anchor="middle" font-size="29" font-weight="650">23:22</text>
+ <path d="M392 33l-7 13h14z" fill="#e4eefa"/><text x="404" y="44" font-size="16.5" font-weight="650">W</text>
+ <text x="505" y="45" text-anchor="middle" font-size="25" font-weight="650">23:22</text>
  <g stroke="#28c6eb" stroke-width="1.8" stroke-linecap="round" transform="translate(628 36)"><path d="M0-8V8M-7-4L7 4M-7 4L7-4"/></g>
- <text x="644" y="44" font-size="19" font-weight="600">4.0°C</text>
+ <text x="644" y="44" font-size="16.5" font-weight="600">4.0°C</text>
  <path d="M419 59H473l8 7h53l8-7h55" fill="none" stroke="#deecf8" stroke-width="1.4" opacity=".85"/>
 </g>
 <g id="full-top-text">
  <rect x="386" y="76" width="240" height="30" rx="3" fill="#0c1321" opacity=".86"/>
- <text id="full-top-label" x="505" y="97" text-anchor="middle" font-size="19" font-weight="650" fill="#f7faff">100 m · Hauptstraße</text>
+ <text id="full-top-label" x="505" y="97" text-anchor="middle" font-size="16.5" font-weight="650" fill="#f7faff">100 m · Hauptstraße</text>
 </g>
 <g id="full-top-lanes" fill="none" stroke="#f1f5fc" stroke-width="2.2" stroke-linecap="square">
  <path d="M449 112v23m31-23v23m31-23v23m33-23v23" stroke-opacity=".7"/>
@@ -2562,21 +2570,21 @@ connect();
 <g id="full-lower-corners">
  <path d="M95 274H178Q210 274 239 302L317 355H99Q67 351 65 317V276Z" fill="url(#f-cutout)"/>
  <path d="M916 274H841Q811 274 783 301L705 355H913Q944 351 945 317V276Z" fill="url(#f-cutout)"/>
- <path d="M173 275Q205 275 236 302L317 355M839 275Q807 276 782 302L705 355" fill="none" stroke="#dce9f5" stroke-width="2" opacity=".93"/>
+ <path d="M178 274Q210 274 239 302L317 355M841 274Q811 274 783 301L705 355" fill="none" stroke="#dce9f5" stroke-width="2" opacity=".93"/>
 </g>
-<g id="full-bottom-info" fill="#eff7ff" font-size="17" font-weight="600">
+<g id="full-bottom-info" fill="#eff7ff" font-size="14.5" font-weight="600">
  <g id="full-bottom-distance">
    <circle cx="402" cy="315" r="7.5" fill="none" stroke="#e5f0fa" stroke-width="1.6"/><path d="M402 303v24m-12-12h24" fill="none" stroke="#e5f0fa" stroke-width="1.1"/>
-   <text x="418" y="321">1.2 km</text>
+   <text x="418" y="319">1.2 km</text>
  </g>
- <g id="full-bottom-eta"><text id="full-bottom-eta-label" x="553" y="321">23:23</text><circle cx="604" cy="314" r="8.4" stroke="#d7e7f4" stroke-width="1.7" fill="none"/><path d="M604 309v5l5 4" fill="none" stroke="#d7e7f4" stroke-width="1.5"/></g>
+ <g id="full-bottom-eta"><text id="full-bottom-eta-label" x="553" y="319">23:23</text><circle cx="604" cy="314" r="8.4" stroke="#d7e7f4" stroke-width="1.7" fill="none"/><path d="M604 309v5l5 4" fill="none" stroke="#d7e7f4" stroke-width="1.5"/></g>
 </g>
-<g id="full-footer" fill="#d8e2ef" font-size="12.5">
+<g id="full-footer" fill="#d8e2ef" font-size="11.5">
  <path d="M334 337H681" stroke="#b8c9d8" stroke-opacity=".7" stroke-width="1.3"/>
  <rect x="341" y="340" width="333" height="24" fill="#0c1828" opacity=".73"/>
  <text x="352" y="356">trip 5936.7 km</text>
  <path d="M483 360l-7-21h9l6 21m9-21h9l-6 21" fill="#b5c1ce" opacity=".75"/>
- <path d="M550 357l6-13 6 13m8 0l6-13 6 13" stroke="#f2d83b" fill="none" stroke-width="2"/>
+ <path d="M554 356l5-10 5 10m7 0l5-10 5 10" stroke="#f2d83b" fill="none" stroke-width="1.6" opacity=".82"/>
  <text x="604" y="355" font-size="10.5">-- km/h</text>
 </g>
 <g id="full-speed" fill="#fff">
@@ -2584,9 +2592,9 @@ connect();
  <text x="839" y="354" text-anchor="middle" font-size="12.5">km/h</text>
 </g>
 <g id="full-side-metrics" fill="#d9e8f9" font-size="13.5" font-weight="600">
- <text x="30" y="113">130</text><text x="42" y="194">90</text><text x="41" y="290">50</text>
+ <g text-anchor="end" dominant-baseline="middle"><text x="34" y="135">130</text><text x="34" y="191">90</text><text x="34" y="264">50</text></g>
  <path d="M40 135h24m-24 56h24m-24 73h24" stroke="#8596aa" stroke-width="2.6" opacity=".57"/>
- <text x="949" y="112">1/1</text><text x="948" y="194">1/2</text><text x="957" y="290">R</text>
+ <g text-anchor="start" dominant-baseline="middle"><text x="977" y="133">1/1</text><text x="977" y="190">1/2</text><text x="977" y="264">R</text></g>
  <path d="M942 133h28m-28 57h28m-28 74h28" stroke="#e5eef9" stroke-width="3.5"/>
 </g>
 <g id="full-carplay-overlay" style="display:none">
@@ -2704,10 +2712,14 @@ function renderCockpitPreview(v){
  var own=state.views[id],bg=(own.mockup&&own.mockup.background)||"grid";
  target("navv-bgmode").value=bg;
  var hasMap=v.carplay.surface!=="off",isMap=v.carplay.surface==="map";
+ target("navv-bgmode").disabled=!isMap;
+ target("navv-bgmode").title=isMap?"Editor-Hintergrund für die Kartenfläche":"Nur bei Kartenbild „Karte“ anwendbar; die Auswahl bleibt gespeichert.";
  function visible(part,show){var node=target(id+"-"+part);if(node)node.style.display=show?"":"none"}
- visible("grid",hasMap&&bg==="grid");
+ visible("grid",isMap&&bg==="grid");
  visible("map-visual",isMap&&bg==="map");
  visible("map-route",isMap&&bg==="map");
+ visible("app-placeholder",v.carplay.surface==="app");
+ visible("off-placeholder",v.carplay.surface==="off");
  visible("top-text",v.native.topText!=="off");
  visible("top-lanes",v.native.topSymbol!=="off"&&v.guidance.lane!=="off");
  visible("right-turn",id!=="full"&&v.native.tube==="on");
@@ -2716,6 +2728,14 @@ function renderCockpitPreview(v){
  visible("bottom-distance",v.native.bottomDistance!==false);
  visible("bottom-eta",v.native.bottomEta!==false&&v.guidance.bottom!=="off"&&v.carplay.eta!==false);
  visible("carplay-overlay",hasMap&&v.carplay.maneuver!=="off");
+ // Maneuver-card position is a mock-up preview only; no vehicle position mapping is implied.
+ var maneuverPositions={
+   center:{top:[0,-92],left:[-14,-6],right:[14,-6]},
+   wide:{top:[0,-76],left:[-62,-8],right:[62,-8]},
+   full:{top:[0,-72],left:[-210,0],right:[210,0]}
+ };
+ var offset=(maneuverPositions[id]&&maneuverPositions[id][v.carplay.maneuver])||[0,0];
+ target(id+"-carplay-overlay").setAttribute("transform","translate("+offset[0]+" "+offset[1]+")");
  var top=target(id+"-top-label");
  if(top){var dist=id==="wide"?"300 m":id==="full"?"100 m":"200 m";
    top.textContent=v.native.topText==="street"?"Hauptstraße":v.native.topText==="maneuver"?"In "+dist+" rechts abbiegen":dist+" · Hauptstraße";}
@@ -2726,6 +2746,7 @@ function renderCockpitPreview(v){
    id==="wide"?
    "Wide: schräge Seitenmodule mit Navigationspfeil und Lane-Symbolen rechts. Nur Mock-up, keine Fahrzeug-BAP-Simulation.":
    "Center: zwei Rundinstrumente mit Kartenfläche. Getrennte SVG-Ebenen, keine BAP-Simulation.";
+ if(!isMap)target("navv-layout-note").textContent+=" "+(document.documentElement.lang==="en"?"Background selection applies only to Map surface.":"Hintergrundmodus ist nur für Kartenbild „Karte“ aktiv.");
  var tube=target("navv-tube-field-label"),distLabel=target("navv-tube-distance-label"),lanesLabel=target("navv-dial-lanes-label");
  if(tube)tube.textContent=id==="wide"?"Großer Pfeil (rechte Seitenkarte)":id==="full"?"Großer Pfeil (Voll: nicht vorhanden)":"Großer Pfeil (rechte Tube)";
  if(distLabel)distLabel.textContent=id==="wide"?"Distanz rechts":id==="full"?"Distanz rechts (nicht vorhanden)":"Distanz am großen Pfeil";

@@ -89,6 +89,34 @@ async function main(){
   set("#navv-bgmode","grid");
   assert.notEqual($("#center-grid").style.display,"none","Grid shows");
   assert.equal($("#center-map-route").style.display,"none","Calibration grid has no route; schematic map is separate");
+  assert.equal($("#center-bottom-info").getAttribute("font-size"),"14.5","Center lower status font reduced");
+  assert.equal($("#center-side-metrics text").getAttribute("y"),"129","Center side tick aligned with marker");
+  assert.ok($("#center-right-turn g").getAttribute("transform").includes("scale(.9)"),"Center arrow inset");
+  set('[data-navv-section="carplay"][data-navv-key="surface"]',"app");
+  assert.notEqual($("#center-app-placeholder").style.display,"none","App mode has distinct editor visualization");
+  assert.equal($("#center-grid").style.display,"none","App mode hides grid");
+  assert.equal($("#navv-bgmode").disabled,true,"Background mode disabled outside map");
+  set('[data-navv-section="carplay"][data-navv-key="surface"]',"off");
+  assert.notEqual($("#center-off-placeholder").style.display,"none","Off mode has distinct editor state");
+  assert.equal($("#center-app-placeholder").style.display,"none","App placeholder hidden in off mode");
+  set('[data-navv-section="carplay"][data-navv-key="surface"]',"map");
+  assert.equal($("#navv-bgmode").disabled,false,"Background mode enabled for map");
+  for(const view of ["center","wide","full"]){
+    click('[data-navv-view='+view+']');
+    const overlay=$("#"+view+"-carplay-overlay");
+    set('[data-navv-section="carplay"][data-navv-key="maneuver"]',"left");
+    const left=overlay.getAttribute("transform");
+    set('[data-navv-section="carplay"][data-navv-key="maneuver"]',"right");
+    const right=overlay.getAttribute("transform");
+    set('[data-navv-section="carplay"][data-navv-key="maneuver"]',"top");
+    const top=overlay.getAttribute("transform");
+    assert.notEqual(left,right,view+" maneuver left and right differ");
+    assert.notEqual(top,left,view+" maneuver top differs");
+    assert.notEqual(overlay.style.display,"none",view+" maneuver preview visible");
+    set('[data-navv-section="carplay"][data-navv-key="maneuver"]',"off");
+    assert.equal(overlay.style.display,"none",view+" maneuver preview hidden");
+  }
+  click('[data-navv-view=center]');
 
 
   // Wide: angled side modules and right-hand native guidance, not enlarged Center circles.
@@ -98,6 +126,13 @@ async function main(){
   assert.equal($("#navv-full-svg").style.display,"none","Full SVG hidden on Wide in Safari");
   assert.equal($("#navv-wide-svg").style.display,"block","Wide SVG visible");
   assert.ok($("#wide-side-panels")&&$("#wide-right-media")&&$("#wide-left-info"),"Wide trapezoid modules and independent content");
+  assert.equal($("#wide-bottom-info").getAttribute("font-size"),"14.5","Wide lower status font reduced");
+  assert.equal($("#wide-side-metrics text").getAttribute("y"),"133","Wide side tick aligned with marker");
+  set('[data-navv-section="carplay"][data-navv-key="surface"]',"app");
+  assert.notEqual($("#wide-app-placeholder").style.display,"none","Wide app editor visualization");
+  set('[data-navv-section="carplay"][data-navv-key="surface"]',"off");
+  assert.notEqual($("#wide-off-placeholder").style.display,"none","Wide off editor visualization");
+  set('[data-navv-section="carplay"][data-navv-key="surface"]',"map");
   assert.ok($("#wide-right-turn")&&$("#wide-dial-lanes")&&$("#wide-dial-distance"),"Wide right native navigation");
   assert.ok($("#wide-map-surface")&&$("#wide-top-status")&&$("#wide-footer"),"Wide map + status");
   assert.equal($("#navv-mode").value,"custom","New Wide profile defaults to individual");
@@ -132,6 +167,14 @@ async function main(){
   assert.equal($("#navv-wide-svg").style.display,"none","Wide SVG hidden on Full");
   assert.equal($("#navv-full-svg").style.display,"block","Full SVG visible");
   assert.ok($("#full-lower-corners")&&$("#full-map-surface")&&$("#full-speed"),"Full map and shaped lower cutouts");
+  assert.ok($("#f-mainclip path").getAttribute("d").includes("V274H841"),"Full clip shares lower corner geometry");
+  assert.equal($("#full-bottom-info").getAttribute("font-size"),"14.5","Full lower status font reduced");
+  assert.equal($("#full-side-metrics text").getAttribute("y"),"135","Full side tick aligned with marker");
+  set('[data-navv-section="carplay"][data-navv-key="surface"]',"app");
+  assert.notEqual($("#full-app-placeholder").style.display,"none","Full app editor visualization");
+  set('[data-navv-section="carplay"][data-navv-key="surface"]',"off");
+  assert.notEqual($("#full-off-placeholder").style.display,"none","Full off editor visualization");
+  set('[data-navv-section="carplay"][data-navv-key="surface"]',"map");
   assert.ok($("#full-top-text")&&$("#full-top-lanes")&&$("#full-bottom-distance")&&$("#full-bottom-eta"),"Full navigation zones");
   assert.equal($("#full-right-turn"),null,"Full must not invent a right-hand tube");
   assert.equal($('[data-navv-section="native"][data-navv-key="tube"]').disabled,true,"Full right tube control inapplicable");
