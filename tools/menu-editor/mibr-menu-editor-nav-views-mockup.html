@@ -2236,7 +2236,8 @@ function check(d){
 }
 var state;
 try{var stored=localStorage.getItem(key);state=stored?check(migrate(JSON.parse(stored))):sample()}catch(e){state=sample()}
-if(!localStorage.getItem(key)){for(var id of ["center","wide","full"]){var edges=window.MIBR_safe.get(id);state.views[id].safeArea={x:edges[0],y:edges[1],w:edges[2]-edges[0],h:edges[3]-edges[1]}}}
+if(!stored){for(var id of ["center","wide","full"]){var edges=window.MIBR_safe.get(id);state.views[id].safeArea={x:edges[0],y:edges[1],w:edges[2]-edges[0],h:edges[3]-edges[1]}}}
+state.vehicle=vehicle();
 function syncToSafe(){for(var id of ["center","wide","full"])window.MIBR_safe.set(id,state.views[id].safeArea);safeViewRendered=""}
 syncToSafe();
 function inherited(){var g=state.global;return {mode:"custom",carplay:{surface:"map",maneuver:"off",eta:true},native:{topText:g.legacyDisplay==="top"?"off":g.legacyLine==="off"?"off":g.legacyLine==="street"?"street":"distance",topSymbol:g.legacyDisplay==="both"?"maneuver":"off",tube:"on"},guidance:{lane:g.legacyLanes?"real":"synthetic",source:g.source,sideStreets:g.sideStreets,bottom:g.bottom}}}
