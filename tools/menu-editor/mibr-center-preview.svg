@@ -41,17 +41,19 @@
  <g id="center-app-placeholder" style="display:none"><rect x="416" y="157" width="180" height="67" rx="7" fill="#0c1728" stroke="#527891" stroke-opacity=".6"/><text x="506" y="185" fill="#d8e7f5" text-anchor="middle" font-size="15" font-weight="600">CarPlay-App</text><text x="506" y="205" fill="#94acbd" text-anchor="middle" font-size="11">Vorschau · nur Editor</text></g>
  <g id="center-off-placeholder" style="display:none"><text x="506" y="182" fill="#8ea4ba" text-anchor="middle" font-size="14" font-weight="600">CarPlay aus</text><text x="506" y="203" fill="#6f8398" text-anchor="middle" font-size="11">nur Editor</text></g>
 </g>
-<g id="center-top-status" fill="#f8fbff">
-  <path d="M425 29l-6 14h12z" fill="#e8f2fb"/><text x="437" y="42" font-size="16.5" font-weight="650">W</text>
-  <text x="506" y="42" font-size="25" font-weight="650" text-anchor="middle" letter-spacing=".25">23:22</text>
-  <g stroke="#25c4ec" stroke-width="1.9" stroke-linecap="round" transform="translate(615 31)"><path d="M0-8V8M-7-4L7 4M-7 4L7-4"/></g>
-  <text x="631" y="41" font-size="16.5" font-weight="600">4.0°C</text>
-  <path d="M410 59H459l8 5h73l8-5h55" stroke="#dce9f5" fill="none" stroke-width="1.5" opacity=".84"/>
+<!-- MIBR_SHARED_TOP_BEGIN: common OEM status coordinates across Center/Wide/Voll -->
+<g id="center-top-status" fill="#f5f9ff">
+  <path d="M384 31l-6 13h12z" fill="#e7f0fb"/><text x="399" y="43" font-size="15.5" font-weight="600">W</text>
+  <text x="505" y="43" text-anchor="middle" font-size="24" font-weight="650" letter-spacing=".1">23:22</text>
+  <g transform="translate(623 34)" stroke="#2bc7eb" stroke-width="1.8" stroke-linecap="round"><path d="M0-8V8M-7-4L7 4M-7 4L7-4"/></g>
+  <text x="640" y="43" font-size="15.5" font-weight="600">4.0°C</text>
+  <path d="M394 60H466l8 6h64l8-6h70" fill="none" stroke="#dce7f3" stroke-width="1.35" opacity=".83"/>
 </g>
-<g id="center-top-text" fill="#f8faff" text-anchor="middle">
-  <rect x="397" y="73" width="217" height="28" rx="3" fill="#090f1d" opacity=".88"/>
-  <text id="center-top-label" x="506" y="93" font-size="16.5" font-weight="600">200 m · Hauptstraße</text>
+<g id="center-top-text" fill="#f7fbff" text-anchor="middle">
+  <rect x="394" y="74" width="222" height="27" rx="3" fill="#0b1423" opacity=".84"/>
+  <text id="center-top-label" x="505" y="93" font-size="15.5" font-weight="600">200 m · Hauptstraße</text>
 </g>
+<!-- MIBR_SHARED_TOP_END -->
 <g id="center-top-lanes" stroke="#f3f7fd" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" fill="none">
   <path d="M464 109V132M495 109V132M527 109V132M560 109V132" stroke-opacity=".72"/>
   <path d="M471 115l13 13m0-13l-13 13M503 115l13 13m0-13l-13 13"/>
@@ -101,19 +103,37 @@
 <g id="center-dial-distance" text-anchor="middle" fill="#f7fbff">
   <text x="757" y="256" font-size="20.5" font-weight="600">200 m</text>
 </g>
-<g id="center-bottom-info" font-size="14.5" font-weight="600" fill="#f1f6ff">
-  <g id="center-bottom-distance"><circle cx="429" cy="312" r="7.5" stroke="#dce7f3" fill="none" stroke-width="1.6"/><path d="M429 300v24m-12-12h24" stroke="#dce7f3" fill="none" stroke-width="1.1"/><text x="444" y="317">1.3 km</text></g>
-  <g id="center-bottom-eta"><text id="center-bottom-eta-label" x="553" y="317">23:23</text><circle cx="599" cy="312" r="8" fill="none" stroke="#eef3fb" stroke-width="1.6"/><path d="M599 307v5l4 3" stroke="#eef3fb" fill="none" stroke-width="1.5"/></g>
+<!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views -->
+<g id="center-bottom-info" fill="#edf5ff" font-size="14" font-weight="600">
+  <g id="center-bottom-distance">
+    <circle cx="420" cy="314" r="7.2" fill="none" stroke="#dce8f5" stroke-width="1.5"/>
+    <path d="M420 302v24m-12-12h24" fill="none" stroke="#dce8f5" stroke-width="1.05"/>
+    <text x="437" y="319">1.3 km</text>
+  </g>
+  <g id="center-bottom-eta">
+    <text id="center-bottom-eta-label" x="550" y="319">23:23</text>
+    <circle cx="600" cy="314" r="7.8" stroke="#e4eef8" stroke-width="1.5" fill="none"/>
+    <path d="M600 308v6l4 3" stroke="#e4eef8" fill="none" stroke-width="1.4"/>
+  </g>
 </g>
-<g id="center-footer" font-size="11.5" font-weight="500" fill="#ccd6e4">
- <path d="M377 332H635" stroke="#d4e2ef" stroke-width="1.2" opacity=".54"/>
- <rect x="385" y="334" width="252" height="24" rx="2" fill="#0c1524" opacity=".64"/>
- <text x="393" y="350">trip 5936.7 km</text>
- <path d="M492 356l6-20h9l6 20" fill="#74879f" opacity=".9"/>
- <path d="M498 336l-7 20m16-20l7 20" stroke="#bcc7d6" stroke-width="1.7"/>
- <path d="M548 350l5-10 5 10m7 0l5-10 5 10" stroke="#ffe12e" stroke-width="1.6" opacity=".82" fill="none"/>
- <text x="580" y="350" font-size="10">--- km/h</text>
+<g id="center-footer" fill="#d2deeb" font-size="11.5" font-weight="500">
+  <path d="M371 333H659" stroke="#b6c8d9" stroke-width="1.15" opacity=".55"/>
+  <rect x="377" y="335" width="286" height="27" rx="2" fill="#0c1728" opacity=".64"/>
+  <text x="387" y="353">trip 5936.7 km</text>
+  <!-- Demonstration icons only; not evidence of independently writable BAP channels. -->
+  <g transform="translate(487 346)" fill="none" stroke="#f33f4b" stroke-width="1.5" stroke-linecap="round">
+    <circle cx="3" cy="-4" r="2" fill="#f33f4b" stroke="none"/>
+    <path d="M2 0l5 4m-3-4l-1 7m-5-5l4 1"/>
+  </g>
+  <path d="M516 358l7-20h11l7 20" fill="#6c8097" opacity=".83"/>
+  <path d="M522 339l-6 19m18-19l7 19" fill="none" stroke="#becbd9" stroke-width="1.55"/>
+  <path d="M566 354l5-10 5 10m7 0l5-10 5 10" fill="none" stroke="#f8d843" stroke-width="1.6" stroke-linejoin="round" opacity=".92"/>
+  <g fill="none" stroke="#cbd9e7" stroke-width="1.15" opacity=".84">
+    <path d="M608 354a8 8 0 1 1 13 0M614.5 350l3-4"/>
+  </g>
+  <text x="633" y="353" font-size="10">--- km/h</text>
 </g>
+<!-- MIBR_SHARED_BOTTOM_END -->
 <g id="center-side-metrics" fill="#d7e6f7" font-size="13.5" font-weight="600">
  <g text-anchor="end" dominant-baseline="middle"><text x="31" y="129">130</text><text x="31" y="178">90</text><text x="31" y="266">50</text></g>
  <path d="M37 129H68M37 178H68M37 266H68" stroke="#4d6076" stroke-width="3" opacity=".65"/>
