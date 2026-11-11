@@ -197,6 +197,20 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
   .tools button.fl{flex:1 1 auto}
 }
 
+
+/* P0.5 global project and dedicated geometry workspace */
+.project-actions{margin-top:9px;padding:10px 0 2px;border-top:1px solid var(--line)}
+.project-actions button{min-height:40px}
+.project-status{color:var(--muted);font-size:12px;flex:1 1 230px}
+.project-status.problem{color:var(--danger)}
+#menuLegacyFiles{border:1px solid var(--line);border-radius:8px;margin-top:6px;background:var(--surface);padding:4px 9px}
+#menuLegacyFiles summary{font-size:12px;cursor:pointer;color:var(--muted);padding:3px}
+#menuLegacyFiles .files{margin:8px 0 4px}
+#app[data-tab="safe"]{display:block}
+#app[data-tab="safe"] #treePane,#app[data-tab="safe"] #panel{display:none!important}
+#app[data-tab="safe"] #viewPane{position:static!important;max-height:none!important;overflow:visible!important;width:100%;padding:0}
+#app[data-tab="safe"] .sa{max-width:940px;margin:0 auto}
+
 /* P0.4: shared app shell and context-specific workspaces */
 #globalVehicle{display:flex;gap:8px 12px;align-items:end;flex-wrap:wrap;padding:12px 0 2px}
 #globalVehicle label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:100px}
@@ -249,6 +263,7 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
   <header>
     <div class="head"><h1 id="appTitle"></h1><span id="status"></span><div class="seg" id="langSeg"><button data-l="de">DE</button><button data-l="en">EN</button></div><div class="seg" id="themeSeg" role="group" aria-label="Day and night mode"><button data-theme-choice="light">☀ Tag</button><button data-theme-choice="dark">☾ Nacht</button><button data-theme-choice="auto">Auto</button></div></div>
     <div id="globalVehicle"><label id="globalBrandLabel"><span>Fahrzeugmarke</span><select id="brand" style="width:auto"></select></label><label><span id="unitLabel">Headunit</span><select id="unitModel"><option value="MU1440">MU1440</option><option value="MU1409">MU1409 · Testprofil</option><option value="MU1447">MU1447 · Testprofil</option></select></label><label><span id="clusterLabel">Virtual Cockpit</span><select id="clusterModel"><option value="AID10">AID10</option><option value="other">Andere · experimentell</option></select></label><span id="compatHint" class="compat"></span></div>
+    <div id="projectActions" class="tools project-actions" role="group" aria-label="Projekt und SD-Karte"><button type="button" id="projectLoad">Projekt laden</button><input type="file" id="projectFileIn" accept=".json,application/json" hidden><button type="button" id="projectSave" class="primary">Projekt speichern</button><button type="button" id="sdExport">Auf SD-Karte exportieren</button><span id="projectStatus" class="project-status" role="status" aria-live="polite">Projekt wird vorbereitet…</span></div>
   </header>
   <nav id="tabs" role="tablist" aria-label="Hauptbereiche"></nav>
   <section id="menuWorkspaceControls" aria-label="Menü-Editor-Werkzeuge">
@@ -263,13 +278,13 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
       <label class="inl" for="fname" id="filenameLabel"></label>
       <input type="text" id="fname" class="grow" autocomplete="off">
     </div>
-    <div class="tools files">
+    <details id="menuLegacyFiles" class="legacy-menu-actions"><summary>Fahrzeug-Menüdatei (erweitert)</summary><div class="tools files">
       <button id="save" class="primary fl"></button>
       <button id="load" class="fl"></button>
       <input type="file" id="fileIn" accept=".txt,text/plain" hidden>
       <button id="copy" class="minor"></button>
       <button id="chip" class="chip ok"></button>
-    </div>
+    </div></details>
     </div><!-- menu-specific tools -->
     <div id="menuSections" aria-label="Menü-Editor-Ansicht"></div>
   </section>
@@ -1902,7 +1917,8 @@ function renderViews(){
     else if(menuPane==="file")renderFile(host);
     else if(menuPane==="changes")renderChanges(host);
     else host.textContent="";
-  }else if(tab==="help")renderHelp(host);
+  }else if(tab==="safe"){window.MIBR_safe.renderStandalone(host)}
+  else if(tab==="help")renderHelp(host);
   else if(tab==="nav"&&navv){host.textContent="";navv.hidden=false;host.appendChild(navv)}
   else host.textContent="";
   var errs=checks.filter(function(c){return c.sev==="err"}).length,warns=checks.length-errs;
@@ -1916,7 +1932,7 @@ function renderViews(){
 }
 function renderTabs(){
   var tabs=$("tabs");tabs.textContent="";
-  [["menu",lang==="de"?"Menü-Editor":"Menu editor"],["nav",t("tabNav").replace("Navigation pro View","View-Konfigurator").replace("Navigation per view","View configurator")],["help",t("tabHelp")]].forEach(function(a){
+  [["menu",lang==="de"?"Menü-Editor":"Menu editor"],["nav",lang==="de"?"View-Konfigurator":"View configurator"],["safe",lang==="de"?"Safe Area":"Safe area"],["help",t("tabHelp")]].forEach(function(a){
     var b=el("button",a[0]===tab?"on":"",a[1]);b.type="button";b.dataset.t=a[0];b.setAttribute("role","tab");b.setAttribute("aria-selected",String(a[0]===tab));
     b.addEventListener("click",function(){tab=a[0];$("app").dataset.tab=tab;renderTabs();renderViews();if(isNarrow())window.scrollTo(0,0)});
     tabs.appendChild(b);
@@ -1991,6 +2007,10 @@ function publishContext(){
 $("unitModel").addEventListener("change",publishContext);
 $("clusterModel").addEventListener("change",publishContext);
 window.MIBR_getVehicle=function(){return {brand:S.brand,headUnit:hwState.unit,cluster:hwState.cluster}};
+window.MIBR_setHardware=function(info){
+  if(!["MU1440","MU1409","MU1447"].includes(info.headUnit)||!["AID10","other"].includes(info.cluster))throw Error("Unsupported hardware selection");
+  $("unitModel").value=info.headUnit;$("clusterModel").value=info.cluster;publishContext();
+};
 
 $("fname").addEventListener("focus",function(){typing=false});
 $("fname").addEventListener("input",function(){if(!typing){remember();typing=true}S.name=clean($("fname").value);softRefresh()});
@@ -2063,6 +2083,7 @@ function scheduleSave(){dirty=true;pending=true;status(t("stSaving"));clearTimeo
 function saveNow(){
   var text=serialize();
   try{localStorage.setItem(KEY,text)}catch(e){}
+  window.dispatchEvent(new CustomEvent("mibr:menuchange"));
   if(!docRef){pending=false;status(t("stLocal"));return}
   docRef.set({schema:KEY,build:BUILD,client:CLIENT,at:new Date().toISOString(),json:text}).then(function(){
     pending=false;status(t("stShared"));
@@ -2075,6 +2096,7 @@ function applyRemote(text){
   applyLang();renderHeader();renderTree();
   var a=document.activeElement;if(!(a&&$("panel").contains(a)))renderPanel();
   renderViews();
+  window.dispatchEvent(new CustomEvent("mibr:menuchange"));
 }
 function initState(){
   var local=null,msg=null;
@@ -2111,8 +2133,28 @@ function connect(){
 window.MIBR_safe={
   get:function(view){var id=view==="full"?"voll":view;return (safe.a[id]||SAFE_STD[id]).slice()},
   set:function(view,rect){var id=view==="full"?"voll":view;var a=[rect.x,rect.y,rect.x+rect.w,rect.y+rect.h];if(!safeOk(a))throw Error("Invalid safe area");safe.a[id]=a;saveSafe()},
-  render:function(view,host){safe.view=view==="full"?"voll":view;saveSafe();renderSafe(host,true)}
+  render:function(view,host){safe.view=view==="full"?"voll":view;saveSafe();renderSafe(host,true)},
+  renderStandalone:function(host){renderSafe(host,false)}
 };
+/* Shared project interface. Menu file stays available as a native export. */
+window.MIBR_menu={
+ get:function(){return JSON.parse(serialize())},
+ validate:function(obj){
+   if(!obj||obj.v!==2||!BRANDS[obj.brand]||!Array.isArray(obj.tree)||!Array.isArray(obj.unused))throw Error("Invalid menu project structure");
+   if(JSON.stringify(obj).length>2000000)throw Error("Menu project too large");
+   var prior=S,brand=prior.brand;
+   try{var converted=deserialize(JSON.stringify(obj));S=converted.st;normalize();var errs=runChecks().filter(function(c){return c.sev==="err"});return{errors:errs.map(function(e){return e.msg})}}finally{S=prior;setBrandFuncs(brand)}
+ },
+ set:function(obj){
+   if(!obj||obj.v!==2||!BRANDS[obj.brand]||!Array.isArray(obj.tree)||!Array.isArray(obj.unused))throw Error("Invalid menu project");
+   var parsed=deserialize(JSON.stringify(obj));S=parsed.st;normalize();selected=null;pvPath=[];pvFocus=null;hist=[];
+   applyLang();renderHeader();renderTree();renderPanel();renderTabs();renderViews();scheduleSave();
+ },
+ nativeText:function(){var problems=runChecks().filter(function(c){return c.sev==="err"});if(problems.length)throw Error(problems.map(function(p){return p.msg}).join("; "));return buildText().full},
+ checks:function(){return runChecks()},
+ brand:function(){return S.brand}
+};
+
 /* ================= start ================= */
 var imp=initState();
 applyLang();renderHeader();renderTree();renderPanel();
@@ -2216,7 +2258,7 @@ connect();
 <div class="navv-row"><label>Quelle</label><select data-navv-section="guidance" data-navv-key="source"><option value="auto">Automatisch</option><option value="stock">Original</option><option value="phone">iPhone</option></select></div>
 <div class="navv-row"><label>Seitenstraßen im Pfeil</label><input type="checkbox" data-navv-section="guidance" data-navv-key="sideStreets"></div>
 <div class="navv-row"><label>Untere Zeitangabe</label><select data-navv-section="guidance" data-navv-key="bottom"><option value="eta">Ankunftszeit</option><option value="remaining">Restfahrzeit</option><option value="off">Aus (experimentell)</option></select></div></div>
-<div class="navv-card"><h3 id="navv-safe-title">Bildbereich / Safe Area</h3><div id="navv-safe-tools"></div></div>
+<p class="navv-note">Safe Areas bearbeitest du im eigenen Hauptreiter „Safe Area“. Die Werte werden gemeinsam mit dem View-Profil gespeichert.</p>
 </div></div></section>
 <details class="navv-accordion"><summary>Gemeinsame Vorgaben (alle Views)</summary><div class="navv-card"><h3>Bestehende globale Schalter als Vorgaben</h3><p class="navv-note">Die hier konfigurierten Werte ändern keine Fahrzeugdateien.</p>
 <div class="navv-row"><label>nav_source</label><select data-navv-global="source"><option value="auto">Automatisch</option><option value="stock">Original</option><option value="phone">iPhone</option></select></div>
@@ -2266,7 +2308,7 @@ function syncToSafe(){for(var id of ["center","wide","full"])window.MIBR_safe.se
 syncToSafe();
 function inherited(){var g=state.global;return {mode:"custom",carplay:{surface:"map",maneuver:"off",eta:true},native:{topText:g.legacyDisplay==="top"?"off":g.legacyLine==="off"?"off":g.legacyLine==="street"?"street":"distance",topSymbol:g.legacyDisplay==="both"?"maneuver":"off",tube:"on"},guidance:{lane:g.legacyLanes?"real":"synthetic",source:g.source,sideStreets:g.sideStreets,bottom:g.bottom}}}
 function effective(){return state.views[current].mode==="inherit"?inherited():state.views[current]}
-function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch(e){}}
+function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch(e){}window.dispatchEvent(new CustomEvent("mibr:viewschange"))}
 function render(){
 var v=effective(),mode=state.views[current].mode;
 all("[data-navv-view]").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.navvView===current))});
@@ -2284,7 +2326,7 @@ if(v.native.topSymbol==="maneuver"&&v.guidance.lane==="real")warn.push("Syntheti
 if(v.native.topSymbol==="lanes"&&v.guidance.lane==="off")warn.push("Lane-Symbol bei deaktivierter Lane Guidance.");
 $("#navv-warning").textContent=warn.length?warn.join(" "):"Keine offensichtlichen Konflikte im Mock-up. Kein Fahrzeugsignal.";
 $("#navv-out").textContent=JSON.stringify(state,null,2);
-if(safeViewRendered!==current){window.MIBR_safe.render(current,$("#navv-safe-tools"));safeViewRendered=current}
+
 }
 all("[data-navv-view]").forEach(function(b){b.onclick=function(){current=b.dataset.navvView;render()}});
 all("[data-navv-section]").forEach(function(c){c.onchange=function(){if(state.views[current].mode!=="custom")return;state.views[current][c.dataset.navvSection][c.dataset.navvKey]=c.type==="checkbox"?c.checked:c.value;save();render()}});
@@ -2327,6 +2369,12 @@ $("#navv-conf").onclick=function(){saveFile("mibr-nav-view-profiles-v2.conf",con
 $("#navv-import").onclick=function(){$("#navv-input").click()};
 $("#navv-input").onchange=function(){var f=this.files[0];if(!f)return;var fr=new FileReader();fr.onload=function(){try{var raw=String(fr.result),val=raw.trimStart().startsWith("{")?check(migrate(JSON.parse(raw))):parseConf(raw);var ctx=vehicle();if(val.vehicle.brand!==ctx.brand||val.vehicle.headUnit!==ctx.headUnit||val.vehicle.cluster!==ctx.cluster)throw Error("Fahrzeugprofil weicht von der globalen Auswahl ab. Bitte zuerst die globale Fahrzeugauswahl anpassen.");state=val;syncToSafe();save();render();$("#navv-status").textContent="Erfolgreich importiert: "+f.name}catch(e){$("#navv-status").textContent="Import abgelehnt: "+e.message}};fr.readAsText(f);this.value=""};
 $("#navv-reset").onclick=function(){if(!confirm("Navigationseinstellungen zurücksetzen?"))return;state=sample();current="center";syncToSafe();save();render()};
+window.MIBR_views={
+ get:function(){return clone(state)},
+ validate:function(x){return check(migrate(clone(x)))},
+ set:function(x){state=check(migrate(clone(x)));syncToSafe();save();render()},
+ nativeConf:function(){return conf()}
+};
 render();
 })();
 </script>
