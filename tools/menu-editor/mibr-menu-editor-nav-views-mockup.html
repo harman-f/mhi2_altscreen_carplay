@@ -2712,10 +2712,14 @@ function renderCockpitPreview(v){
  var own=state.views[id],bg=(own.mockup&&own.mockup.background)||"grid";
  target("navv-bgmode").value=bg;
  var hasMap=v.carplay.surface!=="off",isMap=v.carplay.surface==="map";
+ target("navv-bgmode").disabled=!isMap;
+ target("navv-bgmode").title=isMap?"Editor-Hintergrund für die Kartenfläche":"Nur bei Kartenbild „Karte“ anwendbar; die Auswahl bleibt gespeichert.";
  function visible(part,show){var node=target(id+"-"+part);if(node)node.style.display=show?"":"none"}
- visible("grid",hasMap&&bg==="grid");
+ visible("grid",isMap&&bg==="grid");
  visible("map-visual",isMap&&bg==="map");
  visible("map-route",isMap&&bg==="map");
+ visible("app-placeholder",v.carplay.surface==="app");
+ visible("off-placeholder",v.carplay.surface==="off");
  visible("top-text",v.native.topText!=="off");
  visible("top-lanes",v.native.topSymbol!=="off"&&v.guidance.lane!=="off");
  visible("right-turn",id!=="full"&&v.native.tube==="on");
@@ -2734,6 +2738,7 @@ function renderCockpitPreview(v){
    id==="wide"?
    "Wide: schräge Seitenmodule mit Navigationspfeil und Lane-Symbolen rechts. Nur Mock-up, keine Fahrzeug-BAP-Simulation.":
    "Center: zwei Rundinstrumente mit Kartenfläche. Getrennte SVG-Ebenen, keine BAP-Simulation.";
+ if(!isMap)target("navv-layout-note").textContent+=" "+(document.documentElement.lang==="en"?"Background selection applies only to Map surface.":"Hintergrundmodus ist nur für Kartenbild „Karte“ aktiv.");
  var tube=target("navv-tube-field-label"),distLabel=target("navv-tube-distance-label"),lanesLabel=target("navv-dial-lanes-label");
  if(tube)tube.textContent=id==="wide"?"Großer Pfeil (rechte Seitenkarte)":id==="full"?"Großer Pfeil (Voll: nicht vorhanden)":"Großer Pfeil (rechte Tube)";
  if(distLabel)distLabel.textContent=id==="wide"?"Distanz rechts":id==="full"?"Distanz rechts (nicht vorhanden)":"Distanz am großen Pfeil";
