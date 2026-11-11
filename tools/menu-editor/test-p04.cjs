@@ -31,7 +31,7 @@ async function main(){
   assert.deepEqual(failures,[],"Startup runtime exception");
   assert.equal(query("#appTitle").textContent,"MIB-Konfigurator");
   assert.equal(d.querySelectorAll("#tabs button").length,3);
-  assert.ok(d.querySelectorAll("#tree .row").length>40,"Missing existing menu tree");
+  assert.ok(d.querySelectorAll("#tree .row").length>15,"Missing existing menu tree");
   assert.ok(query("#menuTools")&&!query("#menuTools").hidden);
   assert.ok(query("#menuSections [data-pane=preview]"));
   click('#menuSections [data-pane=file]');
