@@ -2700,7 +2700,7 @@ renderCockpitPreview(v);
 all("[data-navv-view]").forEach(function(b){b.onclick=function(){current=b.dataset.navvView;render()}});
 all("[data-navv-section]").forEach(function(c){c.onchange=function(){if(state.views[current].mode!=="custom")return;state.views[current][c.dataset.navvSection][c.dataset.navvKey]=c.type==="checkbox"?c.checked:c.value;save();render()}});
 all("[data-navv-global]").forEach(function(c){c.onchange=function(){state.global[c.dataset.navvGlobal]=c.type==="checkbox"?c.checked:c.value;save();render()}});
-$("#navv-mode").onchange=function(){var v=state.views[current];if(this.value==="custom"&&(!v.carplay||!v.native||!v.guidance)){var def=inherited();v.carplay=def.carplay;v.native=def.native;v.guidance=def.guidance}v.mode=this.value;save();render()};
+$("#navv-mode").onchange=function(){var v=state.views[current];if(this.value==="custom"&&v.mode==="inherit"){var def=inherited();v.carplay=clone(def.carplay);v.native=clone(def.native);v.guidance=clone(def.guidance)}v.mode=this.value;save();render()};
 
 $("#navv-copy").onclick=function(){var dest=$("#navv-copy-target").value;if(dest===current){$("#navv-warning").textContent="Quell- und Zielansicht sind identisch.";return}var source=effective();state.views[dest]=clone(source);state.views[dest].mode="custom";state.views[dest].safeArea=clone(state.views[current].safeArea);window.MIBR_safe.set(dest,state.views[dest].safeArea);save();render()};
 $("#navv-reset-view").onclick=function(){if(!confirm("Dieses View-Profil auf Standard zurücksetzen?"))return;state.views[current]=viewDefaults(current);window.MIBR_safe.set(current,state.views[current].safeArea);safeViewRendered="";save();render()};
