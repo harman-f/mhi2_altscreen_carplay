@@ -35,6 +35,10 @@ async function main(){
   const sourceSVG=fs.readFileSync(path.join(__dirname,"mibr-center-preview.svg"),"utf8").trim();
   assert.equal($("#mibr-project-controller").textContent.trim(),sourceJS,"Standalone HTML project controller matches its source");
   assert.ok(html.includes(sourceSVG),"Standalone HTML Center SVG matches its source");
+  for(const profile of ["wide","full"]){
+    const source=fs.readFileSync(path.join(__dirname,"mibr-"+profile+"-preview.svg"),"utf8").trim();
+    assert.ok(html.includes(source),"Embedded "+profile+" SVG must exactly match its source");
+  }
   assert.ok(w.MIBR_project,"Unified project API");
   assert.equal($$("#tabs button").length,4,"Four top tabs");
   assert.equal(w.MIBR_project.capture().schema,"mibr-project/1");
@@ -75,6 +79,73 @@ async function main(){
   set("#navv-bgmode","grid");
   assert.notEqual($("#center-grid").style.display,"none","Grid shows");
   assert.notEqual($("#center-map-route").style.display,"none","Map route returns");
+
+
+  // Wide: angled side modules and right-hand native guidance, not enlarged Center circles.
+  click('[data-navv-view=wide]');
+  assert.equal($("#navv-center-svg").hidden,true,"Center SVG hidden on Wide");
+  assert.equal($("#navv-full-svg").hidden,true,"Full SVG hidden on Wide");
+  assert.equal($("#navv-wide-svg").hidden,false,"Wide SVG visible");
+  assert.ok($("#wide-side-panels")&&$("#wide-right-media")&&$("#wide-left-info"),"Wide trapezoid modules and independent content");
+  assert.ok($("#wide-right-turn")&&$("#wide-dial-lanes")&&$("#wide-dial-distance"),"Wide right native navigation");
+  assert.ok($("#wide-map-surface")&&$("#wide-top-status")&&$("#wide-footer"),"Wide map + status");
+  assert.notEqual($("#wide-top-text").style.display,"none","Inherited upper text initially visible in Wide");
+  set("#navv-mode","custom");
+  assert.notEqual($("#wide-top-text").style.display,"none","Customizing inherited Wide must preserve upper text");
+  set('[data-navv-section="native"][data-navv-key="topSymbol"]',"lanes");
+  assert.notEqual($("#wide-top-lanes").style.display,"none","Wide upper lane guidance appears");
+  set('[data-navv-section="native"][data-navv-key="tube"]',"off");
+  assert.equal($("#wide-right-turn").style.display,"none","Wide right arrow hides independently");
+  set('[data-navv-section="native"][data-navv-key="tube"]',"on");
+  assert.notEqual($("#wide-right-turn").style.display,"none","Wide right arrow returns");
+  set('[data-navv-section="native"][data-navv-key="dialLanes"]',false);
+  assert.equal($("#wide-dial-lanes").style.display,"none","Wide right lane strip hides separately");
+  set("#navv-bgmode","map");
+  assert.notEqual($("#wide-map-visual").style.display,"none","Wide optional map visual");
+  assert.notEqual($("#wide-map-route").style.display,"none","Wide optional route visual");
+  set("#navv-bgmode","plain");
+  assert.equal($("#wide-grid").style.display,"none","Wide calibration grid off");
+  assert.equal($("#wide-map-route").style.display,"none","Wide route off on neutral background");
+  click("#navv-preview-zoom");
+  assert.ok($("#navv-center-preview").classList.contains("preview-expanded"),"Wide zoom opens");
+  click("#navv-preview-close");
+  assert.ok(!$("#navv-center-preview").classList.contains("preview-expanded"),"Wide zoom closes");
+
+  // Full: the photo shows one continuous map without a separate right tube.
+  click('[data-navv-view=full]');
+  assert.equal($("#navv-center-svg").hidden,true,"Center SVG hidden on Full");
+  assert.equal($("#navv-wide-svg").hidden,true,"Wide SVG hidden on Full");
+  assert.equal($("#navv-full-svg").hidden,false,"Full SVG visible");
+  assert.ok($("#full-lower-corners")&&$("#full-map-surface")&&$("#full-speed"),"Full map and shaped lower cutouts");
+  assert.ok($("#full-top-text")&&$("#full-top-lanes")&&$("#full-bottom-distance")&&$("#full-bottom-eta"),"Full navigation zones");
+  assert.equal($("#full-right-turn"),null,"Full must not invent a right-hand tube");
+  assert.equal($('[data-navv-section="native"][data-navv-key="tube"]').disabled,true,"Full right tube control inapplicable");
+  assert.equal($('[data-navv-section="native"][data-navv-key="dialLanes"]').disabled,true,"Full right lane strip inapplicable");
+  set("#navv-mode","custom");
+  assert.equal($('[data-navv-section="native"][data-navv-key="tube"]').disabled,true,"Full tube stays disabled in individual profile");
+  set('[data-navv-section="native"][data-navv-key="topSymbol"]',"lanes");
+  assert.notEqual($("#full-top-lanes").style.display,"none","Full top lanes can be shown");
+  set('[data-navv-section="native"][data-navv-key="bottomDistance"]',false);
+  assert.equal($("#full-bottom-distance").style.display,"none","Full bottom distance is independent");
+  set('[data-navv-section="native"][data-navv-key="bottomEta"]',false);
+  assert.equal($("#full-bottom-eta").style.display,"none","Full arrival time is independent");
+  set("#navv-bgmode","map");
+  assert.notEqual($("#full-map-visual").style.display,"none","Full map variant");
+  set("#navv-bgmode","grid");
+  assert.notEqual($("#full-grid").style.display,"none","Full calibration grid returns");
+  assert.equal($("#full-map-route").style.display,"none","Full grid remains calm, no route imposed");
+  click("#navv-preview-zoom");
+  assert.ok($("#navv-center-preview").classList.contains("preview-expanded"),"Full zoom opens");
+  click('[data-navv-view=center]');
+  assert.ok(!$("#navv-center-preview").classList.contains("preview-expanded"),"View switch closes full-size preview");
+  assert.equal($("#navv-center-svg").hidden,false,"Center still available");
+  assert.equal($("#navv-wide-svg").hidden,true,"Wide hidden after switching back");
+  const profiles=w.MIBR_project.capture().viewProfiles.views;
+  assert.equal(profiles.wide.mockup.background,"plain","Wide preview background is saved independently");
+  assert.equal(profiles.full.mockup.background,"grid","Full preview background is saved independently");
+  assert.equal(profiles.center.mockup.background,"grid","Center preview settings remain unchanged");
+  assert.equal(profiles.wide.native.dialLanes,false,"Wide navigation settings preserved");
+  assert.equal(profiles.full.native.bottomDistance,false,"Full navigation settings preserved");
 
   click('#tabs [data-t=safe]');
   assert.ok($(".sa-views")&&$(".sa-menu"),"Dedicated Safe Area controls");
