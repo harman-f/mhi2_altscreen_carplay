@@ -171,7 +171,8 @@
         "modules/audio/tests/run_host.sh"
       ],
       "support_tools": [
-        "modules/audio/tests"
+        "modules/audio/tests",
+        "modules/audio/CROSS_MODULE_INTEGRATION.md"
       ],
       "outputs": [],
       "build_coverage": "host-capability-gate-only; DSP and per-profile QNX ABI unbuilt",
