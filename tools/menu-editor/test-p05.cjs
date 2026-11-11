@@ -49,7 +49,7 @@ async function main(){
   assert.ok($("#center-dial-lanes"),"Right dial lanes");
   assert.ok($("#center-bottom-distance")&&$("#center-bottom-eta"),"Bottom guidance");
   assert.ok($("#center-map-route"),"Layered route geometry");
-  const scaleLabels=$("#center-left-dial .c-gauge-labels text, #center-right-dial .c-gauge-labels text");
+  const scaleLabels=$$("#center-left-dial .c-gauge-labels text, #center-right-dial .c-gauge-labels text");
   assert.ok(scaleLabels.length>=17,"Stable individual gauge numbers; found "+scaleLabels.length+"; left "+$("#center-left-dial").querySelectorAll("text").length+" right "+$("#center-right-dial").querySelectorAll("text").length);
   assert.ok(scaleLabels.every(n=>!n.hasAttribute("transform")),"Gauge numerals must be upright, not tangentially distorted");
   assert.ok($("#center-speed")&&$("#center-left-info"),"Dedicated static instrument layers");
