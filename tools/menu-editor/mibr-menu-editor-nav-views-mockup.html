@@ -2219,5 +2219,36 @@ render();
   render();
 })();
 </script>
+
+<script id="mibr-nav-translate">
+(function(){
+  "use strict";
+  var nav=document.getElementById("navv-layer"), originals=new WeakMap();
+  var dictionary={"View-spezifische Navigation":"View-specific navigation","Die bestehende Menübaum-Bearbeitung bleibt im Original-Editor vollständig erhalten. Hier werden zusätzliche, noch nicht installierbare Navigationsprofile prototypisch konfiguriert.":"The original menu-tree editor remains fully functional. Additional navigation profiles are configured here as an experimental mock-up; they cannot yet be installed.","Cockpit-Views":"Cockpit views","Gemeinsame Werte":"Shared settings","Fahrzeugbefunde":"Vehicle observations","Import / Export":"Import / export","Aktive Cockpit-Ansicht":"Active cockpit view","Voll":"Full","Profilmodus":"Profile mode","Individuell":"Custom","Globale Werte erben":"Inherit shared values","Live-Vorschau:":"Live preview:","Schematische Darstellung. Die echte AID10-/BAP-Wirkung wird nicht simuliert.":"Schematic preview. Actual AID10/BAP behavior is not simulated.","CarPlay-Inhalte":"CarPlay content","Kartenbild":"Map surface","Karte":"Map","App-Standard":"App default","Aus (experimentell)":"Off (experimental)","Zusätzliche Manöverkarte":"Additional maneuver card","Aus":"Off","Links":"Left","Rechts":"Right","Oben":"Top","Ankunftszeit":"Arrival time","Native Cockpit-Elemente":"Native cockpit elements","Text oben":"Top text","Entfernung + Straße":"Distance + street","Straße":"Street","Manövertext (experimentell)":"Maneuver text (experimental)","Kleiner Pfeil oben":"Small top arrow","Manöverpfeil":"Maneuver arrow","Großer Pfeil (rechte Tube)":"Large arrow (right dial)","Ein":"On","Guidance-Mapping":"Guidance mapping","Echte Fahrspuren":"Real lane guidance","Abbiegepfeil statt Fahrspuren":"Maneuver arrow instead of lanes","Quelle":"Source","Automatisch":"Automatic","Original":"Stock","Seitenstraßen im Pfeil":"Side streets in arrow","Untere Zeitangabe":"Lower time label","Restfahrzeit":"Remaining travel time","Bestehende globale Schalter als Vorgaben":"Existing shared switches as defaults","Die hier konfigurierten Werte ändern keine Fahrzeugdateien.":"The values configured here do not modify vehicle files.","nav_side (Seitenstraßen)":"nav_side (side streets)","Reale Testzustände am MU1440 / AID10":"Observed MU1440 / AID10 states","Menüwert":"Menu value","Kleiner Pfeil":"Small arrow","Tube rechts":"Right dial","Quelle: die drei Fahrzeugaufnahmen vom 10.11.2026. Die Pfeilform kann sich durch die Navigationsroute selbst ändern. Die Tabelle belegt nicht unabhängig schaltbare BAP-Kanäle.":"Source: three vehicle photos from November 10, 2026. The arrow shapes may change with the active route. The table does not prove independent BAP channels.","Im bisherigen Code: Manöver via MANEUVER_DESCRIPTOR, Text via updateBapTurnToInfo, obere Symbole über updateBapLaneGuidance. Der bisherige Schalter nav_side steuert Seitenstraßen, nicht Tube ein/aus.":"Existing code: maneuvers via MANEUVER_DESCRIPTOR, text via updateBapTurnToInfo, top symbols via updateBapLaneGuidance. The old nav_side switch controls side streets, not the right-dial visibility.","Versionierte Navigations-Profile":"Versioned navigation profiles","Eigenständiger experimenteller Vertrag mibr.nav-view-profiles/1. Alte Menüs weiter über MIBR_MENU/1 im originalen Editor importieren und exportieren. Kein Fahrzeug-Loader.":"Separate experimental contract mibr.nav-view-profiles/1. Continue using the original editor for MIBR_MENU/1 menus. No vehicle loader is available.","JSON exportieren":"Export JSON",".conf exportieren":"Export .conf","JSON/.conf importieren":"Import JSON/.conf","Zurücksetzen":"Reset","Keine Datei importiert.":"No file imported.","JSON-Vorschau":"JSON preview","Erbt die globalen Legacy-Werte. Zum Bearbeiten auf individuell umstellen.":"Inherits shared legacy values. Switch to custom to edit.","Eigenständiges Profil für diese Cockpit-Ansicht.":"Independent profile for this cockpit view.","Keine offensichtlichen Konflikte im Mock-up. Kein Fahrzeugsignal.":"No obvious conflicts in the mock-up. No vehicle connection.","Tube-Aus nicht am AID10 nachgewiesen.":"Disabling the right dial is not yet verified on AID10.","Synthetischer Pfeil kollidiert möglicherweise mit echter Lane Guidance.":"The synthetic arrow may conflict with real lane guidance.","Lane-Symbol bei deaktivierter Lane Guidance.":"Lane symbol shown with lane guidance disabled."};
+  function translate(){
+    var english=document.documentElement.lang==="en";
+    nav.querySelectorAll("h2,h3,p,label,button,option,th,td").forEach(function(el){
+      Array.from(el.childNodes).forEach(function(node){
+        if(node.nodeType!==3)return;
+        var original=originals.get(node);
+        if(original===undefined){original=node.nodeValue;originals.set(node,original)}
+        var trimmed=original.trim(),translated=dictionary[trimmed];
+        if(!translated)return;
+        var start=original.indexOf(trimmed),prefix=original.slice(0,start),suffix=original.slice(start+trimmed.length);
+        var desired=prefix+(english?translated:trimmed)+suffix;
+        if(node.nodeValue!==desired)node.nodeValue=desired;
+      });
+    });
+  }
+  var scheduled=false;
+  new MutationObserver(function(){
+    if(scheduled)return;
+    scheduled=true;
+    Promise.resolve().then(function(){scheduled=false;translate()});
+  }).observe(nav,{subtree:true,childList:true,characterData:true});
+  document.getElementById("langSeg").addEventListener("click",function(){setTimeout(translate,0)});
+  translate();
+})();
+</script>
 </body>
 </html>
