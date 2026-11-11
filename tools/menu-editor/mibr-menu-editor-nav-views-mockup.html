@@ -222,6 +222,7 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
   #app[data-tab="menu"] #viewPane{position:static;max-height:none;overflow:visible}
   #app[data-tab="menu"][data-menu-pane="tree"] #viewPane{display:none}
   #app[data-tab="menu"]:not([data-menu-pane="tree"]) #treePane{display:none}
+  #app[data-narrow="1"][data-tab="menu"][data-menu-pane="tree"] #treePane{display:block}
   #menuTools{display:block}
   #menuTools .tools{margin-top:7px}
   #globalVehicle{gap:8px}
@@ -1789,7 +1790,7 @@ function loadSafe(){
   return st;
 }
 var safe=loadSafe();
-function saveSafe(){try{localStorage.setItem(KEYS,JSON.stringify(safe))}catch(e){}}
+function saveSafe(){try{localStorage.setItem(KEYS,JSON.stringify(safe))}catch(e){}window.dispatchEvent(new CustomEvent("mibr:safechange",{detail:{view:safe.view,edges:safe.a[safe.view].slice()}}))}
 /* same rule as MibrSafeArea.step: one edge moves, it stops at the limit, the other three stay */
 function safeMove(a,f,wanted){
   var r=a.slice();
@@ -1823,7 +1824,7 @@ function safePicture(){
   svgEl("path",{d:"M"+(SAFE_W/2-24)+" "+(SAFE_H/2+1)+"H"+(SAFE_W/2+25)+"M"+(SAFE_W/2+1)+" "+(SAFE_H/2-24)+"V"+(SAFE_H/2+25),stroke:"#ff4646","stroke-width":2,fill:"none"},null,svg);
   return svg;
 }
-function renderSafe(host){
+function renderSafe(host,embedded){
   host.textContent="";
   var ix=index(),view=safe.view;
   function ttl(id){return ix[id]?titleOf(ix[id].node):(C[id]?C[id][lang]:id)}
@@ -1835,7 +1836,7 @@ function renderSafe(host){
     b.addEventListener("click",function(){if(safe.view===k)return;safe.view=k;saveSafe();renderSafe(host)});
     vs.appendChild(b);
   });
-  box.appendChild(vs);
+  if(!embedded)box.appendChild(vs);
   var svg=safePicture(),frame=svgEl("rect",{fill:"rgba(255,214,60,.16)",stroke:"#ffd63c","stroke-width":3},null,svg);
   box.appendChild(svg);
   var card=el("div","card sa-menu");card.appendChild(el("div","sa-mt",ttl("safe_"+view)));
@@ -1867,7 +1868,8 @@ function renderSafe(host){
   box.appendChild(el("p","small",t("saSuggestNote")));
   var ex=el("div","sa-exp");ex.appendChild(el("h3","",t("saExH")));
   ["saEx1","saEx2","saEx3","saEx4","saEx5"].forEach(function(k){ex.appendChild(el("p","",t(k)))});
-  box.appendChild(ex);
+  if(!embedded)box.appendChild(ex);
+  else box.appendChild(el("p","small",lang==="de"?"Die Safe Area ist Bestandteil der View-Konfiguration und wird mit dem Profil exportiert. Die Werte ändern das Fahrzeug nicht direkt.":"Safe area is part of the view configuration and is exported with the profile. These controls do not directly change the vehicle."));
   host.appendChild(box);
   function upd(){
     var a=cur();
@@ -2092,6 +2094,12 @@ function connect(){
   },function(){});
 }
 
+/* Interface to the integrated view configurator. Existing browser safe-area settings remain readable. */
+window.MIBR_safe={
+  get:function(view){var id=view==="full"?"voll":view;return (safe.a[id]||SAFE_STD[id]).slice()},
+  set:function(view,rect){var id=view==="full"?"voll":view;var a=[rect.x,rect.y,rect.x+rect.w,rect.y+rect.h];if(!safeOk(a))throw Error("Invalid safe area");safe.a[id]=a;saveSafe()},
+  render:function(view,host){safe.view=view==="full"?"voll":view;saveSafe();renderSafe(host,true)}
+};
 /* ================= start ================= */
 var imp=initState();
 applyLang();renderHeader();renderTree();renderPanel();
@@ -2157,11 +2165,11 @@ connect();
 <div id="navv-layer" hidden role="dialog" aria-label="Cockpit Navigation pro View">
 <header><strong>MIBR Menü-Editor · Navigation</strong><span>Entwurf P0.2 · HU MU1440 / AID10</span><button type="button" id="navv-close">← Original-Menü-Editor v2</button></header>
 <div id="navv-body">
-<h2>View-spezifische Navigation</h2><p>Die bestehende Menübaum-Bearbeitung bleibt im Original-Editor vollständig erhalten. Hier werden zusätzliche, noch nicht installierbare Navigationsprofile prototypisch konfiguriert.</p>
+<h2>View-spezifische Navigation</h2><p>Center, Wide und Voll werden als vollständige Cockpit-Profile konfiguriert: CarPlay, native Navigation und Safe Area gehören zusammen. Die Profile sind noch nicht auf dem Fahrzeug installierbar.</p>
 <nav class="navv-menu"><button type="button" data-navv-tab="view" aria-pressed="true">Cockpit-Views</button><button type="button" data-navv-tab="global">Gemeinsame Werte</button><button type="button" data-navv-tab="evidence">Fahrzeugbefunde</button><button type="button" data-navv-tab="files">Import / Export</button></nav>
 <div class="navv-panel" data-navv-panel="view"><div class="navv-grid">
 <div class="navv-stack">
-<div class="navv-card"><h3>Aktive Cockpit-Ansicht</h3><div class="navv-views"><button type="button" data-navv-view="center">Center</button><button type="button" data-navv-view="wide">Wide</button><button type="button" data-navv-view="full">Voll</button></div><div class="navv-row"><label>Profilmodus</label><select id="navv-mode"><option value="custom">Individuell</option><option value="inherit">Globale Werte erben</option></select></div><p id="navv-mode-info" class="navv-note"></p></div>
+<div class="navv-card"><h3>Aktive Cockpit-Ansicht</h3><div class="navv-views"><button type="button" data-navv-view="center">Center</button><button type="button" data-navv-view="wide">Wide</button><button type="button" data-navv-view="full">Voll</button></div><div class="navv-row"><label>Profilmodus</label><select id="navv-mode"><option value="custom">Individuell</option><option value="inherit">Globale Werte erben</option></select></div><p id="navv-mode-info" class="navv-note"></p><div class="navv-buttons"><label for="navv-copy-target" class="navv-note" data-i18n="copylabel">Profil kopieren nach</label><select id="navv-copy-target"><option value="center">Center</option><option value="wide">Wide</option><option value="full">Voll</option></select><button type="button" id="navv-copy">Kopieren</button><button type="button" id="navv-reset-view">View zurücksetzen</button></div></div>
 <div class="navv-card"><h3>Live-Vorschau: <span id="navv-viewname">Center</span></h3><div id="navv-cluster"><div class="navv-dial">19 km<small>seit Start</small></div><div id="navv-mid"><div id="navv-text"></div><div id="navv-small"></div><div id="navv-map"></div></div><div class="navv-dial"><span id="navv-tube"></span><small id="navv-distance"></small></div></div><p class="navv-note">Schematische Darstellung. Die echte AID10-/BAP-Wirkung wird nicht simuliert.</p><div id="navv-warning"></div></div>
 </div>
 <div class="navv-stack">
@@ -2178,6 +2186,7 @@ connect();
 <div class="navv-row"><label>Quelle</label><select data-navv-section="guidance" data-navv-key="source"><option value="auto">Automatisch</option><option value="stock">Original</option><option value="phone">iPhone</option></select></div>
 <div class="navv-row"><label>Seitenstraßen im Pfeil</label><input type="checkbox" data-navv-section="guidance" data-navv-key="sideStreets"></div>
 <div class="navv-row"><label>Untere Zeitangabe</label><select data-navv-section="guidance" data-navv-key="bottom"><option value="eta">Ankunftszeit</option><option value="remaining">Restfahrzeit</option><option value="off">Aus (experimentell)</option></select></div></div>
+<div class="navv-card"><h3 id="navv-safe-title">Bildbereich / Safe Area</h3><div id="navv-safe-tools"></div></div>
 </div></div></div>
 <div class="navv-panel" data-navv-panel="global" hidden><div class="navv-card"><h3>Bestehende globale Schalter als Vorgaben</h3><p class="navv-note">Die hier konfigurierten Werte ändern keine Fahrzeugdateien.</p>
 <div class="navv-row"><label>nav_source</label><select data-navv-global="source"><option value="auto">Automatisch</option><option value="stock">Original</option><option value="phone">iPhone</option></select></div>
@@ -2187,26 +2196,42 @@ connect();
 <div class="navv-row"><label>nav_side (Seitenstraßen)</label><input type="checkbox" data-navv-global="sideStreets"></div>
 <div class="navv-row"><label>nav_bottom</label><select data-navv-global="bottom"><option value="eta">Ankunftszeit</option><option value="remaining">Restfahrzeit</option></select></div></div></div>
 <div class="navv-panel" data-navv-panel="evidence" hidden><div class="navv-card"><h3>Reale Testzustände am MU1440 / AID10</h3><table><thead><tr><th>Menüwert</th><th>Text oben</th><th>Kleiner Pfeil</th><th>Tube rechts</th></tr></thead><tbody><tr><td>Side and Top</td><td>Ja</td><td>Ja</td><td>Ja</td></tr><tr><td>Top only</td><td>Nein</td><td>Nein</td><td>Ja</td></tr><tr><td>Side</td><td>Ja</td><td>Nein</td><td>Ja</td></tr></tbody></table><p class="navv-note">Quelle: die drei Fahrzeugaufnahmen vom 10.11.2026. Die Pfeilform kann sich durch die Navigationsroute selbst ändern. Die Tabelle belegt nicht unabhängig schaltbare BAP-Kanäle.</p><p>Im bisherigen Code: Manöver via MANEUVER_DESCRIPTOR, Text via updateBapTurnToInfo, obere Symbole über updateBapLaneGuidance. Der bisherige Schalter nav_side steuert Seitenstraßen, nicht Tube ein/aus.</p></div></div>
-<div class="navv-panel" data-navv-panel="files" hidden><div class="navv-card"><h3>Versionierte Navigations-Profile</h3><p class="navv-note">Eigenständiger experimenteller Vertrag mibr.nav-view-profiles/1. Alte Menüs weiter über MIBR_MENU/1 im originalen Editor importieren und exportieren. Kein Fahrzeug-Loader.</p><div class="navv-buttons"><button type="button" id="navv-json">JSON exportieren</button><button type="button" id="navv-conf">.conf exportieren</button><button type="button" id="navv-import">JSON/.conf importieren</button><button type="button" id="navv-reset">Zurücksetzen</button></div><input id="navv-input" type="file" accept=".json,.conf,.txt"><p id="navv-status" class="navv-note">Keine Datei importiert.</p><h3>JSON-Vorschau</h3><pre id="navv-out"></pre></div></div>
+<div class="navv-panel" data-navv-panel="files" hidden><div class="navv-card"><h3>Versionierte Navigations-Profile</h3><p class="navv-note">View-Konfiguration mibr.nav-view-profiles/2 mit Safe Areas. Die Menüdatei MIBR_MENU/1 wird ausschließlich im Menü-Editor verwaltet. Kein Fahrzeug-Loader für View-Profile.</p><div class="navv-buttons"><button type="button" id="navv-json">JSON exportieren</button><button type="button" id="navv-conf">.conf exportieren</button><button type="button" id="navv-import">JSON/.conf importieren</button><button type="button" id="navv-reset">Zurücksetzen</button></div><input id="navv-input" type="file" accept=".json,.conf,.txt"><p id="navv-status" class="navv-note">Keine Datei importiert.</p><h3>JSON-Vorschau</h3><pre id="navv-out"></pre></div></div>
 </div></div>
 <script id="navv-script">
 (function(){
 "use strict";
-var schema="mibr.nav-view-profiles/1", key="mibr-nav-view-mockup/2", current="center", currentTab="view";
+
+var schema="mibr.nav-view-profiles/2",oldSchema="mibr.nav-view-profiles/1",key="mibr-nav-view-mockup/2",current="center",currentTab="view",safeViewRendered="";
 function $(s){return document.querySelector(s)}
 function all(s){return Array.from(document.querySelectorAll(s))}
 function clone(x){return JSON.parse(JSON.stringify(x))}
-function sample(){return {schema:schema,version:1,vehicle:{brand:"skoda",headUnit:"MU1440",cluster:"AID10"},global:{source:"auto",legacyDisplay:"side",legacyLine:"dist",legacyLanes:true,sideStreets:true,bottom:"eta"},views:{center:{mode:"custom",carplay:{surface:"map",maneuver:"off",eta:true},native:{topText:"off",topSymbol:"off",tube:"on"},guidance:{lane:"real",source:"auto",sideStreets:true,bottom:"eta"}},wide:{mode:"inherit"},full:{mode:"inherit"}},meta:{runtimeCompatible:false}}}
-var state;
-try{state=JSON.parse(localStorage.getItem(key)||"null")||sample()}catch(e){state=sample()}
-function check(d){
-if(!d||d.schema!==schema||d.version!==1||!d.vehicle||d.vehicle.brand!=="skoda"||d.vehicle.headUnit!=="MU1440"||d.vehicle.cluster!=="AID10")throw Error("Schema oder Fahrzeugprofil ungültig");
-var spec={carplay:{surface:["map","app","off"],maneuver:["off","left","right","top"],eta:[true,false]},native:{topText:["off","distance","street","maneuver"],topSymbol:["off","maneuver","lanes"],tube:["on","off"]},guidance:{lane:["real","synthetic","off"],source:["auto","stock","phone"],sideStreets:[true,false],bottom:["eta","remaining","off"]}};
-if(!d.global||!["auto","stock","phone"].includes(d.global.source)||!["side","top","both"].includes(d.global.legacyDisplay)||!["dist","street","off"].includes(d.global.legacyLine)||typeof d.global.legacyLanes!=="boolean"||typeof d.global.sideStreets!=="boolean"||!["eta","remaining"].includes(d.global.bottom))throw Error("Ungültige globale Werte");
-for(var id of ["center","wide","full"]){var v=d.views&&d.views[id];if(!v||!["inherit","custom"].includes(v.mode))throw Error("Ungültiger View "+id);if(v.mode==="inherit")continue;for(var section of Object.keys(spec))for(var prop of Object.keys(spec[section]))if(!v[section]||!spec[section][prop].includes(v[section][prop]))throw Error("Ungültiger Wert "+id+"."+section+"."+prop)}
-return d;
+function vehicle(){return window.MIBR_getVehicle?window.MIBR_getVehicle():{brand:"skoda",headUnit:"MU1440",cluster:"AID10"}}
+function area(id){return clone({center:{x:380,y:130,w:250,h:160},wide:{x:250,y:130,w:505,h:160},full:{x:10,y:130,w:990,h:140}}[id])}
+function viewDefaults(id){return {mode:id==="center"?"custom":"inherit",safeArea:area(id),carplay:{surface:"map",maneuver:"off",eta:true},native:{topText:"off",topSymbol:"off",tube:"on"},guidance:{lane:"real",source:"auto",sideStreets:true,bottom:"eta"}}}
+function sample(){return {schema:schema,version:2,vehicle:vehicle(),global:{source:"auto",legacyDisplay:"side",legacyLine:"dist",legacyLanes:true,sideStreets:true,bottom:"eta"},views:{center:viewDefaults("center"),wide:viewDefaults("wide"),full:viewDefaults("full")},meta:{runtimeCompatible:false}}}
+function safeValid(v){return !!v&&["x","y","w","h"].every(function(k){return Number.isInteger(v[k])})&&v.x>=0&&v.y>=0&&v.w>=100&&v.h>=60&&v.x+v.w<=1010&&v.y+v.h<=376}
+function migrate(d){
+ if(!d||d.schema!==oldSchema||d.version!==1)return d;
+ var next=sample();next.vehicle=d.vehicle;next.global=d.global;
+ for(var id of ["center","wide","full"]){
+   if(!d.views||!d.views[id])continue;
+   next.views[id]=clone(d.views[id]);
+   var a=window.MIBR_safe.get(id);next.views[id].safeArea={x:a[0],y:a[1],w:a[2]-a[0],h:a[3]-a[1]};
+ }
+ return next;
 }
-try{state=check(state)}catch(e){state=sample()}
+function check(d){
+ if(!d||d.schema!==schema||d.version!==2||!d.vehicle||!["skoda","vw","seat","audi"].includes(d.vehicle.brand)||!["MU1440","MU1409","MU1447"].includes(d.vehicle.headUnit)||!["AID10","other"].includes(d.vehicle.cluster))throw Error("Schema oder Fahrzeugprofil ungültig");
+ var spec={carplay:{surface:["map","app","off"],maneuver:["off","left","right","top"],eta:[true,false]},native:{topText:["off","distance","street","maneuver"],topSymbol:["off","maneuver","lanes"],tube:["on","off"]},guidance:{lane:["real","synthetic","off"],source:["auto","stock","phone"],sideStreets:[true,false],bottom:["eta","remaining","off"]}};
+ if(!d.global||!["auto","stock","phone"].includes(d.global.source)||!["side","top","both"].includes(d.global.legacyDisplay)||!["dist","street","off"].includes(d.global.legacyLine)||typeof d.global.legacyLanes!=="boolean"||typeof d.global.sideStreets!=="boolean"||!["eta","remaining"].includes(d.global.bottom))throw Error("Ungültige globale Werte");
+ for(var id of ["center","wide","full"]){var v=d.views&&d.views[id];if(!v||!["inherit","custom"].includes(v.mode)||!safeValid(v.safeArea))throw Error("Ungültiger View oder Safe Area: "+id);if(v.mode==="inherit")continue;for(var section of Object.keys(spec))for(var prop of Object.keys(spec[section]))if(!v[section]||!spec[section][prop].includes(v[section][prop]))throw Error("Ungültiger Wert "+id+"."+section+"."+prop)}
+ return d;
+}
+var state;
+try{state=check(migrate(JSON.parse(localStorage.getItem(key)||"null")))}catch(e){state=sample()}
+function syncToSafe(){for(var id of ["center","wide","full"])window.MIBR_safe.set(id,state.views[id].safeArea);safeViewRendered=""}
+syncToSafe();
 function inherited(){var g=state.global;return {mode:"custom",carplay:{surface:"map",maneuver:"off",eta:true},native:{topText:g.legacyDisplay==="top"?"off":g.legacyLine==="off"?"off":g.legacyLine==="street"?"street":"distance",topSymbol:g.legacyDisplay==="both"?"maneuver":"off",tube:"on"},guidance:{lane:g.legacyLanes?"real":"synthetic",source:g.source,sideStreets:g.sideStreets,bottom:g.bottom}}}
 function effective(){return state.views[current].mode==="inherit"?inherited():state.views[current]}
 function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch(e){}}
@@ -2214,7 +2239,7 @@ function render(){
 var v=effective(),mode=state.views[current].mode;
 all("[data-navv-view]").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.navvView===current))});
 $("#navv-viewname").textContent=current==="full"?"Voll":current==="wide"?"Wide":"Center";
-$("#navv-mode").value=mode;$("#navv-mode-info").textContent=mode==="inherit"?"Erbt die globalen Legacy-Werte. Zum Bearbeiten auf individuell umstellen.":"Eigenständiges Profil für diese Cockpit-Ansicht.";
+$("#navv-mode").value=mode;$("#navv-mode-info").textContent=mode==="inherit"?"Navigation erbt globale Werte; die Safe Area bleibt pro View individuell.":"Eigenständiges Navigationsprofil für diese Ansicht.";
 all("[data-navv-section]").forEach(function(c){var val=v[c.dataset.navvSection][c.dataset.navvKey];if(c.type==="checkbox")c.checked=val;else c.value=val;c.disabled=mode==="inherit"});
 all("[data-navv-global]").forEach(function(c){var val=state.global[c.dataset.navvGlobal];if(c.type==="checkbox")c.checked=val;else c.value=val});
 $("#navv-text").textContent=v.native.topText==="off"?"":v.native.topText==="street"?"Gallbergweg":v.native.topText==="maneuver"?"In 200 m rechts abbiegen":"200 m · Gallbergweg";
@@ -2227,33 +2252,53 @@ if(v.native.topSymbol==="maneuver"&&v.guidance.lane==="real")warn.push("Syntheti
 if(v.native.topSymbol==="lanes"&&v.guidance.lane==="off")warn.push("Lane-Symbol bei deaktivierter Lane Guidance.");
 $("#navv-warning").textContent=warn.length?warn.join(" "):"Keine offensichtlichen Konflikte im Mock-up. Kein Fahrzeugsignal.";
 $("#navv-out").textContent=JSON.stringify(state,null,2);
+if(safeViewRendered!==current){window.MIBR_safe.render(current,$("#navv-safe-tools"));safeViewRendered=current}
 }
 function tab(v){currentTab=v;all("[data-navv-tab]").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.navvTab===v))});all("[data-navv-panel]").forEach(function(p){p.hidden=p.dataset.navvPanel!==v});render()}
 all("[data-navv-tab]").forEach(function(b){b.onclick=function(){tab(b.dataset.navvTab)}});
 all("[data-navv-view]").forEach(function(b){b.onclick=function(){current=b.dataset.navvView;render()}});
 all("[data-navv-section]").forEach(function(c){c.onchange=function(){if(state.views[current].mode!=="custom")return;state.views[current][c.dataset.navvSection][c.dataset.navvKey]=c.type==="checkbox"?c.checked:c.value;save();render()}});
 all("[data-navv-global]").forEach(function(c){c.onchange=function(){state.global[c.dataset.navvGlobal]=c.type==="checkbox"?c.checked:c.value;save();render()}});
-$("#navv-mode").onchange=function(){state.views[current]=this.value==="inherit"?{mode:"inherit"}:inherited();save();render()};
+$("#navv-mode").onchange=function(){var v=state.views[current];if(this.value==="custom"&&(!v.carplay||!v.native||!v.guidance)){var def=inherited();v.carplay=def.carplay;v.native=def.native;v.guidance=def.guidance}v.mode=this.value;save();render()};
 $("#navv-open").onclick=function(){$("#navv-layer").hidden=false;$("#navv-open").hidden=true;tab("view")};
 $("#navv-close").onclick=function(){$("#navv-layer").hidden=true;$("#navv-open").hidden=false};
+
+$("#navv-copy").onclick=function(){var dest=$("#navv-copy-target").value;if(dest===current){$("#navv-warning").textContent="Quell- und Zielansicht sind identisch.";return}var source=effective();state.views[dest]=clone(source);state.views[dest].mode="custom";state.views[dest].safeArea=clone(state.views[current].safeArea);window.MIBR_safe.set(dest,state.views[dest].safeArea);save();render()};
+$("#navv-reset-view").onclick=function(){if(!confirm("Dieses View-Profil auf Standard zurücksetzen?"))return;state.views[current]=viewDefaults(current);window.MIBR_safe.set(current,state.views[current].safeArea);safeViewRendered="";save();render()};
+window.addEventListener("mibr:safechange",function(e){var a=e.detail,view=a.view==="voll"?"full":a.view;if(!state.views[view])return;var v={x:a.edges[0],y:a.edges[1],w:a.edges[2]-a.edges[0],h:a.edges[3]-a.edges[1]};if(!safeValid(v))return;state.views[view].safeArea=v;save()});
+window.addEventListener("mibr:vehiclechange",function(e){if(!state)return;state.vehicle=clone(e.detail);save();render()});
 function saveFile(name,contents,type){var u=URL.createObjectURL(new Blob([contents],{type:type})),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},1200)}
 function crc(text){var bytes=new TextEncoder().encode(text),v=0xFFFFFFFF;for(var b of bytes){v^=b;for(var j=0;j<8;j++)v=(v>>>1)^((v&1)?0xEDB88320:0)}return ("00000000"+((v^0xFFFFFFFF)>>>0).toString(16)).slice(-8)}
-function conf(){var rows=["MIBR_NAV_VIEW_PROFILES/1","version=1","brand=skoda","head_unit=MU1440","cluster=AID10"];for(var k of Object.keys(state.global).sort())rows.push("global."+k+"="+String(state.global[k]));for(var id of ["center","wide","full"]){var v=state.views[id];rows.push("view."+id+".mode="+v.mode);if(v.mode==="custom")for(var s of ["carplay","native","guidance"])for(var k of Object.keys(v[s]).sort())rows.push("view."+id+"."+s+"."+k+"="+String(v[s][k]))}var body=rows.join("\n")+"\n";return body+"crc32="+crc(body)+"\n"}
-function parseConf(raw){
-raw=raw.replace(/\r\n/g,"\n");var a=raw.split("\n");if(a[a.length-1]==="")a.pop();if(a[0]!=="MIBR_NAV_VIEW_PROFILES/1")throw Error("Falsches Format");var last=a.pop(),body=a.join("\n")+"\n";if(last!=="crc32="+crc(body))throw Error("CRC32-Prüfsumme ungültig");
-var data={};for(var line of a.slice(1)){var i=line.indexOf("=");if(i<1)throw Error("Ungültige .conf-Zeile");var k=line.slice(0,i);if(Object.hasOwn(data,k))throw Error("Doppelter Schlüssel");data[k]=line.slice(i+1)}
-if(data.version!=="1"||data.brand!=="skoda"||data.head_unit!=="MU1440"||data.cluster!=="AID10")throw Error("Falsches Zielprofil");
-function decode(s){return s==="true"?true:s==="false"?false:s}
-var d=sample();
-for(var k of Object.keys(d.global)){if(!Object.hasOwn(data,"global."+k))throw Error("Fehlender Wert "+k);d.global[k]=decode(data["global."+k])}
-for(var id of ["center","wide","full"]){var mode=data["view."+id+".mode"];if(mode==="inherit"){d.views[id]={mode:"inherit"};continue}if(mode!=="custom")throw Error("Ungültiger Modus");d.views[id]=clone(sample().views.center);for(var section of ["carplay","native","guidance"])for(var k of Object.keys(d.views[id][section])){var key="view."+id+"."+section+"."+k;if(!Object.hasOwn(data,key))throw Error("Fehlender Wert "+key);d.views[id][section][k]=decode(data[key])}}
-return check(d);
+
+function conf(){var vctx=state.vehicle;var rows=["MIBR_NAV_VIEW_PROFILES/2","version=2","brand="+vctx.brand,"head_unit="+vctx.headUnit,"cluster="+vctx.cluster];
+ for(var k of Object.keys(state.global).sort())rows.push("global."+k+"="+String(state.global[k]));
+ for(var id of ["center","wide","full"]){var v=state.views[id];rows.push("view."+id+".mode="+v.mode);
+   for(var k of ["x","y","w","h"])rows.push("view."+id+".safeArea."+k+"="+v.safeArea[k]);
+   if(v.mode==="custom")for(var section of ["carplay","native","guidance"])for(var k of Object.keys(v[section]).sort())rows.push("view."+id+"."+section+"."+k+"="+String(v[section][k]));
+ }
+ var body=rows.join("\n")+"\n";return body+"crc32="+crc(body)+"\n";
 }
-$("#navv-json").onclick=function(){saveFile("mibr-nav-view-profiles-v1.json",JSON.stringify(state,null,2)+"\n","application/json")};
-$("#navv-conf").onclick=function(){saveFile("mibr-nav-view-profiles-v1.conf",conf(),"text/plain;charset=utf-8")};
+function parseConf(raw){
+ raw=raw.replace(/\r\n/g,"\n");var a=raw.split("\n");if(a[a.length-1]==="")a.pop();var magic=a[0],old=magic==="MIBR_NAV_VIEW_PROFILES/1";
+ if(!old&&magic!=="MIBR_NAV_VIEW_PROFILES/2")throw Error("Falsches Format");
+ var last=a.pop(),body=a.join("\n")+"\n";if(last!=="crc32="+crc(body))throw Error("CRC32-Prüfsumme ungültig");
+ var data={};for(var line of a.slice(1)){var i=line.indexOf("=");if(i<1)throw Error("Ungültige .conf-Zeile");var k=line.slice(0,i);if(Object.prototype.hasOwnProperty.call(data,k))throw Error("Doppelter Schlüssel");data[k]=line.slice(i+1)}
+ if(data.version!==(old?"1":"2"))throw Error("Falsche Profilversion");
+ function decode(s){return s==="true"?true:s==="false"?false:s}
+ var d=sample();d.vehicle={brand:data.brand,headUnit:data.head_unit,cluster:data.cluster};
+ for(var k of Object.keys(d.global)){if(!Object.prototype.hasOwnProperty.call(data,"global."+k))throw Error("Fehlender Wert "+k);d.global[k]=decode(data["global."+k])}
+ for(var id of ["center","wide","full"]){var mode=data["view."+id+".mode"];if(!["inherit","custom"].includes(mode))throw Error("Ungültiger Modus");d.views[id].mode=mode;
+   if(!old)for(var k of ["x","y","w","h"]){var key="view."+id+".safeArea."+k;if(!/^\d+$/.test(data[key]||""))throw Error("Fehlender oder ungültiger Wert "+key);d.views[id].safeArea[k]=Number(data[key])}
+   else{var edge=window.MIBR_safe.get(id);d.views[id].safeArea={x:edge[0],y:edge[1],w:edge[2]-edge[0],h:edge[3]-edge[1]}}
+   if(mode==="custom")for(var section of ["carplay","native","guidance"])for(var k of Object.keys(d.views[id][section])){var key="view."+id+"."+section+"."+k;if(!Object.prototype.hasOwnProperty.call(data,key))throw Error("Fehlender Wert "+key);d.views[id][section][k]=decode(data[key])}
+ }
+ return check(d);
+}
+$("#navv-json").onclick=function(){saveFile("mibr-nav-view-profiles-v2.json",JSON.stringify(state,null,2)+"\n","application/json")};
+$("#navv-conf").onclick=function(){saveFile("mibr-nav-view-profiles-v2.conf",conf(),"text/plain;charset=utf-8")};
 $("#navv-import").onclick=function(){$("#navv-input").click()};
-$("#navv-input").onchange=function(){var f=this.files[0];if(!f)return;var fr=new FileReader();fr.onload=function(){try{var raw=String(fr.result),val=raw.trimStart().startsWith("{")?check(JSON.parse(raw)):parseConf(raw);state=val;save();render();$("#navv-status").textContent="Erfolgreich importiert: "+f.name}catch(e){$("#navv-status").textContent="Import abgelehnt: "+e.message}};fr.readAsText(f);this.value=""};
-$("#navv-reset").onclick=function(){if(!confirm("Navigationseinstellungen zurücksetzen?"))return;state=sample();current="center";save();render()};
+$("#navv-input").onchange=function(){var f=this.files[0];if(!f)return;var fr=new FileReader();fr.onload=function(){try{var raw=String(fr.result),val=raw.trimStart().startsWith("{")?check(migrate(JSON.parse(raw))):parseConf(raw);var ctx=vehicle();if(val.vehicle.brand!==ctx.brand||val.vehicle.headUnit!==ctx.headUnit||val.vehicle.cluster!==ctx.cluster)throw Error("Fahrzeugprofil weicht von der globalen Auswahl ab. Bitte zuerst die globale Fahrzeugauswahl anpassen.");state=val;syncToSafe();save();render();$("#navv-status").textContent="Erfolgreich importiert: "+f.name}catch(e){$("#navv-status").textContent="Import abgelehnt: "+e.message}};fr.readAsText(f);this.value=""};
+$("#navv-reset").onclick=function(){if(!confirm("Navigationseinstellungen zurücksetzen?"))return;state=sample();current="center";syncToSafe();save();render()};
 render();
 })();
 </script>
