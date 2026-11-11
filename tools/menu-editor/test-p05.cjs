@@ -108,6 +108,7 @@ async function main(){
   click('#tabs [data-t=menu]');
   assert.ok($("#pv")&&$("#tree"),"Menu editor survived");
   click('#langSeg [data-l=en]');
+  await delay(10); // global project toolbar updates after the language handler
   assert.equal($("#projectSave").textContent,"Save project");
   assert.equal($("#appTitle").textContent,"MIB configurator");
   assert.deepEqual(errors,[],"Browser runtime exceptions");
