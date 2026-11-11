@@ -2456,7 +2456,7 @@ function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch(e){}wi
 function renderCenterPreview(v){
  var isCenter=current==="center",target=function(id){return document.getElementById(id)};
  target("navv-center-preview").hidden=!isCenter;target("navv-cluster").hidden=isCenter;
- target("navv-bg-row").hidden=!isCenter;
+ target("navv-bg-row").hidden=!isCenter;target("navv-preview-zoom").hidden=!isCenter;
  if(!isCenter){setCenterZoom(false);return;}
  var mock=state.views.center.mockup||{background:"grid"},bg=mock.background||"grid";
  target("navv-bgmode").value=bg;
