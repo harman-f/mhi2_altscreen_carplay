@@ -77,7 +77,8 @@ async function main(){
   assert.ok(profile.views.wide.safeArea.w>100,"Wide safe area missing");
   change("#navv-mode","custom");
   assert.ok(query('[data-navv-section=native][data-navv-key=topText]')&&!query('[data-navv-section=native][data-navv-key=topText]').disabled);
-  assert.equal(query("#navv-center-preview").hidden,true,"Only Center view uses the new SVG mockup");
+  assert.equal(query("#navv-wide-svg").hidden,false,"Wide view shows its own new SVG mockup");
+  assert.equal(query("#navv-center-svg").hidden,true,"Center SVG hidden when Wide is selected");
 
   click('#tabs [data-t=help]');
   assert.equal(query("#menuWorkspaceControls").hidden,true, "Menu controls leaked into help tab");
