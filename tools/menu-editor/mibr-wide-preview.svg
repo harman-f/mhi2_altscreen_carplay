@@ -1,0 +1,96 @@
+<svg id="navv-wide-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="AID10 Wide: trapezförmige Seiteninstrumente, zentrale Karte und getrennte Navigationsanzeigen">
+<defs>
+<style>
+#navv-wide-svg{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-variant-numeric:tabular-nums}
+.w-primary{fill:#f7fbff;font-weight:600}.w-sub{fill:#d3dce8;font-weight:500}.w-small{font-size:14px}
+</style>
+<linearGradient id="w-surface" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#28344a"/><stop offset=".65" stop-color="#0d1728"/><stop offset="1" stop-color="#060b12"/></linearGradient>
+<linearGradient id="w-panel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#38435e"/><stop offset=".48" stop-color="#263149"/><stop offset=".49" stop-color="#182438"/><stop offset="1" stop-color="#121b2d"/></linearGradient>
+<linearGradient id="w-turn" x1="0" y1="1" x2="0" y2="0"><stop stop-color="#057a2d"/><stop offset=".45" stop-color="#29d946"/><stop offset="1" stop-color="#fff"/></linearGradient>
+<pattern id="w-grid-fine" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M12 0H0V12" fill="none" stroke="#a1acbd" stroke-opacity=".18" stroke-width=".6"/></pattern>
+<pattern id="w-grid-coarse" width="95" height="52" patternUnits="userSpaceOnUse"><path d="M95 0H0V52" fill="none" stroke="#bfc7d5" stroke-opacity=".31" stroke-width="1.4"/></pattern>
+<clipPath id="w-map-clip"><path d="M284 37H723L685 329H331Z"/></clipPath>
+</defs>
+<rect x="2" y="2" width="1006" height="372" rx="53" fill="#030508" stroke="#1e2a38" stroke-width="3"/>
+<path d="M93 23H917Q941 23 942 58V329Q940 355 907 355H101Q68 355 67 324V58Q67 23 93 23Z" fill="url(#w-surface)"/>
+<g id="wide-map-surface" clip-path="url(#w-map-clip)">
+ <rect x="276" y="37" width="465" height="310" fill="#142132"/>
+ <g id="wide-grid"><rect x="276" y="37" width="465" height="310" fill="url(#w-grid-fine)"/><rect x="276" y="37" width="465" height="310" fill="url(#w-grid-coarse)"/><path d="M505 163v25m-12-13h24" stroke="#ed6667" stroke-width="1.4" fill="none"/></g>
+ <g id="wide-map-visual" style="display:none">
+   <rect x="276" y="37" width="465" height="310" fill="#253a45"/>
+   <path d="M297 79H698M300 139H704M300 235H701M348 35V344M430 35V345M559 37V343M638 37V345" stroke="#6e8091" stroke-width="27" fill="none"/>
+   <path d="M297 79H698M300 139H704M300 235H701M348 35V344M430 35V345M559 37V343M638 37V345" stroke="#a4b4be" stroke-opacity=".7" stroke-width="2" fill="none"/>
+   <rect x="372" y="163" width="34" height="49" fill="#364b55"/><rect x="578" y="168" width="35" height="42" fill="#314852"/>
+ </g>
+ <g id="wide-map-route">
+   <path d="M503 326V241Q503 206 523 190L601 129" stroke="#0d1420" stroke-width="15" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+   <path d="M503 326V241Q503 206 523 190L601 129" stroke="#f7d325" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+   <path d="M494 302l9-16 9 16-9-4z" fill="#f53a3b" stroke="#fff" stroke-width="2"/>
+ </g>
+</g>
+<g id="wide-side-panels">
+ <path d="M90 25H283L331 330Q328 348 294 352H98Q74 352 70 326V60Q71 25 90 25Z" fill="url(#w-panel)" stroke="#8795aa" stroke-width="1.3"/>
+ <path d="M920 25H725L683 331Q687 350 715 352H911Q938 352 940 325V60Q939 25 920 25Z" fill="url(#w-panel)" stroke="#8795aa" stroke-width="1.3"/>
+ <path d="M92 180H309M700 180H918" stroke="#bcc9d9" stroke-opacity=".42" stroke-width="1.7"/>
+ <path d="M284 26L331 330M724 26L683 331" stroke="#ebf2fb" stroke-width="3" opacity=".84"/>
+</g>
+<g id="wide-top-status" fill="#f6f8fe">
+ <path d="M389 32l-7 13h14z" fill="#dbe6f4"/><text x="403" y="44" font-size="19" font-weight="600">W</text>
+ <text x="504" y="45" text-anchor="middle" font-size="29" font-weight="650">23:22</text>
+ <path d="M612 32v15m-7-11l14 8m0-8l-14 8" stroke="#29cdf2" stroke-width="1.8" stroke-linecap="round"/>
+ <text x="626" y="44" font-size="18.5" font-weight="600">4.0°C</text>
+ <path d="M393 62H473l8 7h50l8-7h71" stroke="#d2dfec" stroke-width="1.7" fill="none" opacity=".77"/>
+</g>
+<g id="wide-top-text"><rect x="395" y="78" width="221" height="27" rx="3" fill="#0b1323" opacity=".81"/><text id="wide-top-label" x="505" y="97" text-anchor="middle" font-size="18" font-weight="650" fill="#fff">300 m · Hauptstraße</text></g>
+<g id="wide-top-lanes" fill="none" stroke="#edf5fc" stroke-width="2.2" stroke-linecap="square">
+ <path d="M459 112v23m29-23v23m29-23v23m32-23v23" opacity=".85"/>
+ <path d="M464 117l14 14m0-14l-14 14M494 117l14 14m0-14l-14 14"/>
+ <path d="M533 132v-15h12m-6-6l7 6-7 6" stroke-width="3"/>
+</g>
+<g id="wide-left-info">
+ <text x="129" y="101" font-size="15.5" class="w-primary">7:20 h</text>
+ <text x="129" y="122" font-size="14" class="w-sub">Ab Start</text>
+ <path d="M185 202h-21l-8 44h38z" fill="#f3f7fc"/>
+ <path d="M175 206v36" stroke="#1b293a" stroke-width="2.2" stroke-dasharray="6 6"/>
+ <text x="178" y="279" text-anchor="middle" font-size="20" class="w-primary">0 km</text>
+ <text x="178" y="300" text-anchor="middle" font-size="14" class="w-sub">Ab Start</text>
+</g>
+<g id="wide-right-media">
+ <text x="815" y="100" text-anchor="middle" font-size="15" class="w-primary">Bluetooth-Audio</text>
+ <g stroke="#d7e1ef" stroke-width="2" fill="none"><path d="M818 133l9 6v13l-9 6zM816 137v17M834 140q8 8 0 16"/></g>
+</g>
+<g id="wide-dial-lanes" fill="none" stroke="#e7effa" stroke-width="2">
+ <path d="M769 174v19m24-19v19m24-19v19m24-19v19" opacity=".8"/>
+ <path d="M772 179l12 11m0-11l-12 11M797 179l12 11m0-11l-12 11"/>
+ <path d="M822 188v-9h12m-6-6l7 6-7 6" stroke-width="2.8"/>
+</g>
+<g id="wide-right-turn">
+ <path d="M803 262v-33q0-14 16-14h11v-12l25 19-25 18v-11h-10v33z" fill="url(#w-turn)"/>
+ <path d="M807 246v-20q0-16 17-16h8v-10l24 20-24 20v-12h-6q-5 0-5 6v12" stroke="#f7fcff" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g id="wide-dial-distance" fill="#f4f8ff"><text x="821" y="296" text-anchor="middle" font-size="21" font-weight="650">300 m</text></g>
+<g id="wide-speed" fill="#f6f9ff"><text x="846" y="332" text-anchor="middle" font-size="29" font-weight="650">0</text><text x="846" y="348" text-anchor="middle" font-size="13">km/h</text></g>
+<g id="wide-bottom-info" fill="#eef5ff" font-size="16.5" font-weight="600">
+ <g id="wide-bottom-distance"><circle cx="415" cy="315" r="7" stroke="#e5f0fa" stroke-width="1.5" fill="none"/><path d="M415 304v22m-11-11h22" stroke="#e5f0fa" stroke-width="1"/><text x="431" y="321">1.4 km</text></g>
+ <g id="wide-bottom-eta"><text id="wide-bottom-eta-label" x="541" y="321">23:22</text><circle cx="586" cy="314" r="8" stroke="#e5f0fa" stroke-width="1.5" fill="none"/><path d="M586 309v5l4 3" stroke="#e5f0fa" stroke-width="1.5" fill="none"/></g>
+</g>
+<g id="wide-footer" fill="#d3dfeb" font-size="12.5">
+ <path d="M365 336H656" stroke="#a8bbcf" stroke-opacity=".59" stroke-width="1.4"/>
+ <rect x="371" y="338" width="292" height="27" fill="#0c1724" opacity=".67"/>
+ <text x="391" y="356">trip 5936.7 km</text>
+ <path d="M500 360l-8-20h8l4 20m12-20h8l-8 20" fill="#8f9caf" opacity=".84"/>
+ <path d="M559 356l7-13 7 13m6 0l7-13 7 13" stroke="#ffd738" stroke-width="2" fill="none"/>
+ <text x="604" y="355" font-size="10">-- km/h</text>
+</g>
+<g id="wide-side-metrics" fill="#dbe9f8" font-size="14" font-weight="550">
+ <text x="32" y="112">130</text><text x="40" y="190">90</text><text x="43" y="287">50</text>
+ <path d="M39 133h27m-27 50h27m-27 85h27" stroke="#8699ad" stroke-width="2.5" opacity=".6"/>
+ <text x="949" y="111">1/1</text><text x="948" y="190">1/2</text><text x="957" y="287">R</text>
+ <path d="M943 130h29m-29 49h29m-29 91h29" stroke="#dfeaf9" stroke-width="3.3"/>
+</g>
+<g id="wide-carplay-overlay" style="display:none">
+ <rect x="402" y="217" width="198" height="62" rx="8" fill="#122338" stroke="#6bafc9" stroke-width="1.4"/>
+ <text x="420" y="237" fill="#edf7ff" font-size="13">CarPlay-Manöverkarte</text>
+ <text x="420" y="265" fill="#a2f7c6" font-size="19" font-weight="600">↱ 300 m</text>
+</g>
+</svg>

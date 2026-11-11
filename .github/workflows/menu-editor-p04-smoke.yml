@@ -1,0 +1,26 @@
+name: MIBR P0.7 editor smoke
+on:
+  pull_request:
+    paths:
+      - 'tools/menu-editor/mibr-menu-editor-nav-views-mockup.html'
+      - 'tools/menu-editor/test-p04.cjs'
+      - 'tools/menu-editor/test-p05.cjs'
+      - 'tools/menu-editor/mibr-project-controller.js'
+      - 'tools/menu-editor/mibr-center-preview.svg'
+      - 'tools/menu-editor/mibr-wide-preview.svg'
+      - 'tools/menu-editor/mibr-full-preview.svg'
+      - '.github/workflows/menu-editor-p04-smoke.yml'
+  workflow_dispatch:
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test-only DOM runtime
+        run: npm install --no-save --no-package-lock --ignore-scripts jsdom@24 jszip@3
+      - name: Run standalone editor smoke
+        run: node tools/menu-editor/test-p04.cjs && node tools/menu-editor/test-p05.cjs
