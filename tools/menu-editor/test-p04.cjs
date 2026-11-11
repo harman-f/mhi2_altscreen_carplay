@@ -77,8 +77,8 @@ async function main(){
   assert.ok(profile.views.wide.safeArea.w>100,"Wide safe area missing");
   change("#navv-mode","custom");
   assert.ok(query('[data-navv-section=native][data-navv-key=topText]')&&!query('[data-navv-section=native][data-navv-key=topText]').disabled);
-  assert.equal(query("#navv-wide-svg").hidden,false,"Wide view shows its own new SVG mockup");
-  assert.equal(query("#navv-center-svg").hidden,true,"Center SVG hidden when Wide is selected");
+  assert.equal(query("#navv-wide-svg").style.display,"block","Wide view shows only its active SVG on iOS");
+  assert.equal(query("#navv-center-svg").style.display,"none","Center SVG must be genuinely hidden, not a JS-only SVG property");
 
   click('#tabs [data-t=help]');
   assert.equal(query("#menuWorkspaceControls").hidden,true, "Menu controls leaked into help tab");
