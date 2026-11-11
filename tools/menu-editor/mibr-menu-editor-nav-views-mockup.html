@@ -2630,8 +2630,11 @@ function effective(){return state.views[current].mode==="inherit"?inherited():st
 function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch(e){}window.dispatchEvent(new CustomEvent("mibr:viewschange"))}
 
 /* P0.7: one per-view renderer; existing Center IDs stay stable. */
+var lastPreviewView=null;
 function renderCockpitPreview(v){
  var id=current,target=function(part){return document.getElementById(part)};
+ if(lastPreviewView!==null&&lastPreviewView!==id)setCenterZoom(false);
+ lastPreviewView=id;
  target("navv-center-preview").hidden=false;target("navv-cluster").hidden=true;
  target("navv-bg-row").hidden=false;target("navv-preview-zoom").hidden=false;
  ["center","wide","full"].forEach(function(name){target("navv-"+name+"-svg").hidden=name!==id});
