@@ -41,6 +41,12 @@ async function main(){
   }
   assert.ok(w.MIBR_project,"Unified project API");
   assert.equal($$("#tabs button").length,4,"Four top tabs");
+  assert.ok($("#navv-view-workspace").children[0].classList.contains("navv-view-selector"),"Full width view selector first");
+  assert.ok($("#navv-view-workspace").children[1].classList.contains("navv-view-preview"),"Single preview comes before settings");
+  assert.ok($("#navv-view-workspace").children[2].classList.contains("navv-settings-grid"),"Two-column settings below preview");
+  assert.equal($$("#navv-center-preview > svg").length,3,"Three SVG views preloaded, only one to be rendered");
+  assert.ok($("#navv-profile-advanced").tagName==="DETAILS","Secondary profile controls are collapsible");
+  assert.equal($("#navv-profile-advanced").open,false,"Profile management starts collapsed");
   assert.equal(w.MIBR_project.capture().schema,"mibr-project/1");
   assert.equal(w.MIBR_project.capture().menu.v,2);
   assert.equal(w.MIBR_project.capture().viewProfiles.schema,"mibr.nav-view-profiles/2");
@@ -78,20 +84,23 @@ async function main(){
   assert.equal($("#center-map-route").style.display,"none","Neutral background also hides route");
   set("#navv-bgmode","grid");
   assert.notEqual($("#center-grid").style.display,"none","Grid shows");
-  assert.notEqual($("#center-map-route").style.display,"none","Map route returns");
+  assert.equal($("#center-map-route").style.display,"none","Calibration grid has no route; schematic map is separate");
 
 
   // Wide: angled side modules and right-hand native guidance, not enlarged Center circles.
   click('[data-navv-view=wide]');
-  assert.equal($("#navv-center-svg").hidden,true,"Center SVG hidden on Wide");
-  assert.equal($("#navv-full-svg").hidden,true,"Full SVG hidden on Wide");
-  assert.equal($("#navv-wide-svg").hidden,false,"Wide SVG visible");
+  assert.equal($("#navv-center-svg").style.display,"none","Center SVG hidden on Wide in Safari");
+  assert.equal($("#navv-full-svg").style.display,"none","Full SVG hidden on Wide in Safari");
+  assert.equal($("#navv-wide-svg").style.display,"block","Wide SVG visible");
   assert.ok($("#wide-side-panels")&&$("#wide-right-media")&&$("#wide-left-info"),"Wide trapezoid modules and independent content");
   assert.ok($("#wide-right-turn")&&$("#wide-dial-lanes")&&$("#wide-dial-distance"),"Wide right native navigation");
   assert.ok($("#wide-map-surface")&&$("#wide-top-status")&&$("#wide-footer"),"Wide map + status");
-  assert.notEqual($("#wide-top-text").style.display,"none","Inherited upper text initially visible in Wide");
+  assert.equal($("#navv-mode").value,"custom","New Wide profile defaults to individual");
+  assert.equal($("#wide-top-text").style.display,"none","Fresh Wide profile starts without top text");
+  set("#navv-mode","inherit");
+  assert.notEqual($("#wide-top-text").style.display,"none","Global inheritance shows legacy top text");
   set("#navv-mode","custom");
-  assert.notEqual($("#wide-top-text").style.display,"none","Customizing inherited Wide must preserve upper text");
+  assert.notEqual($("#wide-top-text").style.display,"none","Customizing inherited Wide retains shown global top text");
   set('[data-navv-section="native"][data-navv-key="topSymbol"]',"lanes");
   assert.notEqual($("#wide-top-lanes").style.display,"none","Wide upper lane guidance appears");
   set('[data-navv-section="native"][data-navv-key="tube"]',"off");
@@ -113,9 +122,9 @@ async function main(){
 
   // Full: the photo shows one continuous map without a separate right tube.
   click('[data-navv-view=full]');
-  assert.equal($("#navv-center-svg").hidden,true,"Center SVG hidden on Full");
-  assert.equal($("#navv-wide-svg").hidden,true,"Wide SVG hidden on Full");
-  assert.equal($("#navv-full-svg").hidden,false,"Full SVG visible");
+  assert.equal($("#navv-center-svg").style.display,"none","Center SVG hidden on Full");
+  assert.equal($("#navv-wide-svg").style.display,"none","Wide SVG hidden on Full");
+  assert.equal($("#navv-full-svg").style.display,"block","Full SVG visible");
   assert.ok($("#full-lower-corners")&&$("#full-map-surface")&&$("#full-speed"),"Full map and shaped lower cutouts");
   assert.ok($("#full-top-text")&&$("#full-top-lanes")&&$("#full-bottom-distance")&&$("#full-bottom-eta"),"Full navigation zones");
   assert.equal($("#full-right-turn"),null,"Full must not invent a right-hand tube");
@@ -138,14 +147,31 @@ async function main(){
   assert.ok($("#navv-center-preview").classList.contains("preview-expanded"),"Full zoom opens");
   click('[data-navv-view=center]');
   assert.ok(!$("#navv-center-preview").classList.contains("preview-expanded"),"View switch closes full-size preview");
-  assert.equal($("#navv-center-svg").hidden,false,"Center still available");
-  assert.equal($("#navv-wide-svg").hidden,true,"Wide hidden after switching back");
+  assert.equal($("#navv-center-svg").style.display,"block","Center still available");
+  assert.equal($("#navv-wide-svg").style.display,"none","Wide hidden after switching back");
   const profiles=w.MIBR_project.capture().viewProfiles.views;
   assert.equal(profiles.wide.mockup.background,"plain","Wide preview background is saved independently");
   assert.equal(profiles.full.mockup.background,"grid","Full preview background is saved independently");
   assert.equal(profiles.center.mockup.background,"grid","Center preview settings remain unchanged");
   assert.equal(profiles.wide.native.dialLanes,false,"Wide navigation settings preserved");
   assert.equal(profiles.full.native.bottomDistance,false,"Full navigation settings preserved");
+
+
+  // Copying a navigation profile must not silently overwrite another view's geometry.
+  const safeBefore=clone(w.MIBR_project.capture().viewProfiles.views.wide.safeArea);
+  const bgBefore=w.MIBR_project.capture().viewProfiles.views.wide.mockup.background;
+  click("#navv-profile-advanced summary");
+  set("#navv-copy-target","wide");
+  click("#navv-copy");
+  const copied=w.MIBR_project.capture().viewProfiles.views.wide;
+  assert.deepEqual(copied.safeArea,safeBefore,"Copy must preserve target safe-area geometry");
+  assert.equal(copied.mockup.background,bgBefore,"Copy must preserve target preview background");
+  assert.equal(copied.mode,"custom","Copy activates individual profile");
+  assert.equal($("#navv-wide-svg").style.display,"block","Copy selects target view immediately");
+  const originalSafe=clone(copied.safeArea);
+  click("#navv-reset-view");
+  assert.deepEqual(w.MIBR_project.capture().viewProfiles.views.wide.safeArea,originalSafe,"Reset must preserve calibrated safe-area");
+  click('[data-navv-view=center]');
 
   click('#tabs [data-t=safe]');
   assert.ok($(".sa-views")&&$(".sa-menu"),"Dedicated Safe Area controls");
