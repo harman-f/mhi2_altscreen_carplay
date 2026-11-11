@@ -41,6 +41,23 @@ async function main(){
   }
   assert.ok(w.MIBR_project,"Unified project API");
   assert.equal(w.MIBR_views.activeView(),"center","New project opens Center view");
+  // P0.9.1: shared status metrics remain physically identical across cockpit modes.
+  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.1"),"Visible version label");
+  for(const view of ["center","wide","full"]){
+    const q=id=>$("#"+view+"-"+id);
+    const top=q("top-status"),bottom=q("bottom-info"),footer=q("footer");
+    assert.equal(top.querySelector('text[text-anchor="middle"]').getAttribute("x"),"505",view+" clock anchor");
+    assert.equal(top.querySelector('text[text-anchor="middle"]').getAttribute("font-size"),"24",view+" clock size");
+    assert.equal(top.querySelectorAll("text")[2].getAttribute("x"),"640",view+" temperature anchor");
+    assert.equal(q("top-label").getAttribute("x"),"505",view+" shared road anchor");
+    assert.equal(q("top-label").getAttribute("font-size"),"15.5",view+" road typography");
+    assert.equal(bottom.querySelector('#'+view+'-bottom-distance circle').getAttribute("cx"),"420",view+" remaining distance icon");
+    assert.equal(bottom.querySelector('#'+view+'-bottom-distance text').getAttribute("x"),"437",view+" remaining distance anchor");
+    assert.equal(q("bottom-eta-label").getAttribute("x"),"550",view+" arrival time anchor");
+    assert.equal(q("bottom-eta-label").getAttribute("y"),"319",view+" common arrival baseline");
+    assert.equal(footer.querySelector("text").getAttribute("x"),"387",view+" trip anchor");
+    assert.equal(footer.querySelector("text").getAttribute("y"),"353",view+" trip baseline");
+  }
   assert.equal(w.MIBR_safe.activeView(),"center","Calibration initially follows active cockpit view");
   assert.ok($("#navv-guidance-advanced").tagName==="DETAILS","Experimental mapping stays available but collapsed");
   assert.equal($("#navv-guidance-advanced").open,false,"Guidance mapping is secondary");
@@ -89,7 +106,7 @@ async function main(){
   set("#navv-bgmode","grid");
   assert.notEqual($("#center-grid").style.display,"none","Grid shows");
   assert.equal($("#center-map-route").style.display,"none","Calibration grid has no route; schematic map is separate");
-  assert.equal($("#center-bottom-info").getAttribute("font-size"),"14.5","Center lower status font reduced");
+  assert.equal($("#center-bottom-info").getAttribute("font-size"),"14","Center shared OEM lower status font");
   assert.equal($("#center-side-metrics text").getAttribute("y"),"129","Center side tick aligned with marker");
   assert.ok($("#center-right-turn g").getAttribute("transform").includes("scale(.9)"),"Center arrow inset");
   set('[data-navv-section="carplay"][data-navv-key="surface"]',"app");
@@ -126,7 +143,7 @@ async function main(){
   assert.equal($("#navv-full-svg").style.display,"none","Full SVG hidden on Wide in Safari");
   assert.equal($("#navv-wide-svg").style.display,"block","Wide SVG visible");
   assert.ok($("#wide-side-panels")&&$("#wide-right-media")&&$("#wide-left-info"),"Wide trapezoid modules and independent content");
-  assert.equal($("#wide-bottom-info").getAttribute("font-size"),"14.5","Wide lower status font reduced");
+  assert.equal($("#wide-bottom-info").getAttribute("font-size"),"14","Wide shared OEM lower status font");
   assert.equal($("#wide-side-metrics text").getAttribute("y"),"133","Wide side tick aligned with marker");
   set('[data-navv-section="carplay"][data-navv-key="surface"]',"app");
   assert.notEqual($("#wide-app-placeholder").style.display,"none","Wide app editor visualization");
@@ -168,7 +185,7 @@ async function main(){
   assert.equal($("#navv-full-svg").style.display,"block","Full SVG visible");
   assert.ok($("#full-lower-corners")&&$("#full-map-surface")&&$("#full-speed"),"Full map and shaped lower cutouts");
   assert.ok($("#f-mainclip path").getAttribute("d").includes("V274H841"),"Full clip shares lower corner geometry");
-  assert.equal($("#full-bottom-info").getAttribute("font-size"),"14.5","Full lower status font reduced");
+  assert.equal($("#full-bottom-info").getAttribute("font-size"),"14","Full shared OEM lower status font");
   assert.equal($("#full-side-metrics text").getAttribute("y"),"135","Full side tick aligned with marker");
   set('[data-navv-section="carplay"][data-navv-key="surface"]',"app");
   assert.notEqual($("#full-app-placeholder").style.display,"none","Full app editor visualization");

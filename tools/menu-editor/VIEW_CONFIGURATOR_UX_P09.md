@@ -21,3 +21,15 @@ Keine zusätzliche reale App-Darstellung oder BAP-Simulation; keine Änderung de
 ## Abschlussaudit der Manöverkarte
 
 Im P0.8/P0.9-Ausgangsstand wurde `carplay.maneuver` mit den Ausprägungen `left`, `right`, `top` nur ein- oder ausgeblendet, die gewählte Position blieb unberücksichtigt. Der P0.9-Renderer verschiebt nun ausschließlich die **Editor-Vorschau** innerhalb des jeweiligen Cockpitbereichs. Die Positionen unterscheiden sich optisch und werden in Chromium bei Desktop- und iPhone-Abmessungen darauf geprüft, dass `top` oberhalb von `left` liegt, `left` links von `right` und die obere Karte den nativen Straßentext nicht überlagert. Das gespeicherte Format bleibt unverändert; kein Nachweis für fahrzeugseitige Positionierbarkeit.
+
+## P0.9.1 – Gemeinsame OEM-Status-Overlays (11.11.2026)
+
+Die echten AID10-Aufnahmen für Center, Wide und Voll zeigen dieselben oberen und unteren OEM-Statuspositionen. Zuvor waren Uhrzeit, Kompass, Temperatur, Entfernung, ETA und Fußleiste für alle drei Ansichten unabhängig mit abweichenden SVG-Werten modelliert. Diese Abweichungen waren im Vergleich zur Fotoreferenz sichtbar.
+
+**Korrektur:** Eine einzige Quellimplementierung `build-shared-oem-overlays.cjs` erzeugt in Center/Wide/Voll dieselbe Geometrie für die Statusgruppen `top-status`, `top-text`, `bottom-info` und `footer`. Die fahrzeugspezifisch angezeigten Beispieldaten (200/300/100 m oben, 1.3/1.4/1.2 km und ETA unten) werden separat übergeben. Front-SVGs und Standalone-HTML werden synchronisiert und mit `--check` in CI auf Drifts überprüft.
+
+**Shared Design-Referenz (SVG 1010 × 376):** Uhrzeit Mitte x=505/y=43 und 24px; W x=399; Temperatur x=640; Navigationsstraße x=505/y=93; untere Restdistanz x=437/y=319; ETA x=550/y=319; Trip x=387/y=353. Das Mock-up übernimmt bewusst nur die optische Nähe zur realen AID10-Anzeige, nicht die Aussage, dass OEM-BAP-Elemente unabhängig positionierbar sind.
+
+Die gemeinsamen Footer-Statusicons sind exemplarische Vektorgrafiken und keine gesicherten Kanal-/Statussignale. Die Ansichten behalten ihre individuellen Tubes, Sidepanels, Karte, Clip-Masken und Safe Areas.
+
+**Abnahme:** `mibr-menu-editor-nav-views-p091.html` ist eine identische, eigenständig nutzbare Kopie der kanonischen HTML-Datei mit sichtbarem P0.9.1-Versionshinweis. Vor Merge wird sie auf Desktop und Mobile Safari visuell geprüft. `main` und alle Runtime-Artefakte bleiben unverändert.
