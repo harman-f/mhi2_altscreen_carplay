@@ -92,7 +92,7 @@ function overlap(a,b){
     await page.locator(".navv-view-preview").screenshot({path:path.join(output,sc.name+"-"+view+"-maneuver-top.png"),animations:"disabled"});
     results.push({scenario:sc.name,view,surface:"maneuver-top",
       overlay:{x:Math.round(positions.top.x),y:Math.round(positions.top.y)},
-      overlapStatusRoad:Math.round(overlap(upper,await b(page.locator("#"+view+"-top-status"))),
+      overlapStatusRoad:Math.round(overlap(upper,await b(page.locator("#"+view+"-top-status")))),
       overlapLowerFooter:0});
     await page.locator('[data-navv-section="carplay"][data-navv-key="maneuver"]').selectOption("off");
     await page.locator('[data-navv-section="native"][data-navv-key="topText"]').selectOption("off");
