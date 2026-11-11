@@ -37,13 +37,22 @@ return `<!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline 
   <rect x="377" y="335" width="286" height="27" rx="2" fill="#0c1728" opacity=".64"/>
   <text x="387" y="353">trip 5936.7 km</text>
   <!-- Demonstration icons only; not evidence of independently writable BAP channels. -->
-  <g transform="translate(487 346)" fill="none" stroke="#f33f4b" stroke-width="1.5" stroke-linecap="round">
-    <circle cx="3" cy="-4" r="2" fill="#f33f4b" stroke="none"/>
-    <path d="M2 0l5 4m-3-4l-1 7m-5-5l4 1"/>
+  <g id="${v}-seatbelt-warning" transform="translate(485 336)" fill="none" stroke="#ff3047" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Seated occupant, lap/shoulder restraint and buckle: warning pictogram, not a pedestrian. -->
+    <circle cx="7" cy="3.5" r="2.5" fill="#ff3047" stroke="none"/>
+    <path d="M5 8.5L4 15q0 2 3 3h5l4 3" stroke-width="2"/>
+    <path d="M6.2 9l8 9.3" stroke-width="2.4"/>
+    <path d="M3 11v9h13" stroke-width="1.6"/>
+    <path d="M11 12.5l5.5 5.5" stroke-width="1.6"/>
+    <rect x="12.5" y="18" width="3.8" height="2.4" rx=".6" fill="#ff3047" stroke="none"/>
   </g>
   <path d="M516 358l7-20h11l7 20" fill="#6c8097" opacity=".83"/>
   <path d="M522 339l-6 19m18-19l7 19" fill="none" stroke="#becbd9" stroke-width="1.55"/>
-  <path d="M566 354l5-10 5 10m7 0l5-10 5 10" fill="none" stroke="#f8d843" stroke-width="1.6" stroke-linejoin="round" opacity=".92"/>
+  <g id="${v}-yellow-road-guidance" fill="none" stroke="#f8d843" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Perspective road edges and an unmistakable dashed centre line, not two chevrons. -->
+    <path d="M566 356l5-15M588 356l-5-15"/>
+    <path d="M577 342v4m0 4v5" stroke-width="1.7"/>
+  </g>
   <g fill="none" stroke="#cbd9e7" stroke-width="1.15" opacity=".84">
     <path d="M608 354a8 8 0 1 1 13 0M614.5 350l3-4"/>
   </g>
@@ -80,7 +89,7 @@ for(const v of views){
    else console.error("OUT OF SYNC:",path.basename(file));
  }
 }
-for(const name of ["mibr-menu-editor-nav-views-mockup.html","mibr-menu-editor-nav-views-p091.html"]){
+for(const name of ["mibr-menu-editor-nav-views-mockup.html","mibr-menu-editor-nav-views-p092.html"]){
  const file=path.join(root,name),original=fs.readFileSync(file,"utf8"),generated=rebuildHtml(original,svgOut);
  if(original!==generated){
   dirty=true;

@@ -41,8 +41,23 @@ async function main(){
   }
   assert.ok(w.MIBR_project,"Unified project API");
   assert.equal(w.MIBR_views.activeView(),"center","New project opens Center view");
-  // P0.9.1: shared status metrics remain physically identical across cockpit modes.
-  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.1"),"Visible version label");
+  // P0.9.2: all shared symbols use one generator, and Wide's arrow is one stroked path.
+  for(const view of ["center","wide","full"]){
+    const belt=$("#"+view+"-seatbelt-warning");
+    const road=$("#"+view+"-yellow-road-guidance");
+    assert.ok(belt&&belt.querySelector("circle")&&belt.querySelector("rect"),view+" restraint icon is present");
+    assert.ok(road,view+" shared yellow road icon exists");
+    const roadPaths=Array.from(road.querySelectorAll("path")).map(p=>p.getAttribute("d"));
+    assert.equal(roadPaths.length,2,view+" road has edges and centerline");
+    assert.ok(roadPaths[1].includes("v4m0 4v5"),view+" road has dashed center line");
+  }
+  const wideArrow=$("#wide-right-turn");
+  const silhouette=$("#wide-turn-silhouette");
+  assert.ok(wideArrow&&silhouette,"Wide arrow silhouette present");
+  assert.equal(wideArrow.querySelectorAll("path").length,1,"Wide arrow uses one filled and stroked shape");
+  assert.equal(silhouette.getAttribute("stroke"),"#f7fcff","White contour traces the exact green silhouette");
+    // P0.9.1: shared status metrics remain physically identical across cockpit modes.
+  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.2"),"Visible version label");
   for(const view of ["center","wide","full"]){
     const q=id=>$("#"+view+"-"+id);
     const top=q("top-status"),bottom=q("bottom-info"),footer=q("footer");
