@@ -196,6 +196,37 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
   body.sheet .wrap{padding-bottom:75dvh}
   .tools button.fl{flex:1 1 auto}
 }
+
+/* P0.4: shared app shell and context-specific workspaces */
+#globalVehicle{display:flex;gap:8px 12px;align-items:end;flex-wrap:wrap;padding:12px 0 2px}
+#globalVehicle label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:100px}
+#globalVehicle select{font-size:14px;min-height:38px;max-width:210px}
+#globalVehicle .compat{flex:1 1 220px;font-size:12px;color:var(--muted);align-self:center}
+#menuTools{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-top:10px}
+#menuTools .tools{margin:0}
+#menuTools #tools2{order:-1}
+#menuTools .tools.files{margin:0}
+#menuSections{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+#menuSections button{min-height:34px;font-size:13px;padding:5px 10px}
+#menuSections button.on{background:var(--accent-soft);border-color:var(--accent)}
+#tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:14px 0 16px;overflow-x:auto}
+#tabs button{border-radius:7px 7px 0 0;padding:9px 17px}
+#app[data-tab="nav"],#app[data-tab="help"]{display:block}
+#app[data-tab="nav"] #treePane,#app[data-tab="help"] #treePane,
+#app[data-tab="nav"] #panel,#app[data-tab="help"] #panel{display:none!important}
+#app[data-tab="nav"] #viewPane,#app[data-tab="help"] #viewPane{position:static;max-height:none;overflow:visible;padding:0;width:100%}
+#app[data-tab="menu"] #viewPane{min-width:0}
+#app[data-tab="menu"][data-menu-pane="preview"] #vbody{padding-top:0}
+#app[data-tab="menu"] #viewPane{position:sticky;top:8px;max-height:calc(100vh - 16px);overflow:auto;padding-right:2px}
+@media(max-width:1099px){
+  #app[data-tab="menu"] #viewPane{position:static;max-height:none;overflow:visible}
+  #app[data-tab="menu"][data-menu-pane="tree"] #viewPane{display:none}
+  #app[data-tab="menu"]:not([data-menu-pane="tree"]) #treePane{display:none}
+  #menuTools{display:block}
+  #menuTools .tools{margin-top:7px}
+  #globalVehicle{gap:8px}
+}
+
 /* Consolidated editor layout and user-selected theme */
 :root[data-theme="light"]{color-scheme:light}
 :root[data-theme="dark"]{color-scheme:dark}
@@ -209,6 +240,8 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 <div class="wrap">
   <header>
     <div class="head"><h1 id="appTitle"></h1><span id="status"></span><div class="seg" id="langSeg"><button data-l="de">DE</button><button data-l="en">EN</button></div><div class="seg" id="themeSeg" role="group" aria-label="Day and night mode"><button data-theme-choice="light">☀ Tag</button><button data-theme-choice="dark">☾ Nacht</button><button data-theme-choice="auto">Auto</button></div></div>
+    <div id="globalVehicle"><label id="globalBrandLabel"><span>Fahrzeugmarke</span><select id="brand" style="width:auto"></select></label><label><span id="unitLabel">Headunit</span><select id="unitModel"><option value="MU1440">MU1440</option><option value="MU1409">MU1409 · Testprofil</option><option value="MU1447">MU1447 · Testprofil</option></select></label><label><span id="clusterLabel">Virtual Cockpit</span><select id="clusterModel"><option value="AID10">AID10</option><option value="other">Andere · experimentell</option></select></label><span id="compatHint" class="compat"></span></div>
+    <div id="menuTools">
     <div class="tools" id="tools1">
       <button id="undo" class="fl" disabled></button>
       <button id="addPage" class="fl"></button>
@@ -216,8 +249,7 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
       <button id="fold" class="fl"></button>
     </div>
     <div class="tools" id="tools2">
-      <label class="inl" for="brand" id="brandL"></label>
-      <select id="brand" style="width:auto"></select>
+      <label class="inl" for="fname" id="filenameLabel"></label>
       <input type="text" id="fname" class="grow" autocomplete="off">
     </div>
     <div class="tools files">
@@ -227,15 +259,17 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
       <button id="copy" class="minor"></button>
       <button id="chip" class="chip ok"></button>
     </div>
+    </div><!-- menu-specific tools -->
   </header>
-  <div class="app" id="app" data-tab="preview" data-narrow="0">
+  <nav id="tabs" role="tablist" aria-label="Hauptbereiche"></nav>
+  <div id="menuSections" aria-label="Menü-Editor-Ansicht"></div>
+  <div class="app" id="app" data-tab="menu" data-menu-pane="preview" data-narrow="0">
     <section id="treePane" aria-label="Menü">
       <div class="card" id="tree"></div>
       <div id="sammler"><div class="card" id="sam"></div></div>
     </section>
     <aside id="panel"></aside>
     <section id="viewPane">
-      <div id="tabs" role="tablist"></div>
       <div class="vbody" id="vbody"></div>
     </section>
   </div>
@@ -1552,7 +1586,7 @@ function renderPanel(){
 }
 
 /* ================= preview ================= */
-var pvPath=[],pvFocus=null,pvExpert=false,pvChecked={},pvVal={},pvToast="",pvToastT=0,pvScroll=0,tab="preview";
+var pvPath=[],pvFocus=null,pvExpert=false,pvChecked={},pvVal={},pvToast="",pvToastT=0,pvScroll=0,tab="menu",menuPane="preview";
 function sampleVal(n){
   var d=C[n.id],k=kindOf(n);
   if(d&&d.values){var a=d.values.split(", "),i=pvVal[n.id]||0;return a[i%a.length]}
@@ -1626,7 +1660,7 @@ function watchSize(pv){
   set();
   if(window.ResizeObserver){if(ro)ro.disconnect();ro=new ResizeObserver(set);ro.observe(pv)}
 }
-function renderPreviewOnly(){if(tab==="preview"||(isNarrow()===false&&tab==="tree"))renderPreview($("vbody"))}
+function renderPreviewOnly(){if(tab==="menu"&&menuPane==="preview")renderPreview($("vbody"))}
 
 /* ================= file / changes / help tabs ================= */
 var lastChecks=[];
@@ -1848,15 +1882,15 @@ function renderSafe(host){
 }
 function renderViews(){
   var checks=runChecks();lastChecks=checks;
-  var host=$("vbody"),tb=tab,navv=document.getElementById("navv-layer");
+  var host=$("vbody"),navv=document.getElementById("navv-layer");
   if(navv&&navv.parentNode===host){document.body.appendChild(navv);navv.hidden=true}
-  if(!isNarrow()&&tb==="tree")tb="preview";
-  if(tb==="preview")renderPreview(host);
-  else if(tb==="safe")renderSafe(host);
-  else if(tb==="file")renderFile(host);
-  else if(tb==="changes")renderChanges(host);
-  else if(tb==="help")renderHelp(host);
-  else if(tb==="nav"&&navv){host.textContent="";navv.hidden=false;host.appendChild(navv)}
+  if(tab==="menu"){
+    if(menuPane==="preview")renderPreview(host);
+    else if(menuPane==="file")renderFile(host);
+    else if(menuPane==="changes")renderChanges(host);
+    else host.textContent="";
+  }else if(tab==="help")renderHelp(host);
+  else if(tab==="nav"&&navv){host.textContent="";navv.hidden=false;host.appendChild(navv)}
   else host.textContent="";
   var errs=checks.filter(function(c){return c.sev==="err"}).length,warns=checks.length-errs;
   var chip=$("chip");
@@ -1865,26 +1899,36 @@ function renderViews(){
   $("save").disabled=!!errs;$("copy").disabled=!!errs;
   $("save").title=errs?t("cannotSave"):"";
   var cn=changeItems().length+metaChanges().length;
-  var tn=document.querySelector('#tabs [data-t="changes"] .n');if(tn)tn.textContent=cn;
+  var tn=document.querySelector('#menuSections [data-pane="changes"] .n');if(tn)tn.textContent=cn;
 }
 function renderTabs(){
   var tabs=$("tabs");tabs.textContent="";
-  [["tree",t("tabTree")],["preview",t("tabPreview")],["nav",t("tabNav")],["safe",t("tabSafe")],["file",t("tabFile")],["changes",t("tabChanges")],["help",t("tabHelp")]].forEach(function(a){
-    var b=el("button",a[0]===tab||(!isNarrow()&&a[0]==="preview"&&tab==="tree")?"on":"",a[1]);b.type="button";b.dataset.t=a[0];b.setAttribute("role","tab");
-    if(a[0]==="changes")b.appendChild(el("span","n",String(changeItems().length+metaChanges().length)));
+  [["menu",lang==="de"?"Menü-Editor":"Menu editor"],["nav",t("tabNav").replace("Navigation pro View","View-Konfigurator").replace("Navigation per view","View configurator")],["help",t("tabHelp")]].forEach(function(a){
+    var b=el("button",a[0]===tab?"on":"",a[1]);b.type="button";b.dataset.t=a[0];b.setAttribute("role","tab");b.setAttribute("aria-selected",String(a[0]===tab));
     b.addEventListener("click",function(){tab=a[0];$("app").dataset.tab=tab;renderTabs();renderViews();if(isNarrow())window.scrollTo(0,0)});
     tabs.appendChild(b);
   });
+  var ms=$("menuSections");ms.textContent="";
+  [["tree",lang==="de"?"Menüstruktur":"Menu structure"],["preview",t("tabPreview")],["changes",t("tabChanges")],["file",t("tabFile")]].forEach(function(a){
+    var b=el("button",menuPane===a[0]?"on":"",a[1]);b.type="button";b.dataset.pane=a[0];
+    if(a[0]==="changes")b.appendChild(el("span","n",String(changeItems().length+metaChanges().length)));
+    b.addEventListener("click",function(){menuPane=a[0];$("app").dataset.menuPane=menuPane;renderTabs();renderViews()});
+    ms.appendChild(b);
+  });
+  var menu=tab==="menu";
+  $("menuTools").hidden=!menu;ms.hidden=!menu;
+  document.body.classList.toggle("sheet",menu&&!!selected);
+  if(menu&&!isNarrow()&&menuPane==="tree"){menuPane="preview";$("app").dataset.menuPane=menuPane;}
 }
 var mq=window.matchMedia("(max-width:1099px)");
 function isNarrow(){return mq.matches}
 var firstLayout=true;
 function layout(){
-  var n=isNarrow();if(firstLayout){firstLayout=false;if(n)tab="tree"}$("app").dataset.narrow=n?"1":"0";
-  if(!n&&tab==="tree")tab="preview";
-  if(n){if(!$("tabs").parentNode||$("tabs").parentNode.id!=="app")$("app").insertBefore($("tabs"),$("app").firstChild)}
-  else if($("tabs").parentNode.id!=="viewPane")$("viewPane").insertBefore($("tabs"),$("vbody"));
-  $("app").dataset.tab=tab;renderTabs();renderViews();
+  var n=isNarrow();firstLayout=false;
+  $("app").dataset.narrow=n?"1":"0";
+  if(!n&&menuPane==="tree")menuPane="preview";
+  $("app").dataset.tab=tab;$("app").dataset.menuPane=menuPane;
+  renderTabs();renderViews();
 }
 if(mq.addEventListener)mq.addEventListener("change",layout);else if(mq.addListener)mq.addListener(layout);
 
@@ -1898,7 +1942,7 @@ function applyLang(){
   document.documentElement.lang=lang;
   $("appTitle").textContent=t("appTitle");if(S&&document.activeElement!==$("fname"))$("fname").value=S.name||"";
   $("undo").textContent=t("undo");$("addPage").textContent=t("addPage");$("addHint").textContent=t("addHint");
-  $("brandL").textContent=t("brand");$("fname").placeholder=t("name");$("fname").setAttribute("aria-label",t("name"));
+  $("filenameLabel").textContent=t("name");$("globalBrandLabel").firstElementChild.textContent=t("brand");$("unitLabel").textContent="Headunit";$("clusterLabel").textContent="Virtual Cockpit";$("fname").placeholder=t("name");$("fname").setAttribute("aria-label",t("name"));
   $("save").textContent=t("save");$("load").textContent=t("load");$("copy").textContent=t("copy");
   Array.prototype.forEach.call($("langSeg").children,function(b){b.classList.toggle("on",b.dataset.l===lang);b.setAttribute("aria-pressed",b.dataset.l===lang)});
   var bs=$("brand"),cur=S?S.brand:"skoda";bs.textContent="";
@@ -1906,7 +1950,7 @@ function applyLang(){
 }
 Array.prototype.forEach.call($("langSeg").children,function(b){b.addEventListener("click",function(){
   lang=b.dataset.l;try{localStorage.setItem(KEYL,lang)}catch(e){}
-  applyLang();renderStatus();renderTabs();renderHeader();renderTree();renderPanel();renderViews();
+  applyLang();publishContext();renderStatus();renderTabs();renderHeader();renderTree();renderPanel();renderViews();
 })});
 $("undo").addEventListener("click",function(){
   if(!hist.length)return;
@@ -1917,10 +1961,25 @@ $("undo").addEventListener("click",function(){
 $("addPage").addEventListener("click",function(){addNew(addTarget(),"page")});
 $("addHint").addEventListener("click",function(){addNew(addTarget(),"hint")});
 $("fold").addEventListener("click",function(){var all=true;walk(S.tree,function(x){if(x.c&&x.c.length&&!open[x.id])all=false});walk(S.tree,function(x){if(x.c)open[x.id]=!all||x.id==="root"});saveOpen();renderHeader();renderTree()});
-$("brand").addEventListener("change",function(){remember();S.brand=$("brand").value;setBrandFuncs(S.brand);commit()});
+$("brand").addEventListener("change",function(){remember();S.brand=$("brand").value;setBrandFuncs(S.brand);commit();publishContext()});
+
+/* P0.4 shared vehicle context; its availability labels are descriptive, not firmware guarantees. */
+var hwKey="mibr-menu-editor/4:hardware", hwState={unit:"MU1440",cluster:"AID10"};
+try{var oldHW=JSON.parse(localStorage.getItem(hwKey)||"null");if(oldHW&&["MU1440","MU1409","MU1447"].indexOf(oldHW.unit)>=0&&["AID10","other"].indexOf(oldHW.cluster)>=0)hwState=oldHW}catch(e){}
+$("unitModel").value=hwState.unit;$("clusterModel").value=hwState.cluster;
+function publishContext(){
+  hwState.unit=$("unitModel").value;hwState.cluster=$("clusterModel").value;
+  try{localStorage.setItem(hwKey,JSON.stringify(hwState))}catch(e){}
+  $("compatHint").textContent=S.brand==="skoda"&&hwState.unit==="MU1440"&&hwState.cluster==="AID10"?(lang==="de"?"Referenzprofil MU1440/AID10":"Reference profile MU1440/AID10"):(lang==="de"?"Experimentelles Profil: Kompatibilität noch prüfen":"Experimental profile: compatibility unverified");
+  window.dispatchEvent(new CustomEvent("mibr:vehiclechange",{detail:{brand:S.brand,headUnit:hwState.unit,cluster:hwState.cluster}}));
+}
+$("unitModel").addEventListener("change",publishContext);
+$("clusterModel").addEventListener("change",publishContext);
+window.MIBR_getVehicle=function(){return {brand:S.brand,headUnit:hwState.unit,cluster:hwState.cluster}};
+
 $("fname").addEventListener("focus",function(){typing=false});
 $("fname").addEventListener("input",function(){if(!typing){remember();typing=true}S.name=clean($("fname").value);softRefresh()});
-$("chip").addEventListener("click",function(){tab="file";$("app").dataset.tab=tab;renderTabs();renderViews()});
+$("chip").addEventListener("click",function(){tab="menu";menuPane="file";$("app").dataset.tab=tab;$("app").dataset.menuPane=menuPane;renderTabs();renderViews()});
 
 /* ================= save / load ================= */
 var dl=undefined;
@@ -2036,7 +2095,7 @@ function connect(){
 /* ================= start ================= */
 var imp=initState();
 applyLang();renderHeader();renderTree();renderPanel();
-layout();renderStatus();
+layout();renderStatus();publishContext();
 if(imp){toast(imp==="imported"?(lang==="de"?"Aus dem älteren Editor übernommen.":"Imported from the earlier editor."):(lang==="de"?"Aus dem älteren Editor übernommen. Nicht übernommen: "+imp.split(":")[1]+".":"Imported from the earlier editor. Not taken over: "+imp.split(":")[1]+"."))}
 connect();
 })();
