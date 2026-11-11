@@ -33,7 +33,7 @@ async function main(){
   await new Promise(resolve=>setTimeout(resolve,20));
   assert.deepEqual(failures,[],"Startup runtime exception");
   assert.equal(query("#appTitle").textContent,"MIB-Konfigurator");
-  assert.equal(d.querySelectorAll("#tabs button").length,3);
+  assert.equal(d.querySelectorAll("#tabs button").length,4);
   assert.ok(d.querySelectorAll("#tree .row").length>15,"Missing existing menu tree");
   assert.ok(query("#menuTools")&&!query("#menuTools").hidden);
   assert.ok(query("#menuWorkspaceControls").contains(query("#menuTools")), "Menu toolbar must be owned by menu workspace");
@@ -56,22 +56,27 @@ async function main(){
   assert.equal(query("#menuSections").hidden,true);
   assert.equal(w.getComputedStyle(query("#menuWorkspaceControls")).display,"none", "Menu tools visually leaked into View configurator");
   assert.ok(query("#navv-layer").contains(query("#navv-json")), "View profile export must be owned by View configurator");
-  assert.ok(query(".navv-filebar").contains(query("#navv-import")), "View profile import must be directly available in View tab");
+  assert.ok(query(".navv-filebar").contains(query("#navv-import")), "Legacy View profile import remains available");
   assert.ok(query(".navv-filebar").contains(query("#navv-conf")), "View profile .conf export missing");
-  assert.ok(query(".navv-filebar")&&!query(".navv-filebar").closest("details"), "View file controls should not be hidden in collapsed accordion");
+  assert.ok(query(".navv-filebar").closest("#legacyViewFiles"), "Legacy view files belong in an advanced section");
   assert.equal(query("#navv-layer").hidden,false);
-  assert.ok(query('#navv-safe-tools .sa-menu'),"Integrated safe area missing");
+  assert.ok(query("#navv-center-svg"),"Center cockpit SVG missing");
+  assert.equal(query("#navv-cluster").hidden,true,"Legacy preview must be hidden in Center view");
   assert.equal(JSON.parse(query("#navv-out").textContent).schema,"mibr.nav-view-profiles/2");
 
-  change('#navv-safe-tools #sa-x',"400","input");
-  let profile=JSON.parse(query("#navv-out").textContent);
-  // Updating the safe area writes to state; JSON preview refreshes when other controls change.
+  click('#tabs [data-t=safe]');
+  assert.ok(query(".sa-menu"),"Dedicated Safe Area is missing");
+  change("#sa-x","400","input");
+  assert.equal(w.MIBR_views.get().views.center.safeArea.x,400,"Standalone Safe Area should update project state");
+  click('#tabs [data-t=nav]');
   click('[data-navv-view=wide]');
+  let profile;
   profile=JSON.parse(query("#navv-out").textContent);
   assert.equal(profile.views.center.safeArea.x,400,"Safe area did not become part of the view profile");
   assert.ok(profile.views.wide.safeArea.w>100,"Wide safe area missing");
   change("#navv-mode","custom");
   assert.ok(query('[data-navv-section=native][data-navv-key=topText]')&&!query('[data-navv-section=native][data-navv-key=topText]').disabled);
+  assert.equal(query("#navv-center-preview").hidden,true,"Only Center view uses the new SVG mockup");
 
   click('#tabs [data-t=help]');
   assert.equal(query("#menuWorkspaceControls").hidden,true, "Menu controls leaked into help tab");
