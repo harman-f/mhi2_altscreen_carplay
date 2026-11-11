@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "profile": "skoda-mu1440-p4526",
+  "firmware": "MHI2_ER_SKG13_P4526_MU1440",
+  "original_lsd_jxe_sha256": "a55d9cfb69c5756f8202b7f7aa4079d4d5b637ae4c2fd0fe723f1d6816cbeea8",
+  "audio": {
+    "status": "pending-exact-audio-abi",
+    "auto_install": false,
+    "compiled_artifact": null,
+    "spatial_audio_enabled": false,
+    "stereo_upmix_enabled": false,
+    "reference_upstream": [
+      "luka-dev/mib2q-carplay-rgi@df73e061a29c4d996550716987f42a9243daa09a",
+      "yety-ua/mhi2-k3346-carplay-audio-upmix@feb077310a10ce9aef357ebb6467c549eca972ee"
+    ],
+    "evidence_requirements": [
+      "Verify external amplifier ECU/J525 part number and full coding on the actual fitted vehicle, not brand alone",
+      "Prove native QNX audio stack, PCM sink and session/focus APIs for exact target firmware; no Audi Qualcomm drivers",
+      "Observe multichannel MOST route/format/width and channel-to-speaker assignments using safe tests without overwriting amplifier coding",
+      "Confirm six independent music PCM channels, centre and LFE, gain limits, output phase/cabin matrix and DSP CPU deadline",
+      "Isolate voice, navigation announcements, telephone and reverse camera audio from upmix; preserve existing stock mixer owner",
+      "Prove per-profile signed-off ABI build/source provenance, QNX regression, rollback and repeatable on-car A/B"
+    ],
+    "safe_fallback": "Unmodified OEM stereo; never inject six-channel PCM or modify J525 without all gates"
+  },
+  "notes": "Source-only profile declaration; exact firmware identification does not establish physical amplifier identity",
+  "integration_contract": {
+    "schema": "mibr-module-binding/1",
+    "project_runtime_root": "/mnt/app/root/mibr",
+    "profile_selector_source": "/ifs/lsd.jxe",
+    "profile_selector_sha256": "a55d9cfb69c5756f8202b7f7aa4079d4d5b637ae4c2fd0fe723f1d6816cbeea8",
+    "hmi_api_jar_sha256": "57dc5e9313ef8a59403a17b3a6726f0852f6ac68cc72e42ef2a1ca530aba3ae7",
+    "control_plane": "MIBR/3",
+    "control_owner": "modules/broker/source/mibr-control",
+    "settings_registry": "settings/registry.json",
+    "control_binding": "not-implemented",
+    "registry_key": null,
+    "desired_enabled": "off",
+    "runtime_activation": "BLOCKED_PENDING_QUALIFIED_AUDIO_OWNER_ACK",
+    "data_plane": "existing-stock-audio-owner",
+    "existing_audio_owner_source": "modules/audio/source/mibr_audio_owner.c",
+    "new_socket_service": false,
+    "new_audio_daemon": false,
+    "new_carplay_session": false,
+    "qnx_pcm_sink": "pending-exact-abi",
+    "most_channel_mapping": "pending-physical-amplifier-proof",
+    "compiled_audio_adapter": null,
+    "compiled_j9_adapter": null,
+    "build_recipe": null,
+    "unit_rollback_receipt": null,
+    "safe_behavior": "STOCK_UNMODIFIED"
+  }
+}
