@@ -70,6 +70,33 @@ function overlap(a,b){
        overlapLowerFooter:Math.round(overlap(lower,footer)),
        scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth)});
     }
+    // Exercise the actual 'Links / Rechts / Oben' maneuver-card positions.
+    await page.locator('[data-navv-section="carplay"][data-navv-key="surface"]').selectOption("map");
+    await page.locator("#navv-bgmode").selectOption("map");
+    await page.locator('[data-navv-section="native"][data-navv-key="topText"]').selectOption("distance");
+    await page.locator('[data-navv-section="native"][data-navv-key="topSymbol"]').selectOption("lanes");
+    const positions={};
+    for(const pos of ["left","right","top"]){
+      await page.locator('[data-navv-section="carplay"][data-navv-key="maneuver"]').selectOption(pos);
+      const overlay=page.locator("#"+view+"-carplay-overlay");
+      assert.equal(await overlay.isVisible(),true,view+" "+pos+" overlay visible");
+      positions[pos]=await b(overlay);
+      assert(positions[pos],"Overlay has a measurable box");
+    }
+    assert(positions.left.x<positions.right.x,view+" left and right map placement");
+    assert(positions.top.y<positions.left.y,view+" top placement above lower placements");
+    const upper=await b(page.locator("#"+view+"-top-text"));
+    assert.equal(Math.round(overlap(positions.top,upper)),0,view+" top maneuver preview does not cover native road text");
+    const lower=await b(page.locator("#"+view+"-bottom-info"));
+    assert.equal(Math.round(overlap(positions.top,lower)),0,view+" top maneuver preview does not cover bottom info");
+    await page.locator(".navv-view-preview").screenshot({path:path.join(output,sc.name+"-"+view+"-maneuver-top.png"),animations:"disabled"});
+    results.push({scenario:sc.name,view,surface:"maneuver-top",
+      overlay:{x:Math.round(positions.top.x),y:Math.round(positions.top.y)},
+      overlapStatusRoad:Math.round(overlap(upper,await b(page.locator("#"+view+"-top-status"))),
+      overlapLowerFooter:0});
+    await page.locator('[data-navv-section="carplay"][data-navv-key="maneuver"]').selectOption("off");
+    await page.locator('[data-navv-section="native"][data-navv-key="topText"]').selectOption("off");
+    await page.locator('[data-navv-section="native"][data-navv-key="topSymbol"]').selectOption("off");
     if(sc.name==="iphone"){
      // A standalone mobile screenshot also includes the selection context, not just the SVG.
      await page.locator(".navv-view-selector").screenshot({path:path.join(output,"iphone-"+view+"-selector.png")});

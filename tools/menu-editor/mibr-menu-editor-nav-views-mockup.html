@@ -2728,6 +2728,14 @@ function renderCockpitPreview(v){
  visible("bottom-distance",v.native.bottomDistance!==false);
  visible("bottom-eta",v.native.bottomEta!==false&&v.guidance.bottom!=="off"&&v.carplay.eta!==false);
  visible("carplay-overlay",hasMap&&v.carplay.maneuver!=="off");
+ // Maneuver-card position is a mock-up preview only; no vehicle position mapping is implied.
+ var maneuverPositions={
+   center:{top:[0,-92],left:[-14,-6],right:[14,-6]},
+   wide:{top:[0,-76],left:[-62,-8],right:[62,-8]},
+   full:{top:[0,-72],left:[-210,0],right:[210,0]}
+ };
+ var offset=(maneuverPositions[id]&&maneuverPositions[id][v.carplay.maneuver])||[0,0];
+ target(id+"-carplay-overlay").setAttribute("transform","translate("+offset[0]+" "+offset[1]+")");
  var top=target(id+"-top-label");
  if(top){var dist=id==="wide"?"300 m":id==="full"?"100 m":"200 m";
    top.textContent=v.native.topText==="street"?"Hauptstraße":v.native.topText==="maneuver"?"In "+dist+" rechts abbiegen":dist+" · Hauptstraße";}

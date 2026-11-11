@@ -101,6 +101,22 @@ async function main(){
   assert.equal($("#center-app-placeholder").style.display,"none","App placeholder hidden in off mode");
   set('[data-navv-section="carplay"][data-navv-key="surface"]',"map");
   assert.equal($("#navv-bgmode").disabled,false,"Background mode enabled for map");
+  for(const view of ["center","wide","full"]){
+    click('[data-navv-view='+view+']');
+    const overlay=$("#"+view+"-carplay-overlay");
+    set('[data-navv-section="carplay"][data-navv-key="maneuver"]',"left");
+    const left=overlay.getAttribute("transform");
+    set('[data-navv-section="carplay"][data-navv-key="maneuver"]',"right");
+    const right=overlay.getAttribute("transform");
+    set('[data-navv-section="carplay"][data-navv-key="maneuver"]',"top");
+    const top=overlay.getAttribute("transform");
+    assert.notEqual(left,right,view+" maneuver left and right differ");
+    assert.notEqual(top,left,view+" maneuver top differs");
+    assert.notEqual(overlay.style.display,"none",view+" maneuver preview visible");
+    set('[data-navv-section="carplay"][data-navv-key="maneuver"]',"off");
+    assert.equal(overlay.style.display,"none",view+" maneuver preview hidden");
+  }
+  click('[data-navv-view=center]');
 
 
   // Wide: angled side modules and right-hand native guidance, not enlarged Center circles.

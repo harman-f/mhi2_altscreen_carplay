@@ -17,3 +17,7 @@ Keine zusätzliche reale App-Darstellung oder BAP-Simulation; keine Änderung de
 ## Prüfung
 
 `test-p04.cjs` und `test-p05.cjs` einschließlich neuer Assertions für App/Off/Map je View, Textgrößen, Tick-Ausrichtung, gemeinsame Voll-Maskenkontur und exakte Übereinstimmung zwischen SVG-Dateien und Inline-SVGs. Visuelle Prüfung auf echtem iPhone/Safari bleibt Freigabegate. PR bleibt Draft; keine Änderung an `main`.
+
+## Abschlussaudit der Manöverkarte
+
+Im P0.8/P0.9-Ausgangsstand wurde `carplay.maneuver` mit den Ausprägungen `left`, `right`, `top` nur ein- oder ausgeblendet, die gewählte Position blieb unberücksichtigt. Der P0.9-Renderer verschiebt nun ausschließlich die **Editor-Vorschau** innerhalb des jeweiligen Cockpitbereichs. Die Positionen unterscheiden sich optisch und werden in Chromium bei Desktop- und iPhone-Abmessungen darauf geprüft, dass `top` oberhalb von `left` liegt, `left` links von `right` und die obere Karte den nativen Straßentext nicht überlagert. Das gespeicherte Format bleibt unverändert; kein Nachweis für fahrzeugseitige Positionierbarkeit.
