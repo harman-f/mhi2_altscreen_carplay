@@ -164,13 +164,13 @@ async function main(){
   set("#navv-copy-target","wide");
   click("#navv-copy");
   const copied=w.MIBR_project.capture().viewProfiles.views.wide;
-  assert.deepEqual(copied.safeArea,safeBefore,"Copy must preserve target safe-area geometry");
+  assert.deepEqual(clone(copied.safeArea),safeBefore,"Copy must preserve target safe-area geometry");
   assert.equal(copied.mockup.background,bgBefore,"Copy must preserve target preview background");
   assert.equal(copied.mode,"custom","Copy activates individual profile");
   assert.equal($("#navv-wide-svg").style.display,"block","Copy selects target view immediately");
   const originalSafe=clone(copied.safeArea);
   click("#navv-reset-view");
-  assert.deepEqual(w.MIBR_project.capture().viewProfiles.views.wide.safeArea,originalSafe,"Reset must preserve calibrated safe-area");
+  assert.deepEqual(clone(w.MIBR_project.capture().viewProfiles.views.wide.safeArea),originalSafe,"Reset must preserve calibrated safe-area");
   click('[data-navv-view=center]');
 
   click('#tabs [data-t=safe]');
