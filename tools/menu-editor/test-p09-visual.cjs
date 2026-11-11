@@ -7,6 +7,8 @@ const {pathToFileURL} = require("node:url");
 const {chromium} = require("playwright-core");
 
 const source=path.join(__dirname,"mibr-menu-editor-nav-views-mockup.html");
+const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p091.html");
+assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.1 standalone review HTML must match canonical source");
 const output=path.join(process.cwd(),"p09-visual-artifacts");
 fs.mkdirSync(output,{recursive:true});
 const chromeCandidates=[process.env.CHROME_PATH,process.env.CHROMIUM_PATH,
@@ -39,6 +41,20 @@ function overlap(a,b){
     await page.locator('[data-navv-view="'+view+'"]').click();
     assert.equal(await page.locator('[data-navv-view="'+view+'"]').getAttribute("aria-pressed"),"true");
     assert.equal(await page.locator('#navv-viewname').innerText(),view==="full"?"Voll":view==="wide"?"Wide":"Center");
+    const common=await page.evaluate(v=>{
+      const svg=document.getElementById("navv-"+v+"-svg");
+      const a=id=>svg.querySelector("#"+v+"-"+id);
+      return {
+        clockX:a("top-status").querySelector('text[text-anchor="middle"]').getAttribute("x"),
+        clockSize:a("top-status").querySelector('text[text-anchor="middle"]').getAttribute("font-size"),
+        temperatureX:a("top-status").querySelectorAll("text")[2].getAttribute("x"),
+        roadX:a("top-label").getAttribute("x"),
+        distanceX:a("bottom-distance").querySelector("text").getAttribute("x"),
+        etaX:a("bottom-eta-label").getAttribute("x"),
+        footerX:a("footer").querySelector("text").getAttribute("x")
+      };
+    },view);
+    assert.deepEqual(common,{clockX:"505",clockSize:"24",temperatureX:"640",roadX:"505",distanceX:"437",etaX:"550",footerX:"387"},view+" shared layout");
     const active=page.locator("#navv-"+view+"-svg");
     assert.equal(await active.isVisible(),true,view+" visible");
     for(const other of views.filter(x=>x!==view))assert.equal(await page.locator("#navv-"+other+"-svg").isVisible(),false,other+" hidden");

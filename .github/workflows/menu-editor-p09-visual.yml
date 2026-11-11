@@ -1,10 +1,12 @@
-name: MIBR P0.9 visual Chromium acceptance
+name: MIBR P0.9.1 visual Chromium acceptance
 on:
   pull_request:
     paths:
       - 'tools/menu-editor/mibr-menu-editor-nav-views-mockup.html'
       - 'tools/menu-editor/mibr-*-preview.svg'
       - 'tools/menu-editor/test-p09-visual.cjs'
+      - 'tools/menu-editor/build-shared-oem-overlays.cjs'
+      - 'tools/menu-editor/mibr-menu-editor-nav-views-p091.html'
       - '.github/workflows/menu-editor-p09-visual.yml'
   workflow_dispatch:
 jobs:
@@ -18,13 +20,15 @@ jobs:
           node-version: '22'
       - name: Install test-only Chromium driver
         run: npm install --no-save --no-package-lock --ignore-scripts playwright-core@1.55.0
+      - name: Verify SVGs and embedded HTML generated from common OEM layout
+        run: node tools/menu-editor/build-shared-oem-overlays.cjs --check
       - name: Render all three views with real Chromium
         run: node tools/menu-editor/test-p09-visual.cjs
       - name: Upload desktop and iPhone-size screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mib-p09-visual-screenshots
+          name: mib-p091-visual-screenshots
           path: p09-visual-artifacts/
           if-no-files-found: warn
           retention-days: 14
