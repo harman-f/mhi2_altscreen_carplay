@@ -38,17 +38,19 @@
     <path d="M556 174l18 9-18 9v-6h-18v-6h18z" fill="#fff5ac"/>
     <path d="M507 280l-12 17 12-6 12 6z" fill="#ff3a41" stroke="#f5f8ff" stroke-width="2.8"/>
   </g>
+ <g id="center-app-placeholder" style="display:none"><rect x="416" y="157" width="180" height="67" rx="7" fill="#0c1728" stroke="#527891" stroke-opacity=".6"/><text x="506" y="185" fill="#d8e7f5" text-anchor="middle" font-size="15" font-weight="600">CarPlay-App</text><text x="506" y="205" fill="#94acbd" text-anchor="middle" font-size="11">Vorschau · nur Editor</text></g>
+ <g id="center-off-placeholder" style="display:none"><text x="506" y="182" fill="#8ea4ba" text-anchor="middle" font-size="14" font-weight="600">CarPlay aus</text><text x="506" y="203" fill="#6f8398" text-anchor="middle" font-size="11">nur Editor</text></g>
 </g>
 <g id="center-top-status" fill="#f8fbff">
-  <path d="M425 29l-6 14h12z" fill="#e8f2fb"/><text x="437" y="42" font-size="19" font-weight="650">W</text>
-  <text x="506" y="42" font-size="28" font-weight="650" text-anchor="middle" letter-spacing=".25">23:22</text>
+  <path d="M425 29l-6 14h12z" fill="#e8f2fb"/><text x="437" y="42" font-size="16.5" font-weight="650">W</text>
+  <text x="506" y="42" font-size="25" font-weight="650" text-anchor="middle" letter-spacing=".25">23:22</text>
   <g stroke="#25c4ec" stroke-width="1.9" stroke-linecap="round" transform="translate(615 31)"><path d="M0-8V8M-7-4L7 4M-7 4L7-4"/></g>
-  <text x="631" y="41" font-size="18.5" font-weight="600">4.0°C</text>
+  <text x="631" y="41" font-size="16.5" font-weight="600">4.0°C</text>
   <path d="M410 59H459l8 5h73l8-5h55" stroke="#dce9f5" fill="none" stroke-width="1.5" opacity=".84"/>
 </g>
 <g id="center-top-text" fill="#f8faff" text-anchor="middle">
   <rect x="397" y="73" width="217" height="28" rx="3" fill="#090f1d" opacity=".88"/>
-  <text id="center-top-label" x="506" y="93" font-size="17.5" font-weight="600">200 m · Hauptstraße</text>
+  <text id="center-top-label" x="506" y="93" font-size="16.5" font-weight="600">200 m · Hauptstraße</text>
 </g>
 <g id="center-top-lanes" stroke="#f3f7fd" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" fill="none">
   <path d="M464 109V132M495 109V132M527 109V132M560 109V132" stroke-opacity=".72"/>
@@ -90,30 +92,32 @@
   <path d="M774 139v-13q0-4 4-4h11m-6-5l7 5-7 5" stroke-width="2.9"/>
 </g>
 <g id="center-right-turn">
-  <path d="M748 220V188Q748 160 778 160H790V150L813 169L790 188V177H780Q768 177 768 193V220Z" fill="url(#c-turn)"/>
-  <path d="M749 187Q749 155 780 155H789V149L813 169L790 188V176H779Q767 176 767 190" stroke="#f7fcff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M749 221H767" stroke="#10a42a" stroke-width="4"/>
+  <g transform="translate(78 18.5) scale(.9)">
+    <path d="M748 220V188Q748 160 778 160H790V150L813 169L790 188V177H780Q768 177 768 193V220Z" fill="url(#c-turn)"/>
+    <path d="M748 188Q748 160 778 160H790V150L813 169L790 188V177H780Q768 177 768 193" stroke="#f7fcff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M748 220H768" stroke="#10a42a" stroke-width="3"/>
+  </g>
 </g>
 <g id="center-dial-distance" text-anchor="middle" fill="#f7fbff">
   <text x="757" y="256" font-size="20.5" font-weight="600">200 m</text>
 </g>
-<g id="center-bottom-info" font-size="16.5" font-weight="600" fill="#f1f6ff">
-  <g id="center-bottom-distance"><circle cx="429" cy="312" r="7.5" stroke="#dce7f3" fill="none" stroke-width="1.6"/><path d="M429 300v24m-12-12h24" stroke="#dce7f3" fill="none" stroke-width="1.1"/><text x="444" y="319">1.3 km</text></g>
-  <g id="center-bottom-eta"><text id="center-bottom-eta-label" x="553" y="319">23:23</text><circle cx="599" cy="312" r="8" fill="none" stroke="#eef3fb" stroke-width="1.6"/><path d="M599 307v5l4 3" stroke="#eef3fb" fill="none" stroke-width="1.5"/></g>
+<g id="center-bottom-info" font-size="14.5" font-weight="600" fill="#f1f6ff">
+  <g id="center-bottom-distance"><circle cx="429" cy="312" r="7.5" stroke="#dce7f3" fill="none" stroke-width="1.6"/><path d="M429 300v24m-12-12h24" stroke="#dce7f3" fill="none" stroke-width="1.1"/><text x="444" y="317">1.3 km</text></g>
+  <g id="center-bottom-eta"><text id="center-bottom-eta-label" x="553" y="317">23:23</text><circle cx="599" cy="312" r="8" fill="none" stroke="#eef3fb" stroke-width="1.6"/><path d="M599 307v5l4 3" stroke="#eef3fb" fill="none" stroke-width="1.5"/></g>
 </g>
-<g id="center-footer" font-size="12.5" font-weight="500" fill="#ccd6e4">
+<g id="center-footer" font-size="11.5" font-weight="500" fill="#ccd6e4">
  <path d="M377 332H635" stroke="#d4e2ef" stroke-width="1.2" opacity=".54"/>
  <rect x="385" y="334" width="252" height="24" rx="2" fill="#0c1524" opacity=".64"/>
  <text x="393" y="350">trip 5936.7 km</text>
  <path d="M492 356l6-20h9l6 20" fill="#74879f" opacity=".9"/>
  <path d="M498 336l-7 20m16-20l7 20" stroke="#bcc7d6" stroke-width="1.7"/>
- <path d="M545 350l6-13 6 13m8 0l6-13 6 13" stroke="#ffe12e" stroke-width="2" fill="none"/>
+ <path d="M548 350l5-10 5 10m7 0l5-10 5 10" stroke="#ffe12e" stroke-width="1.6" opacity=".82" fill="none"/>
  <text x="580" y="350" font-size="10">--- km/h</text>
 </g>
 <g id="center-side-metrics" fill="#d7e6f7" font-size="13.5" font-weight="600">
- <text x="36" y="111">130</text><text x="42" y="185">90</text><text x="42" y="289">50</text>
+ <g text-anchor="end" dominant-baseline="middle"><text x="31" y="129">130</text><text x="31" y="178">90</text><text x="31" y="266">50</text></g>
  <path d="M37 129H68M37 178H68M37 266H68" stroke="#4d6076" stroke-width="3" opacity=".65"/>
- <text x="944" y="111">1/1</text><text x="943" y="184">1/2</text><text x="951" y="288">R</text>
+ <g text-anchor="start" dominant-baseline="middle"><text x="982" y="130">1/1</text><text x="982" y="181">1/2</text><text x="982" y="268">R</text></g>
  <path d="M945 130H976M945 181H976M945 268H976" stroke="#dbe4ec" stroke-width="4" opacity=".74"/>
 </g>
 <g id="center-carplay-overlay" style="display:none" font-size="12" font-weight="600">
