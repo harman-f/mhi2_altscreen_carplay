@@ -1926,7 +1926,7 @@ var mq=window.matchMedia("(max-width:1099px)");
 function isNarrow(){return mq.matches}
 var firstLayout=true;
 function layout(){
-  var n=isNarrow();firstLayout=false;
+  var n=isNarrow();if(firstLayout&&n)menuPane="tree";firstLayout=false;
   $("app").dataset.narrow=n?"1":"0";
   if(!n&&menuPane==="tree")menuPane="preview";
   $("app").dataset.tab=tab;$("app").dataset.menuPane=menuPane;
@@ -2155,19 +2155,22 @@ connect();
 #navv-layer header{display:none!important}
 #navv-body{max-width:none;padding:12px 2px}
 #navv-layer .navv-card{background:var(--surface);border-color:var(--line);color:var(--text)}
+#navv-layer .navv-accordion{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-top:14px;overflow:hidden}
+#navv-layer .navv-accordion summary{cursor:pointer;padding:12px 15px;font-weight:650;list-style-position:inside}
+#navv-layer .navv-accordion .navv-card{border:0;border-top:1px solid var(--line);border-radius:0}
+#navv-layer .navv-buttons select{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;min-height:38px;padding:5px 8px}
+#navv-layer .sa-menu{background:var(--surface)}
 #navv-layer .navv-note{color:var(--muted)}
 #navv-layer .navv-row{border-bottom-color:var(--line)}
 #navv-layer .navv-menu button,#navv-layer .navv-views button,#navv-layer .navv-buttons button,#navv-layer .navv-row select{background:var(--surface);color:var(--text);border-color:var(--line)}
 #navv-layer .navv-menu button[aria-pressed=true],#navv-layer .navv-views button[aria-pressed=true]{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
 #navv-layer #navv-out{background:var(--raised);color:var(--text)}
 </style>
-<button type="button" id="navv-open">🧭 Navigation pro View · Mock-up</button>
-<div id="navv-layer" hidden role="dialog" aria-label="Cockpit Navigation pro View">
-<header><strong>MIBR Menü-Editor · Navigation</strong><span>Entwurf P0.2 · HU MU1440 / AID10</span><button type="button" id="navv-close">← Original-Menü-Editor v2</button></header>
+<div id="navv-layer" hidden role="region" aria-label="View-Konfigurator">
 <div id="navv-body">
-<h2>View-spezifische Navigation</h2><p>Center, Wide und Voll werden als vollständige Cockpit-Profile konfiguriert: CarPlay, native Navigation und Safe Area gehören zusammen. Die Profile sind noch nicht auf dem Fahrzeug installierbar.</p>
-<nav class="navv-menu"><button type="button" data-navv-tab="view" aria-pressed="true">Cockpit-Views</button><button type="button" data-navv-tab="global">Gemeinsame Werte</button><button type="button" data-navv-tab="evidence">Fahrzeugbefunde</button><button type="button" data-navv-tab="files">Import / Export</button></nav>
-<div class="navv-panel" data-navv-panel="view"><div class="navv-grid">
+<h2>View-Konfigurator</h2><p>Center, Wide und Voll werden als vollständige Cockpit-Profile konfiguriert: CarPlay, native Navigation und Safe Area gehören zusammen. Die Profile sind noch nicht auf dem Fahrzeug installierbar.</p>
+<div class="navv-note" id="navv-config-warning">View-Profile sind experimentell und ändern das Fahrzeug nicht direkt.</div>
+<section id="navv-view-workspace"><div class="navv-grid">
 <div class="navv-stack">
 <div class="navv-card"><h3>Aktive Cockpit-Ansicht</h3><div class="navv-views"><button type="button" data-navv-view="center">Center</button><button type="button" data-navv-view="wide">Wide</button><button type="button" data-navv-view="full">Voll</button></div><div class="navv-row"><label>Profilmodus</label><select id="navv-mode"><option value="custom">Individuell</option><option value="inherit">Globale Werte erben</option></select></div><p id="navv-mode-info" class="navv-note"></p><div class="navv-buttons"><label for="navv-copy-target" class="navv-note" data-i18n="copylabel">Profil kopieren nach</label><select id="navv-copy-target"><option value="center">Center</option><option value="wide">Wide</option><option value="full">Voll</option></select><button type="button" id="navv-copy">Kopieren</button><button type="button" id="navv-reset-view">View zurücksetzen</button></div></div>
 <div class="navv-card"><h3>Live-Vorschau: <span id="navv-viewname">Center</span></h3><div id="navv-cluster"><div class="navv-dial">19 km<small>seit Start</small></div><div id="navv-mid"><div id="navv-text"></div><div id="navv-small"></div><div id="navv-map"></div></div><div class="navv-dial"><span id="navv-tube"></span><small id="navv-distance"></small></div></div><p class="navv-note">Schematische Darstellung. Die echte AID10-/BAP-Wirkung wird nicht simuliert.</p><div id="navv-warning"></div></div>
@@ -2187,22 +2190,22 @@ connect();
 <div class="navv-row"><label>Seitenstraßen im Pfeil</label><input type="checkbox" data-navv-section="guidance" data-navv-key="sideStreets"></div>
 <div class="navv-row"><label>Untere Zeitangabe</label><select data-navv-section="guidance" data-navv-key="bottom"><option value="eta">Ankunftszeit</option><option value="remaining">Restfahrzeit</option><option value="off">Aus (experimentell)</option></select></div></div>
 <div class="navv-card"><h3 id="navv-safe-title">Bildbereich / Safe Area</h3><div id="navv-safe-tools"></div></div>
-</div></div></div>
-<div class="navv-panel" data-navv-panel="global" hidden><div class="navv-card"><h3>Bestehende globale Schalter als Vorgaben</h3><p class="navv-note">Die hier konfigurierten Werte ändern keine Fahrzeugdateien.</p>
+</div></div></section>
+<details class="navv-accordion"><summary>Gemeinsame Vorgaben (alle Views)</summary><div class="navv-card"><h3>Bestehende globale Schalter als Vorgaben</h3><p class="navv-note">Die hier konfigurierten Werte ändern keine Fahrzeugdateien.</p>
 <div class="navv-row"><label>nav_source</label><select data-navv-global="source"><option value="auto">Automatisch</option><option value="stock">Original</option><option value="phone">iPhone</option></select></div>
 <div class="navv-row"><label>nav_display</label><select data-navv-global="legacyDisplay"><option value="side">Side</option><option value="top">Top only</option><option value="both">Side and top</option></select></div>
 <div class="navv-row"><label>nav_line</label><select data-navv-global="legacyLine"><option value="dist">Entfernung + Straße</option><option value="street">Straße</option><option value="off">Aus</option></select></div>
 <div class="navv-row"><label>nav_lanes</label><input type="checkbox" data-navv-global="legacyLanes"></div>
 <div class="navv-row"><label>nav_side (Seitenstraßen)</label><input type="checkbox" data-navv-global="sideStreets"></div>
-<div class="navv-row"><label>nav_bottom</label><select data-navv-global="bottom"><option value="eta">Ankunftszeit</option><option value="remaining">Restfahrzeit</option></select></div></div></div>
-<div class="navv-panel" data-navv-panel="evidence" hidden><div class="navv-card"><h3>Reale Testzustände am MU1440 / AID10</h3><table><thead><tr><th>Menüwert</th><th>Text oben</th><th>Kleiner Pfeil</th><th>Tube rechts</th></tr></thead><tbody><tr><td>Side and Top</td><td>Ja</td><td>Ja</td><td>Ja</td></tr><tr><td>Top only</td><td>Nein</td><td>Nein</td><td>Ja</td></tr><tr><td>Side</td><td>Ja</td><td>Nein</td><td>Ja</td></tr></tbody></table><p class="navv-note">Quelle: die drei Fahrzeugaufnahmen vom 10.11.2026. Die Pfeilform kann sich durch die Navigationsroute selbst ändern. Die Tabelle belegt nicht unabhängig schaltbare BAP-Kanäle.</p><p>Im bisherigen Code: Manöver via MANEUVER_DESCRIPTOR, Text via updateBapTurnToInfo, obere Symbole über updateBapLaneGuidance. Der bisherige Schalter nav_side steuert Seitenstraßen, nicht Tube ein/aus.</p></div></div>
-<div class="navv-panel" data-navv-panel="files" hidden><div class="navv-card"><h3>Versionierte Navigations-Profile</h3><p class="navv-note">View-Konfiguration mibr.nav-view-profiles/2 mit Safe Areas. Die Menüdatei MIBR_MENU/1 wird ausschließlich im Menü-Editor verwaltet. Kein Fahrzeug-Loader für View-Profile.</p><div class="navv-buttons"><button type="button" id="navv-json">JSON exportieren</button><button type="button" id="navv-conf">.conf exportieren</button><button type="button" id="navv-import">JSON/.conf importieren</button><button type="button" id="navv-reset">Zurücksetzen</button></div><input id="navv-input" type="file" accept=".json,.conf,.txt"><p id="navv-status" class="navv-note">Keine Datei importiert.</p><h3>JSON-Vorschau</h3><pre id="navv-out"></pre></div></div>
+<div class="navv-row"><label>nav_bottom</label><select data-navv-global="bottom"><option value="eta">Ankunftszeit</option><option value="remaining">Restfahrzeit</option></select></div></div></details>
+<details class="navv-accordion"><summary>Fahrzeugbefunde und technische Hinweise</summary><div class="navv-card"><h3>Reale Testzustände am MU1440 / AID10</h3><table><thead><tr><th>Menüwert</th><th>Text oben</th><th>Kleiner Pfeil</th><th>Tube rechts</th></tr></thead><tbody><tr><td>Side and Top</td><td>Ja</td><td>Ja</td><td>Ja</td></tr><tr><td>Top only</td><td>Nein</td><td>Nein</td><td>Ja</td></tr><tr><td>Side</td><td>Ja</td><td>Nein</td><td>Ja</td></tr></tbody></table><p class="navv-note">Quelle: die drei Fahrzeugaufnahmen vom 10.11.2026. Die Pfeilform kann sich durch die Navigationsroute selbst ändern. Die Tabelle belegt nicht unabhängig schaltbare BAP-Kanäle.</p><p>Im bisherigen Code: Manöver via MANEUVER_DESCRIPTOR, Text via updateBapTurnToInfo, obere Symbole über updateBapLaneGuidance. Der bisherige Schalter nav_side steuert Seitenstraßen, nicht Tube ein/aus.</p></div></details>
+<details class="navv-accordion"><summary>View-Profile importieren / exportieren</summary><div class="navv-card"><h3>Versionierte Navigations-Profile</h3><p class="navv-note">View-Konfiguration mibr.nav-view-profiles/2 mit Safe Areas. Die Menüdatei MIBR_MENU/1 wird ausschließlich im Menü-Editor verwaltet. Kein Fahrzeug-Loader für View-Profile.</p><div class="navv-buttons"><button type="button" id="navv-json">JSON exportieren</button><button type="button" id="navv-conf">.conf exportieren</button><button type="button" id="navv-import">JSON/.conf importieren</button><button type="button" id="navv-reset">Zurücksetzen</button></div><input id="navv-input" type="file" accept=".json,.conf,.txt"><p id="navv-status" class="navv-note">Keine Datei importiert.</p><h3>JSON-Vorschau</h3><pre id="navv-out"></pre></div></details>
 </div></div>
 <script id="navv-script">
 (function(){
 "use strict";
 
-var schema="mibr.nav-view-profiles/2",oldSchema="mibr.nav-view-profiles/1",key="mibr-nav-view-mockup/2",current="center",currentTab="view",safeViewRendered="";
+var schema="mibr.nav-view-profiles/2",oldSchema="mibr.nav-view-profiles/1",key="mibr-nav-view-mockup/2",current="center",safeViewRendered="";
 function $(s){return document.querySelector(s)}
 function all(s){return Array.from(document.querySelectorAll(s))}
 function clone(x){return JSON.parse(JSON.stringify(x))}
@@ -2254,14 +2257,10 @@ $("#navv-warning").textContent=warn.length?warn.join(" "):"Keine offensichtliche
 $("#navv-out").textContent=JSON.stringify(state,null,2);
 if(safeViewRendered!==current){window.MIBR_safe.render(current,$("#navv-safe-tools"));safeViewRendered=current}
 }
-function tab(v){currentTab=v;all("[data-navv-tab]").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.navvTab===v))});all("[data-navv-panel]").forEach(function(p){p.hidden=p.dataset.navvPanel!==v});render()}
-all("[data-navv-tab]").forEach(function(b){b.onclick=function(){tab(b.dataset.navvTab)}});
 all("[data-navv-view]").forEach(function(b){b.onclick=function(){current=b.dataset.navvView;render()}});
 all("[data-navv-section]").forEach(function(c){c.onchange=function(){if(state.views[current].mode!=="custom")return;state.views[current][c.dataset.navvSection][c.dataset.navvKey]=c.type==="checkbox"?c.checked:c.value;save();render()}});
 all("[data-navv-global]").forEach(function(c){c.onchange=function(){state.global[c.dataset.navvGlobal]=c.type==="checkbox"?c.checked:c.value;save();render()}});
 $("#navv-mode").onchange=function(){var v=state.views[current];if(this.value==="custom"&&(!v.carplay||!v.native||!v.guidance)){var def=inherited();v.carplay=def.carplay;v.native=def.native;v.guidance=def.guidance}v.mode=this.value;save();render()};
-$("#navv-open").onclick=function(){$("#navv-layer").hidden=false;$("#navv-open").hidden=true;tab("view")};
-$("#navv-close").onclick=function(){$("#navv-layer").hidden=true;$("#navv-open").hidden=false};
 
 $("#navv-copy").onclick=function(){var dest=$("#navv-copy-target").value;if(dest===current){$("#navv-warning").textContent="Quell- und Zielansicht sind identisch.";return}var source=effective();state.views[dest]=clone(source);state.views[dest].mode="custom";state.views[dest].safeArea=clone(state.views[current].safeArea);window.MIBR_safe.set(dest,state.views[dest].safeArea);save();render()};
 $("#navv-reset-view").onclick=function(){if(!confirm("Dieses View-Profil auf Standard zurücksetzen?"))return;state.views[current]=viewDefaults(current);window.MIBR_safe.set(current,state.views[current].safeArea);safeViewRendered="";save();render()};
