@@ -222,6 +222,42 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 #app[data-tab="safe"] #viewPane{position:static!important;max-height:none!important;overflow:visible!important;width:100%;padding:0}
 #app[data-tab="safe"] .sa{max-width:940px;margin:0 auto}
 
+
+/* P0.8: selected view first, one visible SVG, settings below. */
+#navv-view-workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;max-width:1420px;margin:0 auto;min-width:0}
+#navv-view-workspace .navv-view-selector,#navv-view-workspace .navv-view-preview{width:100%;box-sizing:border-box}
+#navv-view-workspace .navv-views{display:flex;gap:8px;width:100%;margin:12px 0 8px}
+#navv-view-workspace .navv-views button{flex:1 1 0;min-width:0;min-height:44px;font-weight:600}
+#navv-view-workspace #navv-selection-hint{margin:8px 0 0}
+#navv-view-workspace .navv-profile-advanced{margin-top:14px;border-top:1px solid var(--line);padding-top:11px}
+#navv-view-workspace .navv-profile-advanced summary{cursor:pointer;color:var(--text);font-weight:600;line-height:1.5}
+#navv-view-workspace .navv-profile-advanced .navv-buttons{margin-top:10px}
+#navv-view-workspace .navv-profile-advanced .navv-buttons select{min-width:120px;max-width:300px;width:100%}
+#navv-view-workspace .navv-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+#navv-view-workspace .navv-view-preview{padding:18px 20px}
+#navv-view-workspace #navv-center-preview{max-width:1140px;width:100%;margin:12px auto;min-height:0}
+#navv-view-workspace #navv-bg-row{max-width:650px;margin:14px auto 6px}
+#navv-view-workspace #navv-layout-note{max-width:1140px;margin:7px auto}
+#navv-view-workspace #navv-warning{max-width:1140px;margin:10px auto 0}
+#navv-center-preview > svg{display:none}
+#navv-center-preview > svg[hidden]{display:none!important}
+@media(max-width:860px){
+ #navv-view-workspace .navv-settings-grid{grid-template-columns:minmax(0,1fr)}
+ #navv-view-workspace .navv-view-preview{padding:12px}
+}
+@media(max-width:520px){
+ #navv-view-workspace{gap:10px}
+ #navv-view-workspace .navv-card{padding:12px}
+ #navv-view-workspace .navv-views button{min-height:46px}
+ #navv-view-workspace .navv-row{flex-wrap:wrap;align-items:center}
+ #navv-view-workspace .navv-row select{flex:1 1 180px;min-width:0;max-width:none}
+ #navv-view-workspace .navv-profile-advanced .navv-buttons{display:flex;flex-wrap:wrap}
+ #navv-view-workspace .navv-preview-heading h3{font-size:15px}
+ #navv-view-workspace #navv-bg-row{margin-top:8px}
+ #navv-view-workspace #navv-layout-note{font-size:11px}
+ #navv-view-workspace .navv-view-preview{padding:9px}
+}
+
 /* P0.4: shared app shell and context-specific workspaces */
 #globalVehicle{display:flex;gap:8px 12px;align-items:end;flex-wrap:wrap;padding:12px 0 2px}
 #globalVehicle label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:100px}
@@ -2245,10 +2281,9 @@ connect();
 <div id="navv-body">
 <h2>View-Konfigurator</h2><p>Center, Wide und Voll werden als vollständige Cockpit-Profile konfiguriert: CarPlay, native Navigation und Safe Area gehören zusammen. Die Profile sind noch nicht auf dem Fahrzeug installierbar.</p>
 <div class="navv-note" id="navv-config-warning">View-Profile sind experimentell und ändern das Fahrzeug nicht direkt.</div>
-<section id="navv-view-workspace"><div class="navv-grid">
-<div class="navv-stack">
-<div class="navv-card"><h3>Aktive Cockpit-Ansicht</h3><div class="navv-views"><button type="button" data-navv-view="center">Center</button><button type="button" data-navv-view="wide">Wide</button><button type="button" data-navv-view="full">Voll</button></div><div class="navv-row"><label>Profilmodus</label><select id="navv-mode"><option value="custom">Individuell</option><option value="inherit">Globale Werte erben</option></select></div><p id="navv-mode-info" class="navv-note"></p><div class="navv-buttons"><label for="navv-copy-target" class="navv-note" data-i18n="copylabel">Profil kopieren nach</label><select id="navv-copy-target"><option value="center">Center</option><option value="wide">Wide</option><option value="full">Voll</option></select><button type="button" id="navv-copy">Kopieren</button><button type="button" id="navv-reset-view">View zurücksetzen</button></div></div>
-<div class="navv-card"><div class="navv-preview-heading"><h3>Live-Vorschau: <span id="navv-viewname">Center</span></h3><button type="button" id="navv-preview-zoom" aria-expanded="false">⛶ Großansicht</button></div><div class="navv-row" id="navv-bg-row"><label for="navv-bgmode">Vorschau-Hintergrund (nur Editor)</label><select id="navv-bgmode"><option value="grid">Kalibrier-Grid</option><option value="plain">Neutral</option><option value="map">Schematische Karte</option></select></div><div id="navv-center-preview"><button type="button" id="navv-preview-close" aria-label="Großansicht schließen" hidden>Schließen ✕</button><svg id="navv-center-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Modulares AID10 Center-Cockpit: Instrumente, Navigationsanzeigen und Kartenfläche als getrennte SVG-Ebenen">
+<section id="navv-view-workspace">
+<div class="navv-card navv-view-selector"><h3>Aktive Cockpit-Ansicht</h3><div class="navv-views" role="group" aria-label="Aktive Cockpit-Ansicht"><button type="button" data-navv-view="center">Center</button><button type="button" data-navv-view="wide">Wide</button><button type="button" data-navv-view="full">Voll</button></div><p id="navv-selection-hint" class="navv-note" role="status"></p><details class="navv-profile-advanced" id="navv-profile-advanced"><summary>Profilverwaltung · Vererbung, Kopieren und Zurücksetzen</summary><div class="navv-row"><label for="navv-mode">Profilmodus</label><select id="navv-mode"><option value="custom">Individuelles Profil</option><option value="inherit">Globale Standardwerte verwenden</option></select></div><p id="navv-mode-info" class="navv-note"></p><div class="navv-buttons"><label for="navv-copy-target" class="navv-note" data-i18n="copylabel">Profil kopieren nach</label><select id="navv-copy-target"><option value="center">Center</option><option value="wide">Wide</option><option value="full">Voll</option></select><button type="button" id="navv-copy">Einstellungen kopieren</button><button type="button" id="navv-reset-view">Profil zurücksetzen</button></div><p class="navv-note">Kopieren und Zurücksetzen betreffen die Navi- und CarPlay-Einstellungen. Die Safe-Area-Geometrie bleibt unverändert.</p></details></div>
+<div class="navv-card navv-view-preview"><div class="navv-preview-heading"><h3>Live-Vorschau: <span id="navv-viewname">Center</span></h3><button type="button" id="navv-preview-zoom" aria-expanded="false">⛶ Großansicht</button></div><div id="navv-center-preview"><button type="button" id="navv-preview-close" aria-label="Großansicht schließen" hidden>Schließen ✕</button><svg id="navv-center-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Modulares AID10 Center-Cockpit: Instrumente, Navigationsanzeigen und Kartenfläche als getrennte SVG-Ebenen">
 <defs>
 <style>
 #navv-center-svg{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-variant-numeric:tabular-nums}
@@ -2547,9 +2582,8 @@ connect();
  <text x="440" y="239" fill="#ecf8ff" font-size="13">CarPlay-Manöverkarte</text>
  <text x="441" y="260" fill="#aaf8c9" font-size="18" font-weight="650">↱ 100 m</text>
 </g>
-</svg></div><div id="navv-cluster"><div class="navv-dial">19 km<small>seit Start</small></div><div id="navv-mid"><div id="navv-text"></div><div id="navv-small"></div><div id="navv-map"></div></div><div class="navv-dial"><span id="navv-tube"></span><small id="navv-distance"></small></div></div><p class="navv-note" id="navv-layout-note">Schematische Darstellung. Die echte AID10-/BAP-Wirkung wird nicht simuliert.</p><div id="navv-warning"></div></div>
-</div>
-<div class="navv-stack">
+</svg></div><div id="navv-cluster"><div class="navv-dial">19 km<small>seit Start</small></div><div id="navv-mid"><div id="navv-text"></div><div id="navv-small"></div><div id="navv-map"></div></div><div class="navv-dial"><span id="navv-tube"></span><small id="navv-distance"></small></div></div><div class="navv-row" id="navv-bg-row"><label for="navv-bgmode">Vorschau-Hintergrund (nur Editor)</label><select id="navv-bgmode"><option value="grid">Kalibrier-Grid</option><option value="plain">Neutral</option><option value="map">Schematische Karte</option></select></div><p class="navv-note" id="navv-layout-note">Schematische Darstellung. Die echte AID10-/BAP-Wirkung wird nicht simuliert.</p><div id="navv-warning"></div></div>
+<div class="navv-grid navv-settings-grid" aria-label="Einstellungen der aktiven Ansicht"><div class="navv-stack">
 <div class="navv-card"><h3>CarPlay-Inhalte</h3>
 <div class="navv-row"><label>Kartenbild</label><select data-navv-section="carplay" data-navv-key="surface"><option value="map">Karte</option><option value="app">App-Standard</option><option value="off">Aus (experimentell)</option></select></div>
 <div class="navv-row"><label>Zusätzliche Manöverkarte</label><select data-navv-section="carplay" data-navv-key="maneuver"><option value="off">Aus</option><option value="left">Links</option><option value="right">Rechts</option><option value="top">Oben</option></select></div>
@@ -2562,6 +2596,7 @@ connect();
 <div class="navv-row"><label id="navv-dial-lanes-label">Lane-Symbole in rechter Tube</label><input type="checkbox" data-navv-section="native" data-navv-key="dialLanes"></div>
 <div class="navv-row"><label>Untere Restdistanz</label><input type="checkbox" data-navv-section="native" data-navv-key="bottomDistance"></div>
 <div class="navv-row"><label>Untere Ankunftszeit</label><input type="checkbox" data-navv-section="native" data-navv-key="bottomEta"></div></div>
+</div><div class="navv-stack">
 <div class="navv-card"><h3>Guidance-Mapping</h3>
 <div class="navv-row"><label>Lane Guidance</label><select data-navv-section="guidance" data-navv-key="lane"><option value="real">Echte Fahrspuren</option><option value="synthetic">Abbiegepfeil statt Fahrspuren</option><option value="off">Aus</option></select></div>
 <div class="navv-row"><label>Quelle</label><select data-navv-section="guidance" data-navv-key="source"><option value="auto">Automatisch</option><option value="stock">Original</option><option value="phone">iPhone</option></select></div>
@@ -2599,7 +2634,7 @@ function all(s){return Array.from(document.querySelectorAll(s))}
 function clone(x){return JSON.parse(JSON.stringify(x))}
 function vehicle(){return window.MIBR_getVehicle?window.MIBR_getVehicle():{brand:"skoda",headUnit:"MU1440",cluster:"AID10"}}
 function area(id){return clone({center:{x:380,y:130,w:250,h:160},wide:{x:250,y:130,w:505,h:160},full:{x:10,y:130,w:990,h:140}}[id])}
-function viewDefaults(id){return {mode:id==="center"?"custom":"inherit",safeArea:area(id),mockup:{background:"grid"},carplay:{surface:"map",maneuver:"off",eta:true},native:{topText:"off",topSymbol:"off",tube:"on",tubeDistance:true,dialLanes:true,bottomDistance:true,bottomEta:true},guidance:{lane:"real",source:"auto",sideStreets:true,bottom:"eta"}}}
+function viewDefaults(id){return {mode:"custom",safeArea:area(id),mockup:{background:"grid"},carplay:{surface:"map",maneuver:"off",eta:true},native:{topText:"off",topSymbol:"off",tube:"on",tubeDistance:true,dialLanes:true,bottomDistance:true,bottomEta:true},guidance:{lane:"real",source:"auto",sideStreets:true,bottom:"eta"}}}
 function sample(){return {schema:schema,version:2,vehicle:vehicle(),global:{source:"auto",legacyDisplay:"side",legacyLine:"dist",legacyLanes:true,sideStreets:true,bottom:"eta"},views:{center:viewDefaults("center"),wide:viewDefaults("wide"),full:viewDefaults("full")},meta:{runtimeCompatible:false}}}
 function safeValid(v){return !!v&&["x","y","w","h"].every(function(k){return Number.isInteger(v[k])})&&v.x>=0&&v.y>=0&&v.w>=100&&v.h>=60&&v.x+v.w<=1010&&v.y+v.h<=376}
 function migrate(d){
@@ -2637,14 +2672,20 @@ function renderCockpitPreview(v){
  lastPreviewView=id;
  target("navv-center-preview").hidden=false;target("navv-cluster").hidden=true;
  target("navv-bg-row").hidden=false;target("navv-preview-zoom").hidden=false;
- ["center","wide","full"].forEach(function(name){target("navv-"+name+"-svg").hidden=name!==id});
+ ["center","wide","full"].forEach(function(name){
+   var svg=target("navv-"+name+"-svg"),active=name===id;
+   // SVGElement.hidden can be a JS expando on Safari: set the actual DOM attribute,
+   // and inline display, or the three SVGs will all remain visible on iOS.
+   if(active)svg.removeAttribute("hidden");else svg.setAttribute("hidden","");
+   svg.style.display=active?"block":"none";
+ });
  var own=state.views[id],bg=(own.mockup&&own.mockup.background)||"grid";
  target("navv-bgmode").value=bg;
  var hasMap=v.carplay.surface!=="off",isMap=v.carplay.surface==="map";
  function visible(part,show){var node=target(id+"-"+part);if(node)node.style.display=show?"":"none"}
  visible("grid",hasMap&&bg==="grid");
  visible("map-visual",isMap&&bg==="map");
- visible("map-route",isMap&&(id==="center"?bg!=="plain":bg==="map"));
+ visible("map-route",isMap&&bg==="map");
  visible("top-text",v.native.topText!=="off");
  visible("top-lanes",v.native.topSymbol!=="off"&&v.guidance.lane!=="off");
  visible("right-turn",id!=="full"&&v.native.tube==="on");
@@ -2682,7 +2723,12 @@ document.addEventListener("keydown",function(e){if(e.key==="Escape"&&document.ge
 
 function render(){
 var v=effective(),mode=state.views[current].mode;
-all("[data-navv-view]").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.navvView===current))});
+all("[data-navv-view]").forEach(function(b){var active=b.dataset.navvView===current;b.setAttribute("aria-pressed",String(active));b.setAttribute("aria-current",active?"true":"false")});
+$("#navv-selection-hint").textContent=mode==="inherit"?
+  "Globale Werte aktiv – die Einstellungen unten sind gesperrt. Unter Profilverwaltung kannst du auf individuell umstellen.":
+  "Individuelle Einstellungen für "+(current==="full"?"Voll":current==="wide"?"Wide":"Center")+" · Änderungen wirken direkt auf die Vorschau.";
+all("#navv-copy-target option").forEach(function(option){option.disabled=option.value===current});
+if($("#navv-copy-target").value===current)$("#navv-copy-target").value=current==="center"?"wide":"center";
 $("#navv-viewname").textContent=current==="full"?"Voll":current==="wide"?"Wide":"Center";
 $("#navv-mode").value=mode;$("#navv-mode-info").textContent=mode==="inherit"?"Navigation erbt globale Werte; die Safe Area bleibt pro View individuell.":"Eigenständiges Navigationsprofil für diese Ansicht.";
 all("[data-navv-section]").forEach(function(c){var val=v[c.dataset.navvSection][c.dataset.navvKey];if(c.type==="checkbox")c.checked=val;else c.value=val;c.disabled=mode==="inherit"||(current==="full"&&c.dataset.navvSection==="native"&&["tube","tubeDistance","dialLanes"].includes(c.dataset.navvKey))});
@@ -2705,8 +2751,21 @@ all("[data-navv-section]").forEach(function(c){c.onchange=function(){if(state.vi
 all("[data-navv-global]").forEach(function(c){c.onchange=function(){state.global[c.dataset.navvGlobal]=c.type==="checkbox"?c.checked:c.value;save();render()}});
 $("#navv-mode").onchange=function(){var v=state.views[current];if(this.value==="custom"&&v.mode==="inherit"){var def=inherited();v.carplay=clone(def.carplay);v.native=clone(def.native);v.guidance=clone(def.guidance)}v.mode=this.value;save();render()};
 
-$("#navv-copy").onclick=function(){var dest=$("#navv-copy-target").value;if(dest===current){$("#navv-warning").textContent="Quell- und Zielansicht sind identisch.";return}var source=effective();state.views[dest]=clone(source);state.views[dest].mode="custom";state.views[dest].safeArea=clone(state.views[current].safeArea);window.MIBR_safe.set(dest,state.views[dest].safeArea);save();render()};
-$("#navv-reset-view").onclick=function(){if(!confirm("Dieses View-Profil auf Standard zurücksetzen?"))return;state.views[current]=viewDefaults(current);window.MIBR_safe.set(current,state.views[current].safeArea);safeViewRendered="";save();render()};
+$("#navv-copy").onclick=function(){
+  var dest=$("#navv-copy-target").value;
+  if(dest===current){$("#navv-warning").textContent="Quell- und Zielansicht sind identisch.";return}
+  var name=function(id){return id==="full"?"Voll":id==="wide"?"Wide":"Center"};
+  if(!confirm("Navigation und CarPlay von "+name(current)+" nach "+name(dest)+" kopieren? Die Einstellungen im Ziel werden überschrieben; Safe Areas und Vorschau-Hintergründe bleiben erhalten."))return;
+  var src=effective(),destView=state.views[dest];
+  destView.carplay=clone(src.carplay);destView.native=clone(src.native);destView.guidance=clone(src.guidance);
+  destView.mode="custom";current=dest;save();render()
+};
+$("#navv-reset-view").onclick=function(){
+ if(!confirm("Navigation und CarPlay dieser Ansicht zurücksetzen? Die Safe Area und der gewählte Vorschau-Hintergrund bleiben erhalten."))return;
+ var old=state.views[current],defaults=viewDefaults(current);
+ defaults.safeArea=clone(old.safeArea);defaults.mockup=clone(old.mockup||{background:"grid"});
+ state.views[current]=defaults;save();render()
+};
 window.addEventListener("mibr:safechange",function(e){var a=e.detail,view=a.view==="voll"?"full":a.view;if(!state.views[view])return;var v={x:a.edges[0],y:a.edges[1],w:a.edges[2]-a.edges[0],h:a.edges[3]-a.edges[1]};if(!safeValid(v))return;state.views[view].safeArea=v;save()});
 window.addEventListener("mibr:vehiclechange",function(e){if(!state)return;state.vehicle=clone(e.detail);save();render()});
 function saveFile(name,contents,type){var u=URL.createObjectURL(new Blob([contents],{type:type})),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},1200)}
