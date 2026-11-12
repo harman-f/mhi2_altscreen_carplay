@@ -1881,11 +1881,12 @@ var safe=loadSafe();
 /* Separate local UI preference: never part of mibr-project/1, view profiles or SD output. */
 var SAFE_ASSIST_KEY="mibr-safe-oem-assist/1";
 function loadSafeAssist(){
-  var p={enabled:false,mode:"both",opacity:60};
+  var p={enabled:false,mode:"both",opacity:60,gridNumbers:false};
   try{var v=JSON.parse(localStorage.getItem(SAFE_ASSIST_KEY));if(v){
     p.enabled=v.enabled===true;
     if(["preview","mask","both"].includes(v.mode))p.mode=v.mode;
-    if(Number.isInteger(v.opacity)&&v.opacity>=20&&v.opacity<=80)p.opacity=v.opacity;
+    if(Number.isInteger(v.opacity)&&v.opacity>=20&&v.opacity<=100)p.opacity=v.opacity;
+    p.gridNumbers=v.gridNumbers===true;
   }}catch(e){}
   return p;
 }
@@ -1916,11 +1917,12 @@ function safePicture(){
   svgEl("path",{d:fine,stroke:"#2a322e","stroke-width":1,fill:"none"},null,svg);
   svgEl("path",{d:mid,stroke:"#5a6860","stroke-width":1,fill:"none"},null,svg);
   svgEl("path",{d:strong,stroke:"#aabeb4","stroke-width":1,fill:"none"},null,svg);
+  var gridNumbers=svgEl("g",{id:"sa-grid-numbers"},null,svg);
   for(var y=0;y<SAFE_H;y+=50)for(var x=0;x<SAFE_W;x+=100){
     var sx=String(x),sy=String(y);
-    svgEl("rect",{x:x+1,y:y+1,width:(sx.length+sy.length)*12+7,height:18,fill:"#000"},null,svg);
-    svgEl("text",{x:x+3,y:y+18,fill:"#fff","font-size":20,"font-family":"monospace",textLength:sx.length*12-3,lengthAdjust:"spacingAndGlyphs"},sx,svg);
-    svgEl("text",{x:x+3+sx.length*12+3,y:y+18,fill:"#ffd63c","font-size":20,"font-family":"monospace",textLength:sy.length*12-3,lengthAdjust:"spacingAndGlyphs"},sy,svg);
+    svgEl("rect",{x:x+1,y:y+1,width:(sx.length+sy.length)*12+7,height:18,fill:"#000"},null,gridNumbers);
+    svgEl("text",{x:x+3,y:y+18,fill:"#fff","font-size":20,"font-family":"monospace",textLength:sx.length*12-3,lengthAdjust:"spacingAndGlyphs"},sx,gridNumbers);
+    svgEl("text",{x:x+3+sx.length*12+3,y:y+18,fill:"#ffd63c","font-size":20,"font-family":"monospace",textLength:sy.length*12-3,lengthAdjust:"spacingAndGlyphs"},sy,gridNumbers);
   }
   svgEl("path",{d:"M"+(SAFE_W/2-24)+" "+(SAFE_H/2+1)+"H"+(SAFE_W/2+25)+"M"+(SAFE_W/2+1)+" "+(SAFE_H/2-24)+"V"+(SAFE_H/2+25),stroke:"#ff4646","stroke-width":2,fill:"none"},null,svg);
   return svg;
@@ -1944,6 +1946,8 @@ function safeAssistLayers(svg,view){
     preview.style.display=enabled&&mode!=="mask"?"":"none";
     masks.style.opacity=String(Math.round(safeAssist.opacity*.72)/100);
     preview.style.opacity=String(safeAssist.opacity/100);
+    var labels=svg.querySelector("#sa-grid-numbers");
+    if(labels)labels.style.display=!enabled||safeAssist.gridNumbers?"":"none";
     if(!enabled)return;
     var src=document.getElementById("navv-"+id+"-svg");
     // Shared common OEM bands, calibrated approximately from real AID10 grid photos.
@@ -2002,7 +2006,7 @@ function renderSafe(host,embedded){
     vs.appendChild(b);
   });
   if(!embedded)box.appendChild(vs);
-  var svg=safePicture(),drawAssist=safeAssistLayers(svg,view),frame=svgEl("rect",{fill:"rgba(255,214,60,.16)",stroke:"#ffd63c","stroke-width":3},null,svg);
+  var svg=safePicture(),drawAssist=safeAssistLayers(svg,view),frame=svgEl("rect",{id:"sa-current-area",fill:"rgba(255,214,60,.16)",stroke:"#ffd63c","stroke-width":3},null,svg);
   var controls=el("div","sa-assist-controls"),checkWrap=el("label","",lang==="de"?"OEM-Overlays anzeigen":"Show OEM overlays");
   checkWrap.htmlFor="sa-oem-show";
   var check=el("input","sa-assist-check");check.id="sa-oem-show";check.type="checkbox";check.checked=safeAssist.enabled;
@@ -2015,19 +2019,28 @@ function renderSafe(host,embedded){
   });
   mode.value=safeAssist.mode;modeWrap.appendChild(mode);controls.appendChild(modeWrap);
   var opWrap=el("label","",lang==="de"?"Deckkraft":"Opacity");opWrap.htmlFor="sa-oem-opacity";
-  var opacity=el("input");opacity.id="sa-oem-opacity";opacity.type="range";opacity.min=20;opacity.max=80;opacity.step=5;opacity.value=safeAssist.opacity;
+  var opacity=el("input");opacity.id="sa-oem-opacity";opacity.type="range";opacity.min=20;opacity.max=100;opacity.step=5;opacity.value=safeAssist.opacity;
   var opNum=el("span","sa-assist-opacity",safeAssist.opacity+" %");opWrap.appendChild(opacity);opWrap.appendChild(opNum);controls.appendChild(opWrap);
+  var numbersWrap=el("label","",lang==="de"?"Rasterzahlen anzeigen":"Show grid numbers");
+  numbersWrap.htmlFor="sa-oem-grid-labels";
+  var numbers=el("input","sa-assist-check");numbers.id="sa-oem-grid-labels";numbers.type="checkbox";numbers.checked=safeAssist.gridNumbers;
+  numbersWrap.insertBefore(numbers,numbersWrap.firstChild);controls.appendChild(numbersWrap);
   controls.appendChild(el("p","sa-assist-hint",lang==="de"?
-    "Fahrzeugfotos: Näherung der belegten OEM-Bereiche. Gelb = Statusfelder, Rot = Instrumente/Seitenteile/Einschnitte. Ansicht folgt automatisch Center/Wide/Voll; nur Editor-Anzeige.":
-    "Vehicle-photo approximation of occupied OEM space. Amber = status bands, red = gauges/side panels/cutouts. View follows Center/Wide/Full; editor-only."));
+    "Türkis = eingestellte Safe Area (nur Umriss); Gelb = angenäherte OEM-Statusfelder; Rot = Instrumente/Seitenteile/Einschnitte. Rasterzahlen optional. Keine automatische Änderung der Safe Area.":
+    "Turquoise = current Safe Area outline; amber = approximate OEM status areas; red = gauges/side panels/cutouts. Optional grid numbers. No automatic Safe Area adjustment."));
   function assistChanged(){
     safeAssist.enabled=check.checked;safeAssist.mode=mode.value;safeAssist.opacity=+opacity.value;
-    mode.disabled=!safeAssist.enabled;opacity.disabled=!safeAssist.enabled;
+    safeAssist.gridNumbers=numbers.checked;
+    mode.disabled=!safeAssist.enabled;opacity.disabled=!safeAssist.enabled;numbers.disabled=!safeAssist.enabled;
+    frame.setAttribute("fill",safeAssist.enabled?"rgba(45,212,191,.035)":"rgba(255,214,60,.16)");
+    frame.setAttribute("stroke",safeAssist.enabled?"#2dd4bf":"#ffd63c");
+    frame.setAttribute("stroke-width",safeAssist.enabled?"2.6":"3");
     opNum.textContent=safeAssist.opacity+" %";saveSafeAssist();drawAssist();
   }
   check.addEventListener("change",assistChanged);
   mode.addEventListener("change",assistChanged);
   opacity.addEventListener("input",assistChanged);
+  numbers.addEventListener("change",assistChanged);
   box.appendChild(controls);box.appendChild(svg);assistChanged();
   var card=el("div","card sa-menu");card.appendChild(el("div","sa-mt",ttl("safe_"+view)));
   var nums=[],sls=[],NAMES=["x","y","w","h"];
@@ -2406,7 +2419,7 @@ connect();
 <div class="navv-note" id="navv-config-warning">View-Profile sind experimentell und ändern das Fahrzeug nicht direkt.</div>
 <section id="navv-view-workspace">
 <div class="navv-card navv-view-selector"><h3>Aktive Cockpit-Ansicht</h3><div class="navv-views" role="group" aria-label="Aktive Cockpit-Ansicht"><button type="button" data-navv-view="center">Center</button><button type="button" data-navv-view="wide">Wide</button><button type="button" data-navv-view="full">Voll</button></div><p id="navv-selection-hint" class="navv-note" role="status"></p><details class="navv-profile-advanced" id="navv-profile-advanced"><summary>Profilverwaltung · Vererbung, Kopieren und Zurücksetzen</summary><div class="navv-row"><label for="navv-mode">Profilmodus</label><select id="navv-mode"><option value="custom">Individuelles Profil</option><option value="inherit">Globale Standardwerte verwenden</option></select></div><p id="navv-mode-info" class="navv-note"></p><div class="navv-buttons"><label for="navv-copy-target" class="navv-note" data-i18n="copylabel">Profil kopieren nach</label><select id="navv-copy-target"><option value="center">Center</option><option value="wide">Wide</option><option value="full">Voll</option></select><button type="button" id="navv-copy">Einstellungen kopieren</button><button type="button" id="navv-reset-view">Profil zurücksetzen</button></div><p class="navv-note">Kopieren und Zurücksetzen betreffen die Navi- und CarPlay-Einstellungen. Die Safe-Area-Geometrie bleibt unverändert.</p></details></div>
-<div class="navv-card navv-view-preview"><div class="navv-preview-heading"><h3>Live-Vorschau: <span id="navv-viewname">Center</span> <small class="navv-version" aria-label="Mockup-Version">P0.9.3</small></h3><button type="button" id="navv-preview-zoom" aria-expanded="false">⛶ Großansicht</button></div><div id="navv-center-preview"><button type="button" id="navv-preview-close" aria-label="Großansicht schließen" hidden>Schließen ✕</button><svg id="navv-center-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Modulares AID10 Center-Cockpit: Instrumente, Navigationsanzeigen und Kartenfläche als getrennte SVG-Ebenen">
+<div class="navv-card navv-view-preview"><div class="navv-preview-heading"><h3>Live-Vorschau: <span id="navv-viewname">Center</span> <small class="navv-version" aria-label="Mockup-Version">P0.9.4</small></h3><button type="button" id="navv-preview-zoom" aria-expanded="false">⛶ Großansicht</button></div><div id="navv-center-preview"><button type="button" id="navv-preview-close" aria-label="Großansicht schließen" hidden>Schließen ✕</button><svg id="navv-center-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Modulares AID10 Center-Cockpit: Instrumente, Navigationsanzeigen und Kartenfläche als getrennte SVG-Ebenen">
 <defs>
 <style>
 #navv-center-svg{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-variant-numeric:tabular-nums}
