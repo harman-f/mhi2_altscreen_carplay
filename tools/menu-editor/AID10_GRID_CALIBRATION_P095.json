@@ -1,0 +1,164 @@
+{
+  "schema": "mibr.aid10.photo-grid-calibration/1",
+  "sourcePhotos": [
+    {
+      "view": "wide",
+      "file": "IMG_2319(1).jpeg",
+      "note": "Perspective source photographed with 100×50 numeric grid"
+    },
+    {
+      "view": "center",
+      "file": "IMG_2320(1).jpeg",
+      "note": "Perspective source photographed with 100×50 numeric grid"
+    },
+    {
+      "view": "full",
+      "file": "IMG_2321(1).jpeg",
+      "note": "Perspective source photographed with 100×50 numeric grid"
+    }
+  ],
+  "coordinateSystem": {
+    "width": 1010,
+    "height": 376,
+    "gridX": 100,
+    "gridY": 50,
+    "valuesAreApproximate": true,
+    "sourceAccuracySvgUnits": 20
+  },
+  "targets": {
+    "wide": {
+      "topLeft": 180,
+      "topRight": 830,
+      "bottomLeft": 270,
+      "bottomRight": 740
+    },
+    "full": {
+      "leftShoulderX": 175,
+      "rightShoulderX": 838,
+      "leftTipX": 270,
+      "rightTipX": 740,
+      "shoulderY": 260,
+      "tipY": 350
+    },
+    "center": {
+      "leftCX": 225,
+      "rightCX": 785,
+      "outerRadius": 167.5,
+      "centerY": 184
+    }
+  },
+  "passes": [
+    {
+      "pass": 1,
+      "description": "Wide trapeziums and Full lower cutouts from photo numeric grid",
+      "wide": {
+        "topLeft": 188,
+        "topRight": 830,
+        "bottomLeft": 272,
+        "bottomRight": 738
+      },
+      "full": {
+        "leftShoulderX": 178,
+        "rightShoulderX": 841,
+        "leftTipX": 273,
+        "rightTipX": 737,
+        "shoulderY": 261,
+        "tipY": 350
+      }
+    },
+    {
+      "pass": 2,
+      "description": "Center dial size/spacing and map clearance; maintain native common anchors",
+      "center": {
+        "leftCX": 225,
+        "rightCX": 785,
+        "outerRadius": 167.48,
+        "centerY": 184,
+        "scale": 1.06
+      },
+      "note": "The enlarged circles now stop at x≈392.5/617.5, leaving the map clip x=393–615 unobstructed at the midline. Shared OEM top and bottom overlays remain at identical native coordinates."
+    },
+    {
+      "pass": 3,
+      "description": "Match Safe Area overlay shapes to transformed SVGs; CI regression",
+      "safeArea": "Masks copied from wide and full SVG paths; Center mask inherits parent dial transforms so it matches the true displayed 167.5 radius, x=225/785.",
+      "htmlReview": "mibr-menu-editor-nav-views-p095.html"
+    }
+  ],
+  "caveat": "No project Safe Area, calibration profile or runtime coordinates are modified; targets are perspective-derived photo approximations, not measured OEM BAP boundaries.",
+  "metrics": {
+    "methodology": "Mean absolute SVG coordinate error vs perspective-derived manually read numeric-grid anchor coordinates; not photo-pixel error",
+    "wide": {
+      "before": [
+        284,
+        724,
+        331,
+        683
+      ],
+      "target": [
+        180,
+        830,
+        270,
+        740
+      ],
+      "after": [
+        188,
+        830,
+        272,
+        738
+      ],
+      "maeBefore": 82,
+      "maeAfter": 3
+    },
+    "full": {
+      "before": [
+        178,
+        841,
+        317,
+        705,
+        274,
+        355
+      ],
+      "target": [
+        175,
+        838,
+        270,
+        740,
+        260,
+        350
+      ],
+      "after": [
+        178,
+        841,
+        273,
+        737,
+        261,
+        350
+      ],
+      "maeBefore": 17.83,
+      "maeAfter": 2.17
+    },
+    "center": {
+      "before": [
+        253,
+        757,
+        158,
+        158
+      ],
+      "target": [
+        225,
+        785,
+        167.5,
+        167.5
+      ],
+      "after": [
+        225,
+        785,
+        167.48,
+        167.48
+      ],
+      "maeBefore": 18.75,
+      "maeAfter": 0.01
+    }
+  }
+}

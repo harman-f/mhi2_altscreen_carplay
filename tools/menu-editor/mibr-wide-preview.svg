@@ -9,15 +9,15 @@
 <linearGradient id="w-turn" x1="0" y1="1" x2="0" y2="0"><stop stop-color="#057a2d"/><stop offset=".45" stop-color="#29d946"/><stop offset="1" stop-color="#fff"/></linearGradient>
 <pattern id="w-grid-fine" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M12 0H0V12" fill="none" stroke="#a1acbd" stroke-opacity=".18" stroke-width=".6"/></pattern>
 <pattern id="w-grid-coarse" width="95" height="52" patternUnits="userSpaceOnUse"><path d="M95 0H0V52" fill="none" stroke="#bfc7d5" stroke-opacity=".31" stroke-width="1.4"/></pattern>
-<clipPath id="w-map-clip"><path d="M284 37H723L685 329H331Z"/></clipPath>
+<clipPath id="w-map-clip"><path d="M188 37H830L738 329H272Z"/></clipPath>
 </defs>
 <rect x="2" y="2" width="1006" height="372" rx="53" fill="#030508" stroke="#1e2a38" stroke-width="3"/>
 <path d="M93 23H917Q941 23 942 58V329Q940 355 907 355H101Q68 355 67 324V58Q67 23 93 23Z" fill="url(#w-surface)"/>
 <g id="wide-map-surface" clip-path="url(#w-map-clip)">
- <rect x="276" y="37" width="465" height="310" fill="#142132"/>
- <g id="wide-grid"><rect x="276" y="37" width="465" height="310" fill="url(#w-grid-fine)"/><rect x="276" y="37" width="465" height="310" fill="url(#w-grid-coarse)"/><path d="M505 163v25m-12-13h24" stroke="#ed6667" stroke-width="1.4" fill="none"/></g>
+ <rect x="180" y="37" width="660" height="310" fill="#142132"/>
+ <g id="wide-grid"><rect x="180" y="37" width="660" height="310" fill="url(#w-grid-fine)"/><rect x="180" y="37" width="660" height="310" fill="url(#w-grid-coarse)"/><path d="M505 163v25m-12-13h24" stroke="#ed6667" stroke-width="1.4" fill="none"/></g>
  <g id="wide-map-visual" style="display:none">
-   <rect x="276" y="37" width="465" height="310" fill="#253a45"/>
+   <rect x="180" y="37" width="660" height="310" fill="#253a45"/>
    <path d="M297 79H698M300 139H704M300 235H701M348 35V344M430 35V345M559 37V343M638 37V345" stroke="#6e8091" stroke-width="27" fill="none"/>
    <path d="M297 79H698M300 139H704M300 235H701M348 35V344M430 35V345M559 37V343M638 37V345" stroke="#a4b4be" stroke-opacity=".7" stroke-width="2" fill="none"/>
    <rect x="372" y="163" width="34" height="49" fill="#364b55"/><rect x="578" y="168" width="35" height="42" fill="#314852"/>
@@ -31,10 +31,10 @@
  <g id="wide-off-placeholder" style="display:none"><text x="505" y="185" fill="#8ea4ba" text-anchor="middle" font-size="18" font-weight="600">CarPlay aus</text><text x="505" y="209" fill="#6f8398" text-anchor="middle" font-size="12">nur Editor</text></g>
 </g>
 <g id="wide-side-panels">
- <path d="M90 25H283L331 330Q328 348 294 352H98Q74 352 70 326V60Q71 25 90 25Z" fill="url(#w-panel)" stroke="#8795aa" stroke-width="1.3"/>
- <path d="M920 25H725L683 331Q687 350 715 352H911Q938 352 940 325V60Q939 25 920 25Z" fill="url(#w-panel)" stroke="#8795aa" stroke-width="1.3"/>
- <path d="M92 180H309M700 180H918" stroke="#bcc9d9" stroke-opacity=".42" stroke-width="1.7"/>
- <path d="M284 26L331 330M724 26L683 331" stroke="#ebf2fb" stroke-width="3" opacity=".84"/>
+ <path d="M90 25H188L272 330Q268 348 245 352H98Q74 352 70 326V60Q71 25 90 25Z" fill="url(#w-panel)" stroke="#8795aa" stroke-width="1.3"/>
+ <path d="M920 25H830L738 330Q742 350 765 352H911Q938 352 940 325V60Q939 25 920 25Z" fill="url(#w-panel)" stroke="#8795aa" stroke-width="1.3"/>
+ <path d="M92 180H231M784 180H918" stroke="#bcc9d9" stroke-opacity=".42" stroke-width="1.7"/>
+ <path d="M188 26L272 330M830 26L738 330" stroke="#ebf2fb" stroke-width="3" opacity=".84"/>
 </g>
 <!-- MIBR_SHARED_TOP_BEGIN: common OEM status coordinates across Center/Wide/Voll -->
 <g id="wide-top-status" fill="#f5f9ff">
@@ -54,7 +54,7 @@
  <path d="M464 117l14 14m0-14l-14 14M494 117l14 14m0-14l-14 14"/>
  <path d="M533 132v-15h12m-6-6l7 6-7 6" stroke-width="3"/>
 </g>
-<g id="wide-left-info">
+<g id="wide-left-info" transform="translate(-30 0)">
  <text x="129" y="101" font-size="14.5" class="w-primary">7:20 h</text>
  <text x="129" y="122" font-size="14" class="w-sub">Ab Start</text>
  <path d="M185 202h-21l-8 44h38z" fill="#f3f7fc"/>
@@ -62,21 +62,21 @@
  <text x="178" y="279" text-anchor="middle" font-size="18.5" class="w-primary">0 km</text>
  <text x="178" y="300" text-anchor="middle" font-size="14" class="w-sub">Ab Start</text>
 </g>
-<g id="wide-right-media">
+<g id="wide-right-media" transform="translate(40 0)">
  <text x="815" y="100" text-anchor="middle" font-size="14" class="w-primary">Bluetooth-Audio</text>
  <g stroke="#d7e1ef" stroke-width="2" fill="none"><path d="M818 133l9 6v13l-9 6zM816 137v17M834 140q8 8 0 16"/></g>
 </g>
-<g id="wide-dial-lanes" fill="none" stroke="#e7effa" stroke-width="2">
+<g id="wide-dial-lanes" transform="translate(40 0)" fill="none" stroke="#e7effa" stroke-width="2">
  <path d="M769 174v19m24-19v19m24-19v19m24-19v19" opacity=".8"/>
  <path d="M772 179l12 11m0-11l-12 11M797 179l12 11m0-11l-12 11"/>
  <path d="M822 188v-9h12m-6-6l7 6-7 6" stroke-width="2.8"/>
 </g>
-<g id="wide-right-turn" transform="translate(49.2 13.9) scale(.94)">
+<g id="wide-right-turn" transform="translate(40 0)"><g transform="translate(49.2 13.9) scale(.94)">
  <!-- One closed silhouette: the white border is stroked on the exact same green path. -->
  <path id="wide-turn-silhouette" d="M803 262v-33q0-14 16-14h11v-12l25 19-25 18v-11h-10v33z" fill="url(#w-turn)" stroke="#f7fcff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>
-</g>
-<g id="wide-dial-distance" fill="#f4f8ff"><text x="821" y="296" text-anchor="middle" font-size="19" font-weight="650">300 m</text></g>
-<g id="wide-speed" fill="#f6f9ff"><text x="846" y="332" text-anchor="middle" font-size="29" font-weight="650">0</text><text x="846" y="348" text-anchor="middle" font-size="13">km/h</text></g>
+</g></g>
+<g id="wide-dial-distance" transform="translate(40 0)" fill="#f4f8ff"><text x="821" y="296" text-anchor="middle" font-size="19" font-weight="650">300 m</text></g>
+<g id="wide-speed" transform="translate(40 0)" fill="#f6f9ff"><text x="846" y="332" text-anchor="middle" font-size="29" font-weight="650">0</text><text x="846" y="348" text-anchor="middle" font-size="13">km/h</text></g>
 <!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views -->
 <g id="wide-bottom-info" fill="#edf5ff" font-size="14" font-weight="600">
   <g id="wide-bottom-distance">

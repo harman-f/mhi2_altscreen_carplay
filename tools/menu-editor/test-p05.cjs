@@ -57,7 +57,7 @@ async function main(){
   assert.equal(wideArrow.querySelectorAll("path").length,1,"Wide arrow uses one filled and stroked shape");
   assert.equal(silhouette.getAttribute("stroke"),"#f7fcff","White contour traces the exact green silhouette");
     // P0.9.1: shared status metrics remain physically identical across cockpit modes.
-  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.4"),"Visible version label");
+  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.5"),"Visible version label");
   for(const view of ["center","wide","full"]){
     const q=id=>$("#"+view+"-"+id);
     const top=q("top-status"),bottom=q("bottom-info"),footer=q("footer");
@@ -199,7 +199,11 @@ async function main(){
   assert.equal($("#navv-wide-svg").style.display,"none","Wide SVG hidden on Full");
   assert.equal($("#navv-full-svg").style.display,"block","Full SVG visible");
   assert.ok($("#full-lower-corners")&&$("#full-map-surface")&&$("#full-speed"),"Full map and shaped lower cutouts");
-  assert.ok($("#f-mainclip path").getAttribute("d").includes("V274H841"),"Full clip shares lower corner geometry");
+  assert.ok($("#f-mainclip path").getAttribute("d").includes("V261H841"),"Full clip follows calibrated y261 shoulder");
+  assert.ok($("#f-mainclip path").getAttribute("d").includes("L737 350H273"),"Full lower tips from photographed numeric grid");
+  assert.equal($("#w-map-clip path").getAttribute("d"),"M188 37H830L738 329H272Z","Wide grid-calibrated trapezoid");
+  assert.equal($("#center-left-dial").getAttribute("transform"),"translate(-43.18 -11.04) scale(1.06)","Center left dial shifted outward and scaled");
+  assert.equal($("#center-right-dial").getAttribute("transform"),"translate(-17.42 -11.04) scale(1.06)","Center right dial shifted outward and scaled");
   assert.equal($("#full-bottom-info").getAttribute("font-size"),"14","Full shared OEM lower status font");
   assert.equal($("#full-side-metrics text").getAttribute("y"),"135","Full side tick aligned with marker");
   set('[data-navv-section="carplay"][data-navv-key="surface"]',"app");
@@ -277,6 +281,8 @@ async function main(){
   assert.equal($("#sa-oem-preview").style.opacity,"1","Full 100-percent OEM opacity selectable");
   assert.equal($("#sa-oem-opacity").max,"100","Slider supports full opacity");
   assert.equal($("#sa-oem-mask").children.length,6,"Center: 4 status bands and 2 dial masks");
+  assert.equal($("#sa-oem-mask").children[4].getAttribute("transform"),$("#center-left-dial").getAttribute("transform"),"Left blocked circle follows its transformed gauge");
+  assert.equal($("#sa-oem-mask").children[5].getAttribute("transform"),$("#center-right-dial").getAttribute("transform"),"Right blocked circle follows its transformed gauge");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="top-status"]'),"Preview clones native OEM top group");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="footer"]'),"Preview clones native OEM footer");
   set("#sa-oem-mode","mask");
@@ -296,6 +302,7 @@ async function main(){
   assert.equal(w.MIBR_views.activeView(),"wide","Safe Area selection updates View configurator");
   assert.equal(w.MIBR_safe.activeView(),"wide","Same active Wide in both workspaces");
   assert.equal($("#sa-oem-mask").children.length,6,"Wide: four shared bands and two exact side modules");
+  assert.equal($("#sa-oem-mask").children[4].getAttribute("d"),$("#wide-side-panels > path").getAttribute("d"),"Wide left blocked polygon identical to current calibrated sidepanel");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="side-panels"]'),"Wide OEM overlay uses actual SVG side panels");
   assert.equal($$(".sa-views button")[1].getAttribute("aria-pressed"),"true","Wide calibration active");
   $$(".sa-views button")[2].click(); // Center calibration geometry
@@ -307,6 +314,7 @@ async function main(){
   assert.equal(w.MIBR_safe.activeView(),"full","Shortcut preserves Full calibration view");
   assert.equal($$(".sa-views button")[0].getAttribute("aria-pressed"),"true","Full calibration selected via shortcut");
   assert.equal($("#sa-oem-mask").children.length,6,"Full: four common bands and two lower cutouts");
+  assert.equal($("#sa-oem-mask").children[4].getAttribute("d"),$("#full-lower-corners > path").getAttribute("d"),"Full mask copies updated left diagonal cutout");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="lower-corners"]'),"Full lower shape uses existing SVG outline");
   click('#tabs [data-t=nav]');click('[data-navv-view=center]');
 
