@@ -57,7 +57,7 @@ async function main(){
   assert.equal(wideArrow.querySelectorAll("path").length,1,"Wide arrow uses one filled and stroked shape");
   assert.equal(silhouette.getAttribute("stroke"),"#f7fcff","White contour traces the exact green silhouette");
     // P0.9.1: shared status metrics remain physically identical across cockpit modes.
-  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.2"),"Visible version label");
+  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.3"),"Visible version label");
   for(const view of ["center","wide","full"]){
     const q=id=>$("#"+view+"-"+id);
     const top=q("top-status"),bottom=q("bottom-info"),footer=q("footer");
@@ -256,10 +256,37 @@ async function main(){
 
   click('#tabs [data-t=safe]');
   assert.ok($(".sa-views")&&$(".sa-menu"),"Dedicated Safe Area controls");
+  assert.equal($("#sa-oem-show").checked,false,"OEM assist is optional and defaults off");
+  assert.equal($("#sa-oem-mask").style.display,"none","Occlusion mask hidden by default");
+  const areaBeforeAssist=clone(w.MIBR_project.capture().viewProfiles.views.center.safeArea);
+  const nativeBeforeAssist=w.MIBR_project.nativeFile();
+  let geometryEvents=0;
+  const assistListener=()=>geometryEvents++;
+  w.addEventListener("mibr:safechange",assistListener);
+  click("#sa-oem-show");
+  assert.equal($("#sa-oem-show").checked,true,"OEM overlays toggle on");
+  assert.equal($("#sa-oem-mask").style.display,"","Occlusion mask visible");
+  assert.equal($("#sa-oem-mask").children.length,6,"Center: 4 status bands and 2 dial masks");
+  assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="top-status"]'),"Preview clones native OEM top group");
+  assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="footer"]'),"Preview clones native OEM footer");
+  set("#sa-oem-mode","mask");
+  assert.equal($("#sa-oem-preview").style.display,"none","Only mask mode hides native graphics");
+  set("#sa-oem-opacity","35","input");
+  assert.equal($("#sa-oem-opacity").value,"35","Opacity updates");
+  assert.equal($("#sa-oem-mask").style.opacity,"0.25","Mask transparency updates");
+  set("#sa-oem-mode","preview");
+  assert.equal($("#sa-oem-mask").style.display,"none","Only preview mode hides masks");
+  set("#sa-oem-mode","both");
+  assert.deepEqual(clone(w.MIBR_project.capture().viewProfiles.views.center.safeArea),areaBeforeAssist,"Overlay controls leave safe geometry untouched");
+  assert.equal(w.MIBR_project.nativeFile(),nativeBeforeAssist,"Overlay controls cannot change SD native output");
+  assert.equal(geometryEvents,0,"Overlay toggles never fire safe geometry change");
+  w.removeEventListener("mibr:safechange",assistListener);
   assert.equal(w.MIBR_safe.activeView(),"center","Safe Area follows selected cockpit view");
   $$(".sa-views button")[1].click(); // Wide calibration context
   assert.equal(w.MIBR_views.activeView(),"wide","Safe Area selection updates View configurator");
   assert.equal(w.MIBR_safe.activeView(),"wide","Same active Wide in both workspaces");
+  assert.equal($("#sa-oem-mask").children.length,6,"Wide: four shared bands and two exact side modules");
+  assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="side-panels"]'),"Wide OEM overlay uses actual SVG side panels");
   assert.equal($$(".sa-views button")[1].getAttribute("aria-pressed"),"true","Wide calibration active");
   $$(".sa-views button")[2].click(); // Center calibration geometry
   assert.equal(w.MIBR_views.activeView(),"center","Returning to Center synchronizes both workspaces");
@@ -269,6 +296,8 @@ async function main(){
   assert.equal($("#app").dataset.tab,"safe","Shortcut opens Safe Area workspace");
   assert.equal(w.MIBR_safe.activeView(),"full","Shortcut preserves Full calibration view");
   assert.equal($$(".sa-views button")[0].getAttribute("aria-pressed"),"true","Full calibration selected via shortcut");
+  assert.equal($("#sa-oem-mask").children.length,6,"Full: four common bands and two lower cutouts");
+  assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="lower-corners"]'),"Full lower shape uses existing SVG outline");
   click('#tabs [data-t=nav]');click('[data-navv-view=center]');
 
   const before=clone(w.MIBR_project.capture());

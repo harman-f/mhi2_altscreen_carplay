@@ -7,8 +7,8 @@ const {pathToFileURL} = require("node:url");
 const {chromium} = require("playwright-core");
 
 const source=path.join(__dirname,"mibr-menu-editor-nav-views-mockup.html");
-const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p092.html");
-assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.2 standalone review HTML must match canonical source");
+const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p093.html");
+assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.3 standalone review HTML must match canonical source");
 const output=path.join(process.cwd(),"p09-visual-artifacts");
 fs.mkdirSync(output,{recursive:true});
 const chromeCandidates=[process.env.CHROME_PATH,process.env.CHROMIUM_PATH,
@@ -125,6 +125,27 @@ function overlap(a,b){
      await page.locator(".navv-view-selector").screenshot({path:path.join(output,"iphone-"+view+"-selector.png")});
     }
    }
+   // Screenshot Safe Area with the OEM assist in both visual modes and confirm no geometry changes.
+   await page.locator('[data-navv-view="center"]').click();
+   await page.locator('#tabs [data-t="safe"]').click();
+   const originalEdges=await page.locator("#sa-x").inputValue();
+   await page.locator("#sa-oem-show").check();
+   for(const view of ["center","wide","full"]){
+     const safeKey=view==="full"?"voll":view;
+     await page.locator(".sa-views button").nth(view==="full"?0:view==="wide"?1:2).click();
+     assert.equal(await page.locator("#sa-oem-mask").getAttribute("data-view"),view);
+     await page.locator("#sa-oem-mode").selectOption("both");
+     assert.equal(await page.locator("#sa-oem-mask > *").count(),6,view+" approximate mask has common and per-view geometry");
+     assert.ok(await page.locator('#sa-oem-preview [data-safe-origin="top-status"]').count(),view+" reuses OEM top status");
+     await page.locator(".sa-pic").screenshot({path:path.join(output,sc.name+"-safe-"+view+"-both.png"),animations:"disabled"});
+     await page.locator("#sa-oem-mode").selectOption("mask");
+     assert.equal(await page.locator("#sa-oem-preview").isVisible(),false);
+     await page.locator(".sa-pic").screenshot({path:path.join(output,sc.name+"-safe-"+view+"-mask.png"),animations:"disabled"});
+   }
+   await page.locator(".sa-views button").nth(2).click();
+   assert.equal(await page.locator("#sa-x").inputValue(),originalEdges,"OEM assistant never alters Center safe area");
+   await page.locator("#sa-oem-show").uncheck();
+   assert.equal(await page.locator("#sa-oem-mask").isVisible(),false);
    assert.deepEqual(exceptions,[],sc.name+" browser exceptions");
    await context.close();
   }
