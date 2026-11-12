@@ -68,7 +68,15 @@
     },
     {
       "pass": 2,
-      "description": "Center dial size/spacing and map clearance; maintain native common anchors"
+      "description": "Center dial size/spacing and map clearance; maintain native common anchors",
+      "center": {
+        "leftCX": 225,
+        "rightCX": 785,
+        "outerRadius": 167.48,
+        "centerY": 184,
+        "scale": 1.06
+      },
+      "note": "The enlarged circles now stop at x≈392.5/617.5, leaving the map clip x=393–615 unobstructed at the midline. Shared OEM top and bottom overlays remain at identical native coordinates."
     },
     {
       "pass": 3,
