@@ -7,8 +7,8 @@ const {pathToFileURL} = require("node:url");
 const {chromium} = require("playwright-core");
 
 const source=path.join(__dirname,"mibr-menu-editor-nav-views-mockup.html");
-const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p095.html");
-assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.5 standalone review HTML must match canonical source");
+const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p096.html");
+assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.6 standalone review HTML must match canonical source");
 const output=path.join(process.cwd(),"p09-visual-artifacts");
 fs.mkdirSync(output,{recursive:true});
 const chromeCandidates=[process.env.CHROME_PATH,process.env.CHROMIUM_PATH,
@@ -149,6 +149,10 @@ function overlap(a,b){
      assert.equal(await page.locator("#sa-oem-mask").getAttribute("data-view"),view);
      await page.locator("#sa-oem-mode").selectOption("both");
      assert.equal(await page.locator("#sa-oem-mask > *").count(),6,view+" approximate mask has common and per-view geometry");
+     const edge=page.locator("#sa-oem-edge-shell");
+     assert.equal(await edge.getAttribute("data-view"),view,view+" edge shell accompanies selected OEM view");
+     assert.equal(await edge.locator('[data-safe-edge]').count(),2,view+" two perimeter joints");
+     assert.equal(await edge.locator("rect").count(),4,view+" common header and footer backplanes");
      if(view==="center"){
        const leftTransform=await page.locator("#sa-oem-mask > circle").first().getAttribute("transform");
        const rightTransform=await page.locator("#sa-oem-mask > circle").last().getAttribute("transform");
@@ -157,6 +161,11 @@ function overlap(a,b){
      }
      assert.ok(await page.locator('#sa-oem-preview [data-safe-origin="top-status"]').count(),view+" reuses OEM top status");
      await page.locator(".sa-pic").screenshot({path:path.join(output,sc.name+"-safe-"+view+"-both.png"),animations:"disabled"});
+     // Quantitative grid reference overlay over the opaque OEM perimeter.
+     await page.locator("#sa-oem-grid-labels").check();
+     assert.equal(await page.locator("#sa-grid-foreground").isVisible(),true,view+" front grid labels remain visible");
+     await page.locator(".sa-pic").screenshot({path:path.join(output,sc.name+"-safe-"+view+"-grid-overlay.png"),animations:"disabled"});
+     await page.locator("#sa-oem-grid-labels").uncheck();
      await page.locator("#sa-oem-mode").selectOption("mask");
      assert.equal(await page.locator("#sa-oem-preview").isVisible(),false);
      await page.locator(".sa-pic").screenshot({path:path.join(output,sc.name+"-safe-"+view+"-mask.png"),animations:"disabled"});
@@ -164,10 +173,12 @@ function overlap(a,b){
    await page.locator(".sa-views button").nth(2).click();
    await page.locator("#sa-oem-mode").selectOption("both");
    await page.locator("#sa-oem-grid-labels").check();
-   assert.equal(await page.locator("#sa-grid-numbers").isVisible(),true,"Optional grid numbers remain available");
+   assert.equal(await page.locator("#sa-grid-numbers").isVisible(),false,"Original background grid remains behind opaque OEM");
+   assert.equal(await page.locator("#sa-grid-foreground").isVisible(),true,"Opt-in calibration labels appear in front of OEM");
+   assert.ok(await page.locator("#sa-grid-foreground text").count()>100,"All numeric columns visible for comparison");
    await page.locator(".sa-pic").screenshot({path:path.join(output,sc.name+"-safe-center-grid-numbers.png"),animations:"disabled"});
    await page.locator("#sa-oem-grid-labels").uncheck();
-   assert.equal(await page.locator("#sa-grid-numbers").isVisible(),false);
+   assert.equal(await page.locator("#sa-grid-foreground").isVisible(),false);
    assert.equal(await page.locator("#sa-x").inputValue(),originalEdges,"OEM assistant never alters Center safe area");
    await page.locator("#sa-oem-show").uncheck();
    assert.equal(await page.locator("#sa-oem-mask").isVisible(),false);

@@ -57,7 +57,7 @@ async function main(){
   assert.equal(wideArrow.querySelectorAll("path").length,1,"Wide arrow uses one filled and stroked shape");
   assert.equal(silhouette.getAttribute("stroke"),"#f7fcff","White contour traces the exact green silhouette");
     // P0.9.1: shared status metrics remain physically identical across cockpit modes.
-  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.5"),"Visible version label");
+  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.6"),"Visible version label");
   for(const view of ["center","wide","full"]){
     const q=id=>$("#"+view+"-"+id);
     const top=q("top-status"),bottom=q("bottom-info"),footer=q("footer");
@@ -270,13 +270,20 @@ async function main(){
   click("#sa-oem-show");
   assert.equal($("#sa-oem-show").checked,true,"OEM overlays toggle on");
   assert.equal($("#sa-oem-mask").style.display,"","Occlusion mask visible");
+  assert.equal($("#sa-oem-edge-shell").style.display,"","Visual edge surrounds shown with OEM assist");
+  assert.equal($("#sa-oem-edge-shell").children.length,6,"Two horizontal header/footer transitions and two view-specific side closures");
+  assert.equal($("#sa-oem-edge-shell").querySelectorAll('[data-safe-edge]').length,2,"Left and right continuity are explicit, not floating islands");
+  assert.equal($("#sa-oem-edge-shell").getAttribute("data-view"),"center","Edge shell follows active Center view");
   assert.equal($("#sa-grid-numbers").style.display,"none","Grid labels hidden to avoid text bleeding through OEM elements");
   assert.equal($("#sa-current-area").getAttribute("stroke"),"#2dd4bf","Turquoise outline separates Safe Area from OEM masks");
   assert.equal($("#sa-current-area").getAttribute("fill"),"rgba(45,212,191,.035)","Safe Area no longer covers OEM picture with yellow fill");
   click("#sa-oem-grid-labels");
-  assert.equal($("#sa-grid-numbers").style.display,"","Grid labels can be enabled for calibration");
+  assert.equal($("#sa-grid-numbers").style.display,"none","Original labels stay behind when OEM overlay active");
+  assert.equal($("#sa-grid-foreground").style.display,"","Foreground labels visible above opaque OEM");
+  assert.ok($("#sa-grid-foreground").querySelectorAll("text").length>100,"Numeric calibration annotations preserved on every grid column");
   click("#sa-oem-grid-labels");
-  assert.equal($("#sa-grid-numbers").style.display,"none","Grid labels can be hidden again");
+  assert.equal($("#sa-grid-foreground").style.display,"none","Foreground labels can be hidden again");
+  assert.equal($("#sa-grid-numbers").style.display,"none","Original labels remain hidden while OEM assist is active");
   set("#sa-oem-opacity","100","input");
   assert.equal($("#sa-oem-preview").style.opacity,"1","Full 100-percent OEM opacity selectable");
   assert.equal($("#sa-oem-opacity").max,"100","Slider supports full opacity");
@@ -302,6 +309,8 @@ async function main(){
   assert.equal(w.MIBR_views.activeView(),"wide","Safe Area selection updates View configurator");
   assert.equal(w.MIBR_safe.activeView(),"wide","Same active Wide in both workspaces");
   assert.equal($("#sa-oem-mask").children.length,6,"Wide: four shared bands and two exact side modules");
+  assert.equal($("#sa-oem-edge-shell").getAttribute("data-view"),"wide","Wide continuity surrounds only its side panels");
+  assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="right"]').getAttribute("d"),"M1010 0H830L738 330Q736 357 763 376H1010Z","Wide right panel actually connects to viewport edge");
   assert.equal($("#sa-oem-mask").children[4].getAttribute("d"),$("#wide-side-panels > path").getAttribute("d"),"Wide left blocked polygon identical to current calibrated sidepanel");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="side-panels"]'),"Wide OEM overlay uses actual SVG side panels");
   assert.equal($$(".sa-views button")[1].getAttribute("aria-pressed"),"true","Wide calibration active");
@@ -314,6 +323,8 @@ async function main(){
   assert.equal(w.MIBR_safe.activeView(),"full","Shortcut preserves Full calibration view");
   assert.equal($$(".sa-views button")[0].getAttribute("aria-pressed"),"true","Full calibration selected via shortcut");
   assert.equal($("#sa-oem-mask").children.length,6,"Full: four common bands and two lower cutouts");
+  assert.equal($("#sa-oem-edge-shell").getAttribute("data-view"),"full","Full edge closure follows selected view");
+  assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="left"]').getAttribute("d"),"M0 249H178Q205 260 235 294L273 351V376H0Z","Full lower cutoff attaches to left edge and bottom");
   assert.equal($("#sa-oem-mask").children[4].getAttribute("d"),$("#full-lower-corners > path").getAttribute("d"),"Full mask copies updated left diagonal cutout");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="lower-corners"]'),"Full lower shape uses existing SVG outline");
   click('#tabs [data-t=nav]');click('[data-navv-view=center]');
