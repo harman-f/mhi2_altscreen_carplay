@@ -57,7 +57,7 @@ async function main(){
   assert.equal(wideArrow.querySelectorAll("path").length,1,"Wide arrow uses one filled and stroked shape");
   assert.equal(silhouette.getAttribute("stroke"),"#f7fcff","White contour traces the exact green silhouette");
     // P0.9.1: shared status metrics remain physically identical across cockpit modes.
-  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.6"),"Visible version label");
+  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.7"),"Visible version label");
   for(const view of ["center","wide","full"]){
     const q=id=>$("#"+view+"-"+id);
     const top=q("top-status"),bottom=q("bottom-info"),footer=q("footer");
@@ -278,12 +278,15 @@ async function main(){
   assert.equal($("#sa-current-area").getAttribute("stroke"),"#2dd4bf","Turquoise outline separates Safe Area from OEM masks");
   assert.equal($("#sa-current-area").getAttribute("fill"),"rgba(45,212,191,.035)","Safe Area no longer covers OEM picture with yellow fill");
   click("#sa-oem-grid-labels");
-  assert.equal($("#sa-grid-numbers").style.display,"none","Original labels stay behind when OEM overlay active");
-  assert.equal($("#sa-grid-foreground").style.display,"","Foreground labels visible above opaque OEM");
-  assert.ok($("#sa-grid-foreground").querySelectorAll("text").length>100,"Numeric calibration annotations preserved on every grid column");
+  assert.equal($("#sa-grid-numbers").style.display,"","Original calibration numbers visible below OEM");
+  assert.equal($("#sa-grid-foreground"),null,"No duplicate/foreground coordinate layer");
+  assert.ok($("#sa-grid-numbers").querySelectorAll("text").length>100,"Original numeric grid retained");
+  const safeSvg=$(".sa-pic"),layerOrder=Array.from(safeSvg.children);
+  assert.ok(layerOrder.indexOf($("#sa-grid-numbers"))<layerOrder.indexOf($("#sa-current-area")),"Grid numbers below Safe Area outline");
+  assert.ok(layerOrder.indexOf($("#sa-current-area"))<layerOrder.indexOf($("#sa-oem-edge-shell")),"Safe Area outline below OEM");
+  assert.ok(layerOrder.indexOf($("#sa-oem-edge-shell"))<layerOrder.indexOf($("#sa-oem-preview")),"OEM preview above numbers and edge frame");
   click("#sa-oem-grid-labels");
-  assert.equal($("#sa-grid-foreground").style.display,"none","Foreground labels can be hidden again");
-  assert.equal($("#sa-grid-numbers").style.display,"none","Original labels remain hidden while OEM assist is active");
+  assert.equal($("#sa-grid-numbers").style.display,"none","Original labels optional even with OEM enabled");
   set("#sa-oem-opacity","100","input");
   assert.equal($("#sa-oem-preview").style.opacity,"1","Full 100-percent OEM opacity selectable");
   assert.equal($("#sa-oem-opacity").max,"100","Slider supports full opacity");
@@ -292,6 +295,15 @@ async function main(){
   assert.equal($("#sa-oem-mask").children[5].getAttribute("transform"),$("#center-right-dial").getAttribute("transform"),"Right blocked circle follows its transformed gauge");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="top-status"]'),"Preview clones native OEM top group");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="footer"]'),"Preview clones native OEM footer");
+  const centerPreview=$("#sa-oem-preview"),centerTexts=Array.from(centerPreview.querySelectorAll("text")).map(n=>n.textContent.trim());
+  assert.equal(centerPreview.querySelectorAll('[data-safe-origin="left-dial"]').length,1,"Center left dial drawn once");
+  assert.equal(centerPreview.querySelectorAll('[data-safe-origin="right-dial"]').length,1,"Center right dial drawn once");
+  assert.equal(centerPreview.querySelectorAll('[data-safe-origin="left-info"]').length,0,"Nested left info not cloned separately");
+  assert.equal(centerPreview.querySelectorAll('[data-safe-origin="speed"]').length,0,"Nested right speed not cloned separately");
+  assert.equal(centerTexts.filter(x=>x==="0 km").length,1,"Center left 0 km only once");
+  assert.equal(centerTexts.filter(x=>x==="Ab Start").length,1,"Center left Ab Start only once");
+  assert.equal(centerTexts.filter(x=>x==="km/h").length,1,"Center right km/h only once");
+  assert.equal(centerTexts.filter(x=>x==="0").length,1,"Center right speed 0 only once");
   set("#sa-oem-mode","mask");
   assert.equal($("#sa-oem-preview").style.display,"none","Only mask mode hides native graphics");
   set("#sa-oem-opacity","35","input");
@@ -313,6 +325,8 @@ async function main(){
   assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="right"]').getAttribute("d"),"M1010 0H830L738 330Q736 357 763 376H1010Z","Wide right panel actually connects to viewport edge");
   assert.equal($("#sa-oem-mask").children[4].getAttribute("d"),$("#wide-side-panels > path").getAttribute("d"),"Wide left blocked polygon identical to current calibrated sidepanel");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="side-panels"]'),"Wide OEM overlay uses actual SVG side panels");
+  const wideNames=Array.from($("#sa-oem-preview").children).map(n=>n.getAttribute("data-safe-origin")).filter(Boolean);
+  assert.equal(new Set(wideNames).size,wideNames.length,"Wide renders each OEM group once");
   assert.equal($$(".sa-views button")[1].getAttribute("aria-pressed"),"true","Wide calibration active");
   $$(".sa-views button")[2].click(); // Center calibration geometry
   assert.equal(w.MIBR_views.activeView(),"center","Returning to Center synchronizes both workspaces");
@@ -327,6 +341,8 @@ async function main(){
   assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="left"]').getAttribute("d"),"M0 249H178Q205 260 235 294L273 351V376H0Z","Full lower cutoff attaches to left edge and bottom");
   assert.equal($("#sa-oem-mask").children[4].getAttribute("d"),$("#full-lower-corners > path").getAttribute("d"),"Full mask copies updated left diagonal cutout");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="lower-corners"]'),"Full lower shape uses existing SVG outline");
+  const fullNames=Array.from($("#sa-oem-preview").children).map(n=>n.getAttribute("data-safe-origin")).filter(Boolean);
+  assert.equal(new Set(fullNames).size,fullNames.length,"Full renders each OEM group once");
   click('#tabs [data-t=nav]');click('[data-navv-view=center]');
 
   const before=clone(w.MIBR_project.capture());

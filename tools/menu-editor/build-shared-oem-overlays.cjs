@@ -89,7 +89,7 @@ for(const v of views){
    else console.error("OUT OF SYNC:",path.basename(file));
  }
 }
-for(const name of ["mibr-menu-editor-nav-views-mockup.html","mibr-menu-editor-nav-views-p096.html"]){
+for(const name of ["mibr-menu-editor-nav-views-mockup.html","mibr-menu-editor-nav-views-p097.html"]){
  const file=path.join(root,name),original=fs.readFileSync(file,"utf8"),generated=rebuildHtml(original,svgOut);
  if(original!==generated){
   dirty=true;

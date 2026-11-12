@@ -1959,20 +1959,9 @@ function safeAssistLayers(svg,view){
   });
   var masks=svgEl("g",{id:"sa-oem-mask","data-view":id,"pointer-events":"none"},null,svg);
   var preview=svgEl("g",{id:"sa-oem-preview","data-view":id,"pointer-events":"none"},null,svg);
-  // Labels are deliberately above the opaque OEM preview when requested.
-  // They are calibration annotations, not evidence of uncovered CarPlay pixels.
-  var foreground=svgEl("g",{id:"sa-grid-foreground","pointer-events":"none"},null,svg);
-  var originalNumbers=svg.querySelector("#sa-grid-numbers");
-  if(originalNumbers)Array.from(originalNumbers.querySelectorAll("text")).forEach(function(item){
-    var label=item.cloneNode(true);
-    label.setAttribute("font-size","15");
-    label.setAttribute("stroke","#03060c");
-    label.setAttribute("stroke-width","2.8");
-    label.setAttribute("stroke-linejoin","round");
-    label.setAttribute("paint-order","stroke fill");
-    label.setAttribute("opacity",".92");
-    foreground.appendChild(label);
-  });
+  // The numbered grid is already in safePicture(), below the OEM groups.
+  // No foreground copy: the native OEM may genuinely cover grid annotations.
+  // Layer order: grid -> numbers -> configured Safe Area -> OEM rim/mask/preview.
   var sections={
     center:["left-dial","left-info","right-dial","speed","dial-lanes","right-turn","dial-distance","top-status","top-text","top-lanes","bottom-info","footer","side-metrics"],
     wide:["side-panels","left-info","right-media","dial-lanes","right-turn","dial-distance","speed","top-status","top-text","top-lanes","bottom-info","footer","side-metrics"],
@@ -1988,8 +1977,7 @@ function safeAssistLayers(svg,view){
     masks.style.opacity=String(Math.round(safeAssist.opacity*.72)/100);
     preview.style.opacity=String(safeAssist.opacity/100);
     var labels=svg.querySelector("#sa-grid-numbers");
-    if(labels)labels.style.display=enabled?"none":"";
-    foreground.style.display=enabled&&safeAssist.gridNumbers?"":"none";
+    if(labels)labels.style.display=!enabled||safeAssist.gridNumbers?"":"none";
     if(!enabled)return;
     var src=document.getElementById("navv-"+id+"-svg");
     // Shared common OEM bands, calibrated approximately from real AID10 grid photos.
@@ -2021,9 +2009,12 @@ function safeAssistLayers(svg,view){
     if(mode!=="mask"&&src){
       var defs=src.querySelector("defs");
       if(defs)preview.appendChild(defs.cloneNode(true));
-      sections[id].forEach(function(name){
-        var original=src.querySelector("#"+id+"-"+name);
-        if(!original)return;
+      var sources=sections[id].map(function(name){return src.querySelector("#"+id+"-"+name)}).filter(Boolean);
+      sources.forEach(function(original){
+        // A gauge already owns its inner information and speed. Copying both
+        // parent and descendant drew "0 km / Ab Start" and "0 km/h" twice.
+        if(sources.some(function(parent){return parent!==original&&parent.contains(original)}))return;
+        var name=original.id.slice(id.length+1);
         var copy=original.cloneNode(true);
         copy.setAttribute("data-safe-origin",name);
         copy.removeAttribute("id");
@@ -2050,7 +2041,7 @@ function renderSafe(host,embedded){
     vs.appendChild(b);
   });
   if(!embedded)box.appendChild(vs);
-  var svg=safePicture(),drawAssist=safeAssistLayers(svg,view),frame=svgEl("rect",{id:"sa-current-area",fill:"rgba(255,214,60,.16)",stroke:"#ffd63c","stroke-width":3},null,svg);
+  var svg=safePicture(),frame=svgEl("rect",{id:"sa-current-area",fill:"rgba(255,214,60,.16)",stroke:"#ffd63c","stroke-width":3},null,svg),drawAssist=safeAssistLayers(svg,view);
   var controls=el("div","sa-assist-controls"),checkWrap=el("label","",lang==="de"?"OEM-Overlays anzeigen":"Show OEM overlays");
   checkWrap.htmlFor="sa-oem-show";
   var check=el("input","sa-assist-check");check.id="sa-oem-show";check.type="checkbox";check.checked=safeAssist.enabled;
@@ -2070,8 +2061,8 @@ function renderSafe(host,embedded){
   var numbers=el("input","sa-assist-check");numbers.id="sa-oem-grid-labels";numbers.type="checkbox";numbers.checked=safeAssist.gridNumbers;
   numbersWrap.insertBefore(numbers,numbersWrap.firstChild);controls.appendChild(numbersWrap);
   controls.appendChild(el("p","sa-assist-hint",lang==="de"?
-    "Türkis = eingestellte Safe Area; Gelb/Rot = angenäherte Sperrflächen; Dunkelblau = optische Cockpit-Einfassung (keine Sperrfläche). Rasterzahlen liegen bei Aktivierung als Messhilfe vor den OEM-Flächen. Keine Änderung der Safe Area.":
-    "Turquoise = configured Safe Area; amber/red = estimated obstruction; navy = visual cockpit surround (not blocked). Enabled grid numbers are calibration annotations drawn above OEM graphics. No Safe Area changes."));
+    "Zeichenreihenfolge: Grid → Rasterzahlen → OEM. Türkis = eingestellte Safe Area; Gelb/Rot = angenäherte Sperrflächen; Dunkelblau = optische Einfassung (keine Sperrfläche). OEM kann Rasterzahlen verdecken. Keine Änderung der Safe Area.":
+    "Layer order: grid → numbers → OEM. Turquoise = configured Safe Area; amber/red = estimated obstruction; navy = visual surround (not blocked). OEM may cover grid labels. Safe Area data is unchanged."));
   function assistChanged(){
     safeAssist.enabled=check.checked;safeAssist.mode=mode.value;safeAssist.opacity=+opacity.value;
     safeAssist.gridNumbers=numbers.checked;
@@ -2463,7 +2454,7 @@ connect();
 <div class="navv-note" id="navv-config-warning">View-Profile sind experimentell und ändern das Fahrzeug nicht direkt.</div>
 <section id="navv-view-workspace">
 <div class="navv-card navv-view-selector"><h3>Aktive Cockpit-Ansicht</h3><div class="navv-views" role="group" aria-label="Aktive Cockpit-Ansicht"><button type="button" data-navv-view="center">Center</button><button type="button" data-navv-view="wide">Wide</button><button type="button" data-navv-view="full">Voll</button></div><p id="navv-selection-hint" class="navv-note" role="status"></p><details class="navv-profile-advanced" id="navv-profile-advanced"><summary>Profilverwaltung · Vererbung, Kopieren und Zurücksetzen</summary><div class="navv-row"><label for="navv-mode">Profilmodus</label><select id="navv-mode"><option value="custom">Individuelles Profil</option><option value="inherit">Globale Standardwerte verwenden</option></select></div><p id="navv-mode-info" class="navv-note"></p><div class="navv-buttons"><label for="navv-copy-target" class="navv-note" data-i18n="copylabel">Profil kopieren nach</label><select id="navv-copy-target"><option value="center">Center</option><option value="wide">Wide</option><option value="full">Voll</option></select><button type="button" id="navv-copy">Einstellungen kopieren</button><button type="button" id="navv-reset-view">Profil zurücksetzen</button></div><p class="navv-note">Kopieren und Zurücksetzen betreffen die Navi- und CarPlay-Einstellungen. Die Safe-Area-Geometrie bleibt unverändert.</p></details></div>
-<div class="navv-card navv-view-preview"><div class="navv-preview-heading"><h3>Live-Vorschau: <span id="navv-viewname">Center</span> <small class="navv-version" aria-label="Mockup-Version">P0.9.6</small></h3><button type="button" id="navv-preview-zoom" aria-expanded="false">⛶ Großansicht</button></div><div id="navv-center-preview"><button type="button" id="navv-preview-close" aria-label="Großansicht schließen" hidden>Schließen ✕</button><svg id="navv-center-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Modulares AID10 Center-Cockpit: Instrumente, Navigationsanzeigen und Kartenfläche als getrennte SVG-Ebenen">
+<div class="navv-card navv-view-preview"><div class="navv-preview-heading"><h3>Live-Vorschau: <span id="navv-viewname">Center</span> <small class="navv-version" aria-label="Mockup-Version">P0.9.7</small></h3><button type="button" id="navv-preview-zoom" aria-expanded="false">⛶ Großansicht</button></div><div id="navv-center-preview"><button type="button" id="navv-preview-close" aria-label="Großansicht schließen" hidden>Schließen ✕</button><svg id="navv-center-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Modulares AID10 Center-Cockpit: Instrumente, Navigationsanzeigen und Kartenfläche als getrennte SVG-Ebenen">
 <defs>
 <style>
 #navv-center-svg{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-variant-numeric:tabular-nums}
