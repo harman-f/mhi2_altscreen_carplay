@@ -1932,8 +1932,47 @@ function safePicture(){
    Neither layer is authoritative firmware geometry or a vehicle-exported Safe Area. */
 function safeAssistLayers(svg,view){
   var id=view==="voll"?"full":view;
+  // The dark OEM surround is an optical continuity guide, NOT a blocked Safe Area.
+  // These perimeter paths were estimated from the photographed numeric grid.
+  var edge=svgEl("g",{id:"sa-oem-edge-shell","data-view":id,"pointer-events":"none"},null,svg);
+  svgEl("rect",{x:0,y:0,width:1010,height:42,fill:"#18263c","fill-opacity":".83"},null,edge);
+  svgEl("rect",{x:0,y:42,width:1010,height:19,fill:"#18263c","fill-opacity":".18"},null,edge);
+  svgEl("rect",{x:0,y:326,width:1010,height:50,fill:"#0e1828","fill-opacity":".88"},null,edge);
+  svgEl("rect",{x:0,y:315,width:1010,height:11,fill:"#111c2c","fill-opacity":".19"},null,edge);
+  var edgePaths={
+    center:[
+      "M0 0H205V20Q95 5 62 82Q30 185 65 292Q85 351 205 376H0Z",
+      "M1010 0H805V20Q915 5 948 82Q980 185 945 292Q925 351 805 376H1010Z"
+    ],
+    wide:[
+      "M0 0H188L272 330Q274 357 247 376H0Z",
+      "M1010 0H830L738 330Q736 357 763 376H1010Z"
+    ],
+    full:[
+      "M0 249H178Q205 260 235 294L273 351V376H0Z",
+      "M1010 249H841Q805 260 780 294L737 351V376H1010Z"
+    ]
+  };
+  edgePaths[id].forEach(function(d,i){
+    svgEl("path",{d:d,fill:"#253148","fill-opacity":id==="full"?".75":".83",
+      "data-safe-edge":i===0?"left":"right"},null,edge);
+  });
   var masks=svgEl("g",{id:"sa-oem-mask","data-view":id,"pointer-events":"none"},null,svg);
   var preview=svgEl("g",{id:"sa-oem-preview","data-view":id,"pointer-events":"none"},null,svg);
+  // Labels are deliberately above the opaque OEM preview when requested.
+  // They are calibration annotations, not evidence of uncovered CarPlay pixels.
+  var foreground=svgEl("g",{id:"sa-grid-foreground","pointer-events":"none"},null,svg);
+  var originalNumbers=svg.querySelector("#sa-grid-numbers");
+  if(originalNumbers)Array.from(originalNumbers.querySelectorAll("text")).forEach(function(item){
+    var label=item.cloneNode(true);
+    label.setAttribute("font-size","15");
+    label.setAttribute("stroke","#03060c");
+    label.setAttribute("stroke-width","2.8");
+    label.setAttribute("stroke-linejoin","round");
+    label.setAttribute("paint-order","stroke fill");
+    label.setAttribute("opacity",".92");
+    foreground.appendChild(label);
+  });
   var sections={
     center:["left-dial","left-info","right-dial","speed","dial-lanes","right-turn","dial-distance","top-status","top-text","top-lanes","bottom-info","footer","side-metrics"],
     wide:["side-panels","left-info","right-media","dial-lanes","right-turn","dial-distance","speed","top-status","top-text","top-lanes","bottom-info","footer","side-metrics"],
@@ -1942,12 +1981,15 @@ function safeAssistLayers(svg,view){
   function draw(){
     masks.textContent="";preview.textContent="";
     var mode=safeAssist.mode,enabled=safeAssist.enabled;
+    edge.style.display=enabled?"":"none";
+    edge.style.opacity=String(safeAssist.opacity/100);
     masks.style.display=enabled&&mode!=="preview"?"":"none";
     preview.style.display=enabled&&mode!=="mask"?"":"none";
     masks.style.opacity=String(Math.round(safeAssist.opacity*.72)/100);
     preview.style.opacity=String(safeAssist.opacity/100);
     var labels=svg.querySelector("#sa-grid-numbers");
-    if(labels)labels.style.display=!enabled||safeAssist.gridNumbers?"":"none";
+    if(labels)labels.style.display=enabled?"none":"";
+    foreground.style.display=enabled&&safeAssist.gridNumbers?"":"none";
     if(!enabled)return;
     var src=document.getElementById("navv-"+id+"-svg");
     // Shared common OEM bands, calibrated approximately from real AID10 grid photos.
@@ -2028,8 +2070,8 @@ function renderSafe(host,embedded){
   var numbers=el("input","sa-assist-check");numbers.id="sa-oem-grid-labels";numbers.type="checkbox";numbers.checked=safeAssist.gridNumbers;
   numbersWrap.insertBefore(numbers,numbersWrap.firstChild);controls.appendChild(numbersWrap);
   controls.appendChild(el("p","sa-assist-hint",lang==="de"?
-    "Türkis = eingestellte Safe Area (nur Umriss); Gelb = angenäherte OEM-Statusfelder; Rot = Instrumente/Seitenteile/Einschnitte. Rasterzahlen optional. Keine automatische Änderung der Safe Area.":
-    "Turquoise = current Safe Area outline; amber = approximate OEM status areas; red = gauges/side panels/cutouts. Optional grid numbers. No automatic Safe Area adjustment."));
+    "Türkis = eingestellte Safe Area; Gelb/Rot = angenäherte Sperrflächen; Dunkelblau = optische Cockpit-Einfassung (keine Sperrfläche). Rasterzahlen liegen bei Aktivierung als Messhilfe vor den OEM-Flächen. Keine Änderung der Safe Area.":
+    "Turquoise = configured Safe Area; amber/red = estimated obstruction; navy = visual cockpit surround (not blocked). Enabled grid numbers are calibration annotations drawn above OEM graphics. No Safe Area changes."));
   function assistChanged(){
     safeAssist.enabled=check.checked;safeAssist.mode=mode.value;safeAssist.opacity=+opacity.value;
     safeAssist.gridNumbers=numbers.checked;
@@ -2421,7 +2463,7 @@ connect();
 <div class="navv-note" id="navv-config-warning">View-Profile sind experimentell und ändern das Fahrzeug nicht direkt.</div>
 <section id="navv-view-workspace">
 <div class="navv-card navv-view-selector"><h3>Aktive Cockpit-Ansicht</h3><div class="navv-views" role="group" aria-label="Aktive Cockpit-Ansicht"><button type="button" data-navv-view="center">Center</button><button type="button" data-navv-view="wide">Wide</button><button type="button" data-navv-view="full">Voll</button></div><p id="navv-selection-hint" class="navv-note" role="status"></p><details class="navv-profile-advanced" id="navv-profile-advanced"><summary>Profilverwaltung · Vererbung, Kopieren und Zurücksetzen</summary><div class="navv-row"><label for="navv-mode">Profilmodus</label><select id="navv-mode"><option value="custom">Individuelles Profil</option><option value="inherit">Globale Standardwerte verwenden</option></select></div><p id="navv-mode-info" class="navv-note"></p><div class="navv-buttons"><label for="navv-copy-target" class="navv-note" data-i18n="copylabel">Profil kopieren nach</label><select id="navv-copy-target"><option value="center">Center</option><option value="wide">Wide</option><option value="full">Voll</option></select><button type="button" id="navv-copy">Einstellungen kopieren</button><button type="button" id="navv-reset-view">Profil zurücksetzen</button></div><p class="navv-note">Kopieren und Zurücksetzen betreffen die Navi- und CarPlay-Einstellungen. Die Safe-Area-Geometrie bleibt unverändert.</p></details></div>
-<div class="navv-card navv-view-preview"><div class="navv-preview-heading"><h3>Live-Vorschau: <span id="navv-viewname">Center</span> <small class="navv-version" aria-label="Mockup-Version">P0.9.5</small></h3><button type="button" id="navv-preview-zoom" aria-expanded="false">⛶ Großansicht</button></div><div id="navv-center-preview"><button type="button" id="navv-preview-close" aria-label="Großansicht schließen" hidden>Schließen ✕</button><svg id="navv-center-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Modulares AID10 Center-Cockpit: Instrumente, Navigationsanzeigen und Kartenfläche als getrennte SVG-Ebenen">
+<div class="navv-card navv-view-preview"><div class="navv-preview-heading"><h3>Live-Vorschau: <span id="navv-viewname">Center</span> <small class="navv-version" aria-label="Mockup-Version">P0.9.6</small></h3><button type="button" id="navv-preview-zoom" aria-expanded="false">⛶ Großansicht</button></div><div id="navv-center-preview"><button type="button" id="navv-preview-close" aria-label="Großansicht schließen" hidden>Schließen ✕</button><svg id="navv-center-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Modulares AID10 Center-Cockpit: Instrumente, Navigationsanzeigen und Kartenfläche als getrennte SVG-Ebenen">
 <defs>
 <style>
 #navv-center-svg{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-variant-numeric:tabular-nums}
