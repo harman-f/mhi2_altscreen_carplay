@@ -7,8 +7,8 @@ const {pathToFileURL} = require("node:url");
 const {chromium} = require("playwright-core");
 
 const source=path.join(__dirname,"mibr-menu-editor-nav-views-mockup.html");
-const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p094.html");
-assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.4 standalone review HTML must match canonical source");
+const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p095.html");
+assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.5 standalone review HTML must match canonical source");
 const output=path.join(process.cwd(),"p09-visual-artifacts");
 fs.mkdirSync(output,{recursive:true});
 const chromeCandidates=[process.env.CHROME_PATH,process.env.CHROMIUM_PATH,
@@ -62,7 +62,16 @@ function overlap(a,b){
       assert.equal(await turn.locator("path").count(),1,"Wide uses one arrow silhouette");
       assert.equal(await page.locator("#wide-turn-silhouette").getAttribute("stroke"),"#f7fcff");
     }
-        const active=page.locator("#navv-"+view+"-svg");
+        const calibrated=await page.evaluate(v=>{
+      const svg=document.getElementById("navv-"+v+"-svg");
+      if(v==="wide")return {clip:svg.querySelector("#w-map-clip path").getAttribute("d")};
+      if(v==="full")return {clip:svg.querySelector("#f-mainclip path").getAttribute("d")};
+      return {left:svg.querySelector("#center-left-dial").getAttribute("transform"),right:svg.querySelector("#center-right-dial").getAttribute("transform")};
+    },view);
+    if(view==="wide")assert.equal(calibrated.clip,"M188 37H830L738 329H272Z","Grid-aligned Wide");
+    else if(view==="full")assert.ok(calibrated.clip.includes("L737 350H273"),"Grid-aligned Full cutout");
+    else assert.deepEqual(calibrated,{left:"translate(-43.18 -11.04) scale(1.06)",right:"translate(-17.42 -11.04) scale(1.06)"},"Grid-aligned Center");
+    const active=page.locator("#navv-"+view+"-svg");
     assert.equal(await active.isVisible(),true,view+" visible");
     for(const other of views.filter(x=>x!==view))assert.equal(await page.locator("#navv-"+other+"-svg").isVisible(),false,other+" hidden");
     for(const surface of surfaces){
@@ -140,6 +149,12 @@ function overlap(a,b){
      assert.equal(await page.locator("#sa-oem-mask").getAttribute("data-view"),view);
      await page.locator("#sa-oem-mode").selectOption("both");
      assert.equal(await page.locator("#sa-oem-mask > *").count(),6,view+" approximate mask has common and per-view geometry");
+     if(view==="center"){
+       const leftTransform=await page.locator("#sa-oem-mask > circle").first().getAttribute("transform");
+       const rightTransform=await page.locator("#sa-oem-mask > circle").last().getAttribute("transform");
+       assert.equal(leftTransform,"translate(-43.18 -11.04) scale(1.06)","Center Safe Area mask matches left scaled gauge");
+       assert.equal(rightTransform,"translate(-17.42 -11.04) scale(1.06)","Center Safe Area mask matches right scaled gauge");
+     }
      assert.ok(await page.locator('#sa-oem-preview [data-safe-origin="top-status"]').count(),view+" reuses OEM top status");
      await page.locator(".sa-pic").screenshot({path:path.join(output,sc.name+"-safe-"+view+"-both.png"),animations:"disabled"});
      await page.locator("#sa-oem-mode").selectOption("mask");

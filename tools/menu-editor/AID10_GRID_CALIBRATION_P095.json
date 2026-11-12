@@ -80,8 +80,85 @@
     },
     {
       "pass": 3,
-      "description": "Match Safe Area overlay shapes to transformed SVGs; CI regression"
+      "description": "Match Safe Area overlay shapes to transformed SVGs; CI regression",
+      "safeArea": "Masks copied from wide and full SVG paths; Center mask inherits parent dial transforms so it matches the true displayed 167.5 radius, x=225/785.",
+      "htmlReview": "mibr-menu-editor-nav-views-p095.html"
     }
   ],
-  "caveat": "No project Safe Area, calibration profile or runtime coordinates are modified; targets are perspective-derived photo approximations, not measured OEM BAP boundaries."
+  "caveat": "No project Safe Area, calibration profile or runtime coordinates are modified; targets are perspective-derived photo approximations, not measured OEM BAP boundaries.",
+  "metrics": {
+    "methodology": "Mean absolute SVG coordinate error vs perspective-derived manually read numeric-grid anchor coordinates; not photo-pixel error",
+    "wide": {
+      "before": [
+        284,
+        724,
+        331,
+        683
+      ],
+      "target": [
+        180,
+        830,
+        270,
+        740
+      ],
+      "after": [
+        188,
+        830,
+        272,
+        738
+      ],
+      "maeBefore": 82,
+      "maeAfter": 3
+    },
+    "full": {
+      "before": [
+        178,
+        841,
+        317,
+        705,
+        274,
+        355
+      ],
+      "target": [
+        175,
+        838,
+        270,
+        740,
+        260,
+        350
+      ],
+      "after": [
+        178,
+        841,
+        273,
+        737,
+        261,
+        350
+      ],
+      "maeBefore": 17.83,
+      "maeAfter": 2.17
+    },
+    "center": {
+      "before": [
+        253,
+        757,
+        158,
+        158
+      ],
+      "target": [
+        225,
+        785,
+        167.5,
+        167.5
+      ],
+      "after": [
+        225,
+        785,
+        167.48,
+        167.48
+      ],
+      "maeBefore": 18.75,
+      "maeAfter": 0.01
+    }
+  }
 }

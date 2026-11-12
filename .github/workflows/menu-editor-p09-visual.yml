@@ -1,4 +1,4 @@
-name: MIBR P0.9.4 Safe Area visual clarity acceptance
+name: MIBR P0.9.5 AID10 numeric grid scale acceptance
 on:
   pull_request:
     paths:
@@ -6,7 +6,7 @@ on:
       - 'tools/menu-editor/mibr-*-preview.svg'
       - 'tools/menu-editor/test-p09-visual.cjs'
       - 'tools/menu-editor/build-shared-oem-overlays.cjs'
-      - 'tools/menu-editor/mibr-menu-editor-nav-views-p094.html'
+      - 'tools/menu-editor/mibr-menu-editor-nav-views-p095.html'
       - '.github/workflows/menu-editor-p09-visual.yml'
   workflow_dispatch:
 jobs:
@@ -28,7 +28,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mib-p094-safearea-screenshots
+          name: mib-p095-grid-aligned-screenshots
           path: p09-visual-artifacts/
           if-no-files-found: warn
           retention-days: 14
