@@ -6,7 +6,7 @@
 <linearGradient id="f-cutout" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#111a2a"/><stop offset="1" stop-color="#060911"/></linearGradient>
 <pattern id="f-grid-fine" width="11" height="11" patternUnits="userSpaceOnUse"><path d="M11 0H0V11" stroke="#aebbc9" stroke-opacity=".18" stroke-width=".75" fill="none"/></pattern>
 <pattern id="f-grid-major" width="91" height="49" patternUnits="userSpaceOnUse"><path d="M91 0H0V49" stroke="#b7c7d6" stroke-opacity=".39" stroke-width="1.25" fill="none"/></pattern>
-<clipPath id="f-mainclip"><path d="M97 30Q97 25 105 25H899Q911 25 911 37V274H841Q811 274 783 301L705 355H317L239 302Q210 274 178 274H97Z"/></clipPath>
+<clipPath id="f-mainclip"><path d="M97 30Q97 25 105 25H899Q911 25 911 37V261H841Q805 261 780 294L737 350H273L235 294Q205 261 178 261H97Z"/></clipPath>
 </defs>
 <rect x="2" y="2" width="1006" height="372" rx="52" fill="#04070b" stroke="#1b2736" stroke-width="3"/>
 <path d="M101 24H909Q944 24 946 64V316Q942 353 904 353H105Q68 353 64 316V67Q67 24 101 24Z" fill="url(#f-display)"/>
@@ -49,9 +49,9 @@
  <path d="M526 131v-15h12m-6-6l8 6-8 6" stroke-width="3"/>
 </g>
 <g id="full-lower-corners">
- <path d="M95 274H178Q210 274 239 302L317 355H99Q67 351 65 317V276Z" fill="url(#f-cutout)"/>
- <path d="M916 274H841Q811 274 783 301L705 355H913Q944 351 945 317V276Z" fill="url(#f-cutout)"/>
- <path d="M178 274Q210 274 239 302L317 355M841 274Q811 274 783 301L705 355" fill="none" stroke="#dce9f5" stroke-width="2" opacity=".93"/>
+ <path d="M95 261H178Q205 261 235 294L273 350H99Q67 348 65 317V263Z" fill="url(#f-cutout)"/>
+ <path d="M916 261H841Q805 261 780 294L737 350H913Q944 348 945 317V263Z" fill="url(#f-cutout)"/>
+ <path d="M178 261Q205 261 235 294L273 350M841 261Q805 261 780 294L737 350" fill="none" stroke="#dce9f5" stroke-width="2" opacity=".93"/>
 </g>
 <!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views -->
 <g id="full-bottom-info" fill="#edf5ff" font-size="14" font-weight="600">

@@ -1,0 +1,79 @@
+{
+  "schema": "mibr.aid10.photo-grid-calibration/1",
+  "sourcePhotos": [
+    {
+      "view": "wide",
+      "file": "IMG_2319(1).jpeg",
+      "note": "Perspective source photographed with 100×50 numeric grid"
+    },
+    {
+      "view": "center",
+      "file": "IMG_2320(1).jpeg",
+      "note": "Perspective source photographed with 100×50 numeric grid"
+    },
+    {
+      "view": "full",
+      "file": "IMG_2321(1).jpeg",
+      "note": "Perspective source photographed with 100×50 numeric grid"
+    }
+  ],
+  "coordinateSystem": {
+    "width": 1010,
+    "height": 376,
+    "gridX": 100,
+    "gridY": 50,
+    "valuesAreApproximate": true,
+    "sourceAccuracySvgUnits": 20
+  },
+  "targets": {
+    "wide": {
+      "topLeft": 180,
+      "topRight": 830,
+      "bottomLeft": 270,
+      "bottomRight": 740
+    },
+    "full": {
+      "leftShoulderX": 175,
+      "rightShoulderX": 838,
+      "leftTipX": 270,
+      "rightTipX": 740,
+      "shoulderY": 260,
+      "tipY": 350
+    },
+    "center": {
+      "leftCX": 225,
+      "rightCX": 785,
+      "outerRadius": 167.5,
+      "centerY": 184
+    }
+  },
+  "passes": [
+    {
+      "pass": 1,
+      "description": "Wide trapeziums and Full lower cutouts from photo numeric grid",
+      "wide": {
+        "topLeft": 188,
+        "topRight": 830,
+        "bottomLeft": 272,
+        "bottomRight": 738
+      },
+      "full": {
+        "leftShoulderX": 178,
+        "rightShoulderX": 841,
+        "leftTipX": 273,
+        "rightTipX": 737,
+        "shoulderY": 261,
+        "tipY": 350
+      }
+    },
+    {
+      "pass": 2,
+      "description": "Center dial size/spacing and map clearance; maintain native common anchors"
+    },
+    {
+      "pass": 3,
+      "description": "Match Safe Area overlay shapes to transformed SVGs; CI regression"
+    }
+  ],
+  "caveat": "No project Safe Area, calibration profile or runtime coordinates are modified; targets are perspective-derived photo approximations, not measured OEM BAP boundaries."
+}
