@@ -7,8 +7,8 @@ const {pathToFileURL} = require("node:url");
 const {chromium} = require("playwright-core");
 
 const source=path.join(__dirname,"mibr-menu-editor-nav-views-mockup.html");
-const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p093.html");
-assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.3 standalone review HTML must match canonical source");
+const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p094.html");
+assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.4 standalone review HTML must match canonical source");
 const output=path.join(process.cwd(),"p09-visual-artifacts");
 fs.mkdirSync(output,{recursive:true});
 const chromeCandidates=[process.env.CHROME_PATH,process.env.CHROMIUM_PATH,
@@ -130,6 +130,10 @@ function overlap(a,b){
    await page.locator('#tabs [data-t="safe"]').click();
    const originalEdges=await page.locator("#sa-x").inputValue();
    await page.locator("#sa-oem-show").check();
+   assert.equal(await page.locator("#sa-grid-numbers").isVisible(),false,"Grid labels hidden when assist enabled");
+   assert.equal(await page.locator("#sa-current-area").getAttribute("stroke"),"#2dd4bf","Distinct configured Safe Area outline");
+   await page.locator("#sa-oem-opacity").evaluate(el=>{el.value="100";el.dispatchEvent(new Event("input",{bubbles:true}))});
+   assert.equal(await page.locator("#sa-oem-preview").evaluate(el=>el.style.opacity),"1");
    for(const view of ["center","wide","full"]){
      const safeKey=view==="full"?"voll":view;
      await page.locator(".sa-views button").nth(view==="full"?0:view==="wide"?1:2).click();
@@ -143,6 +147,12 @@ function overlap(a,b){
      await page.locator(".sa-pic").screenshot({path:path.join(output,sc.name+"-safe-"+view+"-mask.png"),animations:"disabled"});
    }
    await page.locator(".sa-views button").nth(2).click();
+   await page.locator("#sa-oem-mode").selectOption("both");
+   await page.locator("#sa-oem-grid-labels").check();
+   assert.equal(await page.locator("#sa-grid-numbers").isVisible(),true,"Optional grid numbers remain available");
+   await page.locator(".sa-pic").screenshot({path:path.join(output,sc.name+"-safe-center-grid-numbers.png"),animations:"disabled"});
+   await page.locator("#sa-oem-grid-labels").uncheck();
+   assert.equal(await page.locator("#sa-grid-numbers").isVisible(),false);
    assert.equal(await page.locator("#sa-x").inputValue(),originalEdges,"OEM assistant never alters Center safe area");
    await page.locator("#sa-oem-show").uncheck();
    assert.equal(await page.locator("#sa-oem-mask").isVisible(),false);

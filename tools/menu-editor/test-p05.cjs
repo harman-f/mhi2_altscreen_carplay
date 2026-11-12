@@ -57,7 +57,7 @@ async function main(){
   assert.equal(wideArrow.querySelectorAll("path").length,1,"Wide arrow uses one filled and stroked shape");
   assert.equal(silhouette.getAttribute("stroke"),"#f7fcff","White contour traces the exact green silhouette");
     // P0.9.1: shared status metrics remain physically identical across cockpit modes.
-  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.3"),"Visible version label");
+  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.4"),"Visible version label");
   for(const view of ["center","wide","full"]){
     const q=id=>$("#"+view+"-"+id);
     const top=q("top-status"),bottom=q("bottom-info"),footer=q("footer");
@@ -266,6 +266,16 @@ async function main(){
   click("#sa-oem-show");
   assert.equal($("#sa-oem-show").checked,true,"OEM overlays toggle on");
   assert.equal($("#sa-oem-mask").style.display,"","Occlusion mask visible");
+  assert.equal($("#sa-grid-numbers").style.display,"none","Grid labels hidden to avoid text bleeding through OEM elements");
+  assert.equal($("#sa-current-area").getAttribute("stroke"),"#2dd4bf","Turquoise outline separates Safe Area from OEM masks");
+  assert.equal($("#sa-current-area").getAttribute("fill"),"rgba(45,212,191,.035)","Safe Area no longer covers OEM picture with yellow fill");
+  click("#sa-oem-grid-labels");
+  assert.equal($("#sa-grid-numbers").style.display,"","Grid labels can be enabled for calibration");
+  click("#sa-oem-grid-labels");
+  assert.equal($("#sa-grid-numbers").style.display,"none","Grid labels can be hidden again");
+  set("#sa-oem-opacity","100","input");
+  assert.equal($("#sa-oem-preview").style.opacity,"1","Full 100-percent OEM opacity selectable");
+  assert.equal($("#sa-oem-opacity").max,"100","Slider supports full opacity");
   assert.equal($("#sa-oem-mask").children.length,6,"Center: 4 status bands and 2 dial masks");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="top-status"]'),"Preview clones native OEM top group");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="footer"]'),"Preview clones native OEM footer");
