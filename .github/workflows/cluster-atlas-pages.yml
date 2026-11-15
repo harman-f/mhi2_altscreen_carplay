@@ -1,0 +1,66 @@
+name: Cluster Atlas static-site validation and Pages deployment
+
+on:
+  pull_request:
+    paths:
+      - docs/index.html
+      - docs/research/**
+      - tools/docs/check_cluster_atlas.py
+      - .github/workflows/cluster-atlas-pages.yml
+  push:
+    branches: [main]
+    paths:
+      - docs/index.html
+      - docs/research/**
+      - tools/docs/check_cluster_atlas.py
+      - .github/workflows/cluster-atlas-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check topic tabs, matrix, profiles, links and privacy
+        run: python3 -B tools/docs/check_cluster_atlas.py docs/index.html
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: cluster-atlas-pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Stage standalone public HTML only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _atlas_site
+          cp docs/index.html _atlas_site/index.html
+          touch _atlas_site/.nojekyll
+          test -s _atlas_site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _atlas_site
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
