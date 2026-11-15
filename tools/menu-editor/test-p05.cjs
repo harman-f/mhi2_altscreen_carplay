@@ -479,6 +479,32 @@ async function main(){
     await badConf("global.transition.enabled=1","global.transition.enabled=true",/abgelehnt.*enabled|abgelehnt.*Wert/);
     deq(w.MIBR_views.get(),got,"Rejected imports leave the state untouched");
 
+
+    // Head-unit written partial, reordered v3 file: missing keys default, unit.revision preserved
+    {
+      const cur=w.MIBR_views.get().vehicle;
+      const unit=["MIBR_NAV_VIEW_PROFILES/3","version=3","unit.revision=4","view.wide.safeArea.h=160","global.bottom=eta","view.full.safeArea.x=10","view.full.safeArea.y=130","view.full.safeArea.w=990","view.full.safeArea.h=140","global.source=auto","view.wide.safeArea.x=250","view.wide.safeArea.y=130","view.wide.safeArea.w=505","global.sideStreets=true"];
+      assert.match(await importText(seal(unit),"unit.conf"),/Erfolgreich/);
+      const u=w.MIBR_views.get();
+      deq(u.vehicle,cur,"Missing vehicle keys keep the current vehicle");
+      deq(u.meta.extra,{"unit.revision":"4"});
+      assert.equal(u.global.legacyDisplay,"side");deq(u.global.transition,{enabled:false,mode:"cycle",gap_ms:500,min_interval_ms:3000});
+      for(const id of ids){assert.equal(u.views[id].mode,"custom");assert.equal(u.views[id].geometry.zoom,"inherit");assert.equal(u.views[id].carplay.surface,"map")}
+      deq(u.views.center.safeArea,{x:380,y:130,w:250,h:160},"Missing safeArea defaults from area()");
+      deq(u.views.wide.safeArea,{x:250,y:130,w:505,h:160});
+      click("#navv-conf");
+      const out=(await lastDownload()).split("\n");out.pop();
+      assert.ok(out.includes("unit.revision=4"));assert.equal(out[out.length-2],"unit.revision=4","unit.revision written back before crc32");
+      for(const l of ["global.transition.enabled=0","view.center.geometry.zoom=inherit","view.center.mode=custom","view.center.safeArea.x=380","view.full.native.tube=on","global.legacyLanes=true"])assert.ok(out.includes(l),"export has "+l);
+      assert.equal(out[out.length-1],"crc32="+crc32(out.slice(0,-1).join("\n")+"\n"));
+      const keys=out.slice(0,-1).slice(1).map(l=>l.split("=")[0]);assert.equal(new Set(keys).size,keys.length,"no duplicate keys");
+      const before2=w.MIBR_views.get();
+      assert.match(await importText(out.join("\n")+"\n","unit-roundtrip.conf"),/Erfolgreich/);
+      deq(w.MIBR_views.get(),before2,"Partial unit file round-trips");
+      assert.match(await importText(seal(unit.concat("global.bottom=eta")),"dup.conf"),/abgelehnt.*Doppelt/);
+      assert.match(await importText(seal(unit.concat("global.transition.gap_ms=9999")),"badv.conf"),/abgelehnt/);
+    }
+    w.MIBR_views.set(got);
     // UI: geometry select and transition controls
     click('#tabs [data-t=nav]');
     click('[data-navv-view="center"]');

@@ -3137,20 +3137,21 @@ function parseConf(raw){
  var data={};for(var line of a.slice(1)){var i=line.indexOf("=");if(i<1)throw Error("Ungültige .conf-Zeile");var k=line.slice(0,i);if(Object.prototype.hasOwnProperty.call(data,k))throw Error("Doppelter Schlüssel");data[k]=line.slice(i+1)}
  if(data.version!==ver)throw Error("Falsche Profilversion");
  function decode(s){return s==="true"?true:s==="false"?false:s}
- var d=sample();d.vehicle={brand:data.brand,headUnit:data.head_unit,cluster:data.cluster};
- for(var k of Object.keys(d.global)){if(k==="transition")continue;if(!Object.prototype.hasOwnProperty.call(data,"global."+k))throw Error("Fehlender Wert "+k);d.global[k]=decode(data["global."+k])}
+ var d=sample();var cv=vehicle();d.vehicle={brand:ver==="3"&&data.brand===undefined?cv.brand:data.brand,headUnit:ver==="3"&&data.head_unit===undefined?cv.headUnit:data.head_unit,cluster:ver==="3"&&data.cluster===undefined?cv.cluster:data.cluster};
+ for(var k of Object.keys(d.global)){if(k==="transition")continue;if(!Object.prototype.hasOwnProperty.call(data,"global."+k)){if(ver==="3")continue;throw Error("Fehlender Wert "+k)}d.global[k]=decode(data["global."+k])}
  var tk={enabled:"global.transition.enabled",mode:"global.transition.mode",gap_ms:"global.transition.gap_ms",min_interval_ms:"global.transition.min_interval_ms"};
  for(var name of Object.keys(tk)){var raw2=data[tk[name]];
-   if(raw2===undefined){if(ver==="3")throw Error("Fehlender Wert "+tk[name]);continue}
+   if(raw2===undefined)continue;
    if(name==="enabled"){if(raw2!=="1"&&raw2!=="0")throw Error("Ungültiger Wert "+tk[name]+" (erlaubt: 1 oder 0)");d.global.transition.enabled=raw2==="1"}
    else if(name==="mode")d.global.transition.mode=raw2;
    else{if(!/^\d+$/.test(raw2))throw Error("Ungültiger Wert "+tk[name]);d.global.transition[name]=Number(raw2)}}
- for(var id of ["center","wide","full"]){var zk="view."+id+".geometry.zoom";if(data[zk]===undefined){if(ver==="3")throw Error("Fehlender Wert "+zk)}else d.views[id].geometry.zoom=data[zk]}
+ for(var id of ["center","wide","full"]){var zk="view."+id+".geometry.zoom";if(data[zk]!==undefined)d.views[id].geometry.zoom=data[zk]}
  var extra={};for(var k of Object.keys(data))if(!knownConfKey(k))extra[k]=data[k];d.meta.extra=extra;
- for(var id of ["center","wide","full"]){var mode=data["view."+id+".mode"];if(!["inherit","custom"].includes(mode))throw Error("Ungültiger Modus");d.views[id].mode=mode;
-   if(!old)for(var k of ["x","y","w","h"]){var key="view."+id+".safeArea."+k;if(!/^\d+$/.test(data[key]||""))throw Error("Fehlender oder ungültiger Wert "+key);d.views[id].safeArea[k]=Number(data[key])}
+ for(var id of ["center","wide","full"]){var mode=data["view."+id+".mode"];if(mode===undefined&&ver==="3")mode="custom";if(!["inherit","custom"].includes(mode))throw Error("Ungültiger Modus");d.views[id].mode=mode;
+   if(!old&&ver==="3"&&["x","y","w","h"].every(function(k){return data["view."+id+".safeArea."+k]===undefined}))d.views[id].safeArea=area(id);
+   else if(!old)for(var k of ["x","y","w","h"]){var key="view."+id+".safeArea."+k;if(!/^\d+$/.test(data[key]||""))throw Error("Fehlender oder ungültiger Wert "+key);d.views[id].safeArea[k]=Number(data[key])}
    else{var edge=window.MIBR_safe.get(id);d.views[id].safeArea={x:edge[0],y:edge[1],w:edge[2]-edge[0],h:edge[3]-edge[1]}}
-   if(mode==="custom")for(var section of ["carplay","native","guidance"])for(var k of Object.keys(d.views[id][section])){var key="view."+id+"."+section+"."+k;if(!Object.prototype.hasOwnProperty.call(data,key)){if(section==="native"&&["tubeDistance","dialLanes","bottomDistance","bottomEta"].includes(k))continue;throw Error("Fehlender Wert "+key)}d.views[id][section][k]=decode(data[key])}
+   if(mode==="custom")for(var section of ["carplay","native","guidance"])for(var k of Object.keys(d.views[id][section])){var key="view."+id+"."+section+"."+k;if(!Object.prototype.hasOwnProperty.call(data,key)){if(ver==="3"||section==="native"&&["tubeDistance","dialLanes","bottomDistance","bottomEta"].includes(k))continue;throw Error("Fehlender Wert "+key)}d.views[id][section][k]=decode(data[key])}
  }
  return check(d);
 }
