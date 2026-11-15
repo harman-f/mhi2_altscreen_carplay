@@ -1,0 +1,26 @@
+{
+  "schema": 2,
+  "reviewed_reference": "1.5.0-beta.11 r11b",
+  "reviewed_public_source_commit": "420fc46c63594a1a0274ddf6a3da7fb19c33b294",
+  "hmi_roots": [
+    "modules/profiles/skoda-mu1440-p4526/hmi",
+    "modules/profiles/seat-mu1409-p4708/hmi",
+    "modules/profiles/seat-mu1447-p4709/hmi"
+  ],
+  "git_objects": {
+    "modules/menu/source": "9cc9927c678f81bd5520fd1a8594d36938218ae4",
+    "modules/profiles/seat-mu1409-p4708/hmi/README.md": "60b7b875247490aedd88473c65918b83622c253b",
+    "modules/profiles/seat-mu1409-p4708/hmi/java/de/mibr/hmi/MibrSeatGearOverlayImage.java": "fef4ea11b8c58db3993a8e704f263c37a1c38abe",
+    "modules/profiles/seat-mu1409-p4708/hmi/java/de/mibr/hmi/MibrSeatMu1409Profile.java": "e8ffd0a7e5fa794e4a49229c7e8e1357cdba4374",
+    "modules/profiles/seat-mu1409-p4708/hmi/oem-anchors.json": "10c2088adf2d3b851a735a07e2b50ea87b63dfb6",
+    "modules/profiles/seat-mu1409-p4708/profile.json": "06b09e0d6a8f3a935b2697911103c86635aaadbb",
+    "modules/profiles/seat-mu1447-p4709/hmi/README.md": "326eb9dabbfe1ba4145979f9fadd53fde7fc1670",
+    "modules/profiles/seat-mu1447-p4709/hmi/java/de/mibr/hmi/MibrSeatMu1447Profile.java": "d2c1f24ef4bdc543a91fc404ca1cc7c641241e56",
+    "modules/profiles/seat-mu1447-p4709/hmi/oem-anchors.json": "2ed997890383c5aaab6c6aea96d6fdc58bc479c6",
+    "modules/profiles/seat-mu1447-p4709/profile.json": "f5ea0e01250acf0385866f66974aaa1eb5282180",
+    "modules/profiles/skoda-mu1440-p4526/hmi/README.md": "6011fb3833798946a374e48d26ff645151267a79",
+    "modules/profiles/skoda-mu1440-p4526/hmi/oem-anchors.json": "1f12419faa9ee484cc99e7cdf2519cc53e6ac771",
+    "modules/profiles/skoda-mu1440-p4526/profile.json": "622c2dd5da7f3d3dc7759e539f64ae1bb66702c7",
+    "settings/registry.json": "73be7b9876ceb692b7031af3f1cf0c15aa729e2d"
+  }
+}

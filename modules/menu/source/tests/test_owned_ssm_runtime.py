@@ -298,7 +298,7 @@ class NativeRuntimeIntegration(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(body, encoding="utf-8")
             sources.append(str(path))
-        for name in ("MibrSsmNativePage", "MibrSsmSourceBinding", "MibrOwnedSsmPageHost", "MibrOemPageEntry", "MibrMenuKeyBack", "MibrMenuDefinition", "MibrI18n"):
+        for name in ("MibrSsmNativePage", "MibrSsmSourceBinding", "MibrOwnedSsmPageHost", "MibrOemPageEntry", "MibrMenuKeyBack", "MibrPlatformDefaults", "MibrMenuDefinition", "MibrI18n"):
             sources.append(str(H / (name + ".java")))
         cls.out = cls.root / "classes"
         cls.out.mkdir()

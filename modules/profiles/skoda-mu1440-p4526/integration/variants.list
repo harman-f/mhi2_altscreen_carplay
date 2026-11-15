@@ -1,0 +1,7 @@
+# target stock-sha expected-patched-sha transform-file transform-sha mode
+# OEM integration of the CarPlay AltScreen hook and the RGI navigation receiver. No OEM bytes are
+# shipped: the installer applies the transform only to verified stock bytes and checks the result.
+# Stock and patched hashes measured on the MU1440 owner unit 2026-11-05 (gawk 3.1.5 on the unit
+# produced exactly these outputs; evidence/2026-11-05-pre-mibr).
+/mnt/system/etc/usblauncher_otg.lua 97822156d198233107b4dec347da6829da251a929fa07b188a2638586f711cc6 c2053fc153542fd18977be0467ec677176e65f1e75a717908087dc09c02ad5d9 profiles/skoda-mu1440-p4526/integration/lua-rgi.awk 67290b6c49441241e9805624d0f2c3cea909c1832087aa6f1f5e29ffa9e805fc 644
+/mnt/system/etc/eso/production/smartphone_integrator.json dd925b8a85ad1acc9d88dd5e7aedabc3118c1c8299e107bbaa99b4c145c807be 9b2ce2169c5397e57a635a00ed62465e3efc459bcbde7b2e133fcf40757f8ab4 profiles/skoda-mu1440-p4526/integration/si-carplay.awk c324abcdd390c9e784c4e009d4be47983e6d1720cb44056017a1b5cbb318585a 644

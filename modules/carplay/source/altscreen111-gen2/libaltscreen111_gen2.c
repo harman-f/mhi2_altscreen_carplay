@@ -4337,6 +4337,57 @@ static void gen2_apply_selected_view(void)
  * The authoritative VC map-focus + DIRECT ownership observation MUST be
  * established before invoking bind_verified; unknown state is always off.
  */
+/* Per-profile zoom signature and auto switch from the platform defaults file
+ * (zoom.wheel_source / zoom.tag / zoom.match_window_ms / zoom.wheel_auto).
+ * Loaded once per boot; absent or invalid keys keep the compiled defaults. */
+static struct {unsigned source,tag,window_ms,wheel_auto;} g2_zoom_cfg={40u,56u,40u,0u};
+static pthread_once_t g2_zoom_cfg_once=PTHREAD_ONCE_INIT;
+/* 0 absent, 1 valid, -1 invalid (logged, default kept). */
+static int g2_zoom_key(const char *buf,const char *key,unsigned lo,unsigned hi,unsigned *out)
+{
+    char pat[40];
+    const char *v=buf;
+    unsigned long x;
+    char *e;
+    snprintf(pat,sizeof(pat),"%s=",key);
+    for(;;){
+        v=strstr(v,pat);
+        if(!v)return 0;
+        if(v==buf||v[-1]=='\n')break;
+        v+=strlen(pat);
+    }
+    v+=strlen(pat);
+    x=strtoul(v,&e,10);
+    if(e==v||(*e&&*e!='\n'&&*e!='\r')||*v=='-'||x<lo||x>hi){
+        logf_u2("GEN2 zoom config: invalid %s, default kept",key);
+        return -1;
+    }
+    *out=(unsigned)x;
+    return 1;
+}
+static void gen2_zoom_cfg_load(void)
+{
+    static char plat[2048];
+    ssize_t got;
+    int fd;
+    g2_zoom_cfg.source=40u;g2_zoom_cfg.tag=56u;g2_zoom_cfg.window_ms=40u;g2_zoom_cfg.wheel_auto=0u;
+    fd=open(MIBR_GEN2_PLATFORM_DEFAULTS,O_RDONLY);
+    if(fd<0)return;
+    got=read(fd,plat,sizeof(plat)-1);
+    close(fd);
+    if(got<=0)return;
+    plat[got]=0;
+    (void)g2_zoom_key(plat,"zoom.wheel_source",0u,65535u,&g2_zoom_cfg.source);
+    (void)g2_zoom_key(plat,"zoom.tag",0u,65535u,&g2_zoom_cfg.tag);
+    (void)g2_zoom_key(plat,"zoom.match_window_ms",1u,500u,&g2_zoom_cfg.window_ms);
+    (void)g2_zoom_key(plat,"zoom.wheel_auto",0u,1u,&g2_zoom_cfg.wheel_auto);
+    if(g2_zoom_cfg.source!=40u||g2_zoom_cfg.tag!=56u||g2_zoom_cfg.window_ms!=40u||g2_zoom_cfg.wheel_auto)
+        logf_u2("GEN2 zoom config: source=%u tag=%u window=%ums auto=%u",
+                g2_zoom_cfg.source,g2_zoom_cfg.tag,g2_zoom_cfg.window_ms,g2_zoom_cfg.wheel_auto);
+}
+static void g2_zoom_cfg_ensure(void){(void)pthread_once(&g2_zoom_cfg_once,gen2_zoom_cfg_load);}
+#include "seat_zoom_auto.inc"
+
 int mibr_alt111_zoom_bind_verified(uint64_t session, unsigned vc_map_focus,
                                    unsigned direct_owner, int positive_is_in)
 {
@@ -4406,6 +4457,8 @@ static void gen2_zoom_worker_tick(void)
     unsigned visible;
 
     pthread_mutex_lock(&g2_core_lock);
+    if(gen2_seat_zoom_auto_enabled() && access(g2_zoom_v1_arm,F_OK)!=0)
+        (void)gen2_seat_zoom_refresh_locked();
     generation=g2_control_session;
     visible=g2_command_ready && g2_control.active && g2_control.desired &&
         g2_control.shown_ack && !g2_control.reacquiring &&
@@ -4600,7 +4653,7 @@ static void gen2_zoom_spi_pair(void *opaque,uint32_t source_ms,int signed_detent
     unsigned ready;
     (void)opaque;
     /* Revocation is checked at the delivery point as well as in idle poll. */
-    if(access(g2_zoom_v1_arm,F_OK)!=0)return;
+    if(!gen2_zoom_spi_requested())return;
     pthread_mutex_lock(&g2_core_lock);
     session=g2_control_session;
     ready=g2_command_ready && g2_zoom.active && session &&
@@ -4608,10 +4661,11 @@ static void gen2_zoom_spi_pair(void *opaque,uint32_t source_ms,int signed_detent
         g2_control.active && g2_control.desired &&
         g2_control.shown_ack && !g2_control.reacquiring &&
         g2_video.active && g2_video.config_valid && g2_video.consumer_primed;
+    if(gen2_seat_zoom_auto_enabled() && access(g2_zoom_v1_arm,F_OK)!=0)
+        ready=ready && gen2_seat_zoom_refresh_locked() &&
+            seat_zoom_epoch_fresh(&g_seat_zoom_epoch,source_ms,(uint32_t)monotonic_ms());
     if(ready) {
-        /* Empirical private MU1440 native scale sequence:
-         * right +1 -> scale decreases -> zoom IN. The car/iPhone UX must
-         * still verify semantic AirPlay polarity in the bounded pilot. */
+        /* Confirm the wheel polarity in the platform-specific qualification. */
         (void)alt111_zoom_polarity(&g2_zoom,session,1);
         /* In V1, correlation with a native zoom action is the temporary
          * per-detent map-focus predicate, and the explicitly armed test
@@ -4636,14 +4690,17 @@ static void *gen2_zoom_spi_worker(void *arg)
         logf_u2("GEN2 ZOOM V1: no decoder memory; inactive");
         return NULL;
     }
+    g2_zoom_cfg_ensure();
     alt111_spi_zoom_init(decoder);
+    (void)alt111_spi_zoom_configure(decoder,g2_zoom_cfg.source,g2_zoom_cfg.tag,g2_zoom_cfg.window_ms);
     for(;;) {
         fd_set rfds;
         struct timeval tv;
         int r;
-        if(access(g2_zoom_v1_arm,F_OK)!=0) {
+        if(!gen2_zoom_spi_requested()) {
             if(fd>=0) {close(fd);fd=-1;}
             alt111_spi_zoom_init(decoder);
+            (void)alt111_spi_zoom_configure(decoder,g2_zoom_cfg.source,g2_zoom_cfg.tag,g2_zoom_cfg.window_ms);
             gen2_zoom_spi_clear();
             usleep(1000000);
             continue;
@@ -4660,6 +4717,7 @@ static void *gen2_zoom_spi_worker(void *arg)
                 close(fd);fd=-1;usleep(1000000);continue;
             }
             alt111_spi_zoom_init(decoder);
+            (void)alt111_spi_zoom_configure(decoder,g2_zoom_cfg.source,g2_zoom_cfg.tag,g2_zoom_cfg.window_ms);
             logf_u2("GEN2 ZOOM V1 receive-only DebugSPI connected (no OEM writes)");
         }
         FD_ZERO(&rfds);FD_SET(fd,&rfds);
@@ -4670,6 +4728,7 @@ static void *gen2_zoom_spi_worker(void *arg)
             if(n<=0) {
                 close(fd);fd=-1;
                 alt111_spi_zoom_init(decoder);
+                (void)alt111_spi_zoom_configure(decoder,g2_zoom_cfg.source,g2_zoom_cfg.tag,g2_zoom_cfg.window_ms);
                 gen2_zoom_spi_clear();
                 usleep(250000);
             } else {
@@ -4683,6 +4742,7 @@ static void *gen2_zoom_spi_worker(void *arg)
         } else if(r<0 && errno!=EINTR) {
             close(fd);fd=-1;
             alt111_spi_zoom_init(decoder);
+            (void)alt111_spi_zoom_configure(decoder,g2_zoom_cfg.source,g2_zoom_cfg.tag,g2_zoom_cfg.window_ms);
             gen2_zoom_spi_clear();
             usleep(250000);
         }
@@ -4959,7 +5019,7 @@ static int install_arm_hook_expected(void *target, void *replacement, void **tra
         uint8_t *shadow;
         void *fixed;
         saved_errno=errno;
-        logf_u2("%s target mprotect RW denied page=%p size=%ld errno=%d %s; trying anonymous MAP_FIXED clone",
+        logf_u2("%s target text page read-only page=%p size=%ld errno=%d %s (expected on QNX); using anonymous MAP_FIXED clone",
                 name,(void *)page,ps,saved_errno,strerror(saved_errno));
 
         /*

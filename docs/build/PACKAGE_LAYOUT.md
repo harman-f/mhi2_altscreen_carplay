@@ -67,3 +67,9 @@ a missing JAR or installer entrypoint is a `MISSING_INPUT` entry and the package
 `PACKAGE_VALIDATED`, `UNIT_TESTED`, `VEHICLE_RELEASE_APPROVED` with `NOT_RUN`/`BLOCKED`;
 `VEHICLE_RELEASE_APPROVED` is never true. The ZIP is deterministic (fixed timestamps, sorted entries,
 modes from a fixed table). `tools/validate_modular_package.py` accepts the ZIP or an extracted directory.
+
+## Installer updates and platform controls
+
+The installer tracks the original provenance of installed files across updates. Uninstall uses verified ownership and backup records to restore the pre-install state; rollback restores the prior installation manifest. Files created outside the main payload are recorded separately for removal. Unknown or modified files are handled conservatively.
+
+Platform defaults can specify `key.view_step`, `key.view_resync_long`, and `key.carplay_switch_long` as keyboard/key pairs. The input daemon loads these at startup; omitted values retain the compiled defaults. SEAT MU1409 and MU1447 profiles require separate vehicle testing.

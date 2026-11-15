@@ -177,7 +177,7 @@ runtime_init(){
     return 2
   }
   [ -x "$TEE" ] || {
-    runtime_emit "ERROR bundled tee helper missing/not executable: $TEE"
+    runtime_emit "ERROR bundled TEE helper missing/not executable: $TEE"
     return 3
   }
   return 0

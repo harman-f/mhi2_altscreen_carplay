@@ -9,11 +9,19 @@ static uint32_t diff_abs(uint32_t a, uint32_t b) {
     return d<0 ? (uint32_t)(-(int64_t)d) : (uint32_t)d;
 }
 void alt111_spi_zoom_init(struct alt111_spi_zoom *s) {
-    if(s) memset(s,0,sizeof(*s));
+    if(!s) return;
+    memset(s,0,sizeof(*s));
+    s->wheel_source=40u;s->tag=56u;s->window_ms=ALT111_SPI_MATCH_WINDOW_MS;
+}
+int alt111_spi_zoom_configure(struct alt111_spi_zoom *s, unsigned wheel_source,
+                              unsigned tag, unsigned window_ms) {
+    if(!s || wheel_source>65535u || tag>65535u || window_ms<1u || window_ms>500u) return 0;
+    s->wheel_source=wheel_source;s->tag=tag;s->window_ms=window_ms;
+    return 1;
 }
 static void try_pair(struct alt111_spi_zoom *s, alt111_spi_zoom_cb cb, void *ctx) {
     if(!s->have_wheel || !s->have_tag) return;
-    if(diff_abs(s->wheel_ms,s->tag_ms)<=ALT111_SPI_MATCH_WINDOW_MS) {
+    if(diff_abs(s->wheel_ms,s->tag_ms)<=s->window_ms) {
         /* One Tag56 AND one wheel record consumed per emitted event. */
         ++s->matches;
         if(cb) cb(ctx,s->wheel_ms,s->wheel_delta);
@@ -44,7 +52,7 @@ static void frame(struct alt111_spi_zoom *s,const unsigned char *f,size_t n,
             if(p[51+5*i]!=1) return;
             fields[i]=(int32_t)be32(p+52+5*i);
         }
-        if(fields[0]!=4 || fields[1]!=40 || fields[3]!=0 ||
+        if(fields[0]!=4 || (unsigned)fields[1]!=s->wheel_source || fields[3]!=0 ||
            fields[4]!=1 || (fields[2]!=1 && fields[2]!=-1)) return;
         ++s->wheel_count;
         s->wheel_ms=timestamp;
@@ -53,7 +61,7 @@ static void frame(struct alt111_spi_zoom *s,const unsigned char *f,size_t n,
         try_pair(s,cb,ctx);
     } else if(p[5]==0xf9 && p[6]==0x04 && pl==61) {
         tag=be32(p+35);
-        if(tag!=56) return;
+        if(tag!=s->tag) return;
         ++s->tag_count;
         s->tag_ms=timestamp;
         s->have_tag=1;

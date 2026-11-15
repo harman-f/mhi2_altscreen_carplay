@@ -16,10 +16,17 @@ struct alt111_spi_zoom {
     size_t used;
     uint32_t wheel_ms, tag_ms;
     int wheel_delta;
+    unsigned wheel_source, tag, window_ms; /* configurable; defaults 40/56/40 */
     unsigned have_wheel, have_tag;
     uint64_t frames, bad_frames, wheel_count, tag_count, matches;
 };
+/* init resets ALL state including the signature to the defaults; a caller that
+ * wants another signature must call configure after every init. configure keeps
+ * stream state, rejects (returns 0, no change) window_ms outside 1..500 or
+ * source/tag above 65535. */
 void alt111_spi_zoom_init(struct alt111_spi_zoom *s);
+int alt111_spi_zoom_configure(struct alt111_spi_zoom *s, unsigned wheel_source,
+                              unsigned tag, unsigned window_ms);
 void alt111_spi_zoom_feed(struct alt111_spi_zoom *s, const void *bytes, size_t n,
                          alt111_spi_zoom_cb on_zoom, void *opaque);
 #endif

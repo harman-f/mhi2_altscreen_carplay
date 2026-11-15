@@ -3,12 +3,15 @@
 #include <string.h>
 void mibr_key40_reset(struct mibr_key40 *k){if(k)memset(k,0,sizeof(*k));}
 enum mibr_key40_event mibr_key40_feed(struct mibr_key40 *k,int keyboard,int key,int state){
-    return mibr_key40_feed_key(k,keyboard,key,state,40);
+    return mibr_key40_feed_code(k,keyboard,key,state,4,40);
 }
 enum mibr_key40_event mibr_key40_feed_key(struct mibr_key40 *k,int keyboard,int key,int state,int wanted_key){
+    return mibr_key40_feed_code(k,keyboard,key,state,4,wanted_key);
+}
+enum mibr_key40_event mibr_key40_feed_code(struct mibr_key40 *k,int keyboard,int key,int state,int wanted_kbd,int wanted_key){
     if(!k)return MIBR_KEY40_INVALID;
     /* Ignore KEY41 Back entirely; never claim its OEM action. */
-    if(keyboard!=4||key!=wanted_key)return MIBR_KEY40_NONE;
+    if(keyboard!=wanted_kbd||key!=wanted_key)return MIBR_KEY40_NONE;
     if(state==1){
         if(k->phase==0){k->phase=1;return MIBR_KEY40_NONE;}
         if(k->phase==1)return MIBR_KEY40_NONE; /* repeat initial press */

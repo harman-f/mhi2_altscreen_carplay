@@ -29,6 +29,7 @@ STUBS = {
     "de/vw/mib/graphics/Color.java": "package de.vw.mib.graphics; public class Color { public static final Color WHITE=new Color(); }",
     "de/vw/mib/graphics/Gradient.java": "package de.vw.mib.graphics; public class Gradient {}",
     "de/vw/mib/graphics/Insets.java": "package de.vw.mib.graphics; public class Insets { public int left,right,top,bottom; }",
+    "de/vw/mib/properties/values/LayoutAttribs.java": "package de.vw.mib.properties.values; public class LayoutAttribs { public int getInsetTop(){return 0;} public int getInsetBottom(){return 0;} }",
     "de/vw/mib/graphics/Point.java": "package de.vw.mib.graphics; public class Point {}",
     "de/vw/mib/graphics/Rectangle.java": "package de.vw.mib.graphics; public class Rectangle { public Rectangle(int x,int y,int w,int h){} }",
     "de/vw/mib/graphics/image/Image.java": "package de.vw.mib.graphics.image; public class Image {}",
@@ -80,7 +81,7 @@ public class ListItem extends Container implements ListItemModel {private int in
     "de/vw/mib/widgets/WidgetList.java": """package de.vw.mib.widgets;import de.vw.mib.widgets.models.*;import de.vw.mib.widgets.list.ListItemTransfer;import de.vw.mib.widgets.controller.DefaultWidgetListController;
 public class WidgetList extends Container {private ListItemTransfer transfer;private int selected=-1,focused=-1,first=-1;public WidgetList(){setController(new DefaultWidgetListController());}public void setListItemTransfer(ListItemTransfer t){transfer=t;}public ListItemTransfer getListItemTransfer(){return transfer;}public void set_selectedIndex(int i){selected=i;}public int get_selectedIndex(){return selected;}public void setFocusedIndex(int i){focused=i;}public int getFocusedIndex(){return focused;}public int getFirstVisibleIndex(){return first;}public void snap(int i,int mode){first=i;}public int get_itemCount(){return children.length;}public void init(Object...a){}public void init(ViewModel v){}public void setChildren(WidgetModel[] c){super.setChildren(c);for(int i=0;i<children.length;i++)if(children[i] instanceof ListItem)((ListItem)children[i]).setAbsoluteIndex(i);} }
 """,
-    "de/vw/mib/widgets/DropDown.java": "package de.vw.mib.widgets; public class DropDown extends WidgetList {public void init(Object...a){} }",
+    "de/vw/mib/widgets/DropDown.java": "package de.vw.mib.widgets; public class DropDown extends WidgetList {public void init(Object...a){} public de.vw.mib.properties.values.LayoutAttribs get_layoutAttribs(){return new de.vw.mib.properties.values.LayoutAttribs();} }",
     "de/vw/mib/widgets/InactiveArea.java": "package de.vw.mib.widgets;import de.vw.mib.graphics.Rectangle;public class InactiveArea extends Container {public void init(Object...a){}public void set_exclusionArea(Rectangle r){} }",
     "de/vw/mib/widgets/StaticImage.java": "package de.vw.mib.widgets;import de.vw.mib.graphics.*;import de.vw.mib.animation.easing.EasingParams;import de.vw.mib.widgets.ui.StaticImageUI;public class StaticImage extends Widget {public void init(Object...a){}public void setUI(StaticImageUI u){} }",
     "de/vw/mib/widgets/controller/DefaultPushButtonController.java": "package de.vw.mib.widgets.controller;public class DefaultPushButtonController extends WidgetController {}",
@@ -244,7 +245,7 @@ class NativeRowsCallbacks(unittest.TestCase):
                      "MibrElementSpec", "MibrElementEngine", "MibrElementTree", "MibrCanonicalElementMenu", "MibrPopupEditorModel",
                      "MibrDraftChoiceModel", "MibrScalingState", "MibrCarPlayMenuModel", "MibrVdataDiag", "MibrEngineState", "MibrViewState", "MibrMenuDefinition", "MibrI18n",
                      "MibrDurableSwitch", "MibrPlatformDefaults", "MibrSafeArea", "MibrGpsDemoState", "MibrVersionInfo",
-                     "MibrMenuCatalog", "MibrMenuFunctions", "MibrMenuLayout", "MibrExpert",
+                     "MibrMenuCatalog", "MibrMenuFunctions", "MibrMenuLayout", "MibrDropdownFrame", "MibrExpert",
                      "MibrV3Protocol", "MibrV3Client", "MibrV3Session",
                      "MibrSettingsCatalog"):
             sources.append(str(H / (name + ".java")))

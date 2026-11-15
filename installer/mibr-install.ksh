@@ -39,10 +39,21 @@
 #   (payload, config, state, kill switch, backup) stays in place unreferenced; ownership receipts of <id> are
 #   removed and install-<id>.receipt gets state=rolled-back.
 #
-# Uninstall: restores only what ownership receipts and installed.manifest prove is ours; OEM files return
-#   to the recorded stock bytes after a hash check; the mibr/ payload is removed; config the user changed,
-#   state/, backup/ and logs/ stay unless --purge. A MIBR block in lsd.sh without receipt or known content
-#   is left untouched (warning). Legacy marker "# MIBR-KIT" is recognised when it is ours.
+# Uninstall: always returns the unit to its ORIGINAL pre-MIBR state (not merely the state before the last
+#   install). It acts only on what ownership receipts and installed.manifest prove is ours:
+#   - MIBR's own files are removed, including payload files outside mibr/ (e.g. eso/lib/libmibr_*.so) that
+#     never existed on a stock unit. The installed.manifest row keeps the ORIGIN of the first install
+#     (new/replaced + backup + presha) across updates; a file whose earlier bytes were a MIBR-own known
+#     state (known-states.list) counts as new, not as replaced.
+#   - OEM files patched by MIBR or by the legacy kit return to verified stock bytes after a hash check
+#     (own receipt, legacy kit backup or legacy-stock-backups.list). A file the legacy kit had already
+#     patched gets its ownership receipt on the first install that finds a verified stock copy; without
+#     one, --apply warns that uninstall cannot restore it.
+#   - files the installer created outside the payload manifest (single-writer gate, late-migrated files) are
+#     recorded as "created <path> <sha>" rows in version/install-created.receipt and removed when unchanged.
+#   - the mibr/ payload is removed; config the user changed, state/, backup/ and logs/ stay unless --purge.
+#   A MIBR block in lsd.sh without receipt or known content is left untouched (warning). Legacy marker
+#   "# MIBR-KIT" is recognised when it is ours. (--rollback <id> stays the one-step-back tool.)
 
 SELF=$0
 case $SELF in */*) SD=${SELF%/*} ;; *) SD=. ;; esac
@@ -92,26 +103,53 @@ inject(){
 # ---------------------------------------------------------------- step 1/2: log, lock, package
 mkwork || die 2 "cannot create work directory"
 if [ -n "$LOG" ]; then
-  echo "=== mibr-install $MODE pid $$ ===" >> "$LOG" 2>/dev/null || die 30 "cannot write session log $LOG"
+  if ! echo "=== mibr-install $MODE pid $$ ===" >> "$LOG" 2>/dev/null; then
+    # read-only package location (e.g. SD card): flat file in /tmp (MU1440 /tmp holds files, not dirs)
+    LOG=/tmp/mibr-install.$$.log
+    echo "=== mibr-install $MODE pid $$ ===" >> "$LOG" 2>/dev/null || die 30 "cannot write session log $LOG"
+  fi
+  say "session log $LOG"
 fi
 if [ "$MODE" != check ]; then
   acquire_lock || die 11 "install lock busy: $LOCK"
 fi
-find_sha || die 5 "no sha256sum (package ships installer/bin/sha256sum)"
+find_sha || die 5 "no sha256 helper (the package ships installer/bin/sha256sum)"
+[ "$OUT_OK" = 1 ] || die 5 "no verbatim line writer (print -r / here-document)"
+for _tool in $NEED_TOOLS; do
+  find_cmd "$_tool" >/dev/null || die 5 "required tool missing on this unit: $_tool"
+done
 say "MIBR_INSTALL=START mode=$MODE package=$PKG"
 verify_package || die 4 "package verification failed (nothing was written)"
 PKGSHA=$(sha_of "$PKG/PACKAGE.sha256")
-PKG12=$(echo "$PKGSHA" | cut -c1-12)
+PKG12=${PKGSHA%"${PKGSHA#????????????}"}
 if [ -n "$ID_OPT" ]; then ID=$ID_OPT; else ID=p$PKG12; fi
 BLOCKVER=$PKG12
 BLOCKFILE=$PKG/installer/config/lsd-block.txt
 ok "package verified ($(grep -c . "$W/pkg.sums") files), install id $ID"
 
-PKGVER=-
-if [ -f "$PKG/package.json" ]; then
-  _v=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$PKG/package.json" 2>/dev/null | head -1)
-  [ -n "$_v" ] && PKGVER=$_v
+# An assembled package declares "package_status": "complete" only when every input
+# (native binaries, menu JARs, installer) is present; anything else is never installed.
+if [ "$MODE" = check ] || [ "$MODE" = apply ]; then
+  grep -q '"package_status": "complete"' "$PKG/package.json" 2>/dev/null \
+    || die 4 "package is not complete (package.json package_status), nothing was written"
 fi
+
+# Top-level string field of package.json (sorted keys, one per line); pure ksh, no sed/tr.
+pkg_field() {
+  _v=
+  [ -f "$PKG/package.json" ] || return 0
+  while IFS= read -r _jl || [ -n "$_jl" ]; do
+    case $_jl in
+      '  "'"$1"'":'*'"'*'"'*) _jl=${_jl#*'"'"$1"'"'}; _jl=${_jl#*:}; _jl=${_jl#*'"'}; _v=${_jl%%'"'*}; break ;;
+    esac
+  done < "$PKG/package.json"
+  case $_v in *[!A-Za-z0-9._+-]*) _v= ;; esac
+  return 0
+}
+PKGVER=-
+pkg_field version; [ -n "$_v" ] && PKGVER=$_v
+PKGSRC=-
+pkg_field source_commit; [ -n "$_v" ] && PKGSRC=$_v
 
 OWN=$NEW/version/ownership
 PREVMF=$NEW/version/installed.manifest
@@ -200,7 +238,7 @@ derive_rows(){
 
 payload_target_ok(){
   case $1 in
-    "$LNEW"/*|/mnt/app/eso/lib/*|/mnt/app/eso/hmi/lsd/jars/*) rebase "$1" >/dev/null ;;
+    "$LNEW"/*|/mnt/app/eso/lib/*|/mnt/app/eso/hmi/lsd/jars/*|/mnt/app/eso/hmi/lsd/mibr/icons/*) rebase "$1" >/dev/null ;;
     *) return 1 ;;
   esac
 }
@@ -214,6 +252,18 @@ stock_source(){
   fi
   _lb=$ROOT/mibr-kit/backup$1
   if [ "$(sha_of "$_lb")" = "$2" ]; then echo "$_lb"; return 0; fi
+  # Stock copies kept by earlier stand-alone installs (R2 RGI, GEN2), listed per target in
+  # installer/config/legacy-stock-backups.list; used only when the bytes hash to STOCKSHA.
+  _ll=$PKG/installer/config/legacy-stock-backups.list
+  if [ -f "$_ll" ]; then
+    while read -r _lt _lr _lx; do
+      case $_lt in ''|'#'*) continue ;; esac
+      [ "$_lt" = "$1" ] || continue
+      case $_lr in /*|*..*) continue ;; esac
+      _lb=$ROOT/$_lr
+      if [ -f "$_lb" ] && [ ! -L "$_lb" ] && [ "$(sha_of "$_lb")" = "$2" ]; then echo "$_lb"; return 0; fi
+    done < "$_ll"
+  fi
   return 1
 }
 
@@ -239,10 +289,13 @@ plan_payload(){
     _act=; _cls=
     if [ "$_cur" = missing ]; then _act=create; _cls=absent
     elif [ "$_cur" = "$_h" ]; then _act=skip; _cls=package
-    elif is_config "$_t"; then _act=keep; _cls=user-owned
     elif mf_find "$PREVMF" "$_t" && [ "$MF_SHA" = "$_cur" ]; then _act=replace; _cls=previous-own
+    elif is_config "$_t"; then _act=keep; _cls=user-owned
     elif _lbl=$(known_state "$KNOWN" "$_t" "$_cur"); then _act=replace; _cls=known-previous:$_lbl
     else block "foreign file at $_t (sha256 $_cur is neither stock, package nor a known previous state)"; continue
+    fi
+    if ! under_new "$_t" && mf_find "$PREVMF" "$_t" && [ "$MF_STATE" = replaced ] && ! known_state "$KNOWN" "$_t" "$MF_PRE" >/dev/null && [ "$(sha_of "$NEW/$MF_BK")" != "$MF_PRE" ]; then
+      block "original-state backup of $_t ($MF_BK) is missing or damaged; cannot carry the uninstall origin"; continue
     fi
     echo "$_act $_h $_m $_t $_s $_cls" >> "$W/payload.plan"
   done < "$W/rows"
@@ -280,8 +333,8 @@ plan_variants(){
     _kh=$(pkg_sha "$_tf") || { block "transform not in package: $_tf"; continue; }
     [ "$_kh" = "$_ts" ] || { block "transform hash differs from variants.list: $_tf"; continue; }
     case $_tf in
-      *.awk|*.sed|*.sh|*.ksh) ;;
-      *) block "unsupported transform kind (TODO: .block/.patch semantics undefined): $_tf"; continue ;;
+      *.awk|*.sh|*.ksh) ;;
+      *) block "unsupported transform kind (only .awk, .sh, .ksh run on the unit): $_tf"; continue ;;
     esac
     if grep -qF " $_t " "$W/var.plan"; then block "duplicate variant target $_t"; continue; fi
     if [ -L "$_real" ] || [ ! -f "$_real" ]; then block "OEM target missing or not a regular file: $_t"; continue; fi
@@ -289,6 +342,12 @@ plan_variants(){
     _in=; _cls=; _act=apply
     if [ "$_cur" = "$_p" ]; then
       _act=skip; _cls=package
+      # already patched (e.g. by the legacy kit) and no ownership receipt yet: adopt it from verified stock bytes
+      if [ ! -f "$OWN/$(own_name "$_t").owned" ]; then
+        if _in=$(stock_source "$_t" "$_s"); then _cls=adopt
+        else _in=; warn "$_t is already patched and no verified stock copy exists: --uninstall cannot restore it"
+        fi
+      fi
     elif [ "$_cur" = "$_s" ]; then
       _in=$_real; _cls=stock
     elif _lbl=$(known_state "$KNOWN" "$_t" "$_cur") || { [ -f "$OWN/$(own_name "$_t").owned" ] && [ "$(getkey "$OWN/$(own_name "$_t").owned" patched_sha256)" = "$_cur" ] && _lbl=owned; }; then
@@ -307,14 +366,13 @@ plan_variants(){
       case $_tf in
         *.awk) _tool=$(find_cmd awk) || { block "awk not found for $_tf"; continue; }
                "$_tool" -f "$PKG/$_tf" "$_in" > "$_out" 2>"$W/var.err" ;;
-        *.sed) _tool=$(find_cmd sed) || { block "sed not found for $_tf"; continue; }
-               "$_tool" -f "$PKG/$_tf" "$_in" > "$_out" 2>"$W/var.err" ;;
         *) "$SH_BIN" "$PKG/$_tf" < "$_in" > "$_out" 2>"$W/var.err" ;;
       esac
       _trc=$?
       if [ "$_trc" -ne 0 ]; then block "transform failed (exit $_trc) for $_t: $(head -1 "$W/var.err")"; continue; fi
       if [ "$(sha_of "$_out")" != "$_p" ]; then block "transform result for $_t has the wrong hash (expected $_p)"; continue; fi
     fi
+    [ -n "$_in" ] || _in=-
     echo "$_n $_act $_t $_s $_p $_mode $_in $_cls $_out $_tf" >> "$W/var.plan"
     say "  variant $_t: $_cls -> $_act"
   done < "$VAR"
@@ -378,9 +436,18 @@ plan_migration(){
   "$SH_BIN" "$PKG/installer/lib/migrate-root.ksh" plan --app "$APP" > "$W/mig.plan" 2>&1
   _mrc=$?
   cat "$W/mig.plan" >> "${LOG:-/dev/null}" 2>/dev/null
+  MIG_DONE=
   if [ "$_mrc" -ne 0 ]; then
     block "root migration plan failed (exit $_mrc): $(tail -1 "$W/mig.plan")"
+  elif MIG_DONE=$(grep '^already-migrated ' "$W/mig.plan" | head -1) && [ -n "$MIG_DONE" ]; then
+    MIG_DONE=${MIG_DONE#already-migrated }
+    say "  migration: already done (id $MIG_DONE), the new root is kept as it is, legacy present=$LEGACY_PRESENT"
+    grep '^late ' "$W/mig.plan" > "$W/mig.late"
+    _ll=
+    while read -r _lk _ll1 _ln; do _ll="$_ll $_ln"; done < "$W/mig.late"
+    [ -n "$_ll" ] && say "  migration: late addition(s) (new map rows, target absent):$_ll"
   else
+    MIG_DONE=
     say "  migration plan: $(grep -c '^migrate ' "$W/mig.plan") to copy, $(grep -c '^skip-equal ' "$W/mig.plan") equal, legacy present=$LEGACY_PRESENT, $(grep '^legacy_disabled=' "$W/mig.plan" | head -1)"
   fi
 }
@@ -405,9 +472,50 @@ plan_apply(){
   plan_lsd
   plan_migration
   plan_space
-  if [ "$SW" = 1 ]; then
-    block "--authorize-single-writer: the target path of the single-writer gate is undecided (registry storage group boot.single_writer_gate has target 'tbd'); nothing is created. TODO owner decision"
+  plan_single_writer
+}
+
+# Single-writer gate (registry boot.single_writer_gate, owner decision 2026-11-05):
+# config/features/mibr-v3-single-writer.enabled in the new root. With it the broker
+# starts with --qualify-durable and may persist settings; without it it is read-only.
+# Only an explicit --authorize-single-writer creates it; a migration never moves it.
+plan_single_writer(){
+  SWF=$NEW/config/features/mibr-v3-single-writer.enabled
+  _swl=$ROOT/altscreen-u2/config/mibr-v3-single-writer.enabled
+  if [ -f "$SWF" ]; then say "  single-writer: present"; return 0; fi
+  if [ "$SW" = 1 ]; then say "  single-writer: will be created (--authorize-single-writer)"; return 0; fi
+  _swv=
+  [ -f "$_swl" ] && read -r _swv < "$_swl"
+  if [ "$_swv" = 1 ]; then
+    warn "single-writer gate is on in the legacy tree but absent in $LNEW: broker stays read-only (settings not saved) until --apply --authorize-single-writer"
+  else
+    say "  single-writer: absent (broker read-only; enable with --authorize-single-writer)"
   fi
+}
+# record_created LOGICAL-PATH SHA: files the installer created outside the payload manifest (single-writer
+# gate, late-migrated files) go into version/install-created.receipt as "created <path> <sha>" rows, the
+# same format as install-defaults.receipt; --uninstall deletes a row's file when its bytes are unchanged.
+record_created(){
+  _rcf=$NEW/version/install-created.receipt
+  { [ -f "$_rcf" ] && cat "$_rcf"; echo "created $1 $2"; } > "$W/created.rows"
+  # one row per path (last wins in uninstall; keep the file small on re-runs)
+  : > "$W/created.new"
+  while read -r _cw _cp _cs; do
+    [ "$_cw" = created ] || continue
+    [ "$_cp" = "$1" ] && [ "$_cs" != "$2" ] && continue
+    grep -qF "created $_cp $_cs" "$W/created.new" || echo "created $_cp $_cs" >> "$W/created.new"
+  done < "$W/created.rows"
+  put "$W/created.new" "$_rcf" "$(sha_of "$W/created.new")" 644 || die 30 "cannot write created-files receipt"
+}
+step_single_writer(){
+  [ "$SW" = 1 ] || return 0
+  say "[8b] single-writer gate"
+  if [ -f "$SWF" ]; then ok "single-writer gate already present"; return 0; fi
+  mkdir -p "$NEW/config/features" || die 30 "cannot create config/features"
+  echo 1 > "$W/sw.val"
+  put "$W/sw.val" "$SWF" "$(sha_of "$W/sw.val")" 644 || die 30 "cannot create single-writer gate"
+  record_created "$LNEW/config/features/mibr-v3-single-writer.enabled" "$(sha_of "$SWF")"
+  ok "created $LNEW/config/features/mibr-v3-single-writer.enabled"
 }
 
 # ---------------------------------------------------------------- writes
@@ -422,6 +530,19 @@ bk_row(){ # TARGET: sets BK_KIND BK_PRE BK_POST BK_MODE BK_REL from the MANIFEST
 
 step_migrate(){
   say "[5] root migration"
+  if [ -n "${MIG_DONE:-}" ]; then
+    say "  skipped: already migrated (id $MIG_DONE)"
+    # late additions: copy once, verified, never over an existing target
+    while read -r _lk _ll1 _ln; do
+      [ "$_lk" = late ] || continue
+      [ -e "$NEW/$_ln" ] && continue
+      mkdir -p "$NEW/${_ln%/*}" || die 30 "cannot create $LNEW/${_ln%/*}"
+      put "$ROOT/$_ll1" "$NEW/$_ln" "$(sha_of "$ROOT/$_ll1")" 644 || die 30 "late migration of $_ll1 failed"
+      case $_ln in state/*|backup/*|logs/*) ;; *) record_created "$LNEW/$_ln" "$(sha_of "$NEW/$_ln")" ;; esac
+      say "  late-migrated $_ll1 -> $_ln"
+    done < "$W/mig.late"
+    return 0
+  fi
   mkdir -p "$NEW" || die 30 "cannot create $NEW"
   MIBR_MIGRATE_NO_MOUNT=1 MIBR_LOCK_FILE="$LOCK.migrate" MIBR_SHA256="$SHA" \
     "$SH_BIN" "$PKG/installer/lib/migrate-root.ksh" run --app "$APP" --id "$ID" > "$W/mig.out" 2>&1
@@ -436,6 +557,14 @@ step_backup(){
   BK=$NEW/backup/$ID/oem
   BKM=$BK/MANIFEST
   mkdir -p "$BK/pre" "$BK/stock" || die 30 "cannot create $BK"
+  # installed.manifest as it was before this install (kept once, an interrupted re-run must not
+  # capture the half-written new one); --rollback puts the origin rows of restored files back from it
+  _mfp=$NEW/backup/$ID
+  if [ ! -f "$_mfp/installed.manifest.pre" ] && [ ! -f "$_mfp/installed.manifest.none" ]; then
+    if [ -f "$PREVMF" ]; then put "$PREVMF" "$_mfp/installed.manifest.pre" "$(sha_of "$PREVMF")" 644 || die 30 "cannot back up installed.manifest"
+    else echo none | put_text "$_mfp/installed.manifest.none" 644 || die 30 "cannot back up installed.manifest"
+    fi
+  fi
   : > "$W/bk.cand"
   while read -r _act _s _m _t _src _cls; do
     case $_act in replace|create) under_new "$_t" || echo "payload $_t $_s $_m - -" >> "$W/bk.cand" ;; esac
@@ -511,6 +640,15 @@ step_variants(){
   say "[7] OEM integration"
   _first=1
   while read -r _n _act _t _s _p _m _in _cls _out _tf; do
+    if [ "$_act" = skip ] && [ "$_cls" = adopt ]; then
+      _rel=${_t#/}
+      if [ "$(sha_of "$BK/stock/$_rel")" != "$_s" ]; then
+        mkdir -p "$BK/stock/${_rel%/*}" && cp "$_in" "$BK/stock/$_rel" && [ "$(sha_of "$BK/stock/$_rel")" = "$_s" ] || die 30 "stock backup failed for $_t"
+      fi
+      write_variant_receipt "$_n" "$_t" "$_s" "$_p" "$_m"
+      say "  adopted already patched $_t (stock copy kept, uninstall restores it)"
+      continue
+    fi
     [ "$_act" = apply ] || continue
     write_variant_receipt "$_n" "$_t" "$_s" "$_p" "$_m"
     if [ "$_first" = 1 ]; then _first=0; inject variants_mid; fi
@@ -533,11 +671,11 @@ step_defaults(){
     for _d in parity-drive:mibr-parity-drive.enabled cpvc:mibr-cpvc.enabled; do
       _f=$NEW/config/features/${_d#*:}
       if [ -e "$_f" ]; then echo "present ${_d#*:}" >> "$W/def.rows"; continue; fi
-      printf '1\n' > "$W/def.val"
+      echo 1 > "$W/def.val"
       put "$W/def.val" "$_f" "$(sha_of "$W/def.val")" 644 || die 30 "cannot create default ${_d#*:}"
       echo "created $LNEW/config/features/${_d#*:} $(sha_of "$_f")" >> "$W/def.rows"
     done
-    echo "not-written=autodirect-value,single-writer-gate (target paths undecided)" >> "$W/def.rows"
+    echo "not-written=autodirect-value (target path undecided); single-writer-gate only via --authorize-single-writer" >> "$W/def.rows"
   fi
   put "$W/def.rows" "$DR" "$(sha_of "$W/def.rows")" 644 || die 30 "cannot write defaults receipt"
 }
@@ -559,9 +697,16 @@ step_receipts(){ # $1 = state
         elif under_new "$_t"; then
           case $_act in create|replace) _st=new ;; skip) _st=new; mf_find "$PREVMF" "$_t" && _st=$MF_STATE ;; esac
         else
-          if bk_row "$_t" && [ "$BK_KIND" = payload ]; then
-            if [ "$BK_PRE" = absent ]; then _st=new; else _st=replaced; _bk=backup/$ID/oem/$BK_REL; _pre=$BK_PRE; fi
-          elif mf_find "$PREVMF" "$_t"; then _st=$MF_STATE; _bk=$MF_BK; _pre=$MF_PRE
+          # origin of the FIRST install wins: carry the previous row; only derive from this install's
+          # backup row when there is none (the current backup/<ID> stays for --rollback)
+          if mf_find "$PREVMF" "$_t"; then _st=$MF_STATE; _bk=$MF_BK; _pre=$MF_PRE
+            # rows written before this rule may record an own earlier build as the origin: fold them to new
+            if [ "$_st" = replaced ] && known_state "$KNOWN" "$_t" "$_pre" >/dev/null; then _st=new; _bk=-; _pre=-; fi
+          elif bk_row "$_t" && [ "$BK_KIND" = payload ]; then
+            if [ "$BK_PRE" = absent ]; then _st=new
+            elif known_state "$KNOWN" "$_t" "$BK_PRE" >/dev/null; then _st=new   # MIBR-own earlier build
+            else _st=replaced; _bk=backup/$ID/oem/$BK_REL; _pre=$BK_PRE
+            fi
           fi
         fi
         echo "$_h $_m $_t $_st $_bk $_pre"
@@ -587,6 +732,9 @@ step_receipts(){ # $1 = state
       echo "end=1"
     } > "$W/components.manifest"
     put "$W/components.manifest" "$NEW/version/components.manifest" "$(sha_of "$W/components.manifest")" 644 || die 30 "cannot write components.manifest"
+  fi
+  if [ "$1" = complete ]; then
+    # the identity is only claimed verified once every install step has succeeded
     _brand=GENERIC
     case $PROFILE in skoda-*) _brand=SKODA ;; seat-*) _brand=SEAT ;; esac
     { echo "identity_schema=1"
@@ -594,7 +742,10 @@ step_receipts(){ # $1 = state
       echo "product_version=$PKGVER"
       echo "target_profile_id=$PROFILE"
       echo "target_brand=$_brand"
-      echo "identity_stage=installed"
+      echo "source_commit=$PKGSRC"
+      # Every payload file was hash-verified on write (put); the menu shows this as
+      # "installation receipt present (runtime unverified)".
+      echo "identity_stage=INSTALLED_VERIFIED"
       echo "package_sha256=$PKGSHA"
       echo "install_id=$ID"
     } > "$W/ivp"
@@ -654,10 +805,12 @@ apply_main(){
   step_payload; inject after_payload
   step_variants; inject after_variants
   step_defaults; inject after_defaults
+  step_single_writer; inject after_single_writer
   step_receipts pending; inject after_receipts
   step_lsd; inject after_lsd
   step_receipts complete
-  _vo=$("$SH_BIN" "$PKG/installer/lib/migrate-root.ksh" verify --app "$APP" --id "$ID" 2>&1)
+  if [ -n "${MIG_DONE:-}" ]; then _vo="MIBR_MIGRATE_VERIFY=OK (migrated earlier, id $MIG_DONE)"
+  else _vo=$("$SH_BIN" "$PKG/installer/lib/migrate-root.ksh" verify --app "$APP" --id "$ID" 2>&1); fi
   case $_vo in
     *"install-in-progress"*) die 20 "migration kill switch still install-in-progress: $_vo" ;;
     *MIBR_MIGRATE_VERIFY=OK*) ok "migration verify" ;;
@@ -800,21 +953,22 @@ un_apply(){
     esac
   done < "$W/un.pay"
   # 4. receipts and empty directories
-  if [ -f "$NEW/version/install-defaults.receipt" ]; then
+  for _cr in "$NEW/version/install-defaults.receipt" "$NEW/version/install-created.receipt"; do
+    [ -f "$_cr" ] || continue
     while read -r _w _p _s; do
       [ "$_w" = created ] || continue
-      _real=$(rebase "$_p")
+      _real=$(rebase "$_p") || continue
       if [ "$(sha_of "$_real")" = "$_s" ]; then rm -f "$_real"; fi
-    done < "$NEW/version/install-defaults.receipt"
-  fi
+    done < "$_cr"
+  done
   for _f in "$NEW"/version/install-*.receipt; do
     [ -f "$_f" ] || continue
-    case $_f in */install-defaults.receipt) continue ;; esac
+    case $_f in */install-defaults.receipt|*/install-created.receipt) continue ;; esac
     _iid=$(getkey "$_f" install_id)
     if [ -n "$_iid" ] && [ -d "$NEW/backup/$_iid" ]; then cp "$_f" "$NEW/backup/$_iid/install.receipt.uninstalled" 2>/dev/null; fi
     rm -f "$_f"
   done
-  rm -f "$NEW/version/install-defaults.receipt" "$NEW/version/components.manifest" "$NEW/version/installed-version.properties"
+  rm -f "$NEW/version/install-defaults.receipt" "$NEW/version/install-created.receipt" "$NEW/version/components.manifest" "$NEW/version/installed-version.properties"
   rm -f "$OWN"/*.owned
   rm -f "$PREVMF"
   prune "$OWN"
@@ -872,12 +1026,36 @@ rollback_main(){
       [ "$_pass" = other ] && inject rb_mid
     done < "$W/rb.plan"
   done
+  # installed.manifest: the rows of every restored file go back to what they were before install <id>
+  # (dropped when the file did not exist), so a following --apply does not see the restored bytes as foreign
+  if [ -f "$PREVMF" ]; then
+    _mfp=$NEW/backup/$RB_ID/installed.manifest.pre
+    : > "$W/rb.targets"
+    while read -r _k _t _x; do
+      case $_k in payload) echo "$_t" >> "$W/rb.targets" ;; esac
+    done < "$BKM"
+    { echo "# sha256 mode target state backup presha   (after rollback of $RB_ID)"
+      while read -r _s _m _t _st _bk _pre; do
+        case $_s in ''|'#'*) continue ;; esac
+        if grep -qxF "$_t" "$W/rb.targets"; then
+          if [ -f "$_mfp" ] && mf_find "$_mfp" "$_t"; then echo "$MF_SHA $MF_MODE $_t $MF_STATE $MF_BK $MF_PRE"
+          elif [ ! -f "$_mfp" ] && [ ! -f "$NEW/backup/$RB_ID/installed.manifest.none" ]; then echo "$_s $_m $_t $_st $_bk $_pre"
+          fi
+        else echo "$_s $_m $_t $_st $_bk $_pre"
+        fi
+      done < "$PREVMF"
+    } > "$W/rb.mf"
+    put "$W/rb.mf" "$PREVMF" "$(sha_of "$W/rb.mf")" 644 || die 30 "cannot update installed.manifest"
+  fi
   for _rf in "$OWN"/*.owned; do
     [ -f "$_rf" ] || continue
     if [ "$(getkey "$_rf" install_id)" = "$RB_ID" ]; then rm -f "$_rf"; fi
   done
   if [ -f "$NEW/version/install-$RB_ID.receipt" ]; then
-    sed 's/^state=.*/state=rolled-back/' "$NEW/version/install-$RB_ID.receipt" > "$W/rb.receipt" \
+    { while IFS= read -r _rl || [ -n "$_rl" ]; do
+        case $_rl in state=*) _rl=state=rolled-back ;; esac
+        out "$_rl"
+      done < "$NEW/version/install-$RB_ID.receipt"; } > "$W/rb.receipt" \
       && put "$W/rb.receipt" "$NEW/version/install-$RB_ID.receipt" "$(sha_of "$W/rb.receipt")" 644 || die 30 "cannot update install receipt"
   fi
   sync

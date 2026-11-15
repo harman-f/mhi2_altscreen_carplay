@@ -214,6 +214,7 @@ final class MibrMenuLayout {
     private static String problem;
     private static String message;
     private static int generation;
+    private static boolean restoredShown;
 
     static byte[] read(String path){
         File f=new File(path);
@@ -256,6 +257,7 @@ final class MibrMenuLayout {
         if(stamp==-1L){current=basic();return current;}
         try{
             current=parse(read(storedPath));
+            restoredShown=false;
         }catch(Invalid bad){
             System.err.println("MIBR_MENU_STORED_INVALID "+bad.getMessage());
             problem=bad.getMessage();
@@ -266,6 +268,17 @@ final class MibrMenuLayout {
     /** Why the stored file was refused, or null. */
     static synchronized String storedProblem(){current();return problem;}
     static synchronized boolean storedActive(){current();return currentStamp!=-1L&&problem==null;}
+    /** Pure decision: a local menu file exists but was refused (so the built-in default stands in) and the notice was not shown yet. */
+    static boolean restoredNoticeDue(boolean storedPresent,String problem,boolean alreadyShown){
+        return storedPresent&&problem!=null&&!alreadyShown;
+    }
+    /** "Default menu restored", handed out once per refused stored file (null otherwise). */
+    static synchronized String restoredNotice(){
+        current();
+        if(!restoredNoticeDue(currentStamp!=-1L,problem,restoredShown))return null;
+        restoredShown=true;
+        return MibrI18n.pick("Standardmenü wiederhergestellt","Default menu restored");
+    }
     /** Line for the top of the main list while the basic menu stands in. */
     static String recoveryNote(){
         if(storedActive())return null;

@@ -74,10 +74,20 @@ jobs:
           python3 tools/release/broker_menu_storage_format.py --self-test --json-out "$RUNNER_TEMP/broker-menu-storage-format.json"
           python3 tools/release/storage_destination_plan.py --self-test --json-out "$RUNNER_TEMP/storage-destination-plan.json"
           python3 -I -B tools/release/storage_destination_plan.py --self-test
+          # All public menu source inputs are pinned; only the exact private
+          # release JAR path is excluded from the profile HMI source lock.
+          python3 -B tools/release/verify_menu_source_lock.py
+          python3 -B tests/release/test_menu_source_lock.py
+          # Fail closed on stale native source fingerprints, without accessing private bytes.
+          python3 -B tools/release/stage_research_prebuilts.py --check-sources
+          bash -n tools/release/build_hmi_and_package.sh
           python3 -B tools/check_registry.py --check --scan-paths
           python3 -B -m unittest discover -s tests/settings -p 'test_*.py' -v
           python3 -B -m unittest discover -s tests/deployment -p 'test_*.py' -v
-          python3 -B -m unittest discover -s tests/installer -p 'test_*.py' -v
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mksh
+          MIBR_TEST_KSH=mksh python3 -B -m unittest discover -s tests/installer -p 'test_*.py' -v
+          python3 -B tools/release/build_modular.py --self-test
           python3 -I -B tools/release/check_executable_modes.py --self-test
 
       - name: Upload source-defined inventory (host evidence only)

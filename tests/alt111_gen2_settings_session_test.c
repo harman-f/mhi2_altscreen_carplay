@@ -109,6 +109,31 @@ static void test_safe_precedence(const char *root)
     load_safe(ALT111_PROFILE,&views);assert(views.view[0].safe_x==profile_x);
 }
 
+static void zoom_cfg_case(const char *path,const char *body,unsigned src,unsigned tag,unsigned win,unsigned au)
+{
+    FILE *f=fopen(path,"w");
+    assert(f);if(body)fputs(body,f);fclose(f);
+    gen2_zoom_cfg_load();
+    assert(g2_zoom_cfg.source==src && g2_zoom_cfg.tag==tag &&
+           g2_zoom_cfg.window_ms==win && g2_zoom_cfg.wheel_auto==au);
+}
+
+static void test_zoom_config(const char *root)
+{
+    snprintf(platform_defaults_path,sizeof(platform_defaults_path),"%s/plat.conf",root);
+    unlink(platform_defaults_path);
+    gen2_zoom_cfg_load();assert(g2_zoom_cfg.source==40 && g2_zoom_cfg.tag==56 &&
+        g2_zoom_cfg.window_ms==40 && g2_zoom_cfg.wheel_auto==0); /* missing file */
+    zoom_cfg_case(platform_defaults_path,"safe_voll=1,2,3,4\n",40,56,40,0);
+    zoom_cfg_case(platform_defaults_path,"zoom.wheel_source=41\nzoom.tag=57\nzoom.match_window_ms=60\nzoom.wheel_auto=1\n",41,57,60,1);
+    zoom_cfg_case(platform_defaults_path,"x=1\nzoom.tag=0\nzoom.wheel_source=65535",65535,0,40,0);
+    zoom_cfg_case(platform_defaults_path,"zoom.wheel_source=65536\nzoom.tag=-1\nzoom.match_window_ms=0\nzoom.wheel_auto=2\n",40,56,40,0);
+    zoom_cfg_case(platform_defaults_path,"zoom.match_window_ms=501\nzoom.tag=5x\nxzoom.wheel_source=9\n",40,56,40,0);
+    zoom_cfg_case(platform_defaults_path,"zoom.match_window_ms=500\nzoom.match_window_ms=1\n",40,56,500,0);
+    unlink(platform_defaults_path);
+    gen2_zoom_cfg_load();assert(g2_zoom_cfg.window_ms==40); /* back to defaults */
+}
+
 int main(void)
 {
     char root[]="/tmp/alt111-gen2-session-XXXXXX",status[192],log[192];
@@ -121,6 +146,7 @@ int main(void)
     AirPlayReceiverSessionRef session=(void *)(uintptr_t)1;
     assert(mkdtemp(root));
     test_m1au_time_presence();
+    test_zoom_config(root);
     p_CFRetain=test_retain;p_CFRelease=test_release;
     snprintf(status,sizeof(status),"%s/status",root);g2_status_path=status;
     snprintf(log,sizeof(log),"%s/log",root);g_log_path=log;

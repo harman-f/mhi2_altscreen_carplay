@@ -1132,8 +1132,7 @@
     {
       "id": "carplay.calibration",
       "current_path": "/mnt/app/root/altscreen-u2/config/mibr-calib.avcc",
-      "target_path": null,
-      "target": "tbd",
+      "target_path": "/mnt/app/root/mibr/bin/mibr-calib.avcc",
       "format": "binary",
       "writer": "installer",
       "evidence": {
@@ -1337,8 +1336,7 @@
     {
       "id": "boot.single_writer_gate",
       "current_path": "/mnt/app/root/altscreen-u2/config/mibr-v3-single-writer.enabled",
-      "target_path": null,
-      "target": "tbd",
+      "target_path": "/mnt/app/root/mibr/config/features/mibr-v3-single-writer.enabled",
       "format": "binary",
       "writer": "operator",
       "evidence": {

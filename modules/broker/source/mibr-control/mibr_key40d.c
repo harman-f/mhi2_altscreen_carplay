@@ -15,6 +15,7 @@
  * Nothing is written to OEM state, no DebugSPI byte is ever sent.
  */
 #include "../../../carplay/source/alt111-settings/include/mibr_paths.h"
+#include "../../../carplay/source/alt111-settings/include/mibr_keymap.h"
 #include "mibr_v3_key40.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -40,6 +41,9 @@
 #define BUF_CAP 8192u
 #define NEEDLE "HK Received: KBD["
 #define DEBOUNCE_MS 1500LL
+
+/* Effective key map (compiled defaults = Skoda MU1440); main() overlays key.* of platform defaults.conf once. */
+static struct mibr_keymap g_km={{4,4,4},{40,40,44}};
 
 struct key40d_scan {
     char buf[BUF_CAP];
@@ -84,12 +88,12 @@ static void key40d_feed(struct key40d_scan *s,const char *data,size_t len,
             if(sscanf(p,"HK Received: KBD[%d] KEY[%d] KST[%d]",&kbd,&key,&kst)==3){
                 enum mibr_key40_event e;
                 if(g_trace)g_trace(kbd,key,kst);
-                if(step&&kbd==4&&key==40&&kst==1)step(context);
+                if(step&&kbd==g_km.kbd[MIBR_KM_VIEW_STEP]&&key==g_km.key[MIBR_KM_VIEW_STEP]&&kst==1)step(context);
                 /* r57: left roller push (KEY44) held long = CarPlay/native route toggle (was KEY40);
                  * right roller push (KEY40) held long = resync of the view counter. */
-                e=mibr_key40_feed_key(&s->key44,kbd,key,kst,44);
+                e=mibr_key40_feed_code(&s->key44,kbd,key,kst,g_km.kbd[MIBR_KM_CARPLAY_SWITCH_LONG],g_km.key[MIBR_KM_CARPLAY_SWITCH_LONG]);
                 if(e==MIBR_KEY40_ROUTE_LONG&&fn)fn(context,e);
-                e=mibr_key40_feed(&s->key,kbd,key,kst);
+                e=mibr_key40_feed_code(&s->key,kbd,key,kst,g_km.kbd[MIBR_KM_VIEW_RESYNC_LONG],g_km.key[MIBR_KM_VIEW_RESYNC_LONG]);
                 if(e==MIBR_KEY40_ROUTE_LONG&&resync)resync(context);
             }
             pos=(size_t)(p-s->buf)+needle;
@@ -115,7 +119,7 @@ static void trace_state(int kbd,int key,int kst){
     static int lines;
     if(lines++>=4000)return;
     /* r28: every key is traced so a second toggle key can be picked from the log. */
-    if(kbd==4&&key==40)fprintf(stderr,"[%lldms] MIBR_KEY40D KEY40 KST=%d\n",mono_ms(),kst);
+    if(kbd==g_km.kbd[MIBR_KM_VIEW_STEP]&&key==g_km.key[MIBR_KM_VIEW_STEP])fprintf(stderr,"[%lldms] MIBR_KEY40D KEY40 KST=%d\n",mono_ms(),kst);
     else fprintf(stderr,"[%lldms] MIBR_KEY40D OTHER KBD=%d KEY=%d KST=%d\n",mono_ms(),kbd,key,kst);
     fflush(stderr);
 }
@@ -201,6 +205,14 @@ static void raw_record(const char *data,size_t n){
     if(fwrite(h,1,6,g_raw)==6&&fwrite(data,1,n,g_raw)==n){g_raw_bytes+=(long)n+6;fflush(g_raw);}
 }
 
+static void km_log(const char *msg){say(msg);}
+static void km_load(void){
+    char d[160];int r=mibr_keymap_load(&g_km,MIBR_KEYMAP_PATH,km_log);
+    mibr_keymap_describe(&g_km,d,sizeof(d));
+    fprintf(stderr,"[%lldms] MIBR_KEY40D KEYMAP %s %s\n",mono_ms(),r<0?"defaults(no file)":"file",d);
+    fflush(stderr);
+}
+
 static volatile sig_atomic_t stopped;
 static void on_stop(int sig){(void)sig;stopped=1;}
 
@@ -210,6 +222,7 @@ int main(void){
     key40d_init(scan);
     signal(SIGPIPE,SIG_IGN);signal(SIGTERM,on_stop);signal(SIGINT,on_stop);
     g_trace=trace_state;
+    km_load();
     say("START passive receiver 127.0.0.1:15001");
     while(!stopped){
         int fd=socket(AF_INET,SOCK_STREAM,0);
@@ -252,6 +265,7 @@ int main(int argc,char **argv){
     size_t chunk=argc>1?(size_t)atoi(argv[1]):4096u;
     char *buf;size_t n;
     if(!scan||chunk==0||chunk>BUF_CAP)return 2;
+    if(argc>2)mibr_keymap_load(&g_km,argv[2],NULL); /* optional keymap file under test */
     buf=(char *)malloc(chunk);
     if(!buf)return 2;
     key40d_init(scan);
