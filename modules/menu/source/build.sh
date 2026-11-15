@@ -61,4 +61,4 @@ python3 "$MODULE/verify_class_major.py" "$OUT/MIBR-HMI-CarPlay-Settings-Home.jar
 if command -v sha256sum >/dev/null 2>&1; then
   sha256sum "$OUT/MIBR-HMI-CarPlay-Settings-Home.jar"
 fi
-echo "OEM_MENU_J9_BUILD_PASS (local OEM-derived output; do not publish)"
+echo "OEM_MENU_J9_BUILD_PASS (profile menu JAR; OEM build inputs remain private)"

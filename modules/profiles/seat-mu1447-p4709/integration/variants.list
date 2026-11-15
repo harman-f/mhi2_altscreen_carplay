@@ -1,0 +1,7 @@
+# target stock-sha expected-patched-sha transform-file transform-sha mode
+# Same transforms as MU1409/MU1440. Stock hashes from the extracted MHI2_ER_SEG11_P4709_MU1447 firmware
+# (efs-system.img, variants 50 and 70 identical); smartphone_integrator.json differs from MU1409 only in the
+# #<genlastmodification> header line. Patched hashes are host transform outputs; the installer re-checks them.
+# NOT unit-tested on a SEAT unit.
+/mnt/system/etc/usblauncher_otg.lua 97822156d198233107b4dec347da6829da251a929fa07b188a2638586f711cc6 c2053fc153542fd18977be0467ec677176e65f1e75a717908087dc09c02ad5d9 profiles/seat-mu1447-p4709/integration/lua-rgi.awk 67290b6c49441241e9805624d0f2c3cea909c1832087aa6f1f5e29ffa9e805fc 644
+/mnt/system/etc/eso/production/smartphone_integrator.json 20bb3291f0e1176a261111e22fbabee3bdcd225bc84d3ce9a2579e54915ee98c 576f84405cb94c874228f15d727d1d07af91973b2a358b2f455093bcc326df4a profiles/seat-mu1447-p4709/integration/si-carplay.awk dbe5d1eb1f2c2726efea03e4d6402c6327742601ef75bb1fe40e1d859286d24f 644

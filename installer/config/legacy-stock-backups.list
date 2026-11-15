@@ -1,0 +1,6 @@
+# Verified stock copies of OEM files kept by earlier stand-alone installs.
+# Format: <target unit path> <backup path relative to /mnt/app/root>
+# The installer (stock_source) uses a row only if the file hashes to the variant's stock
+# SHA-256; a wrong or missing copy just falls through (the variant then blocks).
+/mnt/system/etc/usblauncher_otg.lua mibr-rgi/backup/usblauncher_otg.lua
+/mnt/system/etc/eso/production/smartphone_integrator.json mibr-carplay111-backup/smartphone_integrator.json.stock

@@ -80,6 +80,26 @@ int main(void) {
     n=mkframe(f,sizeof f,2,0xfffffffbu,40,1,1,0);split(&s,f,n,&o);
     n=mkframe(f,sizeof f,4,5u,40,1,1,56);split(&s,f,n,&o);
     assert(o.n==12 && o.direction[11]==1 && s.matches==1);
+    /* Configurable signature: defaults, accept new, reject old, init resets,
+     * invalid configure leaves state untouched. */
+    alt111_spi_zoom_init(&s);o.n=0;
+    assert(s.wheel_source==40 && s.tag==56 && s.window_ms==40);
+    assert(!alt111_spi_zoom_configure(&s,40,56,0) && !alt111_spi_zoom_configure(&s,40,56,501) &&
+           !alt111_spi_zoom_configure(&s,65536,56,40) && !alt111_spi_zoom_configure(&s,40,65536,40) &&
+           !alt111_spi_zoom_configure(NULL,40,56,40));
+    assert(s.wheel_source==40 && s.tag==56 && s.window_ms==40);
+    assert(alt111_spi_zoom_configure(&s,41,57,100));
+    n=mkframe(f,sizeof f,2,1000,40,1,1,0);split(&s,f,n,&o);
+    n=mkframe(f,sizeof f,4,1010,40,1,1,56);split(&s,f,n,&o);
+    assert(o.n==0); /* old source/tag rejected */
+    n=mkframe(f,sizeof f,2,2000,41,-1,1,0);split(&s,f,n,&o);
+    n=mkframe(f,sizeof f,4,2090,41,1,1,57);split(&s,f,n,&o);
+    assert(o.n==1 && o.direction[0]==-1 && o.stamp[0]==2000); /* 90ms within 100ms window */
+    n=mkframe(f,sizeof f,2,3000,41,1,1,0);split(&s,f,n,&o);
+    n=mkframe(f,sizeof f,4,3101,41,1,1,57);split(&s,f,n,&o);
+    assert(o.n==1); /* 101ms outside window */
+    alt111_spi_zoom_init(&s); /* re-init drops the configuration: caller must re-apply */
+    assert(s.wheel_source==40 && s.tag==56 && s.window_ms==40);
     puts("alt111_zoom_debugspi host PASS: eleven synthetic timestamp pairs, split MLP, negatives, wrap");
     return 0;
 }

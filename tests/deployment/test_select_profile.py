@@ -28,7 +28,8 @@ class SelectProfile(unittest.TestCase):
                         "'import sys,hashlib;print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest())'"
                         ')" "$1"\n')
         tool.chmod(tool.stat().st_mode | stat.S_IXUSR)
-        self.env = {"PATH": str(bindir) + ":" + os.environ["PATH"]}
+        # the unit has no sha256sum of its own: the selector takes the package helper or MIBR_SHA256
+        self.env = {"PATH": os.environ["PATH"], "MIBR_SHA256": str(tool)}
         self.jxe = self.tmp / "lsd.jxe"
         self.jxe.write_bytes(b"fake-jxe-A")
         self.h = hashlib.sha256(b"fake-jxe-A").hexdigest()

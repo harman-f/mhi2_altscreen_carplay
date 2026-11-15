@@ -26,11 +26,32 @@ ABSOLUTE_UNBUNDLED = re.compile(
     r"/(?:[A-Za-z0-9_.+-]+/)*(?:sed|tr|printf)(?=$|[^A-Za-z0-9_.-])"
 )
 GREP_BRE_ALTERNATION = re.compile(r"\\\|")
+# QNX grep rejects an empty pattern ("empty (sub)expression in ''"), seen in the
+# r3 --apply on 2026-11-05 (grep -c '' to count lines).
+GREP_EMPTY_PATTERN = re.compile(r"\bgrep\b[^|;&]*?\s(?:''|\"\")(?=\s|$|[;&|)])")
+
+
+# Constructs newer than the unit's GNU Awk 3.1.5 (/mnt/app/armle/usr/bin/awk).
+AWK_TOO_NEW = re.compile(r"@include|@load|@namespace|\bBEGINFILE\b|\bENDFILE\b|\bswitch\s*\(|\bPROCINFO\s*\[\s*\"sorted_in")
+
+
+def scan_awk_text(text: str, name: str) -> list[str]:
+    problems: list[str] = []
+    for number, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("#"):
+            continue
+        if AWK_TOO_NEW.search(line):
+            problems.append(f"{name}:{number}: awk construct newer than the unit's GNU Awk 3.1.5")
+    return problems
 
 
 def scan(path: Path) -> list[str]:
+    return scan_text(path.read_text(encoding="utf-8"), str(path))
+
+
+def scan_text(text: str, path: str) -> list[str]:
     problems: list[str] = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for number, line in enumerate(text.splitlines(), 1):
         stripped = line.lstrip()
         if not stripped or stripped.startswith("#"):
             continue
@@ -38,6 +59,8 @@ def scan(path: Path) -> list[str]:
             problems.append(f"{path}:{number}: forbidden/unbundled target command")
         if GREP_BRE_ALTERNATION.search(line):
             problems.append(f"{path}:{number}: non-portable grep BRE alternation")
+        if GREP_EMPTY_PATTERN.search(line):
+            problems.append(f"{path}:{number}: grep with an empty pattern (rejected by QNX grep)")
     return problems
 
 
@@ -48,6 +71,10 @@ def self_test() -> None:
         assert scan(script), "R17.1 regression: external printf was not rejected"
         script.write_text("#!/bin/ksh\necho '# BEGIN foo'\n", encoding="utf-8")
         assert not scan(script), "simple echo was unexpectedly rejected"
+        script.write_text("#!/bin/ksh\nn=$(grep -c '' list)\n", encoding="utf-8")
+        assert scan(script), "r3 regression: grep with an empty pattern was not rejected"
+        script.write_text("#!/bin/ksh\ngrep -q 'x' list\n", encoding="utf-8")
+        assert not scan(script), "grep with a pattern was unexpectedly rejected"
         script.write_text("#!/bin/ksh\necho yes | tee log.txt\n", encoding="utf-8")
         assert scan(script), "unbundled tee was not rejected"
         for source in (

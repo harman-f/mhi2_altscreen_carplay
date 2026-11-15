@@ -1,5 +1,21 @@
 # MU1440 / AID10 developer test — current
 
+## Current three-profile beta build status (2026-11-10)
+
+The public product repository contains source and publication checks only. Its
+Research-download and beta-assembly workflow has been removed. The private
+HARMAN-F build repository is the sole active producer of three-profile release
+packages; see [release ownership and source boundaries](../docs/build/MULTIPROFILE_RELEASE.md).
+The public publication audit verifies source locks without private credentials.
+The separately pinned `ghcr.io/harman-f/mhi2-qnx65-armv7` package is a QNX
+cross-compiler image, not a deployable CarPlay release, and remains available
+while `tools/qnx65-image.lock` references it.
+
+This cutover does not create or replace a GitHub Release and does not change
+the historical MU1440 developer package described below. It does not extend
+that package's vehicle acceptance to any new source or binary output.
+
+
 This is the currently pinned **MU1440-specific developer prerelease**, not the newest experimental source line. Documentation-only main-branch updates do not mutate the already published ZIP or retroactively re-qualify its binary hashes. See [current integration status](../docs/status/INTEGRATION_STATUS_2026-10-21.md), [latest known issues](../docs/findings/KNOWN_ISSUES.md) and [dated vehicle test evidence](../docs/status/MU1440_FINAL_DRIVE_LIVE_STATUS_2026-10-11.md).
 
 The 29 September Most20/D2 update (kept at the end of this file as a historical implementation note) is already incorporated into the consolidated statements below; later release-tag decisions require their own verification.

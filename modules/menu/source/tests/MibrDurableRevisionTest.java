@@ -92,6 +92,17 @@ public final class MibrDurableRevisionTest {
         check("off".equals(MibrPlatformDefaults.get("nav_line")),"same length");
         pd.delete();
         check(MibrPlatformDefaults.get("nav_line")==null,"deleted");
+        /* key.menu: absent -> fallback, valid -> value, garbage -> fallback */
+        check(MibrPlatformDefaults.intOr("key.menu",16)==16,"key.menu absent");
+        write(pd,"# c\nkey.menu=23\n");
+        check(MibrPlatformDefaults.intOr("key.menu",16)==23,"key.menu 23");
+        write(pd,"key.menu=abc\n");
+        check(MibrPlatformDefaults.intOr("key.menu",16)==16,"key.menu garbage");
+        write(pd,"key.menu=\n");
+        check(MibrPlatformDefaults.intOr("key.menu",16)==16,"key.menu empty");
+        write(pd,"key.menu=99999999999\n");
+        check(MibrPlatformDefaults.intOr("key.menu",16)==16,"key.menu overflow");
+        pd.delete();
         sw.delete();dir.delete();
         System.out.println("MibrDurableRevisionTest PASS");
     }

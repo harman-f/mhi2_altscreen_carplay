@@ -16,7 +16,7 @@
   },
   "firmware_check": {
     "source": "e2p:3A0:19 (runtime/deployment/session.sh mibr_e2p_ascii)",
-    "expected": "MHI2_ER_SEG11_P4708_MU1409",
+    "expected": "MHI2_ER_SEG11_P4708",
     "status": "defined"
   },
   "hmi": {

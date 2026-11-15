@@ -29,6 +29,17 @@ done
 "$CC" "${F[@]}" "${I[@]}" tests/alt111_settings_lock_diagnostics_test.c \
   "${CORE[0]}" "${CORE[@]:2}" -pthread -ldl -lm -o "$OUT/settings_lock_diagnostics"
 "$OUT/settings_lock_diagnostics"
+# QNX /dev/shmem errno behaviour (vehicle 2026-11-06), injected through an lstat redirect.
+"$CC" "${F[@]}" "${I[@]}" tests/alt111_settings_shmem_errno_test.c \
+  "${CORE[0]}" "${CORE[@]:2}" -pthread -ldl -lm -o "$OUT/settings_shmem_errno"
+"$OUT/settings_shmem_errno"
+# SEAT steering-wheel zoom bridge (harman-f PR 72 port; env-gated, Skoda default unchanged).
+"$CC" -std=c99 -Wall -Wextra -Werror -I"$G/include" tests/seat_zoom_epoch_test.c -o "$OUT/seat_zoom_epoch"
+"$OUT/seat_zoom_epoch"
+"$CC" -std=c99 -Wall -Wextra -Werror -pthread -I"$G/include" tests/seat_zoom_auto_context_test.c \
+  "$G/src/alt111_zoom.c" -o "$OUT/seat_zoom_auto_context"
+"$OUT/seat_zoom_auto_context"
 bash tools/test_alt111_zoom_host.sh
 python3 -B tests/alt111_settings_integration.py
+python3 -B tests/seat_mu1409_platform_defaults_test.py
 echo 'GEN2_COMPONENTS_HOST=PASS host_only=1'

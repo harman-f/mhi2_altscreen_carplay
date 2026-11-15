@@ -31,6 +31,19 @@ final class MibrPlatformDefaults {
         return lookup(text,key);
     }
 
+    /** A decimal int value for a key; fallback when absent, invalid or unreadable. Never throws. */
+    static int intOr(String key,int fallback){
+        try{
+            String v=get(key);
+            if(v==null)return fallback;
+            v=v.trim();
+            if(v.length()==0||v.length()>9)return fallback;
+            return Integer.parseInt(v);
+        }catch(Throwable t){
+            return fallback;
+        }
+    }
+
     static String lookup(String content,String key){
         String prefix=key+"=";
         int at=0;

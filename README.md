@@ -43,7 +43,7 @@ The public source now contains the **MIB Runtime** (`/mnt/app/root/mibr/`), tran
 - **New shared three-profile package:** one common runtime plus Škoda MU1440 and SEAT MU1409/MU1447 profiles. Assembly/validation tooling exists; a complete, qualified combined beta artifact must be checked separately.
 - **Installation:** read the correct package's instructions and run an exact-target, read-only preflight before any target write. Do not use legacy MU1440 instructions for the new multi-profile installer.
 
-[Packages and release status](docs/packages/README.md) · [Developer installation / legacy scope](docs/INSTALLATION.md) · [Package contract](docs/build/PACKAGE_LAYOUT.md) · [Current frozen release](release/CURRENT.md)
+[Packages and release status](docs/packages/README.md) · [Beta pipeline and pinned-JAR policy](docs/build/MULTIPROFILE_RELEASE.md) · [Developer installation / legacy scope](docs/INSTALLATION.md) · [Package contract](docs/build/PACKAGE_LAYOUT.md) · [Current frozen release](release/CURRENT.md)
 
 ## Architecture and development
 

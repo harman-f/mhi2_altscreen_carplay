@@ -12,6 +12,7 @@ and the command line exits non-zero with ``MODULAR_PACKAGE_GATE=FAIL <reason>``.
 import argparse
 import hashlib
 import json
+import re
 import os
 from pathlib import Path
 import stat
@@ -20,10 +21,14 @@ import tempfile
 import warnings
 import zipfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from check_mu1440_target_shell import scan_awk_text, scan_text  # noqa: E402
+
 PREFIX = "MIBR-CarPlay/"
 PROFILES = {"skoda-mu1440-p4526", "seat-mu1409-p4708", "seat-mu1447-p4709"}
 SINGLE_SCOPE = "single-profile"
 TRANSFORM_SUFFIXES = (".awk", ".sed", ".block", ".patch", ".ksh", ".sh")
+TARGET_SHELL_SUFFIXES = (".sh", ".ksh")
 OEM_NAMES = ("smartphone_integrator.json", "startup.sh", "lsd.jxe")
 HEX = "0123456789abcdef"
 GROUPS = ("hmi", "icons", "display", "input", "integration")
@@ -85,6 +90,49 @@ def check_variant(files, root, line):
           "OEM-looking payload file in variants (transform required): " + tfile)
     check(sha(need(files, tfile)) == tsha, "transform hash mismatch: " + tfile)
     check(tsha not in (stock, patched), "variant file is OEM bytes, not a transform: " + tfile)
+
+
+BOOT_REF_FILES = ("installer/config/lsd-block.txt", "common/broker/scripts/boot.ksh")
+_MIBR_REF = re.compile(r"(?:/mnt/app/root/mibr|\$\{?MIBR_ROOT\}?|\$\{?BASE\}?|\$A)/((?:scripts|bin)/[A-Za-z0-9._-]+)")
+_JAR_REF = re.compile(r"\$BASE_DIR/lsd/jars/([A-Za-z0-9._-]+\.jar)")
+
+
+def check_boot_references(files, profiles):
+    """Every script/binary/JAR the lsd.sh block and boot.ksh call is installed by the package
+    for every profile (2026-11-05: the beta r2 ZIP shipped neither boot.ksh nor the JARs)."""
+    common = set()
+    for line in need(files, "installer/config/payload.manifest").decode().splitlines():
+        if line and not line.startswith("#") and len(line.split()) == 4:
+            common.add(line.split()[2])
+    refs = set()
+    ref_files = list(BOOT_REF_FILES) + sorted(
+        n for n in files if n.startswith("common/") and "/scripts/" in n and n.endswith((".sh", ".ksh")))
+    for ref_file in ref_files:
+        if ref_file not in files:
+            continue  # lsd-block.txt itself is required by the installer's own package check
+        text = files[ref_file].decode("utf-8", "replace")
+        refs |= {"/mnt/app/root/mibr/" + m for m in _MIBR_REF.findall(text)}
+        refs |= {"/mnt/app/eso/hmi/lsd/jars/" + m for m in _JAR_REF.findall(text)}
+    for pid in sorted(profiles):
+        targets = set(common)
+        pm = files.get("profiles/%s/payload.manifest" % pid, b"").decode()
+        targets |= {l.split()[2] for l in pm.splitlines() if l and not l.startswith("#") and len(l.split()) == 4}
+        absent = sorted(refs - targets)
+        check(not absent, "%s: boot path not installed by the package: %s" % (pid, ", ".join(absent)))
+
+
+def check_target_scripts(files):
+    """Every shell/awk file the unit runs must pass the MU1440 target-shell gate."""
+    problems = []
+    for rel in sorted(files):
+        if not rel.startswith(("installer/", "common/", "profiles/")):
+            continue  # source/ and docs are host material
+        data = files[rel]
+        if rel.endswith(TARGET_SHELL_SUFFIXES):
+            problems += scan_text(data.decode("utf-8", "replace"), rel)
+        elif rel.endswith(".awk"):
+            problems += scan_awk_text(data.decode("utf-8", "replace"), rel)
+    check(not problems, "target shell gate: " + "; ".join(problems[:5]))
 
 
 def parse_package_sha(raw):
@@ -191,6 +239,9 @@ def check_meta(meta, files, profiles, selectors):
           "package_status inconsistent with missing_inputs")
     check(meta["complete"] is (not missing), "complete flag inconsistent with missing_inputs")
     required = list(INSTALLER_REQUIRED) + ["profiles/%s/hmi/MIBR-CarPlay.jar" % p for p in sorted(profiles)]
+    if "installer/config/payload.manifest" in files and \
+            "/mnt/app/eso/hmi/lsd/jars/MIBR-Extender-P1-BootProbe.jar" in files.get("installer/config/lsd-block.txt", b"").decode().replace("$BASE_DIR", "/mnt/app/eso/hmi"):
+        required.append("common/menu/bin/MIBR-Extender-P1-BootProbe.jar")
     for name in required:
         if name in files:
             check(name not in missing, "declared missing but present: " + name)
@@ -270,6 +321,10 @@ def validate(path, require_complete=False):
             if not line or line.startswith("#"):
                 continue
             check_variant(files, root, line)
+    check_target_scripts(files)
+    if "installer/config/payload.manifest" in files and not meta.get("missing_inputs"):
+        # an incomplete package (declared MISSING_INPUT) is never installable; check it once complete
+        check_boot_references(files, profiles)
     oem = oem_hashes(files, profiles)
     for name, data in files.items():
         if name.startswith(("common/", "profiles/")):
@@ -415,6 +470,23 @@ def self_test():
                sealed(lambda f: variants(f, good.replace(sha(b"{ print }\n"), sha(b"other")))))
         reject("non-hex stock sha", "64-hex", sealed(lambda f: variants(f, good.replace(sha(b"stock"), "zz"))))
         reject("variants line too short", "malformed variants line", sealed(lambda f: variants(f, "/x/v1 a b\n")))
+
+        def printf_script(f):
+            f["common/carplay/scripts/x.ksh"] = b"#!/bin/ksh\nprintf '%s\\n' x\n"
+        reject("printf in a unit script", "target shell gate", sealed(printf_script))
+
+        def new_awk(f):
+            f[root + "integration/si.awk"] = b"BEGINFILE { x=1 }\n{ print }\n"
+            variants(f, "/x/v1 %s %s %sintegration/si.awk %s 644\n"
+                     % (sha(b"stock"), sha(b"patched"), root, sha(f[root + "integration/si.awk"])))
+        reject("awk newer than GNU Awk 3.1.5", "target shell gate", sealed(new_awk))
+
+        def boot_ref_missing(f):
+            f["installer/config/lsd-block.txt"] = (
+                b"[ -r /mnt/app/root/mibr/scripts/boot.ksh ] && /bin/ksh /mnt/app/root/mibr/scripts/boot.ksh\n"
+                b"BOOTCLASSPATH=\"$BOOTCLASSPATH -Xbootclasspath/p:$BASE_DIR/lsd/jars/MIBR-CarPlay.jar\"\n")
+        reject("lsd.sh block calls a file the package does not install", "boot path not installed",
+               sealed(boot_ref_missing))
 
         def oem_named(f):
             f[root + "integration/smartphone_integrator.json"] = b"{}\n"
