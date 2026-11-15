@@ -76,7 +76,7 @@ def audit(path: Path) -> None:
     for required in ("id=\"wireless-update\"", "id=\"emulator-overview\"", "id=\"integrations-overview\"", "id=\"perk-overview\"", "id=\"community-repository-leads\"", "id=\"matrix\"", "id=\"lineage\"", "id=\"timeline\""):
         if required not in data:
             errors.append("missing section: " + required)
-    if any(s in data.lower() for s in ("messages11.html", "messages10.html", "canetlotw/m.i.b._research", "t.me/c/2187737352")):
+    if any(s in data.lower() for s in ("messages11.html", "messages10.html", "t.me/c/")):
         errors.append("private/community raw source marker found in public HTML")
     if errors:
         for error in errors:
