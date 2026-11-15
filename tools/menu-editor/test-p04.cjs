@@ -62,7 +62,7 @@ async function main(){
   assert.equal(query("#navv-layer").hidden,false);
   assert.ok(query("#navv-center-svg"),"Center cockpit SVG missing");
   assert.equal(query("#navv-cluster").hidden,true,"Legacy preview must be hidden in Center view");
-  assert.equal(JSON.parse(query("#navv-out").textContent).schema,"mibr.nav-view-profiles/2");
+  assert.equal(JSON.parse(query("#navv-out").textContent).schema,"mibr.nav-view-profiles/3");
 
   click('#tabs [data-t=safe]');
   assert.ok(query(".sa-menu"),"Dedicated Safe Area is missing");

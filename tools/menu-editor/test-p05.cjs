@@ -57,7 +57,7 @@ async function main(){
   assert.equal(wideArrow.querySelectorAll("path").length,1,"Wide arrow uses one filled and stroked shape");
   assert.equal(silhouette.getAttribute("stroke"),"#f7fcff","White contour traces the exact green silhouette");
     // P0.9.1: shared status metrics remain physically identical across cockpit modes.
-  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.7"),"Visible version label");
+  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.8"),"Visible version label");
   for(const view of ["center","wide","full"]){
     const q=id=>$("#"+view+"-"+id);
     const top=q("top-status"),bottom=q("bottom-info"),footer=q("footer");
@@ -85,7 +85,7 @@ async function main(){
   assert.equal($("#navv-profile-advanced").open,false,"Profile management starts collapsed");
   assert.equal(w.MIBR_project.capture().schema,"mibr-project/1");
   assert.equal(w.MIBR_project.capture().menu.v,2);
-  assert.equal(w.MIBR_project.capture().viewProfiles.schema,"mibr.nav-view-profiles/2");
+  assert.equal(w.MIBR_project.capture().viewProfiles.schema,"mibr.nav-view-profiles/3");
   assert.ok($("header #projectLoad")&&$("header #projectSave")&&$("header #sdExport"),"Global project commands");
 
   click('#tabs [data-t=nav]');
@@ -390,6 +390,123 @@ async function main(){
 
   click('#tabs [data-t=menu]');
   assert.ok($("#pv")&&$("#tree"),"Menu editor survived");
+
+  // P0.9.8: view-profile format /3 (geometry, transition, unknown-key preservation)
+  {
+    const crc32=text=>{let v=0xFFFFFFFF;for(const b of Buffer.from(text,"utf8")){v^=b;for(let j=0;j<8;j++)v=(v>>>1)^((v&1)?0xEDB88320:0)}return ((v^0xFFFFFFFF)>>>0).toString(16).padStart(8,"0")};
+    const seal=lines=>{const body=lines.join("\n")+"\n";return body+"crc32="+crc32(body)+"\n"};
+    const readBlob=blob=>new Promise(res=>{const fr=new w.FileReader();fr.onload=()=>res(String(fr.result));fr.readAsText(blob)});
+    const lastDownload=async()=>readBlob(downloads[downloads.length-1].blob);
+    const importText=async(text,name)=>{const input=$("#navv-input");Object.defineProperty(input,"files",{configurable:true,value:[new w.File([text],name)]});input.dispatchEvent(new w.Event("change",{bubbles:true}));await delay(60);return $("#navv-status").textContent};
+    const deq=(a,b,m)=>assert.deepEqual(JSON.parse(JSON.stringify(a)),JSON.parse(JSON.stringify(b)),m);
+    const ids=["center","wide","full"];
+
+    // v2 JSON migrates to v3 by adding defaults only
+    const v3=w.MIBR_views.get();
+    assert.equal(v3.schema,"mibr.nav-view-profiles/3");assert.equal(v3.version,3);
+    const v2=clone(v3);v2.schema="mibr.nav-view-profiles/2";v2.version=2;delete v2.global.transition;delete v2.meta.extra;
+    for(const id of ids)delete v2.views[id].geometry;
+    v2.views.wide.safeArea={x:260,y:131,w:500,h:150};
+    const up=w.MIBR_views.validate(v2);
+    assert.equal(up.schema,"mibr.nav-view-profiles/3");assert.equal(up.version,3);
+    deq(up.global.transition,{enabled:false,mode:"cycle",gap_ms:500,min_interval_ms:3000});
+    for(const id of ids)deq(up.views[id].geometry,{zoom:"inherit"},id+" geometry default");
+    deq(up.views.wide.safeArea,{x:260,y:131,w:500,h:150},"Migration keeps existing values");
+    deq(up.meta.extra,{});
+    // v2 JSON import through the UI
+    assert.match(await importText(JSON.stringify(v2),"old-v2.json"),/Erfolgreich/);
+    assert.equal(w.MIBR_views.get().schema,"mibr.nav-view-profiles/3");
+    assert.equal(w.MIBR_views.get().views.wide.safeArea.x,260);
+    // stored v2 data (localStorage) is migrated on load
+    assert.equal(JSON.parse(w.localStorage.getItem("mibr-nav-view-mockup/2")).version,3);
+
+    // .conf export baseline
+    w.MIBR_views.set(up);
+    click("#navv-conf");
+    let conf=await lastDownload();
+    let lines=conf.split("\n");assert.equal(lines.pop(),"");
+    assert.equal(lines[0],"MIBR_NAV_VIEW_PROFILES/3");assert.equal(lines[1],"version=3");
+    for(const l of ["global.transition.enabled=0","global.transition.mode=cycle","global.transition.gap_ms=500","global.transition.min_interval_ms=3000"])assert.ok(lines.includes(l),"conf has "+l);
+    for(const id of ids)assert.ok(lines.includes("view."+id+".geometry.zoom=inherit"),id+" zoom line");
+    assert.ok(!conf.includes("[object Object]"));
+    assert.equal(lines[lines.length-1],"crc32="+crc32(lines.slice(0,-1).join("\n")+"\n"),"CRC32 over all lines before crc32");
+
+    // v2 .conf import (magic /2, no geometry/transition)
+    const v2conf=lines.slice(0,-1).filter(l=>!/geometry|transition/.test(l)).map((l,i)=>i===0?"MIBR_NAV_VIEW_PROFILES/2":l==="version=3"?"version=2":l);
+    assert.match(await importText(seal(v2conf),"old-v2.conf"),/Erfolgreich/);
+    assert.equal(w.MIBR_views.get().views.center.geometry.zoom,"inherit");assert.equal(w.MIBR_views.get().global.transition.gap_ms,500);
+    // v1 .conf still accepted
+    const v1conf=v2conf.filter(l=>!/\.safeArea\./.test(l)).map((l,i)=>i===0?"MIBR_NAV_VIEW_PROFILES/1":l==="version=2"?"version=1":l);
+    assert.match(await importText(seal(v1conf),"old-v1.conf"),/Erfolgreich/);
+    assert.equal(w.MIBR_views.get().schema,"mibr.nav-view-profiles/3");
+
+    // Full round trip: geometry + transition + unknown keys written by the head unit
+    const custom=lines.slice(0,-1).map(l=>l==="view.wide.geometry.zoom=inherit"?"view.wide.geometry.zoom=125":l==="view.full.geometry.zoom=inherit"?"view.full.geometry.zoom=70":l==="global.transition.enabled=0"?"global.transition.enabled=1":l==="global.transition.mode=cycle"?"global.transition.mode=panels":l==="global.transition.gap_ms=500"?"global.transition.gap_ms=750":l==="global.transition.min_interval_ms=3000"?"global.transition.min_interval_ms=5000":l);
+    custom.push("zz.hu.note=keep me","hu.build=r12=x");
+    assert.match(await importText(seal(custom),"hu.conf"),/Erfolgreich/);
+    let got=w.MIBR_views.get();
+    assert.equal(got.views.wide.geometry.zoom,"125");assert.equal(got.views.full.geometry.zoom,"70");assert.equal(typeof got.views.wide.geometry.zoom,"string");
+    deq(got.global.transition,{enabled:true,mode:"panels",gap_ms:750,min_interval_ms:5000});
+    deq(got.meta.extra,{"hu.build":"r12=x","zz.hu.note":"keep me"});
+    click("#navv-conf");
+    conf=await lastDownload();lines=conf.split("\n");lines.pop();
+    assert.ok(lines.includes("global.transition.enabled=1"),"enabled is written as 1");
+    assert.ok(lines.includes("view.wide.geometry.zoom=125"));assert.ok(lines.includes("view.full.geometry.zoom=70"));
+    deq(lines.slice(-3),["hu.build=r12=x","zz.hu.note=keep me",lines[lines.length-1]],"Unknown keys sorted before crc32");
+    assert.equal(lines[lines.length-1],"crc32="+crc32(lines.slice(0,-1).join("\n")+"\n"));
+    const again=await importText(conf,"roundtrip.conf");assert.match(again,/Erfolgreich/);
+    deq(w.MIBR_views.get(),got,"Round trip is lossless");
+    // JSON round trip keeps meta.extra too
+    deq(w.MIBR_views.validate(clone(got)).meta.extra,got.meta.extra);
+
+    // Corrupted CRC is rejected
+    assert.match(await importText(conf.replace(/crc32=.*\n$/,"crc32=00000000\n"),"bad.conf"),/abgelehnt.*CRC/);
+
+    // Validation: invalid zoom / gap_ms / min_interval / mode / enabled
+    const bad=(mut,re)=>{const x=clone(got);mut(x);assert.throws(()=>w.MIBR_views.validate(x),re)};
+    bad(x=>{x.views.center.geometry.zoom="90"},/Zoom/);
+    bad(x=>{x.views.center.geometry.zoom=100},/Zoom/);
+    bad(x=>{x.global.transition.gap_ms=99},/Übergang/);
+    bad(x=>{x.global.transition.gap_ms=3001},/Übergang/);
+    bad(x=>{x.global.transition.gap_ms=500.5},/Übergang/);
+    bad(x=>{x.global.transition.min_interval_ms=499},/Übergang/);
+    bad(x=>{x.global.transition.mode="loop"},/Übergang/);
+    bad(x=>{x.global.transition.enabled="1"},/Übergang/);
+    bad(x=>{x.meta.extra["view.center.mode"]="custom"},/unbekannt/);
+    const badConf=(from,to,re)=>importText(seal(lines.slice(0,-1).map(l=>l===from?to:l)),"bad.conf").then(t=>assert.match(t,re));
+    await badConf("view.wide.geometry.zoom=125","view.wide.geometry.zoom=90",/abgelehnt.*Zoom/);
+    await badConf("global.transition.gap_ms=750","global.transition.gap_ms=50",/abgelehnt.*Übergang/);
+    await badConf("global.transition.enabled=1","global.transition.enabled=true",/abgelehnt.*enabled|abgelehnt.*Wert/);
+    deq(w.MIBR_views.get(),got,"Rejected imports leave the state untouched");
+
+    // UI: geometry select and transition controls
+    click('#tabs [data-t=nav]');
+    click('[data-navv-view="center"]');
+    assert.equal($("#navv-geo-zoom").value,"inherit");
+    deq(Array.from($("#navv-geo-zoom").options).map(o=>o.value),["inherit","70","85","100","125","150"]);
+    set("#navv-mode","inherit");
+    assert.equal($("#navv-geo-zoom").disabled,false,"Geometry is a view property, editable in inherit mode");
+    set("#navv-geo-zoom","150");
+    assert.equal(w.MIBR_views.get().views.center.geometry.zoom,"150");
+    set("#navv-mode","custom");
+    // copy and reset must not overwrite geometry
+    click('[data-navv-view="wide"]');
+    set("#navv-copy-target","center");click("#navv-copy");
+    assert.equal(w.MIBR_views.get().views.center.geometry.zoom,"150","Copy keeps target geometry");
+    assert.equal(w.MIBR_views.get().views.wide.geometry.zoom,"125","Copy keeps source geometry");
+    click("#navv-reset-view");
+    assert.equal(w.MIBR_views.get().views.wide.geometry.zoom,"125","Reset keeps geometry");
+    set("#navv-tr-gap","50");
+    assert.equal(w.MIBR_views.get().global.transition.gap_ms,750,"Invalid gap_ms is not stored");
+    assert.equal($("#navv-tr-gap").getAttribute("aria-invalid"),"true");assert.ok($("#navv-tr-error").textContent.length>0);
+    set("#navv-tr-gap","900");set("#navv-tr-min","70000");
+    assert.equal(w.MIBR_views.get().global.transition.gap_ms,900);assert.equal(w.MIBR_views.get().global.transition.min_interval_ms,5000);
+    set("#navv-tr-min","8000");set("#navv-tr-enabled",false);set("#navv-tr-mode","cycle");
+    deq(w.MIBR_views.get().global.transition,{enabled:false,mode:"cycle",gap_ms:900,min_interval_ms:8000});
+    assert.equal($("#navv-tr-error").textContent,"");
+    assert.ok(/Bildgeometrie/.test($("#navv-geometry-card").textContent));
+    w.MIBR_views.set(up);
+  }
   click('#langSeg [data-l=en]');
   await delay(10); // global project toolbar updates after the language handler
   assert.equal($("#projectSave").textContent,"Save project");
