@@ -50,8 +50,8 @@ def audit(path: Path) -> None:
     missing = sorted(set(parser.fragments) - ids)
     if missing:
         errors.append("broken internal href anchors: " + ", ".join(missing[:20]))
-    if len(parser.rows) != 58 or len(parser.cards) != 58:
-        errors.append(f"expected exactly 58 repository rows and 58 cards, got {len(parser.rows)} rows and {len(parser.cards)} cards")
+    if len(parser.rows) != 56 or len(parser.cards) != 56:
+        errors.append(f"expected exactly 56 curated repository rows and 56 cards (58 original baseline), got {len(parser.rows)} rows and {len(parser.cards)} cards")
     row_ids = {x.get("data-id") for x in parser.rows}
     card_ids = {x.get("id", "")[5:] for x in parser.cards}
     if row_ids != card_ids:
@@ -116,13 +116,20 @@ def audit(path: Path) -> None:
         errors.append("V3.0 primary release link missing")
     if 'issues/187' not in data or 'id="oem-hud-overview"' not in data or 'id="aftermarket-hud-overview"' not in data:
         errors.append("HUD taxonomy or feedback issue missing")
+    if data.count('data-lineage-edge="1"') != 38 or data.count('class="atlas-lineage-svg"') != 4:
+        errors.append("expanded static lineage graph and source evidence table missing")
+    if 'GitHub fork' not in data or 'Code adaptation' not in data or 'Design reference' not in data or 'Pinned component' not in data:
+        errors.append("lineage must distinguish ancestry from design and pinned dependencies")
+    for hidden in ('repo-new-maxim-smirnov-mhi2-carplay-cluster', 'repo-new-mr-mibonk-mhi2-android-auto-cluster-map'):
+        if hidden in parser.ids:
+            errors.append("unchanged/behind-only fork remains in active catalog: " + hidden)
     if 'id="misc-overview"' not in data:
         errors.append("external dongles and HUD must have a separate Misc tab")
     if errors:
         for error in errors:
             print("FAIL:", error, file=sys.stderr)
         raise SystemExit(1)
-    print(f"PASS: {len(parser.rows)} baseline rows × {len(FEATURES)} features, {len(parser.cards)} profiles, {len(TABS)} tabs, nine filterable research matrices, {len(ids)} distinct IDs and {len(parser.fragments)} working internal anchors")
+    print(f"PASS: {len(parser.rows)} curated rows (58 source baseline) × {len(FEATURES)} features, {len(parser.cards)} profiles, {len(TABS)} tabs, nine filterable research matrices, {len(ids)} distinct IDs and {len(parser.fragments)} working internal anchors")
 
 if __name__ == "__main__":
     audit(Path(sys.argv[1] if len(sys.argv) > 1 else "docs/index.html"))
