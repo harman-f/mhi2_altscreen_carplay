@@ -1,4 +1,4 @@
-name: Cluster Atlas static-site validation and Pages deployment
+name: MIB Atlas static-site validation and Pages deployment
 
 on:
   pull_request:
