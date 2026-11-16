@@ -53,10 +53,6 @@ HASHED_ARTIFACTS = [
         "artifacts/mu1440/direct-ts-remux/vehicle-proven-run143/direct-ts-remux",
         "artifacts/mu1440/direct-ts-remux/vehicle-proven-run143/direct-ts-remux.sha256",
     ),
-    (
-        "artifacts/mu1440/altscreen111/experimental-gen2-2026-09-25/libaltscreen111.so",
-        "artifacts/mu1440/altscreen111/experimental-gen2-2026-09-25/libaltscreen111.so.sha256",
-    ),
 ]
 
 FORBIDDEN_SUFFIXES = {
