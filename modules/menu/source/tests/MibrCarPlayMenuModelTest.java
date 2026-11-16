@@ -72,6 +72,23 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         }
     }
 
+
+    private static void useMenuWithWirelessIdCollision() {
+        try {
+            java.io.File source=new java.io.File(System.getProperty("mibr.menu.standard"));
+            java.io.FileInputStream in=new java.io.FileInputStream(source);
+            byte[] b=new byte[(int)source.length()];int n=in.read(b);in.close();
+            String text=new String(b,0,n,"UTF-8");int crc=text.lastIndexOf("crc32=");
+            if(crc<0)throw new AssertionError("standard menu crc");
+            String prefix=text.substring(0,crc)+"page.wireless\troot\t-\tCustom wireless page\tCustom wireless page\n";
+            byte[] payload=prefix.getBytes("UTF-8");
+            String full=prefix+"crc32="+MibrMenuLayout.crc32(payload,payload.length)+"\n";
+            java.io.File target=java.io.File.createTempFile("mibr-menu-collision",".conf");target.deleteOnExit();
+            java.io.FileOutputStream out=new java.io.FileOutputStream(target);out.write(full.getBytes("UTF-8"));out.close();
+            MibrMenuLayout.storedPath=target.getPath();MibrMenuLayout.forget();
+        } catch (java.io.IOException e) { throw new AssertionError(e.toString()); }
+    }
+
     public static void main(String[] args) {
         MibrI18n.forced = "de_DE";
         useStandardFile();
@@ -85,9 +102,9 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         check(view.screen == MibrCarPlayMenuModel.CATEGORIES, "main list");
         check("CarPlay-Einstellungen".equals(view.title), "main list title");
         // r56: 6 root settings + Ansichten + Erweitert; R2: CarPlay-Navigation checkbox after the settings
-        check(view.rows.length == 11, "main list has 11 rows");
+        check(view.rows.length == 12, "main list has additive Wireless link");
         String[] expected = {"Ansicht", "Kartenanzeige", "Ankunftszeit", "Tempolimit", "Kompass",
-            "Abbiegehinweis", "CarPlay-Navigation", "Pfeile im Cockpit", "Ansichten", "Erweitert", "Version"};
+            "Abbiegehinweis", "CarPlay-Navigation", "Pfeile im Cockpit", "Ansichten", "Erweitert", "Version", "Wireless CarPlay"};
         for (int i = 0; i < expected.length; i++)
             check(expected[i].equals(view.rows[i]), "main row " + i + " " + expected[i]);
         check(menu.keyForRow(0) == index("viewarea.selected") && menu.keyForRow(5) == index("navigation.maneuver"),
@@ -99,7 +116,7 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         // r56: the Ansichten submenu holds the six view rows (virtual keys, no registry keys)
         check(menu.keyForRow(6) == MibrPopupEditorModel.CARPLAY_NAV && menu.groupForRow(6) == -1, "CarPlay-Navigation is the checkbox key");
         menu.select(6);
-        check(view.screen == MibrCarPlayMenuModel.CATEGORIES && view.rows.length == 11, "the checkbox row opens no page");
+        check(view.screen == MibrCarPlayMenuModel.CATEGORIES && view.rows.length == 12, "the checkbox row opens no page");
         menu.select(7);
         check(view.screen == MibrCarPlayMenuModel.ITEMS && "Pfeile im Cockpit".equals(view.title), "Pfeile im Cockpit");
         String[] arrows = {"Quelle", "Anzeige", "Text über der Karte", "Unten", "Seitenstraßen", "Spurempfehlung", "Karte Tag/Nacht", "Demo-Route"};
@@ -230,6 +247,22 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         check(view.screen == MibrCarPlayMenuModel.ITEMS && "Version".equals(view.title) && menu.onVersion(), "Version read-only metadata page");
         check(view.rows.length > 0 && (view.rows[0].indexOf("No installed version metadata") >= 0 || view.rows[0].indexOf("Versionsdaten nicht installiert") >= 0), "Version page reports unknown when receipt is absent");
         menu.back();
+        menu.select(11);
+        check(view.screen==MibrCarPlayMenuModel.ITEMS && "Wireless CarPlay".equals(view.title) && view.rows.length==5,
+              "wireless page is part of the current native menu");
+        check(menu.group()==-2 && menu.keyForRow(0)==-1 && menu.keyForRow(1)==-1 && menu.wirelessStatusRow(0),
+              "wireless rows are virtual controls outside the settings registry");
+        check(menu.wirelessActionForRow(1)==MibrWirelessSession.REQUEST_TOGGLE &&
+              menu.wirelessActionForRow(2)==MibrWirelessSession.REQUEST_PAIRING &&
+              menu.wirelessActionForRow(3)==MibrWirelessSession.REFRESH_STATUS &&
+              menu.wirelessActionForRow(4)==MibrWirelessSession.REQUEST_STOP,
+              "wireless command rows have independent actions");
+        check(!menu.wirelessActionEnabled(MibrWirelessSession.REQUEST_TOGGLE) &&
+              !menu.performWirelessAction(MibrWirelessSession.REQUEST_PAIRING),
+              "missing native backend stays fail closed");
+        MibrCarPlayMenuModel.Snapshot wireless=menu.snapshot();menu.back();menu.restore(wireless);
+        check(menu.wirelessPageOpen() && view.rows.length==5,"wireless snapshot restores its own page");
+        menu.back();
         check(count == 9, "exactly nine user-facing settings reachable");
         int hidden = 0;
         for (int k = 0; k < MibrSettingsCatalog.KEYS.length; k++) {
@@ -255,7 +288,7 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         check(menu.screen() == MibrCarPlayMenuModel.DETAIL && menu.selected() == index("maxFPS"), "restore detail");
         menu.back();
         check(menu.screen() == MibrCarPlayMenuModel.ITEMS && menu.group() == 5, "detail backs to Erweitert");
-        for (int i = 0; i < 3; i++) { menu.close(); menu.open(); check(view.rows.length == 11, "reopen"); }
+        for (int i = 0; i < 3; i++) { menu.close(); menu.open(); check(view.rows.length == 12, "reopen"); }
         MibrI18n.forced = "en_GB";
         menu.refresh();
         check("CarPlay settings".equals(view.title) && "View".equals(view.rows[0]) &&
@@ -264,7 +297,14 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         menu.refresh();
         check("CarPlay settings".equals(view.title), "unreadable language falls back to English");
         menu.close();
+        useMenuWithWirelessIdCollision();
+        MibrCarPlayMenuModelTest collisionView=new MibrCarPlayMenuModelTest();
+        MibrCarPlayMenuModel collision=new MibrCarPlayMenuModel(collisionView);collision.open();
+        check(collisionView.rows.length==13,"stored page id collision keeps unique Wireless link");
+        collision.select(12);
+        check(collision.wirelessPageOpen()&&collision.group()==-2,"synthetic page identity is distinct from stored page id");
+        collision.back();
         System.out.println("MIBR_CARPLAY_MENU_MODEL_PASS registry=48 visible=" + count + " hidden=" + hidden +
-                           " main_rows=11 native_ui=11");
+                           " main_rows=12 native_ui=11 wireless_id_collision=1");
     }
 }
