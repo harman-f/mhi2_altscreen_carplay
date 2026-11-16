@@ -80,7 +80,7 @@ def audit(path: Path) -> None:
         errors.append("private/community raw source marker found in public HTML")
     if "14 emulator and lab leads" not in data or "25 selected development claims and releases" not in data:
         errors.append("missing annotated community research inventory")
-    if "Host operating system" not in data or "Telegram author / dates" not in data:
+    if "Host operating system" not in data or "Telegram author / date" not in data:
         errors.append("missing emulator host/guest provenance columns")
     for marker in ('<title>MIB Atlas', 'id="mib1-retrofit"', 'data-atlas-filter-table="native"', 'data-atlas-filter-table="emulators"', 'data-atlas-filter-table="ha-tools"', 'data-atlas-filter-table="contitool"', 'data-atlas-filter-table="roadmap"', 'data-atlas-filter-table="misc"', 'data-atlas-filter-table="lineage"', 'id="atlas-theme-toggle"'):
         if marker not in data:
