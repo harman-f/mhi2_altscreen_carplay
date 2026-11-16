@@ -80,6 +80,19 @@ def audit(path: Path) -> None:
         errors.append("private/community raw source marker found in public HTML")
     if "14 emulator and lab leads" not in data or "25 selected development claims and releases" not in data:
         errors.append("missing annotated community research inventory")
+    # Comparison tab: primary comparison must precede the MIB1 context,
+    # detailed source catalog and finally the factory HUD (not a new tab).
+    comparison_order = ('id="matrix"', 'id="mib1-retrofit"', 'id="catalog"', 'id="oem-hud-overview"')
+    offsets = [data.find(item) for item in comparison_order]
+    if any(pos < 0 for pos in offsets) or offsets != sorted(offsets) or len(set(offsets)) != len(offsets):
+        errors.append("comparison section order must be matrix, MIB1, catalog, then OEM HUD")
+    if data.count('data-host-os="') != 14 or data.count('class="atlas-host-tags"') != 14:
+        errors.append("all 14 emulator entries must expose visible host OS badges and filter tokens")
+    if '<select class="atlas-filter-select" data-field="hostOs">' not in data or 'sel.dataset.field==="hostOs"' not in data:
+        errors.append("emulator host OS selector must be wired to multi-host filter handling")
+    for label in ('Windows · WSL', 'Windows · ODIS only', 'macOS', 'Linux', 'OS not stated'):
+        if label not in data:
+            errors.append("missing independently classified host environment: " + label)
     if "Host operating system" not in data or "Telegram author / date" not in data:
         errors.append("missing emulator host/guest provenance columns")
     for marker in ('<title>MIB Atlas', 'id="mib1-retrofit"', 'data-atlas-filter-table="native"', 'data-atlas-filter-table="emulators"', 'data-atlas-filter-table="ha-tools"', 'data-atlas-filter-table="contitool"', 'data-atlas-filter-table="roadmap"', 'data-atlas-filter-table="misc"', 'data-atlas-filter-table="lineage"', 'data-atlas-filter-table="oem-hud"', 'data-atlas-filter-table="aftermarket-hud"', 'id="atlas-theme-toggle"'):
