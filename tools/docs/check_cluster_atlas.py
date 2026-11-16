@@ -82,18 +82,18 @@ def audit(path: Path) -> None:
         errors.append("missing annotated community research inventory")
     if "Host operating system" not in data or "Telegram author / date" not in data:
         errors.append("missing emulator host/guest provenance columns")
-    for marker in ('<title>MIB Atlas', 'id="mib1-retrofit"', 'data-atlas-filter-table="native"', 'data-atlas-filter-table="emulators"', 'data-atlas-filter-table="ha-tools"', 'data-atlas-filter-table="contitool"', 'data-atlas-filter-table="roadmap"', 'data-atlas-filter-table="misc"', 'data-atlas-filter-table="lineage"', 'id="atlas-theme-toggle"'):
+    for marker in ('<title>MIB Atlas', 'id="mib1-retrofit"', 'data-atlas-filter-table="native"', 'data-atlas-filter-table="emulators"', 'data-atlas-filter-table="ha-tools"', 'data-atlas-filter-table="contitool"', 'data-atlas-filter-table="roadmap"', 'data-atlas-filter-table="misc"', 'data-atlas-filter-table="lineage"', 'data-atlas-filter-table="oem-hud"', 'data-atlas-filter-table="aftermarket-hud"', 'id="atlas-theme-toggle"'):
         if marker not in data:
             errors.append("MIB Atlas required feature missing: "+marker)
     for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 16 NOV 2026'):
         if marker not in data:
             errors.append("Missing evidence date boundary: "+marker)
-    # Interaction contract: all seven research matrices have actual search/filter/reset handlers.
-    if data.count('data-atlas-filter-table="') != 7:
-        errors.append("expected exactly seven filterable research matrices")
-    if data.count('class="atlas-filter-search"') != 7:
+    # Interaction contract: all nine research matrices have actual search/filter/reset handlers.
+    if data.count('data-atlas-filter-table="') != 9:
+        errors.append("expected exactly nine filterable research matrices")
+    if data.count('class="atlas-filter-search"') != 9:
         errors.append("every research matrix must have a search control")
-    if data.count('class="atlas-filter-clear"') != 7:
+    if data.count('class="atlas-filter-clear"') != 9:
         errors.append("every research matrix must have an active reset control")
     if "data-atlas-sort" not in data or 'root.querySelectorAll("[data-atlas-sort]")' not in data:
         errors.append("research table sorting must be connected to JavaScript")
@@ -108,13 +108,15 @@ def audit(path: Path) -> None:
         errors.append("raw Markdown emphasis inside public HTML")
     if 'MHI2Q_WiFi_CarPlay' not in data or 'perkthefox/mqb_contitool' not in data:
         errors.append("source-anchored native wireless or ContiTool evidence missing")
+    if 'issues/187' not in data or 'id="oem-hud-overview"' not in data or 'id="aftermarket-hud-overview"' not in data:
+        errors.append("HUD taxonomy or feedback issue missing")
     if 'id="misc-overview"' not in data:
         errors.append("external dongles and HUD must have a separate Misc tab")
     if errors:
         for error in errors:
             print("FAIL:", error, file=sys.stderr)
         raise SystemExit(1)
-    print(f"PASS: {len(parser.rows)} baseline rows × {len(FEATURES)} features, {len(parser.cards)} profiles, {len(TABS)} tabs, seven filterable research matrices, {len(ids)} distinct IDs and {len(parser.fragments)} working internal anchors")
+    print(f"PASS: {len(parser.rows)} baseline rows × {len(FEATURES)} features, {len(parser.cards)} profiles, {len(TABS)} tabs, nine filterable research matrices, {len(ids)} distinct IDs and {len(parser.fragments)} working internal anchors")
 
 if __name__ == "__main__":
     audit(Path(sys.argv[1] if len(sys.argv) > 1 else "docs/index.html"))
