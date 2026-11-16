@@ -10,3 +10,11 @@ Changes:
 - Safe Area editor: masks and edge shell from the measured geometry; new display modes "Foto vom Auto (entzerrt)" and "Foto + Maske".
 - Cockpit preview: checkbox "Foto vom Auto überlagern" (editor only, not stored in the project).
 - The rectified photos are embedded once as JPEG (`AID10_PHOTOS`).
+
+## Online use and working folder (P0.9.10)
+
+- Public copy: `https://harman-f.github.io/mhi2_altscreen_carplay/configurator/` (deployed from the develop tip by `cluster-atlas-pages.yml` on main; `configurator-pages-refresh.yml` re-runs it after each configurator change on develop). Nothing is uploaded: the page runs entirely in the browser.
+- The same single HTML file works offline (save the page or download it from the repo and open it locally).
+- Chrome/Edge: "Arbeitsordner wählen" picks a local folder once. The project is then written automatically to `<folder>/mibr-project.json` after every change and loaded from there on the next start. The browser keeps the folder handle (IndexedDB); depending on the browser it may ask once per session to allow access again ("Arbeitsordner verbinden").
+- Firefox/Safari: no folder access API. The browser backup (localStorage) stays active, "Projekt speichern" downloads `mibr-project.json` (normally into Downloads) and "Projekt laden" imports it again.
+- "Auf SD-Karte exportieren" is unchanged (writes `/mibr-menu/mibr-menu.txt` or offers a ZIP).

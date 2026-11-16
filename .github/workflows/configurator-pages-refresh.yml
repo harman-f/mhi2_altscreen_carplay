@@ -1,0 +1,27 @@
+name: Configurator Pages refresh
+
+# The public site (GitHub Pages) is deployed only from main by
+# cluster-atlas-pages.yml. That workflow publishes the configurator from the
+# current develop tip, so a configurator change on develop just has to
+# re-run it. workflow_dispatch is one of the events GITHUB_TOKEN may trigger.
+on:
+  push:
+    branches: [develop]
+    paths:
+      - tools/menu-editor/mibr-menu-editor-nav-views-mockup.html
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Re-run Pages deployment on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run cluster-atlas-pages.yml --ref main
