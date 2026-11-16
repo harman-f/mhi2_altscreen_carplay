@@ -3,6 +3,7 @@
 **Research status · source review and public comparison; 2026-11-16.** This directory contains dated, independently scoped public-source evidence for the [single-file interactive MIB Atlas](../index.html). Individual project versions, target hardware and proof strength are not interchangeable.
 
 - [MIB Atlas recurring editorial and publication rules](MAINTENANCE_RULES.md)
+- [Primary navigation placement and contrast refinement, 16 Nov](TOP_NAVIGATION_UI_2026-11-16.md) — topic bar directly beneath compact header, above hero; readable active/hover/focus states and mobile sticky behavior.
 - [Comparison-first navigation and emulator host OS UI, 16 Nov](COMPARISON_EMULATOR_OS_UI_2026-11-16.md) — matrix first, MIB1 contextual below, OEM HUD last; Windows/WSL versus Windows-only tools, Linux/macOS and unverified hosts visible and filterable.
 - [Branch-aware 14-fork comparison and expanded lineage audit, 16 Nov](FORK_DIFF_LINEAGE_AUDIT_2026-11-16.md) — 2 default-only dormant forks suppressed from 56 curated rows, contributor PRs and branch offsets preserved; 4 source-family lineage graphs and 38 independently classified edges.
 - [omonob Wireless CarPlay Maps V3.0 release audit, 16 Nov](OMONOB_WIRELESS_V3_2026-11-16.md) — experimental native receiver on MU1102/790/791; MU1440 and other profiles remain wired-only; exact integration and acceptance boundary.

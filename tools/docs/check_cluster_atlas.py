@@ -78,6 +78,20 @@ def audit(path: Path) -> None:
             errors.append("missing section: " + required)
     if any(s in data.lower() for s in ("messages11.html", "messages10.html", "t.me/c/")):
         errors.append("private/community raw source marker found in public HTML")
+    # Topic tabs are the primary navigation and must be above the large hero,
+    # immediately beneath the compact sticky branding/navigation header.
+    nav_start, nav_end = data.find("<nav>"), data.find("</nav>")
+    tabbar = data.find('<div class="atlas-tabs">')
+    hero = data.find('<header id="top">')
+    main_start = data.find("<main>")
+    if not (0 <= nav_start < nav_end < tabbar < hero < main_start):
+        errors.append("topic tab navigation must sit between compact navbar and hero title")
+    if 'position:sticky;top:62px;z-index:79' not in data:
+        errors.append("sticky topic navigation must stack beneath the 62px header")
+    if 'background:linear-gradient(135deg,#176960,#1a8173)' not in data:
+        errors.append("active topic must be visibly highlighted")
+    if 'font-size:14px;font-weight:760' not in data:
+        errors.append("topic labels must retain enlarged visible typography")
     if "14 emulator and lab leads" not in data or "25 selected development claims and releases" not in data:
         errors.append("missing annotated community research inventory")
     # Comparison tab: primary comparison must precede the MIB1 context,
