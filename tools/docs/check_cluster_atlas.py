@@ -108,6 +108,12 @@ def audit(path: Path) -> None:
         errors.append("raw Markdown emphasis inside public HTML")
     if 'MHI2Q_WiFi_CarPlay' not in data or 'perkthefox/mqb_contitool' not in data:
         errors.append("source-anchored native wireless or ContiTool evidence missing")
+    if 'Wireless CarPlay Maps V3.0' not in data or 'data-proof="Experimental release"' not in data:
+        errors.append("omonob V3.0 experimental native wireless entry missing")
+    if 'MU1440 is NOT wireless compatible in V3.0' not in data or 'MU1102 / AID 790 and 791' not in data:
+        errors.append("firmware-specific native wireless compatibility or MU1440 refusal missing")
+    if 'https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/releases/tag/v3.0' not in data:
+        errors.append("V3.0 primary release link missing")
     if 'issues/187' not in data or 'id="oem-hud-overview"' not in data or 'id="aftermarket-hud-overview"' not in data:
         errors.append("HUD taxonomy or feedback issue missing")
     if 'id="misc-overview"' not in data:
