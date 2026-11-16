@@ -1,4 +1,4 @@
-# Atlas structured-matrix release snapshot
+# MIB Atlas structured-matrix release snapshot
 
 **Source snapshot:** 2026-11-16. **Scope:** public source review and user-supplied Telegram leads through 2026-11-15; no physical vehicle tests performed in this Atlas maintenance pass. **Status:** research UI / editorial update only. The page and publication policy are in [`docs/index.html`](../index.html) and [`MAINTENANCE_RULES.md`](MAINTENANCE_RULES.md).
 
@@ -6,6 +6,7 @@
 
 | Inventory | Count | What it means |
 | --- | ---: | --- |
+| MIB1 High/MHIG CarPlay/Android Auto retrofit | **1 source lead** | Telegram developer korho claims USB H.264 acceleration and App-Connect on MIB1 High; no verified public MHIG source or firmware train, no inferred VC stream |
 | Original CarPlay/Android Auto matrix | **58** | 58 existing scored profiles, **22 attributes**; scores based on the **4 November** baseline, not all re-scored on November 16 |
 | GitHub links encountered in Telegram HTML | **92** | Distinct owner/repository links in the provided source cutoff; **not 92 independently qualified implementations** |
 | Public source reachability from dated audit | **57/58** | 56 direct and one moved to canonical `omonob/VW-MHI2-Carplay-Maps`; one historic Tiguan fork source unavailable; dated verification |
@@ -18,6 +19,10 @@
 | Lineage relationships | **18** | 14 GitHub fork parents identified + 4 documented design/code ancestry relationships, separately classified |
 
 **These counts overlap**. Do not sum them into an invented unique-project count.
+
+## MIB1 High (MHIG) retrofit provenance
+
+Telegram messages #18572, #18581, #18597–18599 from 13 Nov by **korho** describe CarPlay/Android Auto App-Connect and USB hardware-accelerated decoding; wireless is future/author-reported, not independently accepted. See [MIB1 retrofit audit](MIB1_MHIG_RETROFIT_2026-11-16.md). The legacy M.I.B. activation script explicitly excludes MHIG and is not this new port. There is no 59th public repo until a confirmed implementation source is found.
 
 ## Current native wireless source boundary
 
