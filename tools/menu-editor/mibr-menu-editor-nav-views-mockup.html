@@ -1897,7 +1897,7 @@ function loadSafeAssist(){
 }
 var safeAssist=loadSafeAssist();
 function saveSafeAssist(){try{localStorage.setItem(SAFE_ASSIST_KEY,JSON.stringify(safeAssist))}catch(e){}}
-function saveSafe(){try{localStorage.setItem(KEYS,JSON.stringify(safe))}catch(e){}window.dispatchEvent(new CustomEvent("mibr:safechange",{detail:{view:safe.view,edges:safe.a[safe.view].slice()}}))}
+function saveSafe(id){id=id||safe.view;try{localStorage.setItem(KEYS,JSON.stringify(safe))}catch(e){}window.dispatchEvent(new CustomEvent("mibr:safechange",{detail:{view:id,edges:(safe.a[id]||SAFE_STD[id]).slice()}}))}
 /* same rule as MibrSafeArea.step: one edge moves, it stops at the limit, the other three stay */
 function safeMove(a,f,wanted){
   var r=a.slice();
@@ -2212,7 +2212,7 @@ $("undo").addEventListener("click",function(){
   if(!hist.length)return;
   var r=deserialize(hist.pop());S=r.st;typing=false;
   if(selected&&!index()[selected])selected=null;
-  applyLang();commit();
+  applyLang();commit();publishContext();
 });
 $("addPage").addEventListener("click",function(){addNew(addTarget(),"page")});
 $("addHint").addEventListener("click",function(){addNew(addTarget(),"hint")});
@@ -2294,7 +2294,7 @@ function loadBytes(bytes){
     par.c.push(it?it.node:mk(f.id));added=true;ix=index();
   }}});
   normalize();selected=null;pvPath=[];pvFocus=null;
-  applyLang();commit();
+  applyLang();commit();publishContext();
   var errs=runChecks().filter(function(c){return c.sev==="err"}).length;
   toast(t("loadOk",r.taken)+(r.skipped?t("loadSkipped",r.skipped):"")+(added?t("loadAdded"):"")+(errs?t("loadIssues"):""),errs?"warn":"");
 }
@@ -2318,7 +2318,7 @@ function applyRemote(text){
   var r;try{r=deserialize(text)}catch(e){return}
   S=r.st;ensureCatalog();
   if(selected&&!index()[selected])selected=null;
-  applyLang();renderHeader();renderTree();
+  applyLang();publishContext();renderHeader();renderTree();
   var a=document.activeElement;if(!(a&&$("panel").contains(a)))renderPanel();
   renderViews();
   window.dispatchEvent(new CustomEvent("mibr:menuchange"));
@@ -2357,7 +2357,7 @@ function connect(){
 /* Interface to the integrated view configurator. Existing browser safe-area settings remain readable. */
 window.MIBR_safe={
   get:function(view){var id=view==="full"?"voll":view;return (safe.a[id]||SAFE_STD[id]).slice()},
-  set:function(view,rect){var id=view==="full"?"voll":view;var a=[rect.x,rect.y,rect.x+rect.w,rect.y+rect.h];if(!safeOk(a))throw Error("Invalid safe area");safe.a[id]=a;saveSafe()},
+  set:function(view,rect){var id=view==="full"?"voll":view;var a=[rect.x,rect.y,rect.x+rect.w,rect.y+rect.h];if(!safeOk(a))throw Error("Invalid safe area");safe.a[id]=a;saveSafe(id)},
   select:function(view,silent){
     var id=view==="full"?"voll":view;
     if(SAFE_IDS.indexOf(id)<0)throw Error("Invalid cockpit view");
