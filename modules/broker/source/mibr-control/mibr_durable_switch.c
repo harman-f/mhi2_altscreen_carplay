@@ -472,7 +472,9 @@ static int profile_initial(const char *path_of_def,const struct mibr_switch_def 
         if(d==self)lp=path_of_def;
         else if(production_path(self,path_of_def))lp=d->path;
         else{snprintf(hostp,sizeof(hostp),"%s.legacy-%s",path_of_def,d->capability);lp=hostp;}
-        if(legacy_load(d,lp,&legacy,err,sizeof(err))){memset(&legacy,0,sizeof(legacy));mibr_switch_default(d,legacy.value,sizeof(legacy.value));}
+        /* only values the user actually stored: an absent key keeps its default and, for safe areas,
+         * the registry viewarea.*.safe.* precedence in GEN2 (a written default would override it) */
+        if(legacy_load(d,lp,&legacy,err,sizeof(err))||!legacy.stored)continue;
         snprintf(v,sizeof(v),"%s",legacy.value);
         if(profile_encode(m,body,n,cap,v))return -1;
     }

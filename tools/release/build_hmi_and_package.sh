@@ -209,6 +209,11 @@ QNX_TARGET="$QNX_TARGET" IAP2_LIB="$IAP2_LIB" CLANG="$CLANG" LLD="$LLD" \
 ffmpeg -hide_banner -loglevel error -y -version >/dev/null
 python3 "$ROOT/modules/navigation/source/tools/make_calib_clip.py" \
   "$NATIVE/bin/navigation/mibr-calib.avcc" "$FFMPEG"
+# selectable test patterns (menu Kalibrierbild); keep in step with CALIB_PATTERNS in build_modular.py
+for pattern in black white contrast motion; do
+  python3 "$ROOT/modules/navigation/source/tools/make_calib_clip.py" \
+    "$NATIVE/bin/navigation/mibr-calib-$pattern.avcc" --pattern "$pattern" "$FFMPEG"
+done
 (cd "$NATIVE" && find bin -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
 (cd "$NATIVE" && sha256sum --check --strict SHA256SUMS >/dev/null) || {
   echo 'NATIVE_OUTPUT_MANIFEST_VERIFY_FAIL' >&2
