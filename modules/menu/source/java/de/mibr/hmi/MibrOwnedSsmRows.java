@@ -103,6 +103,13 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     private void failed(Throwable failure){System.err.println("MIBR_SSM_ROWS_FAILED "+failure);later(leave);}
     public void committed(int index){
         // Native option completion, never focus/pressed.
+        if(attached && index==MibrPopupEditorModel.CALIB_IMAGE){
+            // local RAM marker, no broker: the chosen pattern id is the marker content
+            String wish=drafts.draft(index);drafts.discardDraft(index);
+            if(wish!=null)MibrCalibration.set(wish);
+            changed(); // no broker callback for a local marker: refresh the readback ourselves
+            return;
+        }
         if(attached && v3!=null){
             if(index==MibrPopupEditorModel.EXPERT_MODE){
                 String wish=drafts.draft(index);drafts.discardDraft(index);
@@ -254,7 +261,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         else if(key==MibrPopupEditorModel.CARPLAY_NAV)drafts.readback(key,MibrDurableSwitch.CARPLAY_NAV.revision()!=null?
             MibrDurableSwitch.CARPLAY_NAV.value():MibrDurableSwitch.CARPLAY_NAV.persistedOn()?"on":"off");
         else if(key==MibrPopupEditorModel.NAV_DEMO)drafts.readback(key,MibrRgiCockpit.demoRequested()?"on":"off");
-        else if(key==MibrPopupEditorModel.CALIB_IMAGE)drafts.readback(key,MibrCalibration.on()?"on":"off");
+        else if(key==MibrPopupEditorModel.CALIB_IMAGE)drafts.readback(key,MibrCalibration.get());
         else if(MibrPopupEditorModel.durable(key)!=null){
             MibrDurableSwitch sw=MibrPopupEditorModel.durable(key);
             String stored=sw.revision()!=null?sw.value():sw.persistedValue();
@@ -342,14 +349,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
                         if(v3!=null)v3.menuLoad();
                         return;
                     }
-                    if(key==MibrPopupEditorModel.CALIB_IMAGE){
-                        if(drafts.toggle(key)){
-                            String wish=drafts.draft(key);drafts.discardDraft(key);
-                            MibrCalibration.set("on".equals(wish));
-                            menu.refresh();
-                        }
-                    }
-                    else if(key==MibrPopupEditorModel.NAV_DEMO){
+                    if(key==MibrPopupEditorModel.NAV_DEMO){
                         if(drafts.toggle(key)){
                             String wish=drafts.draft(key);drafts.discardDraft(key);
                             MibrRgiCockpit.requestDemo("on".equals(wish));

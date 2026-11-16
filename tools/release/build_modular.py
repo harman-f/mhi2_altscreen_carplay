@@ -106,6 +106,7 @@ def rename_native(name):
 
 # (package path, [native candidates relative to --native-dir], payload targets)
 N = "bin/"
+CALIB_PATTERNS = ("black", "white", "contrast", "motion")  # grid is mibr-calib.avcc
 NATIVE = [
     ("common/carplay/bin/libaltscreen111.so",
      [N + "gen2/libaltscreen111.so", N + "mu1440-source/libaltscreen111.so"],
@@ -138,6 +139,9 @@ NATIVE = [
     # calibration clip read by GEN2 from $APP/bin (navigation/source/tools/make_calib_clip.py output)
     ("common/navigation/assets/mibr-calib.avcc", [N + "navigation/mibr-calib.avcc"],
      [APP + "/bin/mibr-calib.avcc"]),
+    # selectable test patterns (make_calib_clip.py --pattern <id>)
+] + [("common/navigation/assets/mibr-calib-%s.avcc" % pid, [N + "navigation/mibr-calib-%s.avcc" % pid],
+      [APP + "/bin/mibr-calib-%s.avcc" % pid]) for pid in CALIB_PATTERNS] + [
     # host-side helpers used by the installer before anything is deployed
     # also installed: the runtime (carplay/auto-direct common.sh) runs $BASE/bin/sha256sum and tee
     ("common/bin/sha256sum", [N + "support-tools/sha256sum"], [APP + "/bin/sha256sum"]),
@@ -701,8 +705,8 @@ def fake_native(base):
         p = base / ("bin/mu1440-source/mibr-control/%s%s" % (n, BUILD_SUFFIX))
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(b"\x7fELF" + n.encode())
-    clip = base / "bin/navigation/mibr-calib.avcc"
-    clip.write_bytes(b"\x00\x00\x00\x04synthetic-avcc")
+    for nm in ["mibr-calib.avcc"] + ["mibr-calib-%s.avcc" % pid for pid in CALIB_PATTERNS]:
+        (base / "bin/navigation" / nm).write_bytes(b"\x00\x00\x00\x04synthetic-avcc")
     (base / "SOURCE_COMMIT.txt").write_text("0123456789abcdef0123456789abcdef01234567\n")
     (base / "COMPILER.txt").write_text("synthetic-gcc 0.0\n")
     (base / "IMAGE_SOURCE.txt").write_text("IMAGE_SOURCE=synthetic\n")

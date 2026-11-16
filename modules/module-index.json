@@ -110,7 +110,11 @@
       "outputs": [
         "libmibr_rgi_ipod.so",
         "mibr-rgi",
-        "mibr-calib.avcc"
+        "mibr-calib.avcc",
+        "mibr-calib-black.avcc",
+        "mibr-calib-white.avcc",
+        "mibr-calib-contrast.avcc",
+        "mibr-calib-motion.avcc"
       ],
       "build_coverage": "target-specific-incomplete",
       "evidence": "docs/build/MU1440_MENU_RGI_SOURCE.md"

@@ -20,6 +20,7 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/java/de/mibr/hmi/MibrElementEngine.java" \
   "$MODULE/java/de/mibr/hmi/MibrCanonicalElementMenu.java" \
   "$MODULE/java/de/mibr/hmi/MibrDurableSwitch.java" \
+  "$MODULE/java/de/mibr/hmi/MibrViewProfile.java" \
   "$MODULE/java/de/mibr/hmi/MibrPlatformDefaults.java" \
   "$MODULE/java/de/mibr/hmi/MibrSafeArea.java" \
   "$MODULE/java/de/mibr/hmi/MibrScalingState.java" \
@@ -29,6 +30,7 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/java/de/mibr/hmi/MibrMenuFunctions.java" \
   "$MODULE/java/de/mibr/hmi/MibrMenuLayout.java" \
   "$MODULE/java/de/mibr/hmi/MibrExpert.java" \
+  "$MODULE/java/de/mibr/hmi/MibrCalibration.java" \
   "$MODULE/java/de/mibr/hmi/MibrDraftChoiceModel.java" \
   "$MODULE/java/de/mibr/hmi/MibrPopupEditorModel.java" \
   "$MODULE/java/de/mibr/hmi/MibrVdataDiag.java" \

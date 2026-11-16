@@ -36,9 +36,13 @@ CHECKS = {
         "memcmp(raw,want,n)", "same(&now,observed)",
         "guard->enter_rw(guard->context)", "guard->restore_ro(guard->context)",
         "create_file(stage,buf,(size_t)n)||rename(stage,path)",
-        "fsync(fd)", "sync_dir(path)", "mibr_switch_load(def,path,&confirm",
+        "fsync(fd)", "sync_dir(path)", "legacy_load(def,path,&confirm",
         "UNKNOWN_COMMIT", "STALE_REVISION",
         "fopen(mibr_switch_platform_path,",
+        # nav/safe-area switches in the shared view profile (same CAS, guard, stage+rename)
+        "PROFILE_MAGIC \"MIBR_NAV_VIEW_PROFILES/3\"", "profile_check(body,raw_n,&len)",
+        "create_file(stage,body,n)||rename(stage,ppath)", "sync_dir(ppath)",
+        "profile_load(def,m,path,&confirm",
     ),
     JAVA: (
         "new FileInputStream(f)", "persistedValue()",

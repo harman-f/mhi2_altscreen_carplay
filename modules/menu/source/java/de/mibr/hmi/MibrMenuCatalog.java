@@ -94,7 +94,7 @@ final class MibrMenuCatalog {
   "list",
   "list",
   "list",
-  "toggle",
+  "list",
   "page",
   "number",
   "number",

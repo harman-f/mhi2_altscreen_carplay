@@ -1322,6 +1322,18 @@
       }
     },
     {
+      "id": "cockpit.view_profiles",
+      "current_path": "/mnt/app/root/mibr/config/cockpit/view-profiles.conf",
+      "target_path": "/mnt/app/root/mibr/config/cockpit/view-profiles.conf",
+      "format": "keyvalue",
+      "writer": "broker",
+      "evidence": {
+        "writer": "source",
+        "format": "source",
+        "ref": "modules/broker/source/mibr-control/mibr_durable_switch.c profile_set (nav + safe-area switches, MIBR_NAV_VIEW_PROFILES/3 shared with the HTML configurator)"
+      }
+    },
+    {
       "id": "broker.sd_log",
       "current_path": "/mnt/app/root/altscreen-u2/config/mibr-sd-log.conf",
       "target_path": "/mnt/app/root/mibr/config/features/sd-log.conf",

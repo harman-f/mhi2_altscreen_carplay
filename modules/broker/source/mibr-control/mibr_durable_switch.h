@@ -33,4 +33,15 @@ void mibr_switch_default(const struct mibr_switch_def *,char *,size_t);
 int mibr_switch_load(const struct mibr_switch_def *,const char *,struct mibr_switch *,char *,size_t);
 int mibr_switch_set(const struct mibr_switch_def *,const char *,const struct mibr_switch *,
  const char *,uint64_t,const struct mibr_switch_guard *,char *,size_t);
+/* navigation and safe-area switches are stored in the shared view profile
+ * (MIBR_NAV_VIEW_PROFILES/3, also written by the HTML configurator). Same verbs/values as before. */
+extern const char *mibr_view_profile_path;
+int mibr_switch_profile_backed(const struct mibr_switch_def *);
+uint32_t mibr_view_profile_crc32(const char *,size_t);
+/* Profile-only keys (no legacy file): view.<wide|full|center>.geometry.zoom, global.transition.*.
+ * values "#min..max" = canonical decimal range. Served by VIEW_PROFILE_GET/SET key=<profile key>. */
+#define MIBR_VIEW_KEY_COUNT 7u
+extern const struct mibr_switch_def mibr_view_key_defs[MIBR_VIEW_KEY_COUNT];
+const struct mibr_switch_def *mibr_view_key_for(const char *profile_key);
+const char *mibr_view_key_name(const struct mibr_switch_def *);
 #endif
