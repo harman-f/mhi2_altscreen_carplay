@@ -30,6 +30,7 @@ Telegram messages #18572, #18581, #18597–18599 from 13 Nov by **korho** descri
 - [joeyQuery classic MHI2](https://github.com/joeyQuery/MHI2-wirelessCarPlay): MU0678-class Bluetooth iAP2/uap0/AirPlay reverse engineering; **no end-to-end native wireless session**.
 - [congobg MHI2Q_WiFi_CarPlay](https://github.com/congobg/MHI2Q_WiFi_CarPlay): author public installation README claims native wireless for exact Audi software **3638/MU0917**, but no tagged GitHub release or independent physical acceptance was seen in this source pass.
 - [omonob wired maps / wireless announcement](https://github.com/omonob/VW-MHI2-Carplay-Maps): MHI2/MST2 no-dongle direction announced in Telegram messages #18401, #18720 and #18728; currently published 2.0.1/2.1-rc.7 wireless menu option **not a native receiver release**.
+  - **Same-day follow-up (16 Nov, 10:19 CET):** [V3.0 experimental prerelease](https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/releases/tag/v3.0) now packages a **native receiver for MU1102/790/791 only**, superseding the earlier announced-only status. Škoda MU1440/MU1433, VW MU1367, SEAT MU1447 remain **wired-only**; full V3.0 vehicle acceptance not demonstrated. See [dated release audit](OMONOB_WIRELESS_V3_2026-11-16.md). Original announcement and 58×22 score dates are preserved.
 - [HARMAN-F classic MHI2](https://github.com/harman-f/mhi2_altscreen_carplay): Škoda MU1440 native BT/WLAN bootstrap proof incomplete; no accepted full session. Independent external AX1800M dongle work is under Miscellaneous.
 
 ## Dongle / HUD routing
