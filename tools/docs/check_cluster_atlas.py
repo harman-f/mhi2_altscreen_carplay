@@ -78,14 +78,24 @@ def audit(path: Path) -> None:
             errors.append("missing section: " + required)
     if any(s in data.lower() for s in ("messages11.html", "messages10.html", "t.me/c/")):
         errors.append("private/community raw source marker found in public HTML")
-    # Topic tabs are the primary navigation and must be above the large hero,
-    # immediately beneath the compact sticky branding/navigation header.
+    # Primary navigation stays globally visible, but the overview hero and
+    # its four statistics must be scoped to the Overview panel only.
     nav_start, nav_end = data.find("<nav>"), data.find("</nav>")
     tabbar = data.find('<div class="atlas-tabs">')
-    hero = data.find('<header id="top">')
     main_start = data.find("<main>")
-    if not (0 <= nav_start < nav_end < tabbar < hero < main_start):
-        errors.append("topic tab navigation must sit between compact navbar and hero title")
+    overview_start = data.find('<div class="atlas-tab-pane" data-atlas-tab="overview" id="atlas-panel-overview">')
+    hero = data.find('<header id="top">')
+    overview_contents = data.find('<section id="atlas-introduction"')
+    comparison_start = data.find('<div class="atlas-tab-pane" data-atlas-tab="comparison"')
+    if not (0 <= nav_start < nav_end < tabbar < main_start < overview_start < hero < overview_contents < comparison_start):
+        errors.append("global tabs then Overview-only hero/stats before Overview content is required")
+    overview_html = data[overview_start:comparison_start] if overview_start >= 0 and comparison_start > overview_start else ""
+    if data.count('<header id="top">') != 1 or data.count('class="stats"') != 1 or overview_html.count('class="atlas-feedback-banner"') != 1:
+        errors.append("one hero/stats grid and one overview-scoped feedback banner are required")
+    # The separate lineage binary/provenance notice legitimately reuses the
+    # feedback-banner visual style; it is not a duplicate overview hero.
+    if 'nav .brand{font-size:16px!important' not in data:
+        errors.append("compact MIB Atlas brand must remain at enlarged 16px")
     if 'position:sticky;top:62px;z-index:79' not in data:
         errors.append("sticky topic navigation must stack beneath the 62px header")
     if 'background:linear-gradient(135deg,#176960,#1a8173)' not in data:
