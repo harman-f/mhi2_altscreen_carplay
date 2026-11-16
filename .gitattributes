@@ -16,4 +16,6 @@
 *.diff text eol=lf
 *.md whitespace=-blank-at-eol
 tools/source-overlays/*.diff whitespace=-blank-at-eol
+# MIBR_MENU/1 uses trailing tab-separated empty title fields.
+tools/menu-editor/standard-menu.txt whitespace=-blank-at-eol
 *.png binary

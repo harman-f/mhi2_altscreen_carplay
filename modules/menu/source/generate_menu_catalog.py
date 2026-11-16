@@ -45,7 +45,7 @@ def standard_file(catalog):
 def basic_file(catalog):
     """The fallback inside the JAR: only what it takes to load a menu."""
     lines = ["MIBR_MENU/1", "catalog=%d" % catalog["catalog"], "brand=skoda", "name=Basic"]
-    lines += ["version\troot\t-\t\t", "advanced\troot\t-\t\t", "menu.load\tadvanced\t-\t\t"]
+    lines += ["version\troot\t-\t\t", "advanced\troot\t-\t\t", "menu.load\tadvanced\t-\t\t", "wireless.control\troot\t-\t\t"]
     body = "\n".join(lines) + "\n"
     return body + "crc32=%08x\n" % (zlib.crc32(body.encode("utf-8")) & 0xffffffff)
 

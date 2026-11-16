@@ -41,12 +41,12 @@ public final class MibrMenuLayoutTest implements MibrCarPlayMenuModel.View {
         check("cbf43926".equals(MibrMenuLayout.crc32(known,known.length)),"CRC-32 check value");
         byte[] standard=read(System.getProperty("mibr.menu.standard"));
         MibrMenuLayout s=MibrMenuLayout.parse(standard);
-        check(s.skipped==0&&s.root.children.size()==11,"standard menu");
+        check(s.skipped==0&&s.root.children.size()==12,"standard menu");
         check(child(child(s.root,"views"),"calib.image").key==MibrPopupEditorModel.CALIB_IMAGE,"calibration picture in Ansichten");
         check(child(s.root,"version")!=null&&child(child(s.root,"advanced"),"menu.load")!=null,"version on top, menu load in advanced");
         check(!child(child(s.root,"advanced"),"expert.mode").expert,"expert mode row is always visible");
         MibrMenuLayout b=MibrMenuLayout.parse(MibrMenuCatalog.BASIC.getBytes("UTF-8"));
-        check(b.root.children.size()==2&&child(b.root,"version")!=null&&child(b.root,"advanced").children.size()==1&&child(child(b.root,"advanced"),"menu.load")!=null,"basic menu holds only version and menu load");
+        check(b.root.children.size()==3&&child(b.root,"version")!=null&&child(b.root,"advanced").children.size()==1&&child(child(b.root,"advanced"),"menu.load")!=null,"basic menu holds version, menu load and wireless");
 
         /* every catalog function has a row in this build */
         for(int i=0;i<MibrMenuCatalog.IDS.length;i++){
@@ -100,6 +100,14 @@ public final class MibrMenuLayoutTest implements MibrCarPlayMenuModel.View {
         MibrMenuLayout newer=MibrMenuLayout.parse(file("advanced\troot\t-\t\t\n",1));
         check(child(child(newer.root,"advanced"),"calib.image")!=null,"new function appended");
 
+        check(child(newer.root,"wireless.control")!=null,"old layout gets root wireless entry");
+        MibrMenuLayout hidden=MibrMenuLayout.parse(file("advanced\troot\t-\t\t\n",3));
+        check(child(hidden.root,"wireless.control")==null,"current layout can omit wireless");
+        MibrMenuLayout moved=MibrMenuLayout.parse(file("page.wireless\troot\t-\tCustom\tCustom\nwireless.control\tpage.wireless\tx\tOwn\tOwn\n",3));
+        MibrMenuLayout.Node w=child(child(moved.root,"page.wireless"),"wireless.control");
+        check(w!=null&&w.kind==MibrMenuLayout.WIRELESS&&w.expert&&"Own".equals(w.title())&&moved.page(w.number)==w,"wireless can be moved, renamed and expert-only without colliding with a custom page");
+        check("PARENT".equals(refused(file("wireless.control\troot\t-\t\t\nnav_side\twireless.control\t-\t\t\n",3))),"wireless page takes no children");
+
         /* calibration marker */
         java.io.File marker=java.io.File.createTempFile("mibr-calib",".enabled");
         marker.delete();
@@ -130,7 +138,7 @@ public final class MibrMenuLayoutTest implements MibrCarPlayMenuModel.View {
         MibrMenuLayoutTest view=new MibrMenuLayoutTest();
         MibrCarPlayMenuModel menu=new MibrCarPlayMenuModel(view);
         menu.open();
-        check(view.rows.length==3&&view.rows[0].indexOf("Kein Menü gespeichert")>=0&&menu.noteRow(0)&&"Version".equals(view.rows[1]),"basic menu with a note");
+        check(view.rows.length==4&&view.rows[0].indexOf("Kein Menü gespeichert")>=0&&menu.noteRow(0)&&"Version".equals(view.rows[1]),"basic menu with a note");
         menu.select(2);
         check(view.rows.length==1&&"Menü laden: Grundmenü".equals(view.rows[0])&&menu.loadRow(0),"only menu load");
         menu.back();
@@ -139,13 +147,14 @@ public final class MibrMenuLayoutTest implements MibrCarPlayMenuModel.View {
         write(stored,"damaged\n".getBytes("US-ASCII"));
         MibrMenuLayout.loaded();
         menu.open();
-        check(view.rows[0].indexOf("Menüdatei defekt (CHECKSUM)")>=0,"damage is named");
+        check((view.rows[0]+view.rows[1]).indexOf("Menüdatei defekt (CHECKSUM)")>=0,"damage is named");
 
         /* a stored file with expert entries: the switch comes along, the entries follow it */
         write(stored,file("advanced\troot\t-\t\t\nnav_lanes\tadvanced\tx\t\t\nmenu.load\tadvanced\t-\t\t\nversion\troot\t-\t\t\n",2));
         MibrMenuLayout.forget();
+        menu=new MibrCarPlayMenuModel(view);
         menu.open();
-        check(view.rows.length==2&&"Erweitert".equals(view.rows[0]),"no note with a good file");
+        check(view.rows.length==3&&"Erweitert".equals(view.rows[0]),"no note with a good file");
         menu.select(0);
         check(view.rows.length==2&&"Expertenmodus".equals(view.rows[1])&&menu.keyForRow(1)==MibrPopupEditorModel.EXPERT_MODE,"expert entry hidden");
         check(view.rows[0].equals("Menü laden: aus Datei"),"status from file");

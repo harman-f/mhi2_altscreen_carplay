@@ -1,6 +1,6 @@
 {
 "schema": "mibr-menu-catalog/1",
-"catalog": 2,
+"catalog": 3,
 "kinds": {
 "page": {
 "de": "Seite: öffnet eine Unterebene",
@@ -627,6 +627,16 @@
 "en": "Version",
 "desc_de": "Installierte Versionen. Kann nicht entfernt werden.",
 "desc_en": "Installed versions. Cannot be removed."
+},
+{
+"id": "wireless.control",
+"parent": "root",
+"kind": "fixedpage",
+"since": 3,
+"de": "Wireless CarPlay",
+"en": "Wireless CarPlay",
+"desc_de": "Wireless-Status und Anfragen; ohne nativen Adapter nicht verfügbar.",
+"desc_en": "Wireless status and requests; unavailable without a native adapter."
 }
 ]
 }

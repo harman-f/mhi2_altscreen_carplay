@@ -236,7 +236,7 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 </div>
 <script type="application/json" id="catalogData">{
 "schema": "mibr-menu-catalog/1",
-"catalog": 2,
+"catalog": 3,
 "kinds": {
 "page": {
 "de": "Seite: öffnet eine Unterebene",
@@ -863,6 +863,16 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 "en": "Version",
 "desc_de": "Installierte Versionen. Kann nicht entfernt werden.",
 "desc_en": "Installed versions. Cannot be removed."
+},
+{
+"id": "wireless.control",
+"parent": "root",
+"kind": "fixedpage",
+"since": 3,
+"de": "Wireless CarPlay",
+"en": "Wireless CarPlay",
+"desc_de": "Wireless-Status und Anfragen; ohne nativen Adapter nicht verfügbar.",
+"desc_en": "Wireless status and requests; unavailable without a native adapter."
 }
 ]
 }</script>
@@ -1074,7 +1084,7 @@ function setBrandFuncs(b){
 }
 var S=null;      // {brand,name,rootDe,rootEn,tree:{id:"root",c:[]},unused:{id:"@unused",c:[]}}
 function mk(id){var n={id:id,de:"",en:"",x:false,note:""};var d=C[id];if(kindOf(n)==="page")n.c=[];return n}
-function kindOf(n){if(n.id==="root"||n.id==="@unused")return"page";var d=C[n.id];if(d)return d.kind;if(/^page\.\d+$/.test(n.id))return"page";return"hint"}
+function kindOf(n){if(n.id==="root"||n.id==="@unused")return"page";var d=C[n.id];if(d)return d.kind;if(/^page\.[A-Za-z0-9_.]+$/.test(n.id))return"page";return"hint"}
 function isPageK(n){return kindOf(n)==="page"}
 function isNewN(n){return!C[n.id]}
 function stdTitle(n,l){if(n.id==="root")return ROOTSTD[l];if(n.id==="@unused")return t("sammler");var d=C[n.id];return d?d[l]:""}
@@ -1238,7 +1248,7 @@ function parseMenuFile(buf){
     if(!/^[A-Za-z0-9_.]+$/.test(id)||id==="root")return fail(t("e_id",no,id));
     if(byId[id]||skippedIds[id])return fail(t("e_dupe",no,id));
     if(fl!=="-"&&fl!=="x")return fail(t("e_flag",no,fl));
-    var known=!!C[id]||/^page\.\d+$/.test(id)||/^hint\.\d+$/.test(id);
+    var known=!!C[id]||/^page\.[A-Za-z0-9_.]+$/.test(id)||/^hint\.[A-Za-z0-9_.]+$/.test(id);
     var parentNode;
     if(par==="root")parentNode=st.tree;
     else if(byId[par])parentNode=byId[par];
@@ -1253,6 +1263,7 @@ function parseMenuFile(buf){
   var placed={};
   FUNCS.forEach(function(fn){
     if(byId[fn.id])return;
+    if(fn.id==="wireless.control" && fcat<3){st.tree.c.push(mk(fn.id));return}
     var n=mk(fn.id);placed[fn.id]=n;
     var pn=placed[fn.parent];
     if(pn&&pn.c)pn.c.push(n);else st.unused.c.push(n);

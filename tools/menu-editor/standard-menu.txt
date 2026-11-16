@@ -1,5 +1,5 @@
 MIBR_MENU/1
-catalog=2
+catalog=3
 brand=skoda
 name=Standard
 viewarea.selected	root	-		
@@ -66,4 +66,5 @@ scaling.main.physicalSize	scaling	-
 scaling.hint	scaling	-		
 diagnostics	advanced	-		
 version	root	-		
-crc32=52d2ec2f
+wireless.control	root	-		
+crc32=95e92d47

@@ -250,7 +250,7 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         menu.select(11);
         check(view.screen==MibrCarPlayMenuModel.ITEMS && "Wireless CarPlay".equals(view.title) && view.rows.length==5,
               "wireless page is part of the current native menu");
-        check(menu.group()==-2 && menu.keyForRow(0)==-1 && menu.keyForRow(1)==-1 && menu.wirelessStatusRow(0),
+        check(menu.group()>=0 && menu.keyForRow(0)==-1 && menu.keyForRow(1)==-1 && menu.wirelessStatusRow(0),
               "wireless rows are virtual controls outside the settings registry");
         check(menu.wirelessActionForRow(1)==MibrWirelessSession.REQUEST_TOGGLE &&
               menu.wirelessActionForRow(2)==MibrWirelessSession.REQUEST_PAIRING &&
@@ -302,7 +302,9 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         MibrCarPlayMenuModel collision=new MibrCarPlayMenuModel(collisionView);collision.open();
         check(collisionView.rows.length==13,"stored page id collision keeps unique Wireless link");
         collision.select(12);
-        check(collision.wirelessPageOpen()&&collision.group()==-2,"synthetic page identity is distinct from stored page id");
+        check(!collision.wirelessPageOpen(),"custom page is distinct from wireless catalog entry");
+        collision.back(); collision.select(11);
+        check(collision.wirelessPageOpen(),"wireless catalog entry survives custom page id collision");
         collision.back();
         System.out.println("MIBR_CARPLAY_MENU_MODEL_PASS registry=48 visible=" + count + " hidden=" + hidden +
                            " main_rows=12 native_ui=11 wireless_id_collision=1");

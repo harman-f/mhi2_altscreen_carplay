@@ -16,7 +16,7 @@ final class MibrMenuLayout {
     static String storedPath=STORED;
     static final String SD_FILE="/net/mmx/fs/sda0/mibr-menu/mibr-menu.txt";
     static final int MAX_BYTES=16384,MAX_DEPTH=5,MAX_TITLE=60;
-    static final int PAGE=0,KEY=1,DIAGNOSTICS=2,VERSION=3,NOTE=4,LOAD=5;
+    static final int PAGE=0,KEY=1,DIAGNOSTICS=2,VERSION=3,NOTE=4,LOAD=5,WIRELESS=6;
 
     static final class Node {
         final String id;
@@ -29,7 +29,7 @@ final class MibrMenuLayout {
             this.id=id;this.kind=kind;this.key=key;this.number=number;this.expert=expert;this.parent=parent;this.de=de;this.en=en;
         }
         String title(){return MibrI18n.pick(de,en);}
-        boolean opens(){return kind==PAGE||kind==DIAGNOSTICS||kind==VERSION;}
+        boolean opens(){return kind==PAGE||kind==DIAGNOSTICS||kind==VERSION||kind==WIRELESS;}
     }
 
     final Node root;
@@ -106,13 +106,13 @@ final class MibrMenuLayout {
     }
     private static int kindOf(String catalogKind,String id){
         if("page".equals(catalogKind))return PAGE;
-        if("fixedpage".equals(catalogKind))return "version".equals(id)?VERSION:DIAGNOSTICS;
+        if("fixedpage".equals(catalogKind))return "version".equals(id)?VERSION:("wireless.control".equals(id)?WIRELESS:DIAGNOSTICS);
         if("hint".equals(catalogKind))return NOTE;
         if("action".equals(catalogKind))return LOAD;
         return KEY;
     }
     private Node node(String id,int kind,int key,boolean expert,Node parent,String de,String en){
-        Node n=new Node(id,kind,key,kind==PAGE||kind==DIAGNOSTICS||kind==VERSION?pages.size():-1,expert,parent,de,en);
+        Node n=new Node(id,kind,key,kind==PAGE||kind==DIAGNOSTICS||kind==VERSION||kind==WIRELESS?pages.size():-1,expert,parent,de,en);
         if(n.number>=0)pages.addElement(n);
         if(expert)anyExpert=true;
         parent.children.addElement(n);
@@ -178,7 +178,7 @@ final class MibrMenuLayout {
         /* functions newer than the file */
         for(int c=0;c<MibrMenuCatalog.IDS.length;c++){
             if(MibrMenuCatalog.SINCE[c]<=fileCatalog||byId.get(MibrMenuCatalog.IDS[c])!=null)continue;
-            byId.put(MibrMenuCatalog.IDS[c],catalogNode(c,false,fallback,"",""));
+            byId.put(MibrMenuCatalog.IDS[c],catalogNode(c,false,"wireless.control".equals(MibrMenuCatalog.IDS[c])?root:fallback,"",""));
         }
         /* expert entries need their switch */
         if(anyExpert)ensure(byId,"expert.mode",fallback);

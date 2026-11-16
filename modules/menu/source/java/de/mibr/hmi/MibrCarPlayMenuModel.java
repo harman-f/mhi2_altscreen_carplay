@@ -25,8 +25,6 @@ public final class MibrCarPlayMenuModel {
     private int screen = HOME;
     private int selected = -1;
     private MibrWirelessSession wireless;
-    private MibrMenuLayout.Node wirelessNode;
-    private static final int WIRELESS_GROUP=-2;
 
     public MibrCarPlayMenuModel(View view) {
         if (view == null) throw new IllegalArgumentException("view");
@@ -37,7 +35,6 @@ public final class MibrCarPlayMenuModel {
         layoutGeneration = MibrMenuLayout.generation();
         layout = MibrMenuLayout.current();
         page = layout.root;
-        wirelessNode=createWirelessNode(layout.root);
     }
 
     /** Immutable UI state. Never carries a backend value or guessed readback.
@@ -51,7 +48,7 @@ public final class MibrCarPlayMenuModel {
     }
     public Snapshot snapshot(){return new Snapshot(screen,group(),selected,layoutGeneration);}
     public void setWirelessSession(MibrWirelessSession session){wireless=session;}
-    public boolean wirelessPageOpen(){return screen==ITEMS && page==wirelessNode;}
+    public boolean wirelessPageOpen(){return screen==ITEMS && page.kind==MibrMenuLayout.WIRELESS;}
     /** Action row index within the private Wireless page, or -1 for read-only rows. */
     public int wirelessActionForRow(int row){
         if(!wirelessPageOpen()||row<1||row>4)return -1;
@@ -65,10 +62,6 @@ public final class MibrCarPlayMenuModel {
             throw new IllegalArgumentException("MENU_SNAPSHOT_INVALID");
         /* taken from an earlier menu file: its page numbers mean nothing now */
         if(s.generation!=layoutGeneration){open();return;}
-        if(s.group==WIRELESS_GROUP){
-            if(s.screen!=ITEMS||s.selected!=-1)throw new IllegalArgumentException("MENU_WIRELESS_SNAPSHOT");
-            page=wirelessNode;screen=ITEMS;selected=-1;render();return;
-        }
         MibrMenuLayout.Node target=layout.page(s.group);
         if(target==null)throw new IllegalArgumentException("MENU_GROUP_SNAPSHOT");
         if(s.screen==CATEGORIES){
@@ -183,21 +176,8 @@ public final class MibrCarPlayMenuModel {
             MibrMenuLayout.Node n=(MibrMenuLayout.Node)page.children.elementAt(i);
             if(expert||!n.expert)out.addElement(n);
         }
-        if(page==layout.root)out.addElement(wirelessNode);
         nodes=new MibrMenuLayout.Node[out.size()];
         out.copyInto(nodes);
-    }
-
-    private static MibrMenuLayout.Node createWirelessNode(MibrMenuLayout.Node parent){
-        String id="page.wireless";
-        int suffix=0;
-        while(hasChild(parent,id))id="page.wireless.mibr"+(++suffix);
-        String title=MibrI18n.pick("Wireless CarPlay","Wireless CarPlay");
-        return new MibrMenuLayout.Node(id,MibrMenuLayout.PAGE,-1,WIRELESS_GROUP,false,parent,title,title);
-    }
-    private static boolean hasChild(MibrMenuLayout.Node parent,String id){
-        for(int i=0;i<parent.children.size();i++)if(id.equals(((MibrMenuLayout.Node)parent.children.elementAt(i)).id))return true;
-        return false;
     }
 
     private void render() {
