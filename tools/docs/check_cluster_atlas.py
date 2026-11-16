@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Validate the public, self-contained Cluster Atlas; no third-party dependencies."""
+"""Validate the public, self-contained MIB Atlas; no third-party dependencies."""
 from html.parser import HTMLParser
 from pathlib import Path
 import sys
 
-TABS = ("overview", "comparison", "wireless", "emulators", "integrations", "perk", "roadmap", "research")
+TABS = ("overview", "comparison", "wireless", "emulators", "integrations", "perk", "roadmap", "misc", "research")
 FEATURES = ("cpmap", "aamap", "mirror", "card", "rgi", "arrows", "lanes", "hud", "handoff", "cover", "media", "progress", "calls", "spatial", "zoom", "views", "siri", "touchpad", "vehicle", "wireless", "recovery", "installer")
 
 class AtlasParser(HTMLParser):
@@ -82,6 +82,12 @@ def audit(path: Path) -> None:
         errors.append("missing annotated community research inventory")
     if "Host operating system" not in data or "Telegram author / dates" not in data:
         errors.append("missing emulator host/guest provenance columns")
+    for marker in ('<title>MIB Atlas', 'id="mib1-retrofit"', 'data-atlas-filter-table="native"', 'data-atlas-filter-table="emulators"', 'data-atlas-filter-table="ha-tools"', 'data-atlas-filter-table="contitool"', 'data-atlas-filter-table="roadmap"', 'data-atlas-filter-table="misc"', 'data-atlas-filter-table="lineage"', 'id="atlas-theme-toggle"'):
+        if marker not in data:
+            errors.append("MIB Atlas required feature missing: "+marker)
+    for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 16 NOV 2026'):
+        if marker not in data:
+            errors.append("Missing evidence date boundary: "+marker)
     if errors:
         for error in errors:
             print("FAIL:", error, file=sys.stderr)
