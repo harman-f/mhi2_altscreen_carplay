@@ -2,7 +2,8 @@
 
 **Research status · source review and public comparison; 2026-11-16.** This directory contains dated, independently scoped public-source evidence for the [single-file interactive MIB Atlas](../index.html). Individual project versions, target hardware and proof strength are not interchangeable.
 
-- [MIB Atlas recurring editorial and publication rules](MAINTENANCE_RULES.md) — canonical update contract, source status, platforms, evidence, tabs, matrices, themes, publication gates.
+- [MIB Atlas recurring editorial and publication rules](MAINTENANCE_RULES.md)
+- [Nine-tab structured matrix snapshot (16 Nov)](STRUCTURED_MATRIX_SNAPSHOT_2026-11-16.md) — native wireless receiver vs dongle routes; non-additive inventory counts, fork/HA/ContiTool evidence, future QA gates. — canonical update contract, source status, platforms, evidence, tabs, matrices, themes, publication gates.
 - [MIB1 High / MHIG CarPlay and Android Auto retrofit source audit](MIB1_MHIG_RETROFIT_2026-11-16.md) — korho's Telegram 13 Nov reported hardware-decode test; no public standalone repo or exact firmware coverage verified.
 - [Wireless CarPlay / Android Auto survey](WIRELESS_CARPLAY_SURVEY_2026-11-16.md) — native headunit receiver, wireless dongle type-111 relay, Android Auto decoder and hardware-specific caveats.
 - [MHI2/MHI2Q emulators and Home Assistant discovery](EMULATORS_HOME_ASSISTANT_DISCOVERY_2026-11-16.md) — full QNX QEMU vs CarPlay test harness vs HMI mockup, HA Companion and vehicle telematics.
