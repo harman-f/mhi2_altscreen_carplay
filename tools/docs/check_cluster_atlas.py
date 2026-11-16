@@ -145,12 +145,18 @@ def audit(path: Path) -> None:
         errors.append("raw Markdown emphasis inside public HTML")
     if 'MHI2Q_WiFi_CarPlay' not in data or 'perkthefox/mqb_contitool' not in data:
         errors.append("source-anchored native wireless or ContiTool evidence missing")
-    if 'Wireless CarPlay Maps V3.0' not in data or 'data-proof="Experimental release"' not in data:
-        errors.append("omonob V3.0 experimental native wireless entry missing")
-    if 'MU1440 is NOT wireless compatible in V3.0' not in data or 'MU1102 / AID 790 and 791' not in data:
-        errors.append("firmware-specific native wireless compatibility or MU1440 refusal missing")
-    if 'https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/releases/tag/v3.0' not in data:
-        errors.append("V3.0 primary release link missing")
+    if 'Wireless CarPlay Maps V3.1' not in data or 'data-proof="Experimental release"' not in data:
+        errors.append("omonob V3.1 experimental native wireless entry missing")
+    if 'MU1367 / AID 790+791' not in data or 'Škoda MU1440 / AID 790' not in data:
+        errors.append("MU1367/790+791 and MU1440/790 new wireless profiles missing")
+    if 'MU1440 / 791 unsupported' not in data or 'MU1433/MU1447 wired-only' not in data:
+        errors.append("unsupported MU1440/791 or wired-only 1433/1447 boundary missing")
+    if '396 current' not in data or '1,071 historical' not in data or 'headunit_accessed=false' not in data:
+        errors.append("V3.1 offline-only validation boundaries missing")
+    if 'https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/releases/tag/v3.1' not in data:
+        errors.append("V3.1 canonical release link missing")
+    if 'MU1440 is NOT wireless compatible in V3.0' in data or 'V3.0 (MU1102 only)' in data:
+        errors.append("stale V3.0 MU1440 wired-only result remains")
     if 'issues/187' not in data or 'id="oem-hud-overview"' not in data or 'id="aftermarket-hud-overview"' not in data:
         errors.append("HUD taxonomy or feedback issue missing")
     if data.count('data-lineage-edge="1"') != 38 or data.count('class="atlas-lineage-svg"') != 4:
