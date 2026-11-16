@@ -78,13 +78,17 @@ successful quiescent stop. A failed stop keeps buffers and ownership, blocks a
 new start and makes `wcp_uninstall_ready` false. The caller must retry stop and
 keep the adapter loaded. There is no unsafe forced detach. Monotonic time is
 injected; bootstrap/verification time out, backward time and overflow fail.
+Use `wcp_init` only for fresh storage. To reconfigure an initialized instance,
+call `wcp_reinit` after it becomes quiescent; it preserves generation, request,
+clock and wired-ownership state so late events cannot collide with a new session.
 
 `wcp_http_feed` incrementally parses strict HTTP/1.1 request framing with
 bounded headers/body. Duplicate lengths, transfer encoding, invalid line
 endings and oversized bodies fail closed; consumed length preserves trailing
 requests. It is not an HTTP server, RTSP stack or cryptographic transport.
 `wcp_tlv_value` validates the entire TLV stream before copying a value and
-supports adjacent 255-byte fragments. These helpers do not implement pairing.
+supports adjacent 255-byte fragments. It rejects overlapping input and output
+bytes before copying. These helpers do not implement pairing.
 
 ## Build and validation
 
@@ -106,12 +110,13 @@ docker run --rm --platform=linux/amd64 \
   bash modules/wireless/build/build.sh /out qnx
 ```
 
-The build emits `libmibr-wireless.a`, four objects and `wireless-fixtures`.
-The QNX fixture executable is compiled and inspected, never run as a vehicle
-test. Target-only compile assertions check ARM, QNX and 32-bit callback widths.
+The build emits `libmibr-wireless.a`, four objects and three fixture executables:
+`wireless-fixtures`, `wireless-reinit` and `wireless-protocol_overlap`. QNX
+fixtures are compiled and inspected, never run as a vehicle test. Target-only
+compile assertions check ARM, QNX and 32-bit callback widths.
 Record the exact source commit, lockfile identity and output SHA-256 with the
 build. Host fixtures and QNX compilation are separate commands. The repository's
-publication and module gates check the source candidate; they do not execute a
+publication audit runs the synthetic host fixtures; it does not execute a
 dedicated wireless QNX build. Run the commands above for that compile-only check.
 The pinned target archiver predates deterministic archive options; archive
 metadata is not claimed to be byte-identical between builds. On a Windows

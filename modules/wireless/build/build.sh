@@ -20,7 +20,13 @@ done
 # The pinned target binutils predates deterministic ar's D option.
 # Repeatable commands do not imply byte-identical archive metadata.
 "$AR" rcs "$OUT/libmibr-wireless.a" "$OUT/wcp_control.o" "$OUT/wcp_protocol.o" "$OUT/wcp_config.o" "$OUT/wcp_target_abi.o"
-"$CC" "${FLAGS[@]}" -I "$ROOT/modules/wireless/source" \
-  "$ROOT/modules/wireless/tests/test_wireless.c" "$OUT/libmibr-wireless.a" -o "$OUT/wireless-fixtures"
-if [[ "$MODE" == host ]]; then "$OUT/wireless-fixtures"; fi
+for fixture in wireless reinit protocol_overlap; do
+  case "$fixture" in
+    wireless) executable=wireless-fixtures ;;
+    *) executable="wireless-$fixture" ;;
+  esac
+  "$CC" "${FLAGS[@]}" -I "$ROOT/modules/wireless/source" \
+    "$ROOT/modules/wireless/tests/test_$fixture.c" "$OUT/libmibr-wireless.a" -o "$OUT/$executable"
+  if [[ "$MODE" == host ]]; then "$OUT/$executable"; fi
+done
 echo "wireless $MODE compile PASS; hardware qualification absent"

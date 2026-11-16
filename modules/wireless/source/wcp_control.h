@@ -80,12 +80,14 @@ struct wcp_control {
     struct wcp_message messages[WCP_QUEUE];
 };
 
-/* Initialize fresh storage, or reinitialize only after wcp_uninstall_ready()
- * is true. Calling this on an active/unquiesced instance would erase ownership
- * and buffer state; the function cannot safely inspect uninitialized storage
- * to detect that misuse. */
 void wcp_config_default(struct wcp_config *);
+/* Initialize fresh storage only. Never use this to reset a previously initialized
+ * instance: doing so would reuse generation and request IDs. */
 int wcp_init(struct wcp_control *, const struct wcp_config *, const struct wcp_ops *);
+/* Reconfigure an initialized, quiescent instance while preserving its generation,
+ * request counter, monotonic clock and wired-ownership gate. Storage and all
+ * callbacks must remain alive until the adapter is quiescent. */
+int wcp_reinit(struct wcp_control *, const struct wcp_config *, const struct wcp_ops *);
 int wcp_ap_validate(const struct wcp_ap *);
 int wcp_start(struct wcp_control *, const struct wcp_ap *, const struct wcp_peer *,
               uint64_t now_ms);

@@ -173,7 +173,7 @@ static void init_alias(void) {
     struct wcp_control c; struct fake f;
     setup(&c, &f, 1);
     assert(wcp_uninstall_ready(&c));
-    assert(wcp_init(&c, &c.config, &c.ops) == WCP_OK);
+    assert(wcp_reinit(&c, &c.config, &c.ops) == WCP_OK);
     assert(c.config.enabled && c.ops.abi == WCP_ABI && c.ops.context == &f);
     assert(wcp_start(&c, &(struct wcp_ap){
         7, 3, 6, WCP_AP_OPEN, "synthetic", ""

@@ -33,6 +33,21 @@ int wcp_init(struct wcp_control *c, const struct wcp_config *config,
     c->state = config_copy.enabled ? WCP_IDLE : WCP_OFF;
     return WCP_OK;
 }
+int wcp_reinit(struct wcp_control *c, const struct wcp_config *config,
+               const struct wcp_ops *ops) {
+    uint64_t generation, next_request, last_now;
+    unsigned wired;
+    int rc;
+    if (!c) return WCP_INVALID;
+    if (!wcp_uninstall_ready(c)) return WCP_BUSY;
+    generation = c->generation; next_request = c->next_request;
+    last_now = c->last_now; wired = c->wired;
+    rc = wcp_init(c, config, ops);
+    if (rc) return rc;
+    c->generation = generation; c->next_request = next_request;
+    c->last_now = last_now; c->wired = wired;
+    return WCP_OK;
+}
 int wcp_ap_validate(const struct wcp_ap *ap) {
     size_t ssid, psk, i;
     if (!ap || !ap->generation || !ap->interface_index || !ap->channel ||

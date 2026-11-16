@@ -86,8 +86,9 @@ int wcp_tlv_value(const void *data, size_t length, unsigned char type,
     const unsigned char *b = (const unsigned char *)data;
     unsigned char *dst = (unsigned char *)out;
     size_t at = 0, total = 0, n, previous = 0; unsigned found = 0, closed = 0;
-    if (!out_length || (!data && length) || (!out && capacity)) return WCP_PARSE_ERROR;
+    if (!out_length) return WCP_PARSE_ERROR;
     *out_length = 0;
+    if ((!data && length) || (!out && capacity)) return WCP_PARSE_ERROR;
     /* Validate the entire stream before copying anything. */
     while (at < length) {
         if (length - at < 2) return WCP_PARSE_ERROR;
@@ -100,6 +101,13 @@ int wcp_tlv_value(const void *data, size_t length, unsigned char type,
         at += n + 2;
     }
     if (!found) return WCP_PARSE_MORE;
+    /* Compare address differences, avoiding overflowing end addresses. Only
+     * bytes actually copied matter; zero-length values never overlap. */
+    if (length && total) {
+        uintptr_t src = (uintptr_t)data, dest = (uintptr_t)out;
+        if ((dest >= src && dest - src < length) ||
+            (src > dest && src - dest < total)) return WCP_PARSE_ERROR;
+    }
     at = 0; total = 0;
     while (at < length) {
         n = b[at+1];

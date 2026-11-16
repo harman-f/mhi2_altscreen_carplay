@@ -22,6 +22,9 @@ int wcp_http_feed(struct wcp_http *, const void *, size_t, size_t *consumed);
 const unsigned char *wcp_http_body(const struct wcp_http *);
 /* Return a single contiguous value, or adjacent 255-byte TLV fragments.
  * Reject separated duplicate values, truncation and insufficient output space.
+ * The input stream and actual output bytes must not overlap. Empty values
+ * require no output buffer. The length pointer must be valid and disjoint
+ * from input and output; it is set to zero on MORE or ERROR.
  * No data from a malformed stream is returned. */
 int wcp_tlv_value(const void *, size_t, unsigned char type,
                   void *, size_t capacity, size_t *length);
