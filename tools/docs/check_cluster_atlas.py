@@ -88,11 +88,33 @@ def audit(path: Path) -> None:
     for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 16 NOV 2026'):
         if marker not in data:
             errors.append("Missing evidence date boundary: "+marker)
+    # Interaction contract: all seven research matrices have actual search/filter/reset handlers.
+    if data.count('data-atlas-filter-table="') != 7:
+        errors.append("expected exactly seven filterable research matrices")
+    if data.count('class="atlas-filter-search"') != 7:
+        errors.append("every research matrix must have a search control")
+    if data.count('class="atlas-filter-clear"') != 7:
+        errors.append("every research matrix must have an active reset control")
+    if "data-atlas-sort" not in data or 'root.querySelectorAll("[data-atlas-sort]")' not in data:
+        errors.append("research table sorting must be connected to JavaScript")
+    if 'dataset.theme=next' not in data or 'localStorage.setItem("cluster-atlas-theme",next)' not in data:
+        errors.append("persistent light/dark toggle logic missing")
+    if 'html[data-theme="light"]' not in data:
+        errors.append("light theme stylesheet missing")
+    nav = data[data.find("<nav>"):data.find("</nav>") + len("</nav>")]
+    if 'href="#matrix"' in nav or 'href="#catalog"' in nav or 'href="#timeline"' in nav:
+        errors.append("top navigation duplicates the topic tabs")
+    if "**Gateway J533" in data:
+        errors.append("raw Markdown emphasis inside public HTML")
+    if 'MHI2Q_WiFi_CarPlay' not in data or 'perkthefox/mqb_contitool' not in data:
+        errors.append("source-anchored native wireless or ContiTool evidence missing")
+    if 'id="misc-overview"' not in data:
+        errors.append("external dongles and HUD must have a separate Misc tab")
     if errors:
         for error in errors:
             print("FAIL:", error, file=sys.stderr)
         raise SystemExit(1)
-    print(f"PASS: {len(parser.rows)} rows × {len(FEATURES)} features, {len(parser.cards)} profiles, {len(TABS)} tab panels, {len(ids)} distinct IDs, {len(parser.fragments)} internal anchors; privacy markers absent")
+    print(f"PASS: {len(parser.rows)} baseline rows × {len(FEATURES)} features, {len(parser.cards)} profiles, {len(TABS)} tabs, seven filterable research matrices, {len(ids)} distinct IDs and {len(parser.fragments)} working internal anchors")
 
 if __name__ == "__main__":
     audit(Path(sys.argv[1] if len(sys.argv) > 1 else "docs/index.html"))
