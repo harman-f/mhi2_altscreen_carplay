@@ -89,8 +89,11 @@ def audit(path: Path) -> None:
     comparison_start = data.find('<div class="atlas-tab-pane" data-atlas-tab="comparison"')
     if not (0 <= nav_start < nav_end < tabbar < main_start < overview_start < hero < overview_contents < comparison_start):
         errors.append("global tabs then Overview-only hero/stats before Overview content is required")
-    if data.count('<header id="top">') != 1 or data.count('class="stats"') != 1 or data.count('class="atlas-feedback-banner"') != 1:
-        errors.append("hero, statistics and overview feedback banner must each occur exactly once")
+    overview_html = data[overview_start:comparison_start] if overview_start >= 0 and comparison_start > overview_start else ""
+    if data.count('<header id="top">') != 1 or data.count('class="stats"') != 1 or overview_html.count('class="atlas-feedback-banner"') != 1:
+        errors.append("one hero/stats grid and one overview-scoped feedback banner are required")
+    # The separate lineage binary/provenance notice legitimately reuses the
+    # feedback-banner visual style; it is not a duplicate overview hero.
     if 'nav .brand{font-size:16px!important' not in data:
         errors.append("compact MIB Atlas brand must remain at enlarged 16px")
     if 'position:sticky;top:62px;z-index:79' not in data:
