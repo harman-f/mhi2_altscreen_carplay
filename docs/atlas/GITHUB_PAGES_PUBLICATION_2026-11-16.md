@@ -7,7 +7,7 @@
 The Atlas is a **single standalone HTML** file at `docs/index.html` with CSS-controlled offline-safe tabs and optional JavaScript enhancement for search/hash navigation. External links point only to public GitHub source documents and releases. No server, database, API key, analytics, webfont, CDN or proprietary firmware is needed.
 
 Workflow: [`.github/workflows/cluster-atlas-pages.yml`](../../.github/workflows/cluster-atlas-pages.yml).
-- On pull requests the `validate` job checks 58 original feature rows, 58 profiles, 22 data fields per row, seven topic tabs, internal anchors, duplicate IDs and sensitive-source markers.
+- On pull requests the `validate` job checks 58 original feature rows, 58 profiles, 22 data fields per row, eight topic tabs, internal anchors, duplicate IDs and sensitive-source markers.
 - On `main` pushes (or a manual workflow run) the `deploy` job publishes **only `docs/index.html`**, not other `docs/` sources and not firmware or chat exports. This avoids exposing any extra files accidentally through the Pages artifact.
 - No source branch merge or GitHub Pages settings change happens automatically from a draft PR.
 
@@ -22,8 +22,9 @@ Workflow: [`.github/workflows/cluster-atlas-pages.yml`](../../.github/workflows/
 ## Publication acceptance
 
 - [ ] Source-only 58×22 matrix and profile changes reviewed, including recent versions and negative release flags.
-- [ ] Seven tabs work on desktop/mobile and with JavaScript disabled.
+- [ ] Eight tabs work on desktop/mobile and with JavaScript disabled.
 - [ ] Search/filter/sort and link-to-profile navigation work, even after changing tabs.
+- [ ] Author names, message-ID markers and community claims are identified as unverified forum material where no public repository link exists.
 - [ ] No third-party raw chat export, VIN/FAZIT/ECU keys, passwords, private Research paths or proprietary binaries in deployed HTML.
 - [ ] Original withdrawn MST2-cluster-nav 1.1.0 warning visible.
 - [ ] GitHub Actions validation PASS on exact merge head and successful Pages deployment verified on an external browser.
