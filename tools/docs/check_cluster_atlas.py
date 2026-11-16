@@ -4,7 +4,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 import sys
 
-TABS = ("overview", "comparison", "wireless", "emulators", "integrations", "perk", "research")
+TABS = ("overview", "comparison", "wireless", "emulators", "integrations", "perk", "roadmap", "research")
 FEATURES = ("cpmap", "aamap", "mirror", "card", "rgi", "arrows", "lanes", "hud", "handoff", "cover", "media", "progress", "calls", "spatial", "zoom", "views", "siri", "touchpad", "vehicle", "wireless", "recovery", "installer")
 
 class AtlasParser(HTMLParser):
@@ -73,11 +73,15 @@ def audit(path: Path) -> None:
     for t in TABS:
         if f"#atlas-tab-{t}:checked ~ main #atlas-panel-{t}" not in data:
             errors.append(f"missing CSS-only tab activation rule for {t}")
-    for required in ("id=\"wireless-update\"", "id=\"emulator-overview\"", "id=\"integrations-overview\"", "id=\"perk-overview\"", "id=\"community-repository-leads\"", "id=\"matrix\"", "id=\"lineage\"", "id=\"timeline\""):
+    for required in ("id=\"wireless-update\"", "id=\"emulator-overview\"", "id=\"integrations-overview\"", "id=\"perk-overview\"", "id=\"community-repository-leads\"", "id=\"community-roadmap-20261116\"", "id=\"matrix\"", "id=\"lineage\"", "id=\"timeline\""):
         if required not in data:
             errors.append("missing section: " + required)
     if any(s in data.lower() for s in ("messages11.html", "messages10.html", "t.me/c/")):
         errors.append("private/community raw source marker found in public HTML")
+    if "14 emulator and lab leads" not in data or "25 selected development claims and releases" not in data:
+        errors.append("missing annotated community research inventory")
+    if "Host operating system" not in data or "Telegram author / dates" not in data:
+        errors.append("missing emulator host/guest provenance columns")
     if errors:
         for error in errors:
             print("FAIL:", error, file=sys.stderr)
