@@ -6,6 +6,7 @@
 - [MHI2/MHI2Q emulators and Home Assistant discovery](EMULATORS_HOME_ASSISTANT_DISCOVERY_2026-11-16.md) — full QNX QEMU vs CarPlay test harness vs HMI mockup, HA Companion and vehicle telematics.
 - [PerkTheFox and Component Protection research](PERK_COMPONENT_PROTECTION_RESEARCH_2026-11-16.md) — J533 ContiTool public releases, MFK3 target, MST2 Cluster Navigation withdrawn-version alert and documented security scope.
 - [All 58 repositories: current GitHub identity/fork audit](REPOSITORY_METADATA_AUDIT_2026-11-16.md) — full current metadata audit and precisely delimited release deltas (not a full 22-feature revalidation).
+- [Emulators and community roadmap source methodology](COMMUNITY_EMULATORS_ROADMAP_2026-11-16.md) — host/guest distinction, dated Telegram attribution, source-status boundaries, and no raw transcript publication.
 - [Verified public community repository leads](COMMUNITY_PUBLIC_REPOSITORY_LEADS_2026-11-16.md) — de-duplicated public-source watchlist, not raw conversation transcripts.
 - [GitHub Pages publication and acceptance guide](GITHUB_PAGES_PUBLICATION_2026-11-16.md) — build/deployment of only the validated standalone HTML, review and site activation.
 
