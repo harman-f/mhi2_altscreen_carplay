@@ -3,6 +3,7 @@
 **Research status · source review and public comparison; 2026-11-16.** This directory contains dated, independently scoped public-source evidence for the [single-file interactive MIB Atlas](../index.html). Individual project versions, target hardware and proof strength are not interchangeable.
 
 - [MIB Atlas recurring editorial and publication rules](MAINTENANCE_RULES.md)
+- [Branch-aware 14-fork comparison and expanded lineage audit, 16 Nov](FORK_DIFF_LINEAGE_AUDIT_2026-11-16.md) — 2 default-only dormant forks suppressed from 56 curated rows, contributor PRs and branch offsets preserved; 4 source-family lineage graphs and 38 independently classified edges.
 - [omonob Wireless CarPlay Maps V3.0 release audit, 16 Nov](OMONOB_WIRELESS_V3_2026-11-16.md) — experimental native receiver on MU1102/790/791; MU1440 and other profiles remain wired-only; exact integration and acceptance boundary.
 - [HUD classification and public feedback release, 16 Nov](HUD_FEEDBACK_RELEASE_2026-11-16.md) — factory projector software vs add-on CAN/OBD/Android hardware; public corrections issue #187.
 - [Nine-tab structured matrix snapshot (16 Nov)](STRUCTURED_MATRIX_SNAPSHOT_2026-11-16.md) — native wireless receiver vs dongle routes; non-additive inventory counts, fork/HA/ContiTool evidence, future QA gates. — canonical update contract, source status, platforms, evidence, tabs, matrices, themes, publication gates.

@@ -1,0 +1,35 @@
+{
+  "version": "2026-11-16",
+  "baseline_score_date": "2026-11-04",
+  "public_catalog": 56,
+  "source_baseline": 58,
+  "policy": "Not published as an independent scored project unless new unique code, a firmware-specific port or a public release/PR contribution is verified across all branches. This file is tracked in the repository but not copied into the GitHub Pages single-file website.",
+  "items": [
+    {
+      "id": "new-maxim-smirnov-mhi2-carplay-cluster",
+      "name": "maxim-smirnov/mhi2-carplay-cluster",
+      "upstream": "luka-dev/mib2q-carplay-rgi",
+      "ahead": 0,
+      "behind": 73,
+      "reason": "Default main is entirely included in upstream; no additional branches or releases were found.",
+      "source": "https://github.com/luka-dev/mib2q-carplay-rgi/compare/main...maxim-smirnov:main",
+      "reviewed_utc_date": "2026-11-16",
+      "status": "suppressed_from_curated_public_catalog",
+      "checks": "GitHub compare default main, branch enumeration, releases and local PR list; no unique branch or release detected",
+      "watch": "Recheck all refs and PR history when next reviewing sources"
+    },
+    {
+      "id": "new-mr-mibonk-mhi2-android-auto-cluster-map",
+      "name": "Mr-MIBonk/mhi2-android-auto-cluster-map",
+      "upstream": "MacsInSpace/mib-cluster-map",
+      "ahead": 0,
+      "behind": 133,
+      "reason": "Default main is entirely included in upstream; no additional branches or releases were found. README's chopinwong01 credit describes deeper ancestry, not this fork's direct GitHub parent.",
+      "source": "https://github.com/MacsInSpace/mib-cluster-map/compare/main...Mr-MIBonk:main",
+      "reviewed_utc_date": "2026-11-16",
+      "status": "suppressed_from_curated_public_catalog",
+      "checks": "GitHub compare default main, branch enumeration, releases and local PR list; no unique branch or release detected",
+      "watch": "Recheck all refs and PR history when next reviewing sources"
+    }
+  ]
+}

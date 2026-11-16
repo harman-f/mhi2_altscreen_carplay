@@ -59,3 +59,9 @@ The latest inspected release was [ContiTool v2.1.2, 2026-11-15](https://github.c
 - This snapshot records structure and source claims, not live browser QA or end-to-end Pages acceptance. Preserve the HTML and current test output to confirm actual deployment before stating success.
 
 For subsequent reviews, read [`MAINTENANCE_RULES.md`](MAINTENANCE_RULES.md) first and publish a new dated snapshot rather than redating this audit.
+
+## Later 16 Nov follow-up — branch-aware fork deduplication
+
+The original 58×22 dated scoring remains the **4 Nov historical baseline**. After comparing all 14 recorded fork parents (including their release/feature branches and contribution PRs), two default-branch-only, behind-upstream records were removed from the visible comparison/catalog: `maxim-smirnov/mhi2-carplay-cluster` (0 ahead / 73 behind LuKa) and `Mr-MIBonk/mhi2-android-auto-cluster-map` (0 ahead / 133 behind MacsInSpace). **Curated visible count: 56**; **55 of 56** previously checked public sources reachable, one historical Tiguan source remains 404. This change is deduplication, not a new 22-feature re-score. The two suppressed records are retained outside the page for rescan.
+
+Crucial exceptions: `harman-f/qemu-mhi2` main is identical but its Windows/Škoda branch has four own commits and upstream draft PR #2 is still open; `harman-f/mib2-toolbox` GitHub parent is `jilleb/mib2-toolbox` (original created 2019) and its two contributor PRs #219/#220 were merged into that upstream in 2022. A separate experimental branch has four exclusive commits. `evanj495` main README-only does not invalidate its four-commit MU1320 release branch. See [full branch/PR audit](FORK_DIFF_LINEAGE_AUDIT_2026-11-16.md) and expanded 38-relationship Lineage table/graphs in `docs/index.html`.
