@@ -6,7 +6,7 @@ on:
       - 'tools/menu-editor/mibr-*-preview.svg'
       - 'tools/menu-editor/test-p09-visual.cjs'
       - 'tools/menu-editor/build-shared-oem-overlays.cjs'
-      - 'tools/menu-editor/mibr-menu-editor-nav-views-p098.html'
+      - 'tools/menu-editor/mibr-menu-editor-nav-views-p099.html'
       - '.github/workflows/menu-editor-p09-visual.yml'
   workflow_dispatch:
 jobs:

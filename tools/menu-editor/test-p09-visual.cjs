@@ -7,8 +7,8 @@ const {pathToFileURL} = require("node:url");
 const {chromium} = require("playwright-core");
 
 const source=path.join(__dirname,"mibr-menu-editor-nav-views-mockup.html");
-const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p098.html");
-assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.8 standalone review HTML must match canonical source");
+const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-p099.html");
+assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.9 standalone review HTML must match canonical source");
 const output=path.join(process.cwd(),"p09-visual-artifacts");
 fs.mkdirSync(output,{recursive:true});
 const chromeCandidates=[process.env.CHROME_PATH,process.env.CHROMIUM_PATH,
@@ -54,7 +54,7 @@ function overlap(a,b){
         footerX:a("footer").querySelector("text").getAttribute("x")
       };
     },view);
-    assert.deepEqual(common,{clockX:"505",clockSize:"24",temperatureX:"640",roadX:"505",distanceX:"437",etaX:"550",footerX:"387"},view+" shared layout");
+    assert.deepEqual(common,{clockX:"505",clockSize:"31",temperatureX:"665",roadX:"505",distanceX:"392",etaX:"562",footerX:"283"},view+" shared layout");
     assert.equal(await page.locator("#"+view+"-seatbelt-warning").count(),1,view+" seatbelt SVG");
     assert.equal(await page.locator("#"+view+"-yellow-road-guidance path").count(),2,view+" two yellow road paths");
     if(view==="wide"){
@@ -68,9 +68,9 @@ function overlap(a,b){
       if(v==="full")return {clip:svg.querySelector("#f-mainclip path").getAttribute("d")};
       return {left:svg.querySelector("#center-left-dial").getAttribute("transform"),right:svg.querySelector("#center-right-dial").getAttribute("transform")};
     },view);
-    if(view==="wide")assert.equal(calibrated.clip,"M188 37H830L738 329H272Z","Grid-aligned Wide");
-    else if(view==="full")assert.ok(calibrated.clip.includes("L737 350H273"),"Grid-aligned Full cutout");
-    else assert.deepEqual(calibrated,{left:"translate(-43.18 -11.04) scale(1.06)",right:"translate(-17.42 -11.04) scale(1.06)"},"Grid-aligned Center");
+    if(view==="wide")assert.equal(calibrated.clip,"M162 0H847L777 335H231Z","Grid-aligned Wide");
+    else if(view==="full")assert.ok(calibrated.clip.includes("L816 335H216"),"Measured Full cutout");
+    else assert.deepEqual(calibrated,{left:"translate(-115.84 -30.6) scale(1.1772)",right:"translate(-69.14 -30.6) scale(1.1772)"},"Grid-aligned Center");
     const active=page.locator("#navv-"+view+"-svg");
     assert.equal(await active.isVisible(),true,view+" visible");
     for(const other of views.filter(x=>x!==view))assert.equal(await page.locator("#navv-"+other+"-svg").isVisible(),false,other+" hidden");
@@ -152,7 +152,7 @@ function overlap(a,b){
      const edge=page.locator("#sa-oem-edge-shell");
      assert.equal(await edge.getAttribute("data-view"),view,view+" edge shell accompanies selected OEM view");
      assert.equal(await edge.locator('[data-safe-edge]').count(),2,view+" two perimeter joints");
-     assert.equal(await edge.locator("rect").count(),4,view+" common header and footer backplanes");
+     assert.equal(await edge.locator("rect,path:not([data-safe-edge])").count(),4,view+" common header (with clock tab) and footer backplanes");
      const layers=await page.locator(".sa-pic").evaluate(svg=>{
        const idx=id=>Array.from(svg.children).indexOf(svg.querySelector("#"+id));
        return {grid:idx("sa-grid-numbers"),safe:idx("sa-current-area"),edge:idx("sa-oem-edge-shell"),mask:idx("sa-oem-mask"),preview:idx("sa-oem-preview"),duplicateGrid:!!svg.querySelector("#sa-grid-foreground")};
@@ -168,8 +168,8 @@ function overlap(a,b){
      if(view==="center"){
        const leftTransform=await page.locator("#sa-oem-mask > circle").first().getAttribute("transform");
        const rightTransform=await page.locator("#sa-oem-mask > circle").last().getAttribute("transform");
-       assert.equal(leftTransform,"translate(-43.18 -11.04) scale(1.06)","Center Safe Area mask matches left scaled gauge");
-       assert.equal(rightTransform,"translate(-17.42 -11.04) scale(1.06)","Center Safe Area mask matches right scaled gauge");
+       assert.equal(leftTransform,"translate(-115.84 -30.6) scale(1.1772)","Center Safe Area mask matches left scaled gauge");
+       assert.equal(rightTransform,"translate(-69.14 -30.6) scale(1.1772)","Center Safe Area mask matches right scaled gauge");
      }
      assert.ok(await page.locator('#sa-oem-preview [data-safe-origin="top-status"]').count(),view+" reuses OEM top status");
      await page.locator(".sa-pic").screenshot({path:path.join(output,sc.name+"-safe-"+view+"-both.png"),animations:"disabled"});

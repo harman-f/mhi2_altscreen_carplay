@@ -57,21 +57,21 @@ async function main(){
   assert.equal(wideArrow.querySelectorAll("path").length,1,"Wide arrow uses one filled and stroked shape");
   assert.equal(silhouette.getAttribute("stroke"),"#f7fcff","White contour traces the exact green silhouette");
     // P0.9.1: shared status metrics remain physically identical across cockpit modes.
-  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.8"),"Visible version label");
+  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.9"),"Visible version label");
   for(const view of ["center","wide","full"]){
     const q=id=>$("#"+view+"-"+id);
     const top=q("top-status"),bottom=q("bottom-info"),footer=q("footer");
     assert.equal(top.querySelector('text[text-anchor="middle"]').getAttribute("x"),"505",view+" clock anchor");
-    assert.equal(top.querySelector('text[text-anchor="middle"]').getAttribute("font-size"),"24",view+" clock size");
-    assert.equal(top.querySelectorAll("text")[2].getAttribute("x"),"640",view+" temperature anchor");
+    assert.equal(top.querySelector('text[text-anchor="middle"]').getAttribute("font-size"),"31",view+" clock size");
+    assert.equal(top.querySelectorAll("text")[2].getAttribute("x"),"665",view+" temperature anchor");
     assert.equal(q("top-label").getAttribute("x"),"505",view+" shared road anchor");
-    assert.equal(q("top-label").getAttribute("font-size"),"15.5",view+" road typography");
-    assert.equal(bottom.querySelector('#'+view+'-bottom-distance circle').getAttribute("cx"),"420",view+" remaining distance icon");
-    assert.equal(bottom.querySelector('#'+view+'-bottom-distance text').getAttribute("x"),"437",view+" remaining distance anchor");
-    assert.equal(q("bottom-eta-label").getAttribute("x"),"550",view+" arrival time anchor");
-    assert.equal(q("bottom-eta-label").getAttribute("y"),"319",view+" common arrival baseline");
-    assert.equal(footer.querySelector("text").getAttribute("x"),"387",view+" trip anchor");
-    assert.equal(footer.querySelector("text").getAttribute("y"),"353",view+" trip baseline");
+    assert.equal(q("top-label").getAttribute("font-size"),"21",view+" road typography");
+    assert.equal(bottom.querySelector('#'+view+'-bottom-distance circle').getAttribute("cx"),"376",view+" remaining distance icon");
+    assert.equal(bottom.querySelector('#'+view+'-bottom-distance text').getAttribute("x"),"392",view+" remaining distance anchor");
+    assert.equal(q("bottom-eta-label").getAttribute("x"),"562",view+" arrival time anchor");
+    assert.equal(q("bottom-eta-label").getAttribute("y"),"328",view+" common arrival baseline");
+    assert.equal(footer.querySelector("text").getAttribute("x"),"283",view+" trip anchor");
+    assert.equal(footer.querySelector("text").getAttribute("y"),"362",view+" trip baseline");
   }
   assert.equal(w.MIBR_safe.activeView(),"center","Calibration initially follows active cockpit view");
   assert.ok($("#navv-guidance-advanced").tagName==="DETAILS","Experimental mapping stays available but collapsed");
@@ -121,8 +121,8 @@ async function main(){
   set("#navv-bgmode","grid");
   assert.notEqual($("#center-grid").style.display,"none","Grid shows");
   assert.equal($("#center-map-route").style.display,"none","Calibration grid has no route; schematic map is separate");
-  assert.equal($("#center-bottom-info").getAttribute("font-size"),"14","Center shared OEM lower status font");
-  assert.equal($("#center-side-metrics text").getAttribute("y"),"129","Center side tick aligned with marker");
+  assert.equal($("#center-bottom-info").getAttribute("font-size"),"21","Center shared OEM lower status font");
+  assert.equal($("#center-side-metrics"),null,"P0.9.9: side scales are outside the 1010x376 display");
   assert.ok($("#center-right-turn g").getAttribute("transform").includes("scale(.9)"),"Center arrow inset");
   set('[data-navv-section="carplay"][data-navv-key="surface"]',"app");
   assert.notEqual($("#center-app-placeholder").style.display,"none","App mode has distinct editor visualization");
@@ -158,8 +158,8 @@ async function main(){
   assert.equal($("#navv-full-svg").style.display,"none","Full SVG hidden on Wide in Safari");
   assert.equal($("#navv-wide-svg").style.display,"block","Wide SVG visible");
   assert.ok($("#wide-side-panels")&&$("#wide-right-media")&&$("#wide-left-info"),"Wide trapezoid modules and independent content");
-  assert.equal($("#wide-bottom-info").getAttribute("font-size"),"14","Wide shared OEM lower status font");
-  assert.equal($("#wide-side-metrics text").getAttribute("y"),"133","Wide side tick aligned with marker");
+  assert.equal($("#wide-bottom-info").getAttribute("font-size"),"21","Wide shared OEM lower status font");
+  assert.equal($("#wide-side-metrics"),null,"P0.9.9: side scales are outside the 1010x376 display");
   set('[data-navv-section="carplay"][data-navv-key="surface"]',"app");
   assert.notEqual($("#wide-app-placeholder").style.display,"none","Wide app editor visualization");
   set('[data-navv-section="carplay"][data-navv-key="surface"]',"off");
@@ -199,13 +199,14 @@ async function main(){
   assert.equal($("#navv-wide-svg").style.display,"none","Wide SVG hidden on Full");
   assert.equal($("#navv-full-svg").style.display,"block","Full SVG visible");
   assert.ok($("#full-lower-corners")&&$("#full-map-surface")&&$("#full-speed"),"Full map and shaped lower cutouts");
-  assert.ok($("#f-mainclip path").getAttribute("d").includes("V261H841"),"Full clip follows calibrated y261 shoulder");
-  assert.ok($("#f-mainclip path").getAttribute("d").includes("L737 350H273"),"Full lower tips from photographed numeric grid");
-  assert.equal($("#w-map-clip path").getAttribute("d"),"M188 37H830L738 329H272Z","Wide grid-calibrated trapezoid");
-  assert.equal($("#center-left-dial").getAttribute("transform"),"translate(-43.18 -11.04) scale(1.06)","Center left dial shifted outward and scaled");
-  assert.equal($("#center-right-dial").getAttribute("transform"),"translate(-17.42 -11.04) scale(1.06)","Center right dial shifted outward and scaled");
-  assert.equal($("#full-bottom-info").getAttribute("font-size"),"14","Full shared OEM lower status font");
-  assert.equal($("#full-side-metrics text").getAttribute("y"),"135","Full side tick aligned with marker");
+  // P0.9.9: geometry measured on rectified calibration photos (stream pixels, about 3 px)
+  assert.ok($("#f-mainclip path").getAttribute("d").includes("V276H871"),"Full clip follows measured y276 shoulder");
+  assert.ok($("#f-mainclip path").getAttribute("d").includes("L816 335H216"),"Full lower edge at the measured bottom bar");
+  assert.equal($("#w-map-clip path").getAttribute("d"),"M162 0H847L777 335H231Z","Wide measured trapezoid");
+  assert.equal($("#center-left-dial").getAttribute("transform"),"translate(-115.84 -30.6) scale(1.1772)","Center left dial = measured circle r186 at (182,186)");
+  assert.equal($("#center-right-dial").getAttribute("transform"),"translate(-69.14 -30.6) scale(1.1772)","Center right dial = measured circle r186 at (822,186)");
+  assert.equal($("#full-bottom-info").getAttribute("font-size"),"21","Full shared OEM lower status font");
+  assert.equal($("#full-side-metrics"),null,"P0.9.9: side scales are outside the 1010x376 display");
   set('[data-navv-section="carplay"][data-navv-key="surface"]',"app");
   assert.notEqual($("#full-app-placeholder").style.display,"none","Full app editor visualization");
   set('[data-navv-section="carplay"][data-navv-key="surface"]',"off");
@@ -322,7 +323,7 @@ async function main(){
   assert.equal(w.MIBR_safe.activeView(),"wide","Same active Wide in both workspaces");
   assert.equal($("#sa-oem-mask").children.length,6,"Wide: four shared bands and two exact side modules");
   assert.equal($("#sa-oem-edge-shell").getAttribute("data-view"),"wide","Wide continuity surrounds only its side panels");
-  assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="right"]').getAttribute("d"),"M1010 0H830L738 330Q736 357 763 376H1010Z","Wide right panel actually connects to viewport edge");
+  assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="right"]').getAttribute("d"),"M1010 0H847L777 330Q775 350 798 356L1010 376Z","Wide right panel actually connects to viewport edge");
   assert.equal($("#sa-oem-mask").children[4].getAttribute("d"),$("#wide-side-panels > path").getAttribute("d"),"Wide left blocked polygon identical to current calibrated sidepanel");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="side-panels"]'),"Wide OEM overlay uses actual SVG side panels");
   const wideNames=Array.from($("#sa-oem-preview").children).map(n=>n.getAttribute("data-safe-origin")).filter(Boolean);
@@ -338,7 +339,7 @@ async function main(){
   assert.equal($$(".sa-views button")[0].getAttribute("aria-pressed"),"true","Full calibration selected via shortcut");
   assert.equal($("#sa-oem-mask").children.length,6,"Full: four common bands and two lower cutouts");
   assert.equal($("#sa-oem-edge-shell").getAttribute("data-view"),"full","Full edge closure follows selected view");
-  assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="left"]').getAttribute("d"),"M0 249H178Q205 260 235 294L273 351V376H0Z","Full lower cutoff attaches to left edge and bottom");
+  assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="left"]').getAttribute("d"),"M0 276H160Q168 276 174 284L250 376H0Z","Full lower cutoff attaches to left edge and bottom");
   assert.equal($("#sa-oem-mask").children[4].getAttribute("d"),$("#full-lower-corners > path").getAttribute("d"),"Full mask copies updated left diagonal cutout");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="lower-corners"]'),"Full lower shape uses existing SVG outline");
   const fullNames=Array.from($("#sa-oem-preview").children).map(n=>n.getAttribute("data-safe-origin")).filter(Boolean);
