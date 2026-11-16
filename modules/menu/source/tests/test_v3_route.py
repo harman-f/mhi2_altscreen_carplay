@@ -12,7 +12,7 @@ ROOT = P.parents[2]
 GENERATED = Path(tempfile.mkdtemp(prefix="mibr-v3-generated-"))
 MAIN = ("MibrV3Protocol", "MibrV3Client", "MibrV3Bootstrap", "MibrV3Session", "MibrV3Route",
         "MibrI18n", "MibrPopupEditorModel", "MibrScalingState", "MibrDraftChoiceModel", "MibrVersionInfo",
-        "MibrCarPlayMenuModel", "MibrGpsDemoState", "MibrVdataDiag", "MibrEngineState", "MibrViewState", "MibrElementSpec", "MibrElementEngine", "MibrElementTree", "MibrCanonicalElementMenu",
+        "MibrCarPlayMenuModel", "MibrWirelessBackend", "MibrWirelessSession", "MibrGpsDemoState", "MibrVdataDiag", "MibrEngineState", "MibrViewState", "MibrElementSpec", "MibrElementEngine", "MibrElementTree", "MibrCanonicalElementMenu",
         "MibrDurableSwitch", "MibrPlatformDefaults", "MibrSafeArea", "MibrMenuCatalog", "MibrMenuFunctions", "MibrMenuLayout", "MibrExpert")
 
 
@@ -31,7 +31,7 @@ class V3JavaHost(unittest.TestCase):
         sources = [str(H / (n + ".java")) for n in MAIN] + [
                    str(GENERATED / "MibrMenuDefinition.java"),
                    str(GENERATED / "MibrSettingsCatalog.java")] + [str(T / (n + ".java")) for n in
-                   ("MibrV3RouteTest", "MibrV3BindingTest", "MibrV3SocketTest", "MibrScalingBindingTest", "MibrCarPlayMenuModelTest", "MibrAdvancedOptionsTest")]
+                   ("MibrV3RouteTest", "MibrV3BindingTest", "MibrV3SocketTest", "MibrScalingBindingTest", "MibrCarPlayMenuModelTest", "MibrWirelessSessionTest", "MibrAdvancedOptionsTest")]
         run = subprocess.run([javac, "-encoding", "UTF-8", "-source", "8", "-target", "8", "-nowarn", "-d", str(out)] + sources,
                              capture_output=True, text=True)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
@@ -44,6 +44,10 @@ class V3JavaHost(unittest.TestCase):
                               "-cp", str(out), "de.mibr.hmi.MibrCarPlayMenuModelTest"], capture_output=True, text=True, timeout=60)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         self.assertIn("MIBR_CARPLAY_MENU_MODEL_PASS", run.stdout)
+        run = subprocess.run([java, "-Dmibr.menu.standard=" + str(ROOT / "tools/menu-editor/standard-menu.txt"),
+                              "-cp", str(out), "de.mibr.hmi.MibrWirelessSessionTest"], capture_output=True, text=True, timeout=60)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("MIBR_WIRELESS_SESSION_PASS", run.stdout)
         run = subprocess.run([java, "-Dmibr.menu.standard=" + str(ROOT / "tools/menu-editor/standard-menu.txt"),
                               "-cp", str(out), "de.mibr.hmi.MibrAdvancedOptionsTest"], capture_output=True, text=True, timeout=60)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
