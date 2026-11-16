@@ -1,14 +1,14 @@
 {
   "schema": 2,
-  "reviewed_reference": "1.5.0-beta.11 r11b",
-  "reviewed_public_source_commit": "420fc46c63594a1a0274ddf6a3da7fb19c33b294",
+  "reviewed_reference": "Wireless menu source (compile-only; no release prebuilt)",
+  "reviewed_public_source_commit": "6357aa48458822bf2ebd1605fe93f0af71717fd1",
   "hmi_roots": [
     "modules/profiles/skoda-mu1440-p4526/hmi",
     "modules/profiles/seat-mu1409-p4708/hmi",
     "modules/profiles/seat-mu1447-p4709/hmi"
   ],
   "git_objects": {
-    "modules/menu/source": "9cc9927c678f81bd5520fd1a8594d36938218ae4",
+    "modules/menu/source": "39811f9e8085817fd20d45d0a2d063ec05b4e9b4",
     "modules/profiles/seat-mu1409-p4708/hmi/README.md": "60b7b875247490aedd88473c65918b83622c253b",
     "modules/profiles/seat-mu1409-p4708/hmi/java/de/mibr/hmi/MibrSeatGearOverlayImage.java": "fef4ea11b8c58db3993a8e704f263c37a1c38abe",
     "modules/profiles/seat-mu1409-p4708/hmi/java/de/mibr/hmi/MibrSeatMu1409Profile.java": "e8ffd0a7e5fa794e4a49229c7e8e1357cdba4374",
