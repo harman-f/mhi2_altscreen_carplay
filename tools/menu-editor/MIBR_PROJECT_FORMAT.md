@@ -117,6 +117,7 @@ Projektweite Einstellungen der Einheit, im Reiter „View-Konfigurator“ unter 
 
 | JSON | Einheit-Schlüssel | Werte, Standard |
 | --- | --- | --- |
+| `options.viewConfigMode` | Modus der CarPlay-/Navi-Einstellungen (Fahrzeugseite folgt) | `global` (wie bisher, im Auto-Menü einstellbar) oder `perView` (Werte je Ansicht nur aus den Editor-Dateien); `global` |
 | `options.carplayNav` | `carplay_nav` (MIBR_CARPLAY_NAV/1) | Boolean, `false` |
 | `options.language` | Menüsprache | `AUTO`, `de`, `en`; `AUTO` |
 | `options.expertMode` | `expert_mode` | Boolean, `false` |
