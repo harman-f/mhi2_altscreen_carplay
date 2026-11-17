@@ -3198,7 +3198,7 @@ function parseConf(raw){
    if(!old&&ver==="3"&&["x","y","w","h"].every(function(k){return data["view."+id+".safeArea."+k]===undefined}))d.views[id].safeArea=area(id);
    else if(!old)for(var k of ["x","y","w","h"]){var key="view."+id+".safeArea."+k;if(!/^\d+$/.test(data[key]||""))throw Error("Fehlender oder ungültiger Wert "+key);d.views[id].safeArea[k]=Number(data[key])}
    else{var edge=window.MIBR_safe.get(id);d.views[id].safeArea={x:edge[0],y:edge[1],w:edge[2]-edge[0],h:edge[3]-edge[1]}}
-   if(mode==="custom")for(var section of ["carplay","native","guidance"])for(var k of Object.keys(d.views[id][section])){var key="view."+id+"."+section+"."+k;if(!Object.prototype.hasOwnProperty.call(data,key)){if(ver==="3"||section==="native"&&["tubeDistance","dialLanes","bottomDistance","bottomEta"].includes(k))continue;throw Error("Fehlender Wert "+key)}d.views[id][section][k]=decode(data[key])}
+   if(mode==="custom")for(var section of ["carplay","native","guidance"])for(var k of Object.keys(d.views[id][section])){var key="view."+id+"."+section+"."+k;if(!Object.prototype.hasOwnProperty.call(data,key)){if(ver==="3"||section==="native"&&["tubeDistance","dialLanes","bottomDistance","bottomEta"].includes(k)||section==="carplay"&&["speedLimit","compass","mapNight"].includes(k)||section==="guidance"&&["display","line"].includes(k))continue;throw Error("Fehlender Wert "+key)}d.views[id][section][k]=decode(data[key])}
  }
  return check(d);
 }

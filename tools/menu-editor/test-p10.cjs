@@ -80,6 +80,25 @@ async function main(){
     }
     w.MIBR_views.set(edited);
   }
+  // older v1/v2 .conf with custom views: newly added per-view keys are optional and take defaults
+  for(const v of ["1","2"]){
+    const crc=b=>(require("node:zlib").crc32(Buffer.from(b,"utf8"))>>>0).toString(16).padStart(8,"0");
+    let lines=conf.split("\n").filter(l=>l&&!l.startsWith("crc32=")&&!/^view\.[a-z]+\.(carplay\.(speedLimit|compass|mapNight)|guidance\.(display|line))=/.test(l));
+    lines[0]="MIBR_NAV_VIEW_PROFILES/"+v;
+    lines=lines.map(l=>l.startsWith("version=")?"version="+v:l);
+    const body=lines.join("\n")+"\n",oldConf=body+"crc32="+crc(body)+"\n";
+    Object.defineProperty(input,"files",{value:[new w.File([oldConf],"v"+v+".conf")],configurable:true});
+    input.dispatchEvent(new w.Event("change"));
+    await delay(80);
+    const st=$("#navv-status").textContent;
+    assert.ok(st.startsWith("Erfolgreich importiert"),"v"+v+" conf imported: "+st);
+    const got=clone(w.MIBR_views.get());
+    assert.equal(got.views.wide.mode,"custom");
+    assert.equal(got.views.wide.carplay.speedLimit,"user","v"+v+" speedLimit default");
+    assert.equal(got.views.wide.carplay.mapNight,"auto","v"+v+" mapNight default");
+    assert.equal(got.views.wide.guidance.display,got.global.legacyDisplay,"v"+v+" display from global");
+    w.MIBR_views.set(edited);
+  }
   // invalid per-view values rejected
   for(const [sec,key,val] of [["carplay","speedLimit","maybe"],["carplay","mapNight","night"],["guidance","display","left"],["guidance","line","x"]]){
     const bad=clone(edited);bad.views.wide[sec][key]=val;
