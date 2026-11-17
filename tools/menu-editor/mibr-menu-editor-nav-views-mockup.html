@@ -3192,6 +3192,7 @@ function parseConf(raw){
    else if(name==="mode")d.global.transition.mode=raw2;
    else{if(!/^\d+$/.test(raw2))throw Error("Ungültiger Wert "+tk[name]);d.global.transition[name]=Number(raw2)}}
  for(var id of ["center","wide","full"]){var zk="view."+id+".geometry.zoom";if(data[zk]!==undefined)d.views[id].geometry.zoom=data[zk]}
+ for(var id of ["center","wide","full"]){d.views[id].guidance.display=d.global.legacyDisplay;d.views[id].guidance.line=d.global.legacyLine}
  var extra={};for(var k of Object.keys(data))if(!knownConfKey(k))extra[k]=data[k];d.meta.extra=extra;
  for(var id of ["center","wide","full"]){var mode=data["view."+id+".mode"];if(mode===undefined&&ver==="3")mode="custom";if(!["inherit","custom"].includes(mode))throw Error("Ungültiger Modus");d.views[id].mode=mode;
    if(!old&&ver==="3"&&["x","y","w","h"].every(function(k){return data["view."+id+".safeArea."+k]===undefined}))d.views[id].safeArea=area(id);

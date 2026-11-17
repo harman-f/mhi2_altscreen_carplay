@@ -63,6 +63,23 @@ async function main(){
   const back=clone(w.MIBR_views.get());
   assert.deepEqual(back.views.wide.carplay,edited.views.wide.carplay,"carplay round trip via conf");
   assert.deepEqual(back.views.wide.guidance,edited.views.wide.guidance,"guidance round trip via conf");
+  // older v3 .conf without per-view guidance keys: views take the imported globals
+  {
+    const crc=b=>(require("node:zlib").crc32(Buffer.from(b,"utf8"))>>>0).toString(16).padStart(8,"0");
+    let lines=conf.split("\n").filter(l=>l&&!l.startsWith("crc32=")&&!/^view\.[a-z]+\.guidance\.(display|line)=/.test(l));
+    lines=lines.map(l=>l.startsWith("global.legacyDisplay=")?"global.legacyDisplay=both":l.startsWith("global.legacyLine=")?"global.legacyLine=street":l);
+    const body=lines.join("\n")+"\n",oldConf=body+"crc32="+crc(body)+"\n";
+    Object.defineProperty(input,"files",{value:[new w.File([oldConf],"old.conf")],configurable:true});
+    input.dispatchEvent(new w.Event("change"));
+    await delay(80);
+    const got=clone(w.MIBR_views.get());
+    assert.equal(got.global.legacyDisplay,"both","old conf global display imported");
+    for(const id of ["center","wide","full"]){
+      assert.equal(got.views[id].guidance.display,"both",id+" display falls back to imported global");
+      assert.equal(got.views[id].guidance.line,"street",id+" line falls back to imported global");
+    }
+    w.MIBR_views.set(edited);
+  }
   // invalid per-view values rejected
   for(const [sec,key,val] of [["carplay","speedLimit","maybe"],["carplay","mapNight","night"],["guidance","display","left"],["guidance","line","x"]]){
     const bad=clone(edited);bad.views.wide[sec][key]=val;
