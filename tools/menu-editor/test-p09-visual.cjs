@@ -71,7 +71,7 @@ function overlap(a,b){
       return {left:svg.querySelector("#center-left-dial").getAttribute("transform"),right:svg.querySelector("#center-right-dial").getAttribute("transform")};
     },view);
     if(view==="wide")assert.equal(calibrated.clip,"M162.6 0H847.9L780.3 334H229.7Z","Grid-aligned Wide (P0.9.10 measured)");
-    else if(view==="full")assert.ok(calibrated.clip.includes("L822.4 306H186.9"),"Measured Full cutout (P0.9.10)");
+    else if(view==="full")assert.ok(calibrated.clip.includes("L822.4 306L798.4 334H210.2L186.9 306"),"Measured Full cutout (P0.9.10)");
     else assert.deepEqual(calibrated,{left:"translate(-115.84 -30.6) scale(1.1772)",right:"translate(-69.14 -30.6) scale(1.1772)"},"Grid-aligned Center");
     const active=page.locator("#navv-"+view+"-svg");
     assert.equal(await active.isVisible(),true,view+" visible");

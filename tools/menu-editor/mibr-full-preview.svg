@@ -6,7 +6,7 @@
 <linearGradient id="f-cutout" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#111a2a"/><stop offset="1" stop-color="#060911"/></linearGradient>
 <pattern id="f-grid-fine" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#8f9cb0" stroke-opacity=".2" stroke-width=".6"/></pattern>
 <pattern id="f-grid-major" width="100" height="50" patternUnits="userSpaceOnUse"><path d="M100 0H0V50" fill="none" stroke="#a9b7c8" stroke-opacity=".34" stroke-width="1.2"/></pattern>
-<clipPath id="f-mainclip"><path d="M94 0H910C940 4 985 16 1010 27V274.3L862 276.6Q850 279 844 285.7L822.4 306H186.9L162 283.2Q150 277 138 275.8L0 273.7V16C30 8 70 2 94 0Z"/></clipPath>
+<clipPath id="f-mainclip"><path d="M94 0H910C940 4 985 16 1010 27V274.3L862 276.6Q850 279 844 285.7L822.4 306L798.4 334H210.2L186.9 306L162 283.2Q150 277 138 275.8L0 273.7V16C30 8 70 2 94 0Z"/></clipPath>
 </defs>
 <!-- P0.9.10: the AID10 display IS the 1010x376 stream; no bezel inset (geometry from rectified photos, AID10_CLUSTER_GEOMETRY_P099.json) -->
 <rect x="0" y="0" width="1010" height="376" fill="url(#f-display)"/>

@@ -203,7 +203,7 @@ async function main(){
   assert.ok($("#full-lower-corners")&&$("#full-map-surface")&&$("#full-speed"),"Full map and shaped lower cutouts");
   // P0.9.9: geometry measured on rectified calibration photos (stream pixels, about 3 px)
   assert.ok($("#f-mainclip path").getAttribute("d").includes("V274.3L862 276.6"),"Full clip follows measured shoulder y 274..277 (P0.9.10)");
-  assert.ok($("#f-mainclip path").getAttribute("d").includes("L822.4 306H186.9"),"Full lower edge at the measured strip y 306 (P0.9.10)");
+  assert.ok($("#f-mainclip path").getAttribute("d").includes("L822.4 306L798.4 334H210.2L186.9 306"),"Full lower edge at the measured strip y 306 (P0.9.10)");
   assert.equal($("#w-map-clip path").getAttribute("d"),"M162.6 0H847.9L780.3 334H229.7Z","Wide measured trapezoid (P0.9.10: edges x=0.2008y+162.6 / 847.9-0.2023y)");
   assert.equal($("#center-left-dial").getAttribute("transform"),"translate(-115.84 -30.6) scale(1.1772)","Center left dial = measured circle r186 at (182,186)");
   assert.equal($("#center-right-dial").getAttribute("transform"),"translate(-69.14 -30.6) scale(1.1772)","Center right dial = measured circle r186 at (822,186)");
