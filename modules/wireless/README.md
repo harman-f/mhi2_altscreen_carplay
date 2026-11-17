@@ -51,6 +51,13 @@ stock driver configuration. A stock adapter must translate actual protocol
 and cipher values without guessing their meaning. It must prove live
 freshness independently. Temporary record copies are cleared on return.
 
+`wcp_wifi_reply` converts a normalized record to the iAP2 0x5703 message ID
+and parameter bytes. The caller supplies the credential kind and compares
+snapshot/current interface and generation values. WPA2 requires a passphrase;
+the known 64-hex raw PSK form is rejected until its interoperability is proven.
+The caller must independently establish freshness and clear successful output
+after use. This function does not construct link framing or send a message.
+
 For example, a **synthetic** record is:
 
 ```text
@@ -110,8 +117,9 @@ docker run --rm --platform=linux/amd64 \
   bash modules/wireless/build/build.sh /out qnx
 ```
 
-The build emits `libmibr-wireless.a`, four objects and three fixture executables:
-`wireless-fixtures`, `wireless-reinit` and `wireless-protocol_overlap`. QNX
+The build emits `libmibr-wireless.a`, six objects and four fixture executables:
+`wireless-fixtures`, `wireless-reinit`, `wireless-protocol_overlap` and
+`wireless-wifi_reply`. QNX
 fixtures are compiled and inspected, never run as a vehicle test. Target-only
 compile assertions check ARM, QNX and 32-bit callback widths.
 Record the exact source commit, lockfile identity and output SHA-256 with the
