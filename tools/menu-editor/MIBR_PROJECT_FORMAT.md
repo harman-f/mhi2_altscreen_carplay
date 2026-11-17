@@ -52,6 +52,8 @@ Die automatische Browser-Sicherung unter `localStorage["mibr-project/1:autosave"
 }
 ```
 
+Optional (seit P0.10) kommen zwei Top-Level-Objekte hinzu, `options` und `keys` (Systemeinstellungen der Einheit, siehe Abschnitt „Systemeinstellungen“). Schema und Version bleiben `mibr-project/1` / `1`; fehlen die Felder (ältere Projektdateien), gelten die Standardwerte der Einheit.
+
 Das Beispiel zeigt **nur die Struktur**, keine vollständige oder gültig installierbare Konfiguration: `menu.tree`, `viewProfiles.global` und die drei Views benötigen konkrete Werte. Ein echter Export enthält sie. Bei Import werden die drei Fahrzeugkontexte gegeneinander geprüft. Der Menüeditor verwendet sein bewährtes JSON-Modell mit den ursprünglichen IDs und Funktionen; die View-Profile enthalten die Safe Areas `{x,y,w,h}` (x/y Ursprung links oben, Pixel, in der derzeitigen Referenz `1010×376`).
 
 ### Migration und Quellformate
@@ -108,6 +110,41 @@ SD-Transport: /mibr-config/view-profiles.conf
 ```
 
 Der Fahrzeug-Loader ist für r13 geplant und **noch nicht vorhanden**. Bis dahin ist die Datei nur ein Editor-Austauschformat; `meta.runtimeCompatible` bleibt `false`.
+
+## Systemeinstellungen (P0.10)
+
+Projektweite Einstellungen der Einheit, im Reiter „View-Konfigurator“ unter „System (Einheit)“. Gespeichert als optionale Top-Level-Felder `options` und `keys`; fehlende Teile werden mit den Standardwerten ergänzt, ungültige Werte lehnt der Import ab. Es gibt **keinen SD-Export** dieser Werte (kein Fahrzeug-Loader), die Oberfläche zeigt „Fahrzeugseite folgt“.
+
+| JSON | Einheit-Schlüssel | Werte, Standard |
+| --- | --- | --- |
+| `options.carplayNav` | `carplay_nav` (MIBR_CARPLAY_NAV/1) | Boolean, `false` |
+| `options.language` | Menüsprache | `AUTO`, `de`, `en`; `AUTO` |
+| `options.expertMode` | `expert_mode` | Boolean, `false` |
+| `options.sdLog` | `sd_log` | Boolean, `false` |
+| `options.scaling.mainZoom` / `clusterZoom` | `scaling.main.zoomFactor` / `scaling.cluster.zoomFactor` | `AUTO`, `70`, `85`, `100`, `125`, `150`; `AUTO` |
+| `options.scaling.mainPhysical` / `clusterPhysical` | `scaling.main.physicalSize` / `scaling.cluster.physicalSize` | `BASE`, `P20`, `P30`, `P50`; `BASE` |
+| `keys.viewStep` | `key.view_step` | Taste aus der Tabelle, `4/40` |
+| `keys.viewResyncLong` | `key.view_resync_long` | nur Tasten mit langem Druck (`4/40`, `4/41`, `4/44`), `4/40` |
+| `keys.carplaySwitchLong` | `key.carplay_switch_long` | wie oben, `4/44` |
+| `keys.menu` | `key.menu` | OEM-KeyListener-Code (dezimal) 16 MENU, 1 MEDIA, 2 TELEFON, 3 NAVIGATION, 5 CAR, 6 SETTINGS, 17 KLIMA, 33 HOME, 34 SMARTPHONE; `16` |
+| `keys.zoomWheelSource` | `zoom.wheel_source` | Encoder-ID `40` (rechts) oder `44` (links); `40` |
+| `keys.zoomWheelAuto` | `zoom.wheel_auto` | Boolean, `false` |
+
+Die Tastentabelle (Keyboard/Key) steht einmal im HTML (`KEYS` im Skript `mibr-system-settings`) und ist dort erweiterbar: 4/40 Lenkrad rechts Rollen-Druck, 4/41 rechts Zurück, 4/53 rechts Telefon, 4/46 links oben, 4/47 links unten, 4/44 links Rollen-Druck, 4/50 Sprache, 13/116 Home, 13/78 Menü. Die Power-Taste wird nicht angeboten.
+
+### Neue View-Schlüssel (P0.10)
+
+Pro View (`views.<id>`), wie die übrigen Schlüssel nur im Modus `custom` in der `.conf` (`view.<id>.…`); fehlen sie in älteren Dateien, gelten die Standardwerte (`guidance.display`/`line` aus den globalen Legacy-Werten):
+
+| JSON | Werte, Standard |
+| --- | --- |
+| `carplay.speedLimit` | `yes`, `no`, `user`; `user` |
+| `carplay.compass` | `yes`, `no`, `user`; `user` |
+| `carplay.mapNight` | `auto`, `light`, `dark`; `auto` |
+| `guidance.display` | `side`, `top`, `both` (nav_display); `side` |
+| `guidance.line` | `dist`, `street`, `off` (nav_line); `dist` |
+
+Fahrzeugseitig werden diese Werte je View noch nicht ausgewertet („Fahrzeugseite folgt“).
 
 ## Qualitätssicherung
 
