@@ -24,7 +24,7 @@ async function main(){
   // ---- defaults follow the unit sources
   const def=clone(sys.defaults());
   assert.deepEqual(def.keys,{viewStep:"4/40",viewResyncLong:"4/40",carplaySwitchLong:"4/44",menu:16,zoomWheelSource:40,zoomWheelAuto:false});
-  assert.deepEqual(def.options,{carplayNav:false,language:"AUTO",expertMode:false,sdLog:false,scaling:{mainZoom:"AUTO",clusterZoom:"AUTO",mainPhysical:"BASE",clusterPhysical:"BASE"}});
+  assert.deepEqual(def.options,{viewConfigMode:"global",carplayNav:false,language:"AUTO",expertMode:false,sdLog:false,scaling:{mainZoom:"AUTO",clusterZoom:"AUTO",mainPhysical:"BASE",clusterPhysical:"BASE"}});
   // key table: no power key; long-press selects only offer long-capable keys
   const table=clone(sys.keyTable());
   assert.ok(!table.some(k=>k.code==="13/88"),"power key not offered");
@@ -80,6 +80,25 @@ async function main(){
     }
     w.MIBR_views.set(edited);
   }
+  // older v1/v2 .conf with custom views: newly added per-view keys are optional and take defaults
+  for(const v of ["1","2"]){
+    const crc=b=>(require("node:zlib").crc32(Buffer.from(b,"utf8"))>>>0).toString(16).padStart(8,"0");
+    let lines=conf.split("\n").filter(l=>l&&!l.startsWith("crc32=")&&!/^view\.[a-z]+\.(carplay\.(speedLimit|compass|mapNight)|guidance\.(display|line))=/.test(l));
+    lines[0]="MIBR_NAV_VIEW_PROFILES/"+v;
+    lines=lines.map(l=>l.startsWith("version=")?"version="+v:l);
+    const body=lines.join("\n")+"\n",oldConf=body+"crc32="+crc(body)+"\n";
+    Object.defineProperty(input,"files",{value:[new w.File([oldConf],"v"+v+".conf")],configurable:true});
+    input.dispatchEvent(new w.Event("change"));
+    await delay(80);
+    const st=$("#navv-status").textContent;
+    assert.ok(st.startsWith("Erfolgreich importiert"),"v"+v+" conf imported: "+st);
+    const got=clone(w.MIBR_views.get());
+    assert.equal(got.views.wide.mode,"custom");
+    assert.equal(got.views.wide.carplay.speedLimit,"user","v"+v+" speedLimit default");
+    assert.equal(got.views.wide.carplay.mapNight,"auto","v"+v+" mapNight default");
+    assert.equal(got.views.wide.guidance.display,got.global.legacyDisplay,"v"+v+" display from global");
+    w.MIBR_views.set(edited);
+  }
   // invalid per-view values rejected
   for(const [sec,key,val] of [["carplay","speedLimit","maybe"],["carplay","mapNight","night"],["guidance","display","left"],["guidance","line","x"]]){
     const bad=clone(edited);bad.views.wide[sec][key]=val;
@@ -95,7 +114,7 @@ async function main(){
   const p0=clone(w.MIBR_project.capture());
   assert.deepEqual(p0.options,def.options);assert.deepEqual(p0.keys,def.keys);
   const p1=clone(p0);
-  p1.options={carplayNav:true,language:"en",expertMode:true,sdLog:true,scaling:{mainZoom:"125",clusterZoom:"85",mainPhysical:"P30",clusterPhysical:"P50"}};
+  p1.options={viewConfigMode:"perView",carplayNav:true,language:"en",expertMode:true,sdLog:true,scaling:{mainZoom:"125",clusterZoom:"85",mainPhysical:"P30",clusterPhysical:"P50"}};
   p1.keys={viewStep:"4/46",viewResyncLong:"4/41",carplaySwitchLong:"4/40",menu:33,zoomWheelSource:44,zoomWheelAuto:true};
   w.MIBR_project.apply(p1);
   const p2=JSON.parse(JSON.stringify(w.MIBR_project.capture()));
@@ -103,6 +122,9 @@ async function main(){
   assert.equal($("#sys-keys-menu").value,"33","UI shows loaded menu key");
   assert.equal($("#sys-scaling-mainZoom").value,"125");
   assert.equal($("#sys-options-carplayNav").value,"true");
+  assert.equal($("#sys-options-viewConfigMode").value,"perView","UI shows loaded view config mode");
+  const vm=$("#sys-options-viewConfigMode");vm.value="global";vm.dispatchEvent(new w.Event("change"));
+  assert.equal(w.MIBR_project.capture().options.viewConfigMode,"global","mode switch flows into capture");
   // UI change flows into capture
   const sel=$("#sys-keys-viewStep");sel.value="13/78";sel.dispatchEvent(new w.Event("change"));
   assert.equal(w.MIBR_project.capture().keys.viewStep,"13/78");
@@ -121,7 +143,7 @@ async function main(){
   // ---- invalid values rejected, state unchanged
   const before=JSON.stringify(w.MIBR_project.capture());
   const bads=[["keys","viewStep","13/88"],["keys","viewStep","99/1"],["keys","viewResyncLong","4/53"],["keys","carplaySwitchLong","13/116"],
-    ["keys","menu",99],["keys","zoomWheelSource",41],["keys","zoomWheelAuto","yes"],["options","language","fr"],["options","carplayNav","on"],["options","sdLog",1]];
+    ["keys","menu",99],["keys","zoomWheelSource",41],["keys","zoomWheelAuto","yes"],["options","language","fr"],["options","viewConfigMode","view"],["options","carplayNav","on"],["options","sdLog",1]];
   for(const [grp,k,v] of bads){const b=clone(p0);b[grp][k]=v;throwsMsg(()=>w.MIBR_project.validate(b),grp+"."+k+"="+v);throwsMsg(()=>w.MIBR_project.apply(b),"apply "+k);}
   for(const [k,v] of [["mainZoom","90"],["clusterPhysical","P40"]]){const b=clone(p0);b.options.scaling[k]=v;throwsMsg(()=>w.MIBR_project.validate(b),k);}
   throwsMsg(()=>w.MIBR_project.validate(Object.assign(clone(p0),{keys:"x"})),"keys not an object");
