@@ -8,7 +8,7 @@ const {chromium} = require("playwright-core");
 
 const source=path.join(__dirname,"mibr-menu-editor-nav-views-mockup.html");
 const reviewFile=path.join(__dirname,"mibr-menu-editor-nav-views-mockup.html");
-assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.9 standalone review HTML must match canonical source");
+assert.equal(fs.readFileSync(reviewFile,"utf8"),fs.readFileSync(source,"utf8"),"P0.9.10 standalone review HTML must match canonical source");
 const output=path.join(process.cwd(),"p09-visual-artifacts");
 fs.mkdirSync(output,{recursive:true});
 const chromeCandidates=[process.env.CHROME_PATH,process.env.CHROMIUM_PATH,
@@ -54,7 +54,9 @@ function overlap(a,b){
         footerX:a("footer").querySelector("text").getAttribute("x")
       };
     },view);
-    assert.deepEqual(common,{clockX:"505",clockSize:"31",temperatureX:"665",roadX:"505",distanceX:"392",etaX:"562",footerX:"283"},view+" shared layout");
+    // P0.9.10: bottom band and trip text are measured per view.
+    const perView={center:{distanceX:"392",etaX:"562",footerX:"283"},wide:{distanceX:"392",etaX:"570",footerX:"285"},full:{distanceX:"339",etaX:"633",footerX:"285"}}[view];
+    assert.deepEqual(common,{clockX:"505",clockSize:"31",temperatureX:"665",roadX:"505",...perView},view+" shared layout");
     assert.equal(await page.locator("#"+view+"-seatbelt-warning").count(),1,view+" seatbelt SVG");
     assert.equal(await page.locator("#"+view+"-yellow-road-guidance path").count(),2,view+" two yellow road paths");
     if(view==="wide"){
@@ -68,8 +70,8 @@ function overlap(a,b){
       if(v==="full")return {clip:svg.querySelector("#f-mainclip path").getAttribute("d")};
       return {left:svg.querySelector("#center-left-dial").getAttribute("transform"),right:svg.querySelector("#center-right-dial").getAttribute("transform")};
     },view);
-    if(view==="wide")assert.equal(calibrated.clip,"M162 0H847L777 335H231Z","Grid-aligned Wide");
-    else if(view==="full")assert.ok(calibrated.clip.includes("L816 335H216"),"Measured Full cutout");
+    if(view==="wide")assert.equal(calibrated.clip,"M162.6 0H847.9L780.3 334H229.7Z","Grid-aligned Wide (P0.9.10 measured)");
+    else if(view==="full")assert.ok(calibrated.clip.includes("L822.4 306H186.9"),"Measured Full cutout (P0.9.10)");
     else assert.deepEqual(calibrated,{left:"translate(-115.84 -30.6) scale(1.1772)",right:"translate(-69.14 -30.6) scale(1.1772)"},"Grid-aligned Center");
     const active=page.locator("#navv-"+view+"-svg");
     assert.equal(await active.isVisible(),true,view+" visible");
