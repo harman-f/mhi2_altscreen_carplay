@@ -622,12 +622,13 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 {
 "id": "calib.image",
 "parent": "views",
-"kind": "toggle",
+"kind": "list",
 "since": 2,
 "de": "Kalibrierbild",
 "en": "Calibration picture",
-"desc_de": "Zeigt im Cockpit statt des iPhone-Bilds ein Raster mit Pixelzahlen, um die Safe Area abzulesen. Die CarPlay-Verbindung bleibt bestehen. Endet beim Verlassen des Menüs.",
-"desc_en": "Shows a grid with pixel numbers in the cockpit instead of the iPhone picture, to read the safe area off. CarPlay stays connected. Ends when you leave the menu."
+"values": "Aus, Gitter, Schwarz, Weiß, Kontrast, Bewegung",
+"desc_de": "Zeigt im Cockpit statt des iPhone-Bilds ein Testbild (Gitter mit Pixelzahlen zum Ablesen der Safe Area, Schwarz, Weiß, Kontrast oder Bewegung). Die CarPlay-Verbindung bleibt bestehen. Endet beim Verlassen des Menüs.",
+"desc_en": "Shows a test pattern in the cockpit instead of the iPhone picture (grid with pixel numbers to read the safe area off, black, white, contrast or motion). CarPlay stays connected. Ends when you leave the menu."
 },
 {
 "id": "safe_voll",
@@ -2867,7 +2868,11 @@ connect();
 <div class="navv-card"><h3>CarPlay-Inhalte</h3>
 <div class="navv-row"><label>Kartenbild</label><select data-navv-section="carplay" data-navv-key="surface"><option value="map">Karte</option><option value="app">App-Standard</option><option value="off">Aus (experimentell)</option></select></div>
 <div class="navv-row"><label>Zusätzliche Manöverkarte</label><select data-navv-section="carplay" data-navv-key="maneuver"><option value="off">Aus</option><option value="left">Links</option><option value="right">Rechts</option><option value="top">Oben</option></select></div>
-<div class="navv-row"><label>Ankunftszeit</label><input type="checkbox" data-navv-section="carplay" data-navv-key="eta"></div></div>
+<div class="navv-row"><label>Ankunftszeit</label><input type="checkbox" data-navv-section="carplay" data-navv-key="eta"></div>
+<div class="navv-row"><label>Tempolimit</label><select data-navv-section="carplay" data-navv-key="speedLimit"><option value="user">App-Einstellung</option><option value="yes">Immer zeigen</option><option value="no">Ausblenden</option></select></div>
+<div class="navv-row"><label>Kompass</label><select data-navv-section="carplay" data-navv-key="compass"><option value="user">App-Einstellung</option><option value="yes">Immer zeigen</option><option value="no">Ausblenden</option></select></div>
+<div class="navv-row"><label>Karte Tag/Nacht</label><select data-navv-section="carplay" data-navv-key="mapNight"><option value="auto">Automatisch</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></div>
+<p class="navv-note">Tempolimit, Kompass und Karte Tag/Nacht je View: Fahrzeugseite folgt.</p></div>
 <div class="navv-card"><h3>Native Cockpit-Elemente</h3>
 <div class="navv-row"><label>Text oben</label><select data-navv-section="native" data-navv-key="topText"><option value="off">Aus</option><option value="distance">Entfernung + Straße</option><option value="street">Straße</option><option value="maneuver">Manövertext (experimentell)</option></select></div>
 <div class="navv-row"><label>Kleiner Pfeil oben</label><select data-navv-section="native" data-navv-key="topSymbol"><option value="off">Aus</option><option value="maneuver">Manöverpfeil</option><option value="lanes">Lane Guidance</option></select></div>
@@ -2884,7 +2889,10 @@ connect();
 <div class="navv-row"><label>Lane Guidance</label><select data-navv-section="guidance" data-navv-key="lane"><option value="real">Echte Fahrspuren</option><option value="synthetic">Abbiegepfeil statt Fahrspuren</option><option value="off">Aus</option></select></div>
 <div class="navv-row"><label>Quelle</label><select data-navv-section="guidance" data-navv-key="source"><option value="auto">Automatisch</option><option value="stock">Original</option><option value="phone">iPhone</option></select></div>
 <div class="navv-row"><label>Seitenstraßen im Pfeil</label><input type="checkbox" data-navv-section="guidance" data-navv-key="sideStreets"></div>
-<div class="navv-row"><label>Untere Zeitangabe</label><select data-navv-section="guidance" data-navv-key="bottom"><option value="eta">Ankunftszeit</option><option value="remaining">Restfahrzeit</option><option value="off">Aus (experimentell)</option></select></div></details>
+<div class="navv-row"><label>Untere Zeitangabe</label><select data-navv-section="guidance" data-navv-key="bottom"><option value="eta">Ankunftszeit</option><option value="remaining">Restfahrzeit</option><option value="off">Aus (experimentell)</option></select></div>
+<div class="navv-row"><label>Anzeige (nav_display)</label><select data-navv-section="guidance" data-navv-key="display"><option value="side">Seite</option><option value="top">Nur oben</option><option value="both">Seite und oben</option></select></div>
+<div class="navv-row"><label>Textzeile (nav_line)</label><select data-navv-section="guidance" data-navv-key="line"><option value="dist">Entfernung + Straße</option><option value="street">Straße</option><option value="off">Aus</option></select></div>
+<p class="navv-note">Anzeige und Textzeile je View: Fahrzeugseite folgt.</p></details>
 <p class="navv-note">Safe Areas bearbeitest du im eigenen Hauptreiter „Safe Area“. Die Werte werden gemeinsam mit dem View-Profil gespeichert.</p><button type="button" id="navv-edit-safe">Safe Area der aktiven Ansicht bearbeiten</button>
 </div></div></section>
 <details id="legacyViewFiles" class="navv-accordion"><summary>Einzelne View-Dateien (erweitert)</summary>
@@ -2910,6 +2918,24 @@ connect();
 <div class="navv-row"><label for="navv-tr-gap">Pause (ms, 100–3000)</label><input type="number" id="navv-tr-gap" data-navv-transition="gap_ms" min="100" max="3000" step="1" inputmode="numeric"></div>
 <div class="navv-row"><label for="navv-tr-min">Mindestabstand (ms, 500–60000)</label><input type="number" id="navv-tr-min" data-navv-transition="min_interval_ms" min="500" max="60000" step="1" inputmode="numeric"></div>
 <p id="navv-tr-error" class="navv-note" role="alert"></p></div></details>
+<details class="navv-accordion" id="navv-system" open><summary>System (Einheit)</summary><div class="navv-card"><h3>Systemoptionen</h3><p class="navv-note">Projektweite Einstellungen der Einheit, gespeichert in der Projektdatei (options, keys). Fahrzeugseite folgt: ein SD-Export dieser Werte ist noch nicht möglich.</p>
+<div class="navv-row"><label for="sys-options-carplayNav">CarPlay-Navigation (carplay_nav)</label><select id="sys-options-carplayNav" data-sys="options.carplayNav"><option value="false">Aus</option><option value="true">Ein</option></select></div>
+<div class="navv-row"><label for="sys-options-language">Menüsprache</label><select id="sys-options-language" data-sys="options.language"><option value="AUTO">Automatisch</option><option value="de">Deutsch</option><option value="en">English</option></select></div>
+<div class="navv-row"><label for="sys-options-expertMode">Expertenmodus</label><input type="checkbox" id="sys-options-expertMode" data-sys="options.expertMode"></div>
+<div class="navv-row"><label for="sys-options-sdLog">Protokoll auf SD-Karte (sd_log)</label><input type="checkbox" id="sys-options-sdLog" data-sys="options.sdLog"></div></div>
+<div class="navv-card"><h3>Skalierung</h3><p class="navv-note">Zoom und physische Größe je Display (scaling.*). Wirkt nach dem Neuverbinden.</p>
+<div class="navv-row"><label for="sys-scaling-mainZoom">Hauptdisplay: Zoom</label><select id="sys-scaling-mainZoom" data-sys="options.scaling.mainZoom"><option value="AUTO">Automatisch</option><option value="70">70 %</option><option value="85">85 %</option><option value="100">100 %</option><option value="125">125 %</option><option value="150">150 %</option></select></div>
+<div class="navv-row"><label for="sys-scaling-clusterZoom">Kombiinstrument: Zoom</label><select id="sys-scaling-clusterZoom" data-sys="options.scaling.clusterZoom"><option value="AUTO">Automatisch</option><option value="70">70 %</option><option value="85">85 %</option><option value="100">100 %</option><option value="125">125 %</option><option value="150">150 %</option></select></div>
+<div class="navv-row"><label for="sys-scaling-mainPhysical">Hauptdisplay: physische Größe</label><select id="sys-scaling-mainPhysical" data-sys="options.scaling.mainPhysical"><option value="BASE">BASE</option><option value="P20">P20</option><option value="P30">P30</option><option value="P50">P50</option></select></div>
+<div class="navv-row"><label for="sys-scaling-clusterPhysical">Kombiinstrument: physische Größe</label><select id="sys-scaling-clusterPhysical" data-sys="options.scaling.clusterPhysical"><option value="BASE">BASE</option><option value="P20">P20</option><option value="P30">P30</option><option value="P50">P50</option></select></div></div>
+<div class="navv-card"><h3>Tasten</h3><p class="navv-note">Lenkrad- und Head-Unit-Tasten (Keyboard/Key). Lange Druckfunktionen bieten nur Tasten an, die einen langen Druck auswerten. Fahrzeugseite folgt.</p>
+<div class="navv-row"><label for="sys-keys-viewStep">View weiterschalten (key.view_step)</label><select id="sys-keys-viewStep" data-sys="keys.viewStep"></select></div>
+<div class="navv-row"><label for="sys-keys-viewResyncLong">View-Zähler neu synchronisieren, lang (key.view_resync_long)</label><select id="sys-keys-viewResyncLong" data-sys="keys.viewResyncLong"></select></div>
+<div class="navv-row"><label for="sys-keys-carplaySwitchLong">CarPlay/Nativ umschalten, lang (key.carplay_switch_long)</label><select id="sys-keys-carplaySwitchLong" data-sys="keys.carplaySwitchLong"></select></div>
+<div class="navv-row"><label for="sys-keys-menu">MIBR-Menü schließen (key.menu)</label><select id="sys-keys-menu" data-sys="keys.menu"></select></div>
+<div class="navv-row"><label for="sys-keys-zoomWheelSource">Kartenzoom: Lenkrad-Rad (zoom.wheel_source)</label><select id="sys-keys-zoomWheelSource" data-sys="keys.zoomWheelSource"></select></div>
+<div class="navv-row"><label for="sys-keys-zoomWheelAuto">Kartenzoom automatisch per Lenkrad (zoom.wheel_auto)</label><input type="checkbox" id="sys-keys-zoomWheelAuto" data-sys="keys.zoomWheelAuto"></div>
+<div class="navv-buttons"><button type="button" id="sys-reset">System zurücksetzen</button></div></div></details>
 <details class="navv-accordion"><summary>Fahrzeugbefunde und technische Hinweise</summary><div class="navv-card"><h3>Reale Testzustände am MU1440 / AID10</h3><table><thead><tr><th>Menüwert</th><th>Text oben</th><th>Kleiner Pfeil</th><th>Tube rechts</th></tr></thead><tbody><tr><td>Side and Top</td><td>Ja</td><td>Ja</td><td>Ja</td></tr><tr><td>Top only</td><td>Nein</td><td>Nein</td><td>Ja</td></tr><tr><td>Side</td><td>Ja</td><td>Nein</td><td>Ja</td></tr></tbody></table><p class="navv-note">Quelle: die drei Fahrzeugaufnahmen vom 10.11.2026. Die Pfeilform kann sich durch die Navigationsroute selbst ändern. Die Tabelle belegt nicht unabhängig schaltbare BAP-Kanäle.</p><p>Im bisherigen Code: Manöver via MANEUVER_DESCRIPTOR, Text via updateBapTurnToInfo, obere Symbole über updateBapLaneGuidance. Der bisherige Schalter nav_side steuert Seitenstraßen, nicht Tube ein/aus.</p></div></details>
 
 </div></div>
@@ -2927,7 +2953,7 @@ function vehicle(){return window.MIBR_getVehicle?window.MIBR_getVehicle():{brand
 function area(id){return clone({center:{x:380,y:130,w:250,h:160},wide:{x:250,y:130,w:505,h:160},full:{x:10,y:130,w:990,h:140}}[id])}
 var ZOOMS=["inherit","70","85","100","125","150"],TR_MODES=["cycle","panels"],CONF_ID=["center","wide","full"];
 function transitionDefaults(){return {enabled:false,mode:"cycle",gap_ms:500,min_interval_ms:3000}}
-function viewDefaults(id){return {mode:"custom",safeArea:area(id),geometry:{zoom:"inherit"},mockup:{background:"grid"},carplay:{surface:"map",maneuver:"off",eta:true},native:{topText:"off",topSymbol:"off",tube:"on",tubeDistance:true,dialLanes:true,bottomDistance:true,bottomEta:true},guidance:{lane:"real",source:"auto",sideStreets:true,bottom:"eta"}}}
+function viewDefaults(id){return {mode:"custom",safeArea:area(id),geometry:{zoom:"inherit"},mockup:{background:"grid"},carplay:{surface:"map",maneuver:"off",eta:true,speedLimit:"user",compass:"user",mapNight:"auto"},native:{topText:"off",topSymbol:"off",tube:"on",tubeDistance:true,dialLanes:true,bottomDistance:true,bottomEta:true},guidance:{lane:"real",source:"auto",sideStreets:true,bottom:"eta",display:"side",line:"dist"}}}
 function sample(){return {schema:schema,version:3,vehicle:vehicle(),global:{source:"auto",legacyDisplay:"side",legacyLine:"dist",legacyLanes:true,sideStreets:true,bottom:"eta",transition:transitionDefaults()},views:{center:viewDefaults("center"),wide:viewDefaults("wide"),full:viewDefaults("full")},meta:{runtimeCompatible:false,extra:{}}}}
 function safeValid(v){return !!v&&["x","y","w","h"].every(function(k){return Number.isInteger(v[k])})&&v.x>=0&&v.y>=0&&v.w>=100&&v.h>=60&&v.x+v.w<=1010&&v.y+v.h<=376}
 function migrate(d){
@@ -2951,6 +2977,11 @@ function upgrade(d){
  return n;
 }
 function intIn(v,lo,hi){return typeof v==="number"&&Number.isInteger(v)&&v>=lo&&v<=hi}
+/* Per-view keys added after /3 was published: files without them get the defaults (display and line from the global legacy values). */
+function fillViewKeys(v,g){
+ var def={carplay:{speedLimit:"user",compass:"user",mapNight:"auto"},guidance:{display:g.legacyDisplay,line:g.legacyLine}};
+ for(var sec of Object.keys(def))if(v[sec]&&typeof v[sec]==="object")for(var p of Object.keys(def[sec]))if(v[sec][p]===undefined)v[sec][p]=def[sec][p];
+}
 function checkTransition(t){
  if(!t||typeof t!=="object"||typeof t.enabled!=="boolean"||!TR_MODES.includes(t.mode)||!intIn(t.gap_ms,100,3000)||!intIn(t.min_interval_ms,500,60000))throw Error("Ungültiger Übergang (enabled, mode, gap_ms 100–3000, min_interval_ms 500–60000)");
 }
@@ -2972,11 +3003,11 @@ function checkExtra(x){
 }
 function check(d){
  if(!d||d.schema!==schema||d.version!==3||!d.vehicle||!["skoda","vw","seat","audi"].includes(d.vehicle.brand)||!["MU1440","MU1409","MU1447"].includes(d.vehicle.headUnit)||!["AID10","other"].includes(d.vehicle.cluster))throw Error("Schema oder Fahrzeugprofil ungültig");
- var spec={carplay:{surface:["map","app","off"],maneuver:["off","left","right","top"],eta:[true,false]},native:{topText:["off","distance","street","maneuver"],topSymbol:["off","maneuver","lanes"],tube:["on","off"],tubeDistance:[true,false],dialLanes:[true,false],bottomDistance:[true,false],bottomEta:[true,false]},guidance:{lane:["real","synthetic","off"],source:["auto","stock","phone"],sideStreets:[true,false],bottom:["eta","remaining","off"]}};
+ var spec={carplay:{surface:["map","app","off"],maneuver:["off","left","right","top"],eta:[true,false],speedLimit:["yes","no","user"],compass:["yes","no","user"],mapNight:["auto","light","dark"]},native:{topText:["off","distance","street","maneuver"],topSymbol:["off","maneuver","lanes"],tube:["on","off"],tubeDistance:[true,false],dialLanes:[true,false],bottomDistance:[true,false],bottomEta:[true,false]},guidance:{lane:["real","synthetic","off"],source:["auto","stock","phone"],sideStreets:[true,false],bottom:["eta","remaining","off"],display:["side","top","both"],line:["dist","street","off"]}};
  if(!d.global||!["auto","stock","phone"].includes(d.global.source)||!["side","top","both"].includes(d.global.legacyDisplay)||!["dist","street","off"].includes(d.global.legacyLine)||typeof d.global.legacyLanes!=="boolean"||typeof d.global.sideStreets!=="boolean"||!["eta","remaining"].includes(d.global.bottom))throw Error("Ungültige globale Werte");
  if(d.global.transition===undefined)d.global.transition=transitionDefaults();checkTransition(d.global.transition);
  if(!d.meta||typeof d.meta!=="object")d.meta={runtimeCompatible:false};if(d.meta.extra===undefined)d.meta.extra={};checkExtra(d.meta.extra);
- for(var id of ["center","wide","full"]){var v=d.views&&d.views[id];if(!v||!["inherit","custom"].includes(v.mode)||!safeValid(v.safeArea))throw Error("Ungültiger View oder Safe Area: "+id);if(v.geometry===undefined)v.geometry={zoom:"inherit"};if(!v.geometry||typeof v.geometry!=="object"||typeof v.geometry.zoom!=="string"||!ZOOMS.includes(v.geometry.zoom))throw Error("Ungültiger Zoom (erlaubt: inherit, 70, 85, 100, 125, 150): "+id);if(!v.mockup)v.mockup={background:"grid"};if(!["grid","plain","map"].includes(v.mockup.background))throw Error("Ungültiger Vorschau-Hintergrund: "+id);if(v.native){for(var field of ["tubeDistance","dialLanes","bottomDistance","bottomEta"])if(v.native[field]===undefined)v.native[field]=true}if(v.mode==="inherit")continue;for(var section of Object.keys(spec))for(var prop of Object.keys(spec[section]))if(!v[section]||!spec[section][prop].includes(v[section][prop]))throw Error("Ungültiger Wert "+id+"."+section+"."+prop)}
+ for(var id of ["center","wide","full"]){var v=d.views&&d.views[id];if(!v||!["inherit","custom"].includes(v.mode)||!safeValid(v.safeArea))throw Error("Ungültiger View oder Safe Area: "+id);if(v.geometry===undefined)v.geometry={zoom:"inherit"};if(!v.geometry||typeof v.geometry!=="object"||typeof v.geometry.zoom!=="string"||!ZOOMS.includes(v.geometry.zoom))throw Error("Ungültiger Zoom (erlaubt: inherit, 70, 85, 100, 125, 150): "+id);if(!v.mockup)v.mockup={background:"grid"};if(!["grid","plain","map"].includes(v.mockup.background))throw Error("Ungültiger Vorschau-Hintergrund: "+id);if(v.native){for(var field of ["tubeDistance","dialLanes","bottomDistance","bottomEta"])if(v.native[field]===undefined)v.native[field]=true}fillViewKeys(v,d.global);if(v.mode==="inherit")continue;for(var section of Object.keys(spec))for(var prop of Object.keys(spec[section]))if(!v[section]||!spec[section][prop].includes(v[section][prop]))throw Error("Ungültiger Wert "+id+"."+section+"."+prop)}
  return d;
 }
 var state;
@@ -2986,7 +3017,7 @@ state.vehicle=vehicle();
 window.MIBR_safe.select(current,true);
 function syncToSafe(){for(var id of ["center","wide","full"])window.MIBR_safe.set(id,state.views[id].safeArea);safeViewRendered=""}
 syncToSafe();
-function inherited(){var g=state.global;return {mode:"custom",carplay:{surface:"map",maneuver:"off",eta:true},native:{topText:g.legacyDisplay==="top"?"off":g.legacyLine==="off"?"off":g.legacyLine==="street"?"street":"distance",topSymbol:g.legacyDisplay==="both"?"maneuver":"off",tube:"on",tubeDistance:true,dialLanes:true,bottomDistance:true,bottomEta:true},mockup:{background:"grid"},guidance:{lane:g.legacyLanes?"real":"synthetic",source:g.source,sideStreets:g.sideStreets,bottom:g.bottom}}}
+function inherited(){var g=state.global;return {mode:"custom",carplay:{surface:"map",maneuver:"off",eta:true,speedLimit:"user",compass:"user",mapNight:"auto"},native:{topText:g.legacyDisplay==="top"?"off":g.legacyLine==="off"?"off":g.legacyLine==="street"?"street":"distance",topSymbol:g.legacyDisplay==="both"?"maneuver":"off",tube:"on",tubeDistance:true,dialLanes:true,bottomDistance:true,bottomEta:true},mockup:{background:"grid"},guidance:{lane:g.legacyLanes?"real":"synthetic",source:g.source,sideStreets:g.sideStreets,bottom:g.bottom,display:g.legacyDisplay,line:g.legacyLine}}}
 function effective(){return state.views[current].mode==="inherit"?inherited():state.views[current]}
 function save(){try{localStorage.setItem(key,JSON.stringify(state))}catch(e){}window.dispatchEvent(new CustomEvent("mibr:viewschange"))}
 function selectView(id,source){
@@ -3161,6 +3192,7 @@ function parseConf(raw){
    else if(name==="mode")d.global.transition.mode=raw2;
    else{if(!/^\d+$/.test(raw2))throw Error("Ungültiger Wert "+tk[name]);d.global.transition[name]=Number(raw2)}}
  for(var id of ["center","wide","full"]){var zk="view."+id+".geometry.zoom";if(data[zk]!==undefined)d.views[id].geometry.zoom=data[zk]}
+ for(var id of ["center","wide","full"]){d.views[id].guidance.display=d.global.legacyDisplay;d.views[id].guidance.line=d.global.legacyLine}
  var extra={};for(var k of Object.keys(data))if(!knownConfKey(k))extra[k]=data[k];d.meta.extra=extra;
  for(var id of ["center","wide","full"]){var mode=data["view."+id+".mode"];if(mode===undefined&&ver==="3")mode="custom";if(!["inherit","custom"].includes(mode))throw Error("Ungültiger Modus");d.views[id].mode=mode;
    if(!old&&ver==="3"&&["x","y","w","h"].every(function(k){return data["view."+id+".safeArea."+k]===undefined}))d.views[id].safeArea=area(id);
@@ -3212,7 +3244,7 @@ render();
 (function(){
   "use strict";
   var nav=document.getElementById("navv-layer"), originals=new WeakMap();
-  var dictionary={"Safe Area der aktiven Ansicht bearbeiten":"Edit safe area for active view","Guidance-Mapping (experimentell)":"Guidance mapping (experimental)","Quelle und Interpretation von Navigationsdaten. Diese Optionen sind nicht gleichbedeutend mit dem Ein-/Ausblenden nativer Cockpit-Elemente und derzeit nicht unabhängig am Fahrzeug bestätigt.":"Navigation data source and interpretation. These do not equal toggles for native cockpit elements, and independent vehicle support remains unverified.","Profilverwaltung · Vererbung, Kopieren und Zurücksetzen":"Profile management · defaults, copy and reset","Individuelles Profil":"Individual profile","Globale Standardwerte verwenden":"Use global defaults","Einstellungen kopieren":"Copy settings","Profil zurücksetzen":"Reset profile","Kopieren und Zurücksetzen betreffen die Navi- und CarPlay-Einstellungen. Safe Area und Bildgeometrie bleiben unverändert.":"Copy and reset affect navigation and CarPlay settings only. Safe area and image geometry are preserved.","Globale Werte aktiv – die Einstellungen unten sind gesperrt. Unter Profilverwaltung kannst du auf individuell umstellen.":"Global defaults active – controls below are locked. Switch to an individual profile under profile management.","Individuelle Einstellungen für Center · Änderungen wirken direkt auf die Vorschau.":"Individual settings for Center · changes update the preview immediately.","Individuelle Einstellungen für Wide · Änderungen wirken direkt auf die Vorschau.":"Individual settings for Wide · changes update the preview immediately.","Individuelle Einstellungen für Voll · Änderungen wirken direkt auf die Vorschau.":"Individual settings for Full · changes update the preview immediately.","Vorschau-Hintergrund (nur Editor)":"Preview background (editor only)","Kalibrier-Grid":"Calibration grid","Neutral":"Neutral","Schematische Karte":"Schematic map","Live-Vorschau:":"Live preview:","Profilmodus":"Profile mode","Großansicht":"Full-screen preview","Großer Pfeil (Voll: nicht vorhanden)":"Large arrow (not available in Full)","Distanz rechts (nicht vorhanden)":"Right-hand distance (not available)","Lane-Symbole rechts (nicht vorhanden)":"Right-hand lane indicators (not available)","Großer Pfeil (rechte Seitenkarte)":"Large arrow (right side panel)","Distanz rechts":"Right-hand distance","Lane-Symbole rechts":"Right-hand lane indicators","Voll: großflächige Karte ohne rechte Tube. Die Tube-Einstellung ist in dieser Vorschau nicht anwendbar; keine BAP-Simulation.":"Full: large map without right-hand dial. Right-hand arrow settings do not apply here; BAP behavior is not simulated.","Wide: schräge Seitenmodule mit Navigationspfeil und Lane-Symbolen rechts. Nur Mock-up, keine Fahrzeug-BAP-Simulation.":"Wide: sloped side modules with right-hand navigation arrow and lane symbols. Mock-up only; no vehicle BAP simulation.","Center: zwei Rundinstrumente mit Kartenfläche. Getrennte SVG-Ebenen, keine BAP-Simulation.":"Center: two circular gauges with map area. Separate SVG layers; no BAP simulation.","View-Konfigurator":"View configurator","Profil kopieren nach":"Copy profile to","Kopieren":"Copy","View zurücksetzen":"Reset view","Bildbereich / Safe Area":"Display area / safe area","Gemeinsame Vorgaben (alle Views)":"Shared defaults (all views)","Fahrzeugbefunde und technische Hinweise":"Vehicle observations and technical notes","View-Profile importieren / exportieren":"Import / export view profiles","View-Profil-Dateien":"View profile files","JSON-Vorschau":"JSON preview","View-Profile sind experimentell und ändern das Fahrzeug nicht direkt.":"View profiles are experimental and do not directly change the vehicle.","Center, Wide und Voll werden als vollständige Cockpit-Profile konfiguriert: CarPlay, native Navigation und Safe Area gehören zusammen. Die Profile sind noch nicht auf dem Fahrzeug installierbar.":"Center, Wide and Full are complete cockpit profiles: CarPlay, native navigation and safe area in one place. They cannot yet be installed in the vehicle.","Navigation erbt globale Werte; die Safe Area bleibt pro View individuell.":"Navigation inherits global values; safe area remains specific to each view.","Eigenständiges Navigationsprofil für diese Ansicht.":"Independent navigation profile for this view.","View-Konfiguration mibr.nav-view-profiles/3 mit Safe Areas, Bildgeometrie und Übergang. Die Menüdatei MIBR_MENU/1 wird ausschließlich im Menü-Editor verwaltet. Kein Fahrzeug-Loader für View-Profile.":"View configuration mibr.nav-view-profiles/3 includes safe areas, image geometry and transition. The MIBR_MENU/1 menu file belongs exclusively to the menu editor. No vehicle loader for view profiles.","View-spezifische Navigation":"View-specific navigation","Die bestehende Menübaum-Bearbeitung bleibt im Original-Editor vollständig erhalten. Hier werden zusätzliche, noch nicht installierbare Navigationsprofile prototypisch konfiguriert.":"The original menu-tree editor remains fully functional. Additional navigation profiles are configured here as an experimental mock-up; they cannot yet be installed.","Cockpit-Views":"Cockpit views","Gemeinsame Werte":"Shared settings","Fahrzeugbefunde":"Vehicle observations","Import / Export":"Import / export","Aktive Cockpit-Ansicht":"Active cockpit view","Voll":"Full","Profilmodus":"Profile mode","Individuell":"Custom","Globale Werte erben":"Inherit shared values","Live-Vorschau:":"Live preview:","Schematische Darstellung. Die echte AID10-/BAP-Wirkung wird nicht simuliert.":"Schematic preview. Actual AID10/BAP behavior is not simulated.","CarPlay-Inhalte":"CarPlay content","Kartenbild":"Map surface","Karte":"Map","App-Standard":"App default","Aus (experimentell)":"Off (experimental)","Zusätzliche Manöverkarte":"Additional maneuver card","Aus":"Off","Links":"Left","Rechts":"Right","Oben":"Top","Ankunftszeit":"Arrival time","Native Cockpit-Elemente":"Native cockpit elements","Text oben":"Top text","Entfernung + Straße":"Distance + street","Straße":"Street","Manövertext (experimentell)":"Maneuver text (experimental)","Kleiner Pfeil oben":"Small top arrow","Manöverpfeil":"Maneuver arrow","Großer Pfeil (rechte Tube)":"Large arrow (right dial)","Ein":"On","Guidance-Mapping":"Guidance mapping","Echte Fahrspuren":"Real lane guidance","Abbiegepfeil statt Fahrspuren":"Maneuver arrow instead of lanes","Quelle":"Source","Automatisch":"Automatic","Original":"Stock","Seitenstraßen im Pfeil":"Side streets in arrow","Untere Zeitangabe":"Lower time label","Restfahrzeit":"Remaining travel time","Bestehende globale Schalter als Vorgaben":"Existing shared switches as defaults","Die hier konfigurierten Werte ändern keine Fahrzeugdateien.":"The values configured here do not modify vehicle files.","nav_side (Seitenstraßen)":"nav_side (side streets)","Reale Testzustände am MU1440 / AID10":"Observed MU1440 / AID10 states","Menüwert":"Menu value","Kleiner Pfeil":"Small arrow","Tube rechts":"Right dial","Quelle: die drei Fahrzeugaufnahmen vom 10.11.2026. Die Pfeilform kann sich durch die Navigationsroute selbst ändern. Die Tabelle belegt nicht unabhängig schaltbare BAP-Kanäle.":"Source: three vehicle photos from November 10, 2026. The arrow shapes may change with the active route. The table does not prove independent BAP channels.","Im bisherigen Code: Manöver via MANEUVER_DESCRIPTOR, Text via updateBapTurnToInfo, obere Symbole über updateBapLaneGuidance. Der bisherige Schalter nav_side steuert Seitenstraßen, nicht Tube ein/aus.":"Existing code: maneuvers via MANEUVER_DESCRIPTOR, text via updateBapTurnToInfo, top symbols via updateBapLaneGuidance. The old nav_side switch controls side streets, not the right-dial visibility.","Versionierte Navigations-Profile":"Versioned navigation profiles","Eigenständiger experimenteller Vertrag mibr.nav-view-profiles/1. Alte Menüs weiter über MIBR_MENU/1 im originalen Editor importieren und exportieren. Kein Fahrzeug-Loader.":"Separate experimental contract mibr.nav-view-profiles/1. Continue using the original editor for MIBR_MENU/1 menus. No vehicle loader is available.","JSON exportieren":"Export JSON",".conf exportieren":"Export .conf","JSON/.conf importieren":"Import JSON/.conf","Zurücksetzen":"Reset","Keine Datei importiert.":"No file imported.","JSON-Vorschau":"JSON preview","Erbt die globalen Legacy-Werte. Zum Bearbeiten auf individuell umstellen.":"Inherits shared legacy values. Switch to custom to edit.","Eigenständiges Profil für diese Cockpit-Ansicht.":"Independent profile for this cockpit view.","Keine offensichtlichen Konflikte im Mock-up. Kein Fahrzeugsignal.":"No obvious conflicts in the mock-up. No vehicle connection.","Tube-Aus nicht am AID10 nachgewiesen.":"Disabling the right dial is not yet verified on AID10.","Synthetischer Pfeil kollidiert möglicherweise mit echter Lane Guidance.":"The synthetic arrow may conflict with real lane guidance.","Lane-Symbol bei deaktivierter Lane Guidance.":"Lane symbol shown with lane guidance disabled.","Bildgeometrie":"Image geometry","Global (erben)":"Global (inherit)","Wirkt beim View-Wechsel, falls der Live-Wechsel (P8) am Fahrzeug bestätigt ist; sonst beim nächsten Verbinden.":"Applied on view change if the live switch (P8) is confirmed on the vehicle; otherwise on next connect.","Übergang":"Transition","Steuert den Wechsel zwischen den Cockpit-Ansichten. Kein Fahrzeug-Loader vorhanden.":"Controls switching between cockpit views. No vehicle loader is available.","Übergang aktiv":"Transition enabled","Übergangsmodus":"Transition mode","Zyklus (cycle)":"Cycle","Pause (ms, 100–3000)":"Gap (ms, 100–3000)","Mindestabstand (ms, 500–60000)":"Minimum interval (ms, 500–60000)"};
+  var dictionary={"Safe Area der aktiven Ansicht bearbeiten":"Edit safe area for active view","Guidance-Mapping (experimentell)":"Guidance mapping (experimental)","Quelle und Interpretation von Navigationsdaten. Diese Optionen sind nicht gleichbedeutend mit dem Ein-/Ausblenden nativer Cockpit-Elemente und derzeit nicht unabhängig am Fahrzeug bestätigt.":"Navigation data source and interpretation. These do not equal toggles for native cockpit elements, and independent vehicle support remains unverified.","Profilverwaltung · Vererbung, Kopieren und Zurücksetzen":"Profile management · defaults, copy and reset","Individuelles Profil":"Individual profile","Globale Standardwerte verwenden":"Use global defaults","Einstellungen kopieren":"Copy settings","Profil zurücksetzen":"Reset profile","Kopieren und Zurücksetzen betreffen die Navi- und CarPlay-Einstellungen. Safe Area und Bildgeometrie bleiben unverändert.":"Copy and reset affect navigation and CarPlay settings only. Safe area and image geometry are preserved.","Globale Werte aktiv – die Einstellungen unten sind gesperrt. Unter Profilverwaltung kannst du auf individuell umstellen.":"Global defaults active – controls below are locked. Switch to an individual profile under profile management.","Individuelle Einstellungen für Center · Änderungen wirken direkt auf die Vorschau.":"Individual settings for Center · changes update the preview immediately.","Individuelle Einstellungen für Wide · Änderungen wirken direkt auf die Vorschau.":"Individual settings for Wide · changes update the preview immediately.","Individuelle Einstellungen für Voll · Änderungen wirken direkt auf die Vorschau.":"Individual settings for Full · changes update the preview immediately.","Vorschau-Hintergrund (nur Editor)":"Preview background (editor only)","Kalibrier-Grid":"Calibration grid","Neutral":"Neutral","Schematische Karte":"Schematic map","Live-Vorschau:":"Live preview:","Profilmodus":"Profile mode","Großansicht":"Full-screen preview","Großer Pfeil (Voll: nicht vorhanden)":"Large arrow (not available in Full)","Distanz rechts (nicht vorhanden)":"Right-hand distance (not available)","Lane-Symbole rechts (nicht vorhanden)":"Right-hand lane indicators (not available)","Großer Pfeil (rechte Seitenkarte)":"Large arrow (right side panel)","Distanz rechts":"Right-hand distance","Lane-Symbole rechts":"Right-hand lane indicators","Voll: großflächige Karte ohne rechte Tube. Die Tube-Einstellung ist in dieser Vorschau nicht anwendbar; keine BAP-Simulation.":"Full: large map without right-hand dial. Right-hand arrow settings do not apply here; BAP behavior is not simulated.","Wide: schräge Seitenmodule mit Navigationspfeil und Lane-Symbolen rechts. Nur Mock-up, keine Fahrzeug-BAP-Simulation.":"Wide: sloped side modules with right-hand navigation arrow and lane symbols. Mock-up only; no vehicle BAP simulation.","Center: zwei Rundinstrumente mit Kartenfläche. Getrennte SVG-Ebenen, keine BAP-Simulation.":"Center: two circular gauges with map area. Separate SVG layers; no BAP simulation.","View-Konfigurator":"View configurator","Profil kopieren nach":"Copy profile to","Kopieren":"Copy","View zurücksetzen":"Reset view","Bildbereich / Safe Area":"Display area / safe area","Gemeinsame Vorgaben (alle Views)":"Shared defaults (all views)","Fahrzeugbefunde und technische Hinweise":"Vehicle observations and technical notes","View-Profile importieren / exportieren":"Import / export view profiles","View-Profil-Dateien":"View profile files","JSON-Vorschau":"JSON preview","View-Profile sind experimentell und ändern das Fahrzeug nicht direkt.":"View profiles are experimental and do not directly change the vehicle.","Center, Wide und Voll werden als vollständige Cockpit-Profile konfiguriert: CarPlay, native Navigation und Safe Area gehören zusammen. Die Profile sind noch nicht auf dem Fahrzeug installierbar.":"Center, Wide and Full are complete cockpit profiles: CarPlay, native navigation and safe area in one place. They cannot yet be installed in the vehicle.","Navigation erbt globale Werte; die Safe Area bleibt pro View individuell.":"Navigation inherits global values; safe area remains specific to each view.","Eigenständiges Navigationsprofil für diese Ansicht.":"Independent navigation profile for this view.","View-Konfiguration mibr.nav-view-profiles/3 mit Safe Areas, Bildgeometrie und Übergang. Die Menüdatei MIBR_MENU/1 wird ausschließlich im Menü-Editor verwaltet. Kein Fahrzeug-Loader für View-Profile.":"View configuration mibr.nav-view-profiles/3 includes safe areas, image geometry and transition. The MIBR_MENU/1 menu file belongs exclusively to the menu editor. No vehicle loader for view profiles.","View-spezifische Navigation":"View-specific navigation","Die bestehende Menübaum-Bearbeitung bleibt im Original-Editor vollständig erhalten. Hier werden zusätzliche, noch nicht installierbare Navigationsprofile prototypisch konfiguriert.":"The original menu-tree editor remains fully functional. Additional navigation profiles are configured here as an experimental mock-up; they cannot yet be installed.","Cockpit-Views":"Cockpit views","Gemeinsame Werte":"Shared settings","Fahrzeugbefunde":"Vehicle observations","Import / Export":"Import / export","Aktive Cockpit-Ansicht":"Active cockpit view","Voll":"Full","Profilmodus":"Profile mode","Individuell":"Custom","Globale Werte erben":"Inherit shared values","Live-Vorschau:":"Live preview:","Schematische Darstellung. Die echte AID10-/BAP-Wirkung wird nicht simuliert.":"Schematic preview. Actual AID10/BAP behavior is not simulated.","CarPlay-Inhalte":"CarPlay content","Kartenbild":"Map surface","Karte":"Map","App-Standard":"App default","Aus (experimentell)":"Off (experimental)","Zusätzliche Manöverkarte":"Additional maneuver card","Aus":"Off","Links":"Left","Rechts":"Right","Oben":"Top","Ankunftszeit":"Arrival time","Native Cockpit-Elemente":"Native cockpit elements","Text oben":"Top text","Entfernung + Straße":"Distance + street","Straße":"Street","Manövertext (experimentell)":"Maneuver text (experimental)","Kleiner Pfeil oben":"Small top arrow","Manöverpfeil":"Maneuver arrow","Großer Pfeil (rechte Tube)":"Large arrow (right dial)","Ein":"On","Guidance-Mapping":"Guidance mapping","Echte Fahrspuren":"Real lane guidance","Abbiegepfeil statt Fahrspuren":"Maneuver arrow instead of lanes","Quelle":"Source","Automatisch":"Automatic","Original":"Stock","Seitenstraßen im Pfeil":"Side streets in arrow","Untere Zeitangabe":"Lower time label","Restfahrzeit":"Remaining travel time","Bestehende globale Schalter als Vorgaben":"Existing shared switches as defaults","Die hier konfigurierten Werte ändern keine Fahrzeugdateien.":"The values configured here do not modify vehicle files.","nav_side (Seitenstraßen)":"nav_side (side streets)","Reale Testzustände am MU1440 / AID10":"Observed MU1440 / AID10 states","Menüwert":"Menu value","Kleiner Pfeil":"Small arrow","Tube rechts":"Right dial","Quelle: die drei Fahrzeugaufnahmen vom 10.11.2026. Die Pfeilform kann sich durch die Navigationsroute selbst ändern. Die Tabelle belegt nicht unabhängig schaltbare BAP-Kanäle.":"Source: three vehicle photos from November 10, 2026. The arrow shapes may change with the active route. The table does not prove independent BAP channels.","Im bisherigen Code: Manöver via MANEUVER_DESCRIPTOR, Text via updateBapTurnToInfo, obere Symbole über updateBapLaneGuidance. Der bisherige Schalter nav_side steuert Seitenstraßen, nicht Tube ein/aus.":"Existing code: maneuvers via MANEUVER_DESCRIPTOR, text via updateBapTurnToInfo, top symbols via updateBapLaneGuidance. The old nav_side switch controls side streets, not the right-dial visibility.","Versionierte Navigations-Profile":"Versioned navigation profiles","Eigenständiger experimenteller Vertrag mibr.nav-view-profiles/1. Alte Menüs weiter über MIBR_MENU/1 im originalen Editor importieren und exportieren. Kein Fahrzeug-Loader.":"Separate experimental contract mibr.nav-view-profiles/1. Continue using the original editor for MIBR_MENU/1 menus. No vehicle loader is available.","JSON exportieren":"Export JSON",".conf exportieren":"Export .conf","JSON/.conf importieren":"Import JSON/.conf","Zurücksetzen":"Reset","Keine Datei importiert.":"No file imported.","JSON-Vorschau":"JSON preview","Erbt die globalen Legacy-Werte. Zum Bearbeiten auf individuell umstellen.":"Inherits shared legacy values. Switch to custom to edit.","Eigenständiges Profil für diese Cockpit-Ansicht.":"Independent profile for this cockpit view.","Keine offensichtlichen Konflikte im Mock-up. Kein Fahrzeugsignal.":"No obvious conflicts in the mock-up. No vehicle connection.","Tube-Aus nicht am AID10 nachgewiesen.":"Disabling the right dial is not yet verified on AID10.","Synthetischer Pfeil kollidiert möglicherweise mit echter Lane Guidance.":"The synthetic arrow may conflict with real lane guidance.","Lane-Symbol bei deaktivierter Lane Guidance.":"Lane symbol shown with lane guidance disabled.","Bildgeometrie":"Image geometry","Global (erben)":"Global (inherit)","Wirkt beim View-Wechsel, falls der Live-Wechsel (P8) am Fahrzeug bestätigt ist; sonst beim nächsten Verbinden.":"Applied on view change if the live switch (P8) is confirmed on the vehicle; otherwise on next connect.","Übergang":"Transition","Steuert den Wechsel zwischen den Cockpit-Ansichten. Kein Fahrzeug-Loader vorhanden.":"Controls switching between cockpit views. No vehicle loader is available.","Übergang aktiv":"Transition enabled","Übergangsmodus":"Transition mode","Zyklus (cycle)":"Cycle","Pause (ms, 100–3000)":"Gap (ms, 100–3000)","Mindestabstand (ms, 500–60000)":"Minimum interval (ms, 500–60000)","System (Einheit)":"System (unit)","Systemoptionen":"System options","Projektweite Einstellungen der Einheit, gespeichert in der Projektdatei (options, keys). Fahrzeugseite folgt: ein SD-Export dieser Werte ist noch nicht möglich.":"Unit-wide settings, stored in the project file (options, keys). Vehicle support pending: these values cannot be exported to the SD card yet.","CarPlay-Navigation (carplay_nav)":"CarPlay navigation (carplay_nav)","Menüsprache":"Menu language","Deutsch":"German","Expertenmodus":"Expert mode","Protokoll auf SD-Karte (sd_log)":"Log to SD card (sd_log)","Skalierung":"Scaling","Zoom und physische Größe je Display (scaling.*). Wirkt nach dem Neuverbinden.":"Zoom and physical size per display (scaling.*). Takes effect after reconnecting.","Hauptdisplay: Zoom":"Main display: zoom","Kombiinstrument: Zoom":"Cluster: zoom","Hauptdisplay: physische Größe":"Main display: physical size","Kombiinstrument: physische Größe":"Cluster: physical size","Tasten":"Keys","Lenkrad- und Head-Unit-Tasten (Keyboard/Key). Lange Druckfunktionen bieten nur Tasten an, die einen langen Druck auswerten. Fahrzeugseite folgt.":"Steering-wheel and head-unit keys (keyboard/key). Long-press functions offer only keys that evaluate a long press. Vehicle support pending.","View weiterschalten (key.view_step)":"Step view (key.view_step)","View-Zähler neu synchronisieren, lang (key.view_resync_long)":"Resync view counter, long press (key.view_resync_long)","CarPlay/Nativ umschalten, lang (key.carplay_switch_long)":"Switch CarPlay/native, long press (key.carplay_switch_long)","MIBR-Menü schließen (key.menu)":"Close MIBR menu (key.menu)","Kartenzoom: Lenkrad-Rad (zoom.wheel_source)":"Map zoom: wheel (zoom.wheel_source)","Kartenzoom automatisch per Lenkrad (zoom.wheel_auto)":"Automatic map zoom by wheel (zoom.wheel_auto)","System zurücksetzen":"Reset system settings","Tempolimit":"Speed limit","App-Einstellung":"App setting","Immer zeigen":"Always show","Ausblenden":"Hide","Kompass":"Compass","Karte Tag/Nacht":"Map day/night","Hell":"Light","Dunkel":"Dark","Tempolimit, Kompass und Karte Tag/Nacht je View: Fahrzeugseite folgt.":"Speed limit, compass and map day/night per view: vehicle support pending.","Anzeige (nav_display)":"Display (nav_display)","Seite":"Side","Nur oben":"Top only","Seite und oben":"Side and top","Textzeile (nav_line)":"Text line (nav_line)","Anzeige und Textzeile je View: Fahrzeugseite folgt.":"Display and text line per view: vehicle support pending."};
   function translate(){
     if(typeof document==="undefined"||!document||!document.documentElement)return;
     var english=document.documentElement.lang==="en";
@@ -3239,10 +3271,103 @@ render();
   translate();
 })();
 </script>
+<script id="mibr-system-settings">
+/* Unit system settings: options (broker switches) and keys (platform defaults).
+   Values and defaults follow the unit sources; stored in the project as top-level "options" and "keys".
+   No SD export yet: the vehicle-side loader for these files does not exist. */
+(function(){
+"use strict";
+/* One table of all known keys (keyboard/key). Extend here. long: the code evaluates long press on that key.
+   Power (13/88) is deliberately not offered. */
+var KEYS=[
+ {code:"4/40",long:true,de:"Lenkrad rechts: Rollen-Druck",en:"Right wheel: roller press"},
+ {code:"4/41",long:true,de:"Lenkrad rechts: Zurück",en:"Right wheel: Back"},
+ {code:"4/53",de:"Lenkrad rechts: Telefon",en:"Right wheel: Phone"},
+ {code:"4/46",de:"Lenkrad links: oben",en:"Left wheel: upper key"},
+ {code:"4/47",de:"Lenkrad links: unten",en:"Left wheel: lower key"},
+ {code:"4/44",long:true,de:"Lenkrad links: Rollen-Druck",en:"Left wheel: roller press"},
+ {code:"4/50",de:"Lenkrad: Sprache",en:"Wheel: Voice"},
+ {code:"13/116",de:"Head Unit: Home",en:"Head unit: Home"},
+ {code:"13/78",de:"Head Unit: Menü",en:"Head unit: Menu"}];
+/* key.menu: OEM KeyListener code (decimal). */
+var MENU_KEYS=[{code:16,de:"MENU",en:"MENU"},{code:1,de:"MEDIA",en:"MEDIA"},{code:2,de:"TELEFON",en:"TELEPHONE"},{code:3,de:"NAVIGATION",en:"NAVIGATION"},{code:5,de:"CAR",en:"CAR"},{code:6,de:"SETTINGS",en:"SETTINGS"},{code:17,de:"KLIMA",en:"CLIMATE"},{code:33,de:"HOME",en:"HOME"},{code:34,de:"SMARTPHONE",en:"SMARTPHONE"}];
+/* zoom.wheel_source: encoder id of the wheel detents. */
+var WHEEL_SRC=[{code:40,de:"Lenkrad rechts (40)",en:"Right wheel (40)"},{code:44,de:"Lenkrad links (44)",en:"Left wheel (44)"}];
+var ZOOMS=["AUTO","70","85","100","125","150"],PHYS=["BASE","P20","P30","P50"];
+function defaults(){return {
+ options:{carplayNav:false,language:"AUTO",expertMode:false,sdLog:false,scaling:{mainZoom:"AUTO",clusterZoom:"AUTO",mainPhysical:"BASE",clusterPhysical:"BASE"}},
+ keys:{viewStep:"4/40",viewResyncLong:"4/40",carplaySwitchLong:"4/44",menu:16,zoomWheelSource:40,zoomWheelAuto:false}}}
+function clone(x){return JSON.parse(JSON.stringify(x))}
+function isObj(x){return !!x&&typeof x==="object"&&!Array.isArray(x)}
+function codes(list,longOnly){return list.filter(function(k){return !longOnly||k.long}).map(function(k){return k.code})}
+function pick(src,def,name,allowed,out){
+ var v=src&&src[name];if(v===undefined)return def;
+ if(!allowed.includes(v))throw Error("Ungültiger Wert: "+out+"."+name+" = "+JSON.stringify(v));
+ return v}
+function bool(src,def,name,out){var v=src&&src[name];if(v===undefined)return def;if(typeof v!=="boolean")throw Error("Ungültiger Wert: "+out+"."+name);return v}
+/* Missing parts take their defaults (old project files); present values must be valid. */
+function validate(x){
+ var d=defaults(),o=x&&x.options,k=x&&x.keys;
+ if(o!==undefined&&!isObj(o))throw Error("Ungültige Systemoptionen (options)");
+ if(k!==undefined&&!isObj(k))throw Error("Ungültige Tastenbelegung (keys)");
+ if(o&&o.scaling!==undefined&&!isObj(o.scaling))throw Error("Ungültige Skalierung (options.scaling)");
+ var s=(o&&o.scaling)||{},ds=d.options.scaling;
+ d.options.carplayNav=bool(o,d.options.carplayNav,"carplayNav","options");
+ d.options.language=pick(o,d.options.language,"language",["AUTO","de","en"],"options");
+ d.options.expertMode=bool(o,d.options.expertMode,"expertMode","options");
+ d.options.sdLog=bool(o,d.options.sdLog,"sdLog","options");
+ d.options.scaling={mainZoom:pick(s,ds.mainZoom,"mainZoom",ZOOMS,"options.scaling"),clusterZoom:pick(s,ds.clusterZoom,"clusterZoom",ZOOMS,"options.scaling"),
+  mainPhysical:pick(s,ds.mainPhysical,"mainPhysical",PHYS,"options.scaling"),clusterPhysical:pick(s,ds.clusterPhysical,"clusterPhysical",PHYS,"options.scaling")};
+ d.keys.viewStep=pick(k,d.keys.viewStep,"viewStep",codes(KEYS),"keys");
+ d.keys.viewResyncLong=pick(k,d.keys.viewResyncLong,"viewResyncLong",codes(KEYS,true),"keys");
+ d.keys.carplaySwitchLong=pick(k,d.keys.carplaySwitchLong,"carplaySwitchLong",codes(KEYS,true),"keys");
+ d.keys.menu=pick(k,d.keys.menu,"menu",codes(MENU_KEYS),"keys");
+ d.keys.zoomWheelSource=pick(k,d.keys.zoomWheelSource,"zoomWheelSource",codes(WHEEL_SRC),"keys");
+ d.keys.zoomWheelAuto=bool(k,d.keys.zoomWheelAuto,"zoomWheelAuto","keys");
+ return d}
+var state=defaults();
+function $(s){return document.querySelector(s)}
+function english(){return document.documentElement.lang==="en"}
+function fill(sel,list,fnLabel,only){
+ var cur=sel.value;sel.textContent="";
+ list.forEach(function(k){if(only&&!only(k))return;var o=document.createElement("option");o.value=String(k.code);o.textContent=fnLabel(k);sel.appendChild(o)});
+ if(cur)sel.value=cur}
+var PHYS_LABEL={BASE:["BASE (OEM)","BASE (OEM)"],P20:["P20","P20"],P30:["P30","P30"],P50:["P50","P50"]};
+function ui(){
+ var en=english(),box=$("#navv-system");if(!box)return;
+ var tab=function(k){return k.code+" · "+(en?k.en:k.de)};
+ fill($("#sys-keys-viewStep"),KEYS,tab);
+ fill($("#sys-keys-viewResyncLong"),KEYS,tab,function(k){return k.long});
+ fill($("#sys-keys-carplaySwitchLong"),KEYS,tab,function(k){return k.long});
+ fill($("#sys-keys-menu"),MENU_KEYS,function(k){return k.code+" · "+(en?k.en:k.de)});
+ fill($("#sys-keys-zoomWheelSource"),WHEEL_SRC,function(k){return en?k.en:k.de});
+ ["main","cluster"].forEach(function(n){var s=$("#sys-scaling-"+n+"Physical");Array.from(s.options).forEach(function(o){o.textContent=PHYS_LABEL[o.value][0]})});
+ Array.from(box.querySelectorAll("[data-sys]")).forEach(function(c){
+  var p=c.dataset.sys.split("."),val=state[p[0]];
+  if(p[1]==="scaling")val=val.scaling[p[2]];else val=val[p[1]];
+  if(c.type==="checkbox")c.checked=!!val;else c.value=String(val)})}
+function emit(){window.dispatchEvent(new CustomEvent("mibr:systemchange"))}
+function bind(){
+ var box=$("#navv-system");if(!box)return;
+ Array.from(box.querySelectorAll("[data-sys]")).forEach(function(c){c.onchange=function(){
+  var p=c.dataset.sys.split("."),next=clone(state),val=c.type==="checkbox"?c.checked:c.value;
+  if(p[0]==="keys"&&["menu","zoomWheelSource"].includes(p[1]))val=Number(val);
+  if(p[1]==="carplayNav")val=val==="true";
+  if(p[1]==="scaling")next.options.scaling[p[2]]=val;else next[p[0]][p[1]]=val;
+  try{state=validate(next)}catch(e){}ui();emit()}});
+ $("#sys-reset").onclick=function(){state=defaults();ui();emit()};
+ document.getElementById("langSeg").addEventListener("click",function(){setTimeout(ui,0)})}
+window.MIBR_system={defaults:function(){return defaults()},get:function(){return clone(state)},validate:validate,
+ set:function(x){state=validate(x||{});ui();emit()},keyTable:function(){return clone(KEYS)}};
+bind();ui();
+})();
+</script>
+
 <script id="mibr-project-controller">
 /* MIB-Konfigurator P0.5: shared browser project + SD export.
    Embedded in the standalone HTML by the release workflow.
    The vehicle runtime currently knows only /mibr-menu/mibr-menu.txt.
+   Options/keys (unit system settings) are optional top-level fields.
    P0.9.10: optional working folder (File System Access API, Chrome/Edge):
    chosen once, handle kept in IndexedDB, project auto-saved to and
    auto-loaded from <folder>/mibr-project.json. Same HTML online and offline;
@@ -3257,8 +3382,10 @@ function tr(de,english){return en()?english:de}
 function status(msg,error){var e=$("projectStatus");e.textContent=msg;e.classList.toggle("problem",!!error)}
 function clone(x){return JSON.parse(JSON.stringify(x))}
 function car(){return window.MIBR_getVehicle()}
+function system(){return window.MIBR_system}
 function capture(){var v=car(),n=window.MIBR_views.get();n.vehicle=clone(v);
-  return {schema:SCHEMA,version:1,vehicle:clone(v),menu:window.MIBR_menu.get(),viewProfiles:n};}
+  var s=system().get();
+  return {schema:SCHEMA,version:1,vehicle:clone(v),menu:window.MIBR_menu.get(),viewProfiles:n,options:s.options,keys:s.keys};}
 function identical(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 function validate(p){
   if(!p||p.schema!==SCHEMA||p.version!==1||!p.vehicle||!p.menu||!p.viewProfiles)throw Error(tr("Kein gültiges MIB-Projekt","Invalid MIB project"));
@@ -3267,6 +3394,8 @@ function validate(p){
   if(p.menu.brand!==v.brand||!p.viewProfiles.vehicle||!identical(p.viewProfiles.vehicle,v))throw Error(tr("Fahrzeugkontext stimmt nicht überein","Vehicle contexts disagree"));
   var m=window.MIBR_menu.validate(p.menu);
   window.MIBR_views.validate(p.viewProfiles);
+  /* options/keys are optional (older project files): missing parts take the unit defaults, invalid values are rejected. */
+  system().validate({options:p.options,keys:p.keys});
   return {errors:m.errors||[]};
 }
 function persist(){
@@ -3287,8 +3416,9 @@ function applyProject(p){
     window.MIBR_menu.set(p.menu);
     window.MIBR_setHardware(p.vehicle);
     window.MIBR_views.set(p.viewProfiles);
+    system().set({options:p.options,keys:p.keys});
   }catch(e){
-    try{window.MIBR_menu.set(old.menu);window.MIBR_setHardware(old.vehicle);window.MIBR_views.set(old.viewProfiles)}catch(ignored){}
+    try{window.MIBR_menu.set(old.menu);window.MIBR_setHardware(old.vehicle);window.MIBR_views.set(old.viewProfiles);system().set({options:old.options,keys:old.keys})}catch(ignored){}
     throw e;
   }finally{applying=false}
   persist();
@@ -3494,7 +3624,7 @@ $("projectFileIn").addEventListener("change",function(){readProject(this.files&&
 $("projectSave").addEventListener("click",saveProject);
 $("sdExport").addEventListener("click",sdExport);
 $("langSeg").addEventListener("click",function(){setTimeout(labels,0)});
-["mibr:menuchange","mibr:viewschange","mibr:safechange","mibr:vehiclechange"].forEach(function(name){window.addEventListener(name,schedule)});
+["mibr:menuchange","mibr:viewschange","mibr:safechange","mibr:vehiclechange","mibr:systemchange"].forEach(function(name){window.addEventListener(name,schedule)});
 try{var raw=localStorage.getItem(STORE);if(raw)applyProject(JSON.parse(raw));else persist()}
 catch(e){status(tr("Vorherige Einstellungen erhalten. Projekt-Wiederherstellung gescheitert: ","Previous settings preserved. Project restore failed: ")+e.message,true)}
 folderInit();

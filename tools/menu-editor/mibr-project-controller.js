@@ -1,6 +1,7 @@
 /* MIB-Konfigurator P0.5: shared browser project + SD export.
    Embedded in the standalone HTML by the release workflow.
    The vehicle runtime currently knows only /mibr-menu/mibr-menu.txt.
+   Options/keys (unit system settings) are optional top-level fields.
    P0.9.10: optional working folder (File System Access API, Chrome/Edge):
    chosen once, handle kept in IndexedDB, project auto-saved to and
    auto-loaded from <folder>/mibr-project.json. Same HTML online and offline;
@@ -15,8 +16,10 @@ function tr(de,english){return en()?english:de}
 function status(msg,error){var e=$("projectStatus");e.textContent=msg;e.classList.toggle("problem",!!error)}
 function clone(x){return JSON.parse(JSON.stringify(x))}
 function car(){return window.MIBR_getVehicle()}
+function system(){return window.MIBR_system}
 function capture(){var v=car(),n=window.MIBR_views.get();n.vehicle=clone(v);
-  return {schema:SCHEMA,version:1,vehicle:clone(v),menu:window.MIBR_menu.get(),viewProfiles:n};}
+  var s=system().get();
+  return {schema:SCHEMA,version:1,vehicle:clone(v),menu:window.MIBR_menu.get(),viewProfiles:n,options:s.options,keys:s.keys};}
 function identical(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 function validate(p){
   if(!p||p.schema!==SCHEMA||p.version!==1||!p.vehicle||!p.menu||!p.viewProfiles)throw Error(tr("Kein gültiges MIB-Projekt","Invalid MIB project"));
@@ -25,6 +28,8 @@ function validate(p){
   if(p.menu.brand!==v.brand||!p.viewProfiles.vehicle||!identical(p.viewProfiles.vehicle,v))throw Error(tr("Fahrzeugkontext stimmt nicht überein","Vehicle contexts disagree"));
   var m=window.MIBR_menu.validate(p.menu);
   window.MIBR_views.validate(p.viewProfiles);
+  /* options/keys are optional (older project files): missing parts take the unit defaults, invalid values are rejected. */
+  system().validate({options:p.options,keys:p.keys});
   return {errors:m.errors||[]};
 }
 function persist(){
@@ -45,8 +50,9 @@ function applyProject(p){
     window.MIBR_menu.set(p.menu);
     window.MIBR_setHardware(p.vehicle);
     window.MIBR_views.set(p.viewProfiles);
+    system().set({options:p.options,keys:p.keys});
   }catch(e){
-    try{window.MIBR_menu.set(old.menu);window.MIBR_setHardware(old.vehicle);window.MIBR_views.set(old.viewProfiles)}catch(ignored){}
+    try{window.MIBR_menu.set(old.menu);window.MIBR_setHardware(old.vehicle);window.MIBR_views.set(old.viewProfiles);system().set({options:old.options,keys:old.keys})}catch(ignored){}
     throw e;
   }finally{applying=false}
   persist();
@@ -252,7 +258,7 @@ $("projectFileIn").addEventListener("change",function(){readProject(this.files&&
 $("projectSave").addEventListener("click",saveProject);
 $("sdExport").addEventListener("click",sdExport);
 $("langSeg").addEventListener("click",function(){setTimeout(labels,0)});
-["mibr:menuchange","mibr:viewschange","mibr:safechange","mibr:vehiclechange"].forEach(function(name){window.addEventListener(name,schedule)});
+["mibr:menuchange","mibr:viewschange","mibr:safechange","mibr:vehiclechange","mibr:systemchange"].forEach(function(name){window.addEventListener(name,schedule)});
 try{var raw=localStorage.getItem(STORE);if(raw)applyProject(JSON.parse(raw));else persist()}
 catch(e){status(tr("Vorherige Einstellungen erhalten. Projekt-Wiederherstellung gescheitert: ","Previous settings preserved. Project restore failed: ")+e.message,true)}
 folderInit();
