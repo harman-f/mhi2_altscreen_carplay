@@ -1,8 +1,12 @@
 {
- "schema": "MIBR_CLUSTER_GEOMETRY/1",
- "source": "photos 2026-11-15 23:21 (Skoda MU1440 cluster, calibration grid stream 111 1010x376), rectified by homography from grid points",
+ "schema": "MIBR_CLUSTER_GEOMETRY/2",
+ "source": "center: photos 2026-11-15 23:21 (rectified by grid homography); wide/full: photos 2026-11-16 (stream 111 1010x376, grid fit rms 0.3 wide / 0.9 full, white/map photos registered on static chrome), P0.9.10",
  "coords": "stream 111 pixels, 1010x376, origin top left",
- "accuracy_px": "about 3",
+ "accuracy_px": {
+  "center": "about 3",
+  "wide": "about 1",
+  "full": "about 1"
+ },
  "common": {
   "top_bar": {
    "poly": [
@@ -63,6 +67,121 @@
    ],
    "kind": "opaque",
    "note": "trip, assist icons, speed limit"
+  },
+  "top_bar_p0910": {
+   "poly": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     1010.0,
+     0.0
+    ],
+    [
+     1010.0,
+     37.0
+    ],
+    [
+     555.0,
+     37.0
+    ],
+    [
+     536.0,
+     50.5
+    ],
+    [
+     476.0,
+     50.5
+    ],
+    [
+     455.0,
+     37.0
+    ],
+    [
+     0.0,
+     37.0
+    ]
+   ],
+   "note": "wide/full: bar line y 37, clock tab bottom y 50.5, flanks 455->476 and 536->555; wide opaque, full translucent"
+  },
+  "bottom_bar_p0910": {
+   "poly": [
+    [
+     0,
+     334
+    ],
+    [
+     1010,
+     334
+    ],
+    [
+     1010,
+     376
+    ],
+    [
+     0,
+     376
+    ]
+   ],
+   "note": "wide/full: opaque from y 334"
+  },
+  "arrow_box": {
+   "rect_xywh": [
+    367,
+    89,
+    275,
+    35
+   ],
+   "kind": "opaque",
+   "views": [
+    "wide",
+    "full"
+   ],
+   "glyph_with_separators_xywh": [
+    487,
+    100,
+    37,
+    20
+   ]
+  },
+  "text_zone": {
+   "rect_xywh": [
+    367,
+    60,
+    275,
+    24
+   ],
+   "views": [
+    "wide",
+    "full"
+   ],
+   "note": "text centred x 505, ink y 63..77"
+  },
+  "scrim": {
+   "poly": [
+    [
+     0,
+     37
+    ],
+    [
+     1010,
+     37
+    ],
+    [
+     1010,
+     96
+    ],
+    [
+     0,
+     96
+    ]
+   ],
+   "views": [
+    "wide",
+    "full"
+   ],
+   "note": "dark fade under the top bar y 37..96"
   }
  },
  "views": {
@@ -71,42 +190,82 @@
     {
      "poly": [
       [
-       0,
-       276
+       0.0,
+       273.7
       ],
       [
-       165,
-       276
+       138.0,
+       275.8
       ],
       [
-       217,
-       334
+       150.0,
+       277.0
       ],
       [
-       0,
-       334
+       162.0,
+       283.2
+      ],
+      [
+       180.0,
+       301.3
+      ],
+      [
+       186.9,
+       306.0
+      ],
+      [
+       210.2,
+       334.0
+      ],
+      [
+       0.0,
+       334.0
       ]
      ],
      "kind": "opaque",
-     "note": "left corner"
+     "note": "left corner (curved shoulder + diagonal)"
     },
     {
      "poly": [
       [
-       866,
-       276
+       1010.0,
+       274.3
       ],
       [
-       1010,
-       276
+       1006.0,
+       274.3
       ],
       [
-       1010,
-       334
+       862.0,
+       276.6
       ],
       [
-       815,
-       334
+       856.0,
+       278.0
+      ],
+      [
+       850.0,
+       280.9
+      ],
+      [
+       844.0,
+       285.7
+      ],
+      [
+       826.0,
+       304.5
+      ],
+      [
+       822.4,
+       306.0
+      ],
+      [
+       798.4,
+       334.0
+      ],
+      [
+       1010.0,
+       334.0
       ]
      ],
      "kind": "opaque",
@@ -115,64 +274,543 @@
    ],
    "max_safe_rect": [
     0,
-    48,
+    125,
     1010,
-    228
-   ]
+    148
+   ],
+   "visible_polygon": [
+    [
+     94.0,
+     0.0
+    ],
+    [
+     910.0,
+     0.0
+    ],
+    [
+     925.0,
+     2.0
+    ],
+    [
+     938.0,
+     4.0
+    ],
+    [
+     948.0,
+     6.0
+    ],
+    [
+     957.0,
+     8.0
+    ],
+    [
+     965.0,
+     10.0
+    ],
+    [
+     973.0,
+     12.0
+    ],
+    [
+     980.0,
+     14.0
+    ],
+    [
+     987.0,
+     16.0
+    ],
+    [
+     993.0,
+     18.0
+    ],
+    [
+     1000.0,
+     21.0
+    ],
+    [
+     1010.0,
+     27.0
+    ],
+    [
+     1010.0,
+     274.3
+    ],
+    [
+     1006.0,
+     274.3
+    ],
+    [
+     862.0,
+     276.6
+    ],
+    [
+     856.0,
+     278.0
+    ],
+    [
+     850.0,
+     280.9
+    ],
+    [
+     844.0,
+     285.7
+    ],
+    [
+     826.0,
+     304.5
+    ],
+    [
+     822.4,
+     306.0
+    ],
+    [
+     186.9,
+     306.0
+    ],
+    [
+     180.0,
+     301.3
+    ],
+    [
+     162.0,
+     283.2
+    ],
+    [
+     150.0,
+     277.0
+    ],
+    [
+     138.0,
+     275.8
+    ],
+    [
+     0.0,
+     273.7
+    ],
+    [
+     0.0,
+     16.0
+    ],
+    [
+     3.0,
+     14.0
+    ],
+    [
+     9.0,
+     12.0
+    ],
+    [
+     18.0,
+     10.0
+    ],
+    [
+     40.0,
+     8.0
+    ],
+    [
+     55.0,
+     6.0
+    ],
+    [
+     67.0,
+     4.0
+    ],
+    [
+     79.0,
+     2.0
+    ],
+    [
+     94.0,
+     0.0
+    ]
+   ],
+   "bottom_strip": {
+    "poly": [
+     [
+      186.9,
+      306.0
+     ],
+     [
+      822.4,
+      306.0
+     ],
+     [
+      798.4,
+      334.0
+     ],
+     [
+      210.2,
+      334.0
+     ]
+    ],
+    "kind": "translucent (about 20% stream transmit)",
+    "note": "grey strip with distance + ETA",
+    "y_range": [
+     306,
+     334
+    ]
+   },
+   "bottom_items": {
+    "y_range": [
+     306,
+     334
+    ],
+    "distance_group": [
+     311,
+     310,
+     87,
+     22
+    ],
+    "distance_icon": [
+     311,
+     311,
+     21,
+     21
+    ],
+    "distance_text": [
+     339,
+     312,
+     59,
+     17
+    ],
+    "eta_group": [
+     633,
+     310,
+     76,
+     22
+    ],
+    "eta_clock_icon": [
+     687,
+     310,
+     22,
+     22
+    ]
+   },
+   "top_bar_kind": "translucent: dark in the centre (about 20% transmit x 150..850), fades to about 60-70% at the display edges",
+   "arrow_box": [
+    367,
+    89,
+    275,
+    35
+   ],
+   "text_zone": [
+    367,
+    60,
+    275,
+    24
+   ],
+   "scrim": {
+    "y_range": [
+     37,
+     96
+    ],
+    "transmit_pct": "see geometry_2026-11-16 measurement; about 25-40% centre, 60-100% sides"
+   },
+   "accuracy_px": "about 1",
+   "source": "photos 2026-11-16",
+   "display_corner_top_left": [
+    [
+     94.0,
+     0.0
+    ],
+    [
+     79.0,
+     2.0
+    ],
+    [
+     67.0,
+     4.0
+    ],
+    [
+     55.0,
+     6.0
+    ],
+    [
+     40.0,
+     8.0
+    ],
+    [
+     18.0,
+     10.0
+    ],
+    [
+     9.0,
+     12.0
+    ],
+    [
+     3.0,
+     14.0
+    ],
+    [
+     0.0,
+     16.0
+    ]
+   ],
+   "display_corner_top_right": [
+    [
+     910.0,
+     0.0
+    ],
+    [
+     925.0,
+     2.0
+    ],
+    [
+     938.0,
+     4.0
+    ],
+    [
+     948.0,
+     6.0
+    ],
+    [
+     957.0,
+     8.0
+    ],
+    [
+     965.0,
+     10.0
+    ],
+    [
+     973.0,
+     12.0
+    ],
+    [
+     980.0,
+     14.0
+    ],
+    [
+     987.0,
+     16.0
+    ],
+    [
+     993.0,
+     18.0
+    ],
+    [
+     1000.0,
+     21.0
+    ],
+    [
+     1010.0,
+     27.0
+    ]
+   ],
+   "lower_corner_diagonals": {
+    "left_x_eq_a_y_plus_b": [
+     0.8335,
+     -68.17
+    ],
+    "right_x_eq_a_y_plus_b": [
+     -0.8548,
+     1083.95
+    ],
+    "note": "valid for y 306..376"
+   },
+   "top_bar_transmit": "translucent: about 20% centre (x 150..850), 60-70% at the display edges"
   },
   "wide": {
    "chrome": [
     {
      "poly": [
       [
-       0,
-       0
+       0.0,
+       0.0
       ],
       [
-       162,
-       0
+       162.6,
+       0.0
       ],
       [
-       231,
-       334
+       229.7,
+       334.0
       ],
       [
-       0,
-       334
+       0.0,
+       334.0
       ]
      ],
      "kind": "opaque",
-     "note": "left panel (trip data)"
+     "note": "left panel (trip data)",
+     "edge_line": {
+      "x_eq_a_y_plus_b": [
+       0.2008,
+       162.6
+      ],
+      "y_range": [
+       0,
+       334
+      ]
+     }
     },
     {
      "poly": [
       [
-       847,
-       0
+       1010.0,
+       0.0
       ],
       [
-       1010,
-       0
+       847.9,
+       0.0
       ],
       [
-       1010,
-       334
+       780.3,
+       334.0
       ],
       [
-       777,
-       334
+       1010.0,
+       334.0
       ]
      ],
      "kind": "opaque",
-     "note": "right panel (media/turn, speed)"
+     "note": "right panel (media/turn, speed)",
+     "edge_line": {
+      "x_eq_a_y_plus_b": [
+       -0.2023,
+       847.87
+      ],
+      "y_range": [
+       0,
+       334
+      ]
+     }
     }
    ],
    "max_safe_rect": [
-    232,
-    48,
-    545,
-    285
-   ]
+    224,
+    125,
+    563,
+    180
+   ],
+   "visible_polygon": [
+    [
+     170.0,
+     37.0
+    ],
+    [
+     455.0,
+     37.0
+    ],
+    [
+     476.0,
+     50.5
+    ],
+    [
+     536.0,
+     50.5
+    ],
+    [
+     555.0,
+     37.0
+    ],
+    [
+     840.4,
+     37.0
+    ],
+    [
+     786.0,
+     306.0
+    ],
+    [
+     224.1,
+     306.0
+    ]
+   ],
+   "bottom_strip": {
+    "poly": [
+     [
+      224.1,
+      306.0
+     ],
+     [
+      786.0,
+      306.0
+     ],
+     [
+      780.3,
+      334.0
+     ],
+     [
+      229.7,
+      334.0
+     ]
+    ],
+    "kind": "opaque",
+    "note": "grey strip with distance + ETA, covers the stream",
+    "y_range": [
+     306,
+     334
+    ]
+   },
+   "bottom_items": {
+    "y_range": [
+     306,
+     334
+    ],
+    "distance_group": [
+     366,
+     311,
+     85,
+     21
+    ],
+    "distance_icon": [
+     366,
+     311,
+     20,
+     21
+    ],
+    "distance_text": [
+     392,
+     313,
+     59,
+     17
+    ],
+    "eta_group": [
+     570,
+     311,
+     75,
+     21
+    ],
+    "eta_clock_icon": [
+     623,
+     311,
+     22,
+     21
+    ]
+   },
+   "top_bar_kind": "opaque",
+   "arrow_box": [
+    367,
+    89,
+    275,
+    35
+   ],
+   "text_zone": [
+    367,
+    60,
+    275,
+    24
+   ],
+   "scrim": {
+    "y_range": [
+     37,
+     96
+    ],
+    "transmit_pct": "see geometry_2026-11-16 measurement; about 25-40% centre, 60-100% sides"
+   },
+   "accuracy_px": "about 1",
+   "source": "photos 2026-11-16",
+   "panel_edges": {
+    "left_x_eq_a_y_plus_b": [
+     0.2008,
+     162.6
+    ],
+    "right_x_eq_a_y_plus_b": [
+     -0.2023,
+     847.87
+    ]
+   },
+   "max_safe_rect_note": "x from the panel edges at y 306, y 125..305 (below the arrow box); full-width rect for full only to y 273"
   },
   "center": {
    "chrome": [

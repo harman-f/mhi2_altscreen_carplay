@@ -57,7 +57,7 @@ async function main(){
   assert.equal(wideArrow.querySelectorAll("path").length,1,"Wide arrow uses one filled and stroked shape");
   assert.equal(silhouette.getAttribute("stroke"),"#f7fcff","White contour traces the exact green silhouette");
     // P0.9.1: shared status metrics remain physically identical across cockpit modes.
-  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.9"),"Visible version label");
+  assert.ok($("#navv-layer .navv-version").textContent.includes("P0.9.10"),"Visible version label");
   for(const view of ["center","wide","full"]){
     const q=id=>$("#"+view+"-"+id);
     const top=q("top-status"),bottom=q("bottom-info"),footer=q("footer");
@@ -66,11 +66,13 @@ async function main(){
     assert.equal(top.querySelectorAll("text")[2].getAttribute("x"),"665",view+" temperature anchor");
     assert.equal(q("top-label").getAttribute("x"),"505",view+" shared road anchor");
     assert.equal(q("top-label").getAttribute("font-size"),"21",view+" road typography");
-    assert.equal(bottom.querySelector('#'+view+'-bottom-distance circle').getAttribute("cx"),"376",view+" remaining distance icon");
-    assert.equal(bottom.querySelector('#'+view+'-bottom-distance text').getAttribute("x"),"392",view+" remaining distance anchor");
-    assert.equal(q("bottom-eta-label").getAttribute("x"),"562",view+" arrival time anchor");
+    // P0.9.10: bottom band items are measured per view (Center unchanged, Wide ETA x 570, Voll distance 311..398 / ETA 633..709).
+    const B={center:["376","392","562"],wide:["376","392","570"],full:["321.5","339","633"]}[view];
+    assert.equal(bottom.querySelector('#'+view+'-bottom-distance circle').getAttribute("cx"),B[0],view+" remaining distance icon");
+    assert.equal(bottom.querySelector('#'+view+'-bottom-distance text').getAttribute("x"),B[1],view+" remaining distance anchor");
+    assert.equal(q("bottom-eta-label").getAttribute("x"),B[2],view+" arrival time anchor");
     assert.equal(q("bottom-eta-label").getAttribute("y"),"328",view+" common arrival baseline");
-    assert.equal(footer.querySelector("text").getAttribute("x"),"283",view+" trip anchor");
+    assert.equal(footer.querySelector("text").getAttribute("x"),view==="center"?"283":"285",view+" trip anchor (P0.9.10: measured 285 in Wide/Voll)");
     assert.equal(footer.querySelector("text").getAttribute("y"),"362",view+" trip baseline");
   }
   assert.equal(w.MIBR_safe.activeView(),"center","Calibration initially follows active cockpit view");
@@ -200,9 +202,9 @@ async function main(){
   assert.equal($("#navv-full-svg").style.display,"block","Full SVG visible");
   assert.ok($("#full-lower-corners")&&$("#full-map-surface")&&$("#full-speed"),"Full map and shaped lower cutouts");
   // P0.9.9: geometry measured on rectified calibration photos (stream pixels, about 3 px)
-  assert.ok($("#f-mainclip path").getAttribute("d").includes("V276H871"),"Full clip follows measured y276 shoulder");
-  assert.ok($("#f-mainclip path").getAttribute("d").includes("L816 335H216"),"Full lower edge at the measured bottom bar");
-  assert.equal($("#w-map-clip path").getAttribute("d"),"M162 0H847L777 335H231Z","Wide measured trapezoid");
+  assert.ok($("#f-mainclip path").getAttribute("d").includes("V274.3L862 276.6"),"Full clip follows measured shoulder y 274..277 (P0.9.10)");
+  assert.ok($("#f-mainclip path").getAttribute("d").includes("L822.4 306L798.4 334H210.2L186.9 306"),"Full lower edge at the measured strip y 306 (P0.9.10)");
+  assert.equal($("#w-map-clip path").getAttribute("d"),"M162.6 0H847.9L780.3 334H229.7Z","Wide measured trapezoid (P0.9.10: edges x=0.2008y+162.6 / 847.9-0.2023y)");
   assert.equal($("#center-left-dial").getAttribute("transform"),"translate(-115.84 -30.6) scale(1.1772)","Center left dial = measured circle r186 at (182,186)");
   assert.equal($("#center-right-dial").getAttribute("transform"),"translate(-69.14 -30.6) scale(1.1772)","Center right dial = measured circle r186 at (822,186)");
   assert.equal($("#full-bottom-info").getAttribute("font-size"),"21","Full shared OEM lower status font");
@@ -323,7 +325,7 @@ async function main(){
   assert.equal(w.MIBR_safe.activeView(),"wide","Same active Wide in both workspaces");
   assert.equal($("#sa-oem-mask").children.length,6,"Wide: four shared bands and two exact side modules");
   assert.equal($("#sa-oem-edge-shell").getAttribute("data-view"),"wide","Wide continuity surrounds only its side panels");
-  assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="right"]').getAttribute("d"),"M1010 0H847L777 330Q775 350 798 356L1010 376Z","Wide right panel actually connects to viewport edge");
+  assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="right"]').getAttribute("d"),"M1010 0H847.9L780.3 334H1010Z","Wide right panel (P0.9.10 measured) actually connects to viewport edge");
   assert.equal($("#sa-oem-mask").children[4].getAttribute("d"),$("#wide-side-panels > path").getAttribute("d"),"Wide left blocked polygon identical to current calibrated sidepanel");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="side-panels"]'),"Wide OEM overlay uses actual SVG side panels");
   const wideNames=Array.from($("#sa-oem-preview").children).map(n=>n.getAttribute("data-safe-origin")).filter(Boolean);
@@ -339,7 +341,7 @@ async function main(){
   assert.equal($$(".sa-views button")[0].getAttribute("aria-pressed"),"true","Full calibration selected via shortcut");
   assert.equal($("#sa-oem-mask").children.length,6,"Full: four common bands and two lower cutouts");
   assert.equal($("#sa-oem-edge-shell").getAttribute("data-view"),"full","Full edge closure follows selected view");
-  assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="left"]').getAttribute("d"),"M0 276H160Q168 276 174 284L250 376H0Z","Full lower cutoff attaches to left edge and bottom");
+  assert.equal($("#sa-oem-edge-shell").querySelector('[data-safe-edge="left"]').getAttribute("d"),"M0 273.7L138 275.8Q150 277 162 283.2L180 301.3L186.9 306L245 376H0Z","Full lower cutoff (P0.9.10 measured) attaches to left edge and bottom");
   assert.equal($("#sa-oem-mask").children[4].getAttribute("d"),$("#full-lower-corners > path").getAttribute("d"),"Full mask copies updated left diagonal cutout");
   assert.ok($("#sa-oem-preview").querySelector('[data-safe-origin="lower-corners"]'),"Full lower shape uses existing SVG outline");
   const fullNames=Array.from($("#sa-oem-preview").children).map(n=>n.getAttribute("data-safe-origin")).filter(Boolean);

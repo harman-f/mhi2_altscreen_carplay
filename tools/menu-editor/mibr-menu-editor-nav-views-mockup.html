@@ -1940,11 +1940,12 @@ function safeAssistLayers(svg,view){
   // The dark OEM surround is an optical continuity guide, NOT a blocked Safe Area.
   // These perimeter paths were estimated from the photographed numeric grid.
   var edge=svgEl("g",{id:"sa-oem-edge-shell","data-view":id,"pointer-events":"none"},null,svg);
-  // P0.9.9: measured on the rectified photos: translucent top bar to y 38 (clock tab to y 51), opaque bottom bar from y 335.
-  svgEl("path",{d:"M0 0H1010V38H559L539 51H474L454 38H0Z",fill:"#18263c","fill-opacity":".83"},null,edge);
-  svgEl("rect",{x:0,y:38,width:1010,height:12,fill:"#18263c","fill-opacity":".18"},null,edge);
-  svgEl("rect",{x:0,y:335,width:1010,height:41,fill:"#0e1828","fill-opacity":".88"},null,edge);
-  svgEl("rect",{x:0,y:325,width:1010,height:10,fill:"#111c2c","fill-opacity":".19"},null,edge);
+  // P0.9.10 (measured 2026-11-16, about 1 px): translucent top bar to y 38 (clock tab to y 51), opaque bottom bar from y 335.
+  // P0.9.10: bar line y 37, clock tab to y 50.5 (flanks 455->476, 536->555), dark scrim y 37..96 (wide/full), grey strip y 306..334 (wide/full), bottom bar from y 334.
+  svgEl("path",{d:"M0 0H1010V37H555L536 50.5H476L455 37H0Z",fill:"#18263c","fill-opacity":id==="full"?".7":".88"},null,edge);
+  svgEl("rect",{x:0,y:37,width:1010,height:id==="center"?13:59,fill:id==="center"?"#18263c":"#04070d","fill-opacity":id==="center"?".18":".4"},null,edge);
+  svgEl("rect",{x:0,y:334,width:1010,height:42,fill:"#0e1828","fill-opacity":".88"},null,edge);
+  svgEl("path",{d:id==="wide"?"M224.1 306H786L780.3 334H229.7Z":id==="full"?"M186.9 306H822.4L798.4 334H210.2Z":"M0 325H1010V334H0Z",fill:id==="center"?"#111c2c":"#3b4354","fill-opacity":id==="center"?".19":id==="full"?".8":"1"},null,edge);
   var edgePaths={
     // P0.9.9: measured (about 3 px): dials r 186 at (182,186)/(822,186); Wide edges 162->231 / 847->777; Voll corners from y 276.
     center:[
@@ -1952,12 +1953,12 @@ function safeAssistLayers(svg,view){
       "M1010 0H822A186 186 0 0 0 822 372V376H1010Z"
     ],
     wide:[
-      "M0 0H162L231 330Q233 350 210 356L0 376Z",
-      "M1010 0H847L777 330Q775 350 798 356L1010 376Z"
+      "M0 0H162.6L229.7 334H0Z",
+      "M1010 0H847.9L780.3 334H1010Z"
     ],
     full:[
-      "M0 276H160Q168 276 174 284L250 376H0Z",
-      "M1010 276H871Q863 276 857 284L782 376H1010Z"
+      "M0 273.7L138 275.8Q150 277 162 283.2L180 301.3L186.9 306L245 376H0Z",
+      "M1010 274.3L1006 274.3L862 276.6Q850 279 844 285.7L826 304.5L822.4 306L763 376H1010Z"
     ]
   };
   edgePaths[id].forEach(function(d,i){
@@ -1971,8 +1972,8 @@ function safeAssistLayers(svg,view){
   // Layer order: grid -> numbers -> configured Safe Area -> OEM rim/mask/preview.
   var sections={
     center:["left-dial","left-info","right-dial","speed","dial-lanes","right-turn","dial-distance","top-status","top-text","top-lanes","bottom-info","footer"],
-    wide:["side-panels","left-info","right-media","dial-lanes","right-turn","dial-distance","speed","top-status","top-text","top-lanes","bottom-info","footer"],
-    full:["lower-corners","top-status","top-text","top-lanes","bottom-info","footer","speed"]
+    wide:["side-panels","left-info","right-media","dial-lanes","right-turn","dial-distance","top-status","top-text","arrow-box","top-lanes","bottom-strip","bottom-info","bottom-bar","footer","speed"],
+    full:["lower-corners","top-status","top-text","arrow-box","top-lanes","bottom-strip","bottom-info","bottom-bar","footer","speed"]
   };
   function draw(){
     masks.textContent="";preview.textContent="";
@@ -1995,7 +1996,9 @@ function safeAssistLayers(svg,view){
     }
     if(mode!=="preview"&&mode!=="photo"){
       // P0.9.9 measured: status line (compass..temperature), road text, bottom navigation, footer.
-      var bands=[[288,8,437,46],[395,60,220,27],[362,305,285,30],[216,335,600,41]];
+      // P0.9.10: wide/full: text zone + arrow box merged (367..642 x 60..124), strip band y 306..334, bottom bar from y 334.
+      var bands=id==="center"?[[288,8,437,46],[395,60,220,27],[362,305,285,30],[216,335,600,41]]
+        :[[288,8,437,46],[367,60,275,64],id==="wide"?[224,306,562,28]:[187,306,636,28],[0,334,1010,42]];
       bands.forEach(function(z){
         svgEl("rect",{x:z[0],y:z[1],width:z[2],height:z[3],rx:3,
           fill:"#f59e0b","fill-opacity":".24",stroke:"#ffca72","stroke-width":"1.4","stroke-dasharray":"5 4"},null,masks);
@@ -2467,7 +2470,7 @@ connect();
 <div class="navv-note" id="navv-config-warning">View-Profile sind experimentell und ändern das Fahrzeug nicht direkt.</div>
 <section id="navv-view-workspace">
 <div class="navv-card navv-view-selector"><h3>Aktive Cockpit-Ansicht</h3><div class="navv-views" role="group" aria-label="Aktive Cockpit-Ansicht"><button type="button" data-navv-view="center">Center</button><button type="button" data-navv-view="wide">Wide</button><button type="button" data-navv-view="full">Voll</button></div><p id="navv-selection-hint" class="navv-note" role="status"></p><details class="navv-profile-advanced" id="navv-profile-advanced"><summary>Profilverwaltung · Vererbung, Kopieren und Zurücksetzen</summary><div class="navv-row"><label for="navv-mode">Profilmodus</label><select id="navv-mode"><option value="custom">Individuelles Profil</option><option value="inherit">Globale Standardwerte verwenden</option></select></div><p id="navv-mode-info" class="navv-note"></p><div class="navv-buttons"><label for="navv-copy-target" class="navv-note" data-i18n="copylabel">Profil kopieren nach</label><select id="navv-copy-target"><option value="center">Center</option><option value="wide">Wide</option><option value="full">Voll</option></select><button type="button" id="navv-copy">Einstellungen kopieren</button><button type="button" id="navv-reset-view">Profil zurücksetzen</button></div><p class="navv-note">Kopieren und Zurücksetzen betreffen die Navi- und CarPlay-Einstellungen. Safe Area und Bildgeometrie bleiben unverändert.</p></details></div>
-<div class="navv-card navv-view-preview"><div class="navv-preview-heading"><h3>Live-Vorschau: <span id="navv-viewname">Center</span> <small class="navv-version" aria-label="Mockup-Version">P0.9.9</small></h3><button type="button" id="navv-preview-zoom" aria-expanded="false">⛶ Großansicht</button></div><div id="navv-center-preview"><button type="button" id="navv-preview-close" aria-label="Großansicht schließen" hidden>Schließen ✕</button><svg id="navv-center-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Modulares AID10 Center-Cockpit: Instrumente, Navigationsanzeigen und Kartenfläche als getrennte SVG-Ebenen">
+<div class="navv-card navv-view-preview"><div class="navv-preview-heading"><h3>Live-Vorschau: <span id="navv-viewname">Center</span> <small class="navv-version" aria-label="Mockup-Version">P0.9.10</small></h3><button type="button" id="navv-preview-zoom" aria-expanded="false">⛶ Großansicht</button></div><div id="navv-center-preview"><button type="button" id="navv-preview-close" aria-label="Großansicht schließen" hidden>Schließen ✕</button><svg id="navv-center-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 376" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Modulares AID10 Center-Cockpit: Instrumente, Navigationsanzeigen und Kartenfläche als getrennte SVG-Ebenen">
 <defs>
 <style>
 #navv-center-svg{font-family:Arial,"Helvetica Neue",Helvetica,sans-serif;font-variant-numeric:tabular-nums}
@@ -2509,7 +2512,7 @@ connect();
  <g id="center-app-placeholder" style="display:none"><rect x="416" y="157" width="180" height="67" rx="7" fill="#0c1728" stroke="#527891" stroke-opacity=".6"/><text x="506" y="185" fill="#d8e7f5" text-anchor="middle" font-size="15" font-weight="600">CarPlay-App</text><text x="506" y="205" fill="#94acbd" text-anchor="middle" font-size="11">Vorschau · nur Editor</text></g>
  <g id="center-off-placeholder" style="display:none"><text x="506" y="182" fill="#8ea4ba" text-anchor="middle" font-size="14" font-weight="600">CarPlay aus</text><text x="506" y="203" fill="#6f8398" text-anchor="middle" font-size="11">nur Editor</text></g>
 </g>
-<!-- MIBR_SHARED_TOP_BEGIN: common OEM status coordinates across Center/Wide/Voll (P0.9.9: measured on rectified photos) -->
+<!-- MIBR_SHARED_TOP_BEGIN: common OEM status coordinates across Center/Wide/Voll (P0.9.10: measured on rectified photos, per-view bar/scrim/arrow box) -->
 <g id="center-top-status" fill="#f5f9ff">
   <path d="M296 13l-6 17h12z" fill="#e7f0fb"/><text x="304" y="30" font-size="22" font-weight="600">W</text>
   <text x="505" y="40" text-anchor="middle" font-size="31" font-weight="600" letter-spacing=".5">23:22</text>
@@ -2571,7 +2574,7 @@ connect();
 <g id="center-dial-distance" transform="translate(-69.14 -30.6) scale(1.1772)" text-anchor="middle" fill="#f7fbff">
   <text x="757" y="256" font-size="20.5" font-weight="600">200 m</text>
 </g>
-<!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views (P0.9.9: measured on rectified photos) -->
+<!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views (P0.9.10: measured on rectified photos, per-view band positions) -->
 <g id="center-bottom-info" fill="#edf5ff" font-size="21" font-weight="600">
   <g id="center-bottom-distance">
     <circle cx="376" cy="321" r="8.5" fill="none" stroke="#dce8f5" stroke-width="1.8"/>
@@ -2628,9 +2631,9 @@ connect();
 <linearGradient id="w-turn" x1="0" y1="1" x2="0" y2="0"><stop stop-color="#057a2d"/><stop offset=".45" stop-color="#29d946"/><stop offset="1" stop-color="#fff"/></linearGradient>
 <pattern id="w-grid-fine" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#8f9cb0" stroke-opacity=".2" stroke-width=".6"/></pattern>
 <pattern id="w-grid-coarse" width="100" height="50" patternUnits="userSpaceOnUse"><path d="M100 0H0V50" fill="none" stroke="#a9b7c8" stroke-opacity=".34" stroke-width="1.2"/></pattern>
-<clipPath id="w-map-clip"><path d="M162 0H847L777 335H231Z"/></clipPath>
+<clipPath id="w-map-clip"><path d="M162.6 0H847.9L780.3 334H229.7Z"/></clipPath>
 </defs>
-<!-- P0.9.9: the AID10 display IS the 1010x376 stream; no bezel inset (geometry from rectified photos, AID10_CLUSTER_GEOMETRY_P099.json) -->
+<!-- P0.9.10: the AID10 display IS the 1010x376 stream; no bezel inset (geometry from rectified photos, AID10_CLUSTER_GEOMETRY_P099.json) -->
 <rect x="0" y="0" width="1010" height="376" fill="url(#w-surface)"/>
 <g id="wide-map-surface" clip-path="url(#w-map-clip)">
  <rect x="0" y="0" width="1010" height="376" fill="#142132"/>
@@ -2649,30 +2652,34 @@ connect();
  <g id="wide-app-placeholder" style="display:none"><rect x="404" y="150" width="202" height="76" rx="8" fill="#0c1728" stroke="#527891" stroke-opacity=".6"/><text x="505" y="183" fill="#d8e7f5" text-anchor="middle" font-size="17" font-weight="600">CarPlay-App</text><text x="505" y="206" fill="#94acbd" text-anchor="middle" font-size="12">Vorschau · nur Editor</text></g>
  <g id="wide-off-placeholder" style="display:none"><text x="505" y="185" fill="#8ea4ba" text-anchor="middle" font-size="18" font-weight="600">CarPlay aus</text><text x="505" y="209" fill="#6f8398" text-anchor="middle" font-size="12">nur Editor</text></g>
 </g>
-<!-- MIBR_SHARED_TOP_BEGIN: common OEM status coordinates across Center/Wide/Voll (P0.9.9: measured on rectified photos) -->
+<!-- MIBR_SHARED_TOP_BEGIN: common OEM status coordinates across Center/Wide/Voll (P0.9.10: measured on rectified photos, per-view bar/scrim/arrow box) -->
+<defs><linearGradient id="wide-scrim-grad" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#04070d" stop-opacity=".66"/><stop offset=".55" stop-color="#04070d" stop-opacity=".5"/><stop offset="1" stop-color="#04070d" stop-opacity="0"/></linearGradient></defs>
+<rect id="wide-top-scrim" x="0" y="37" width="1010" height="59" fill="url(#wide-scrim-grad)"/>
+<path id="wide-top-bar" d="M0 0H1010V37H555L536 50.5H476L455 37H0Z" fill="#18263c"/>
 <g id="wide-top-status" fill="#f5f9ff">
   <path d="M296 13l-6 17h12z" fill="#e7f0fb"/><text x="304" y="30" font-size="22" font-weight="600">W</text>
   <text x="505" y="40" text-anchor="middle" font-size="31" font-weight="600" letter-spacing=".5">23:22</text>
   <g transform="translate(654 22)" stroke="#2bc7eb" stroke-width="2.2" stroke-linecap="round"><path d="M0-10V10M-8.7-5L8.7 5M-8.7 5L8.7-5"/></g>
   <text x="665" y="30" font-size="22" font-weight="600">4.0°C</text>
-  <path d="M0 38H454L474 51H539L559 38H1010" fill="none" stroke="#dce7f3" stroke-width="1.6" opacity=".83"/>
+  <path d="M0 37H455L476 50.5H536L555 37H1010" fill="none" stroke="#dce7f3" stroke-width="1.6" opacity=".83"/>
 </g>
 <g id="wide-top-text" fill="#f7fbff" text-anchor="middle">
-  <rect x="395" y="60" width="220" height="27" rx="3" fill="#0b1423" opacity=".5"/>
-  <text id="wide-top-label" x="505" y="80" font-size="21" font-weight="600">300 m · Hauptstraße</text>
+  <rect id="wide-top-text-zone" x="367" y="60" width="275" height="24" rx="3" fill="#0b1423" opacity=".5"/>
+  <text id="wide-top-label" x="505" y="77" font-size="21" font-weight="600">300 m · Hauptstraße</text>
 </g>
+<rect id="wide-arrow-box" x="367" y="89" width="275" height="35" fill="#4d5566"/>
 <!-- MIBR_SHARED_TOP_END -->
-<g id="wide-top-lanes" transform="translate(0 -20)" fill="none" stroke="#edf5fc" stroke-width="2.2" stroke-linecap="square">
- <path d="M459 112v23m29-23v23m29-23v23m32-23v23" opacity=".85"/>
- <path d="M464 117l14 14m0-14l-14 14M494 117l14 14m0-14l-14 14"/>
- <path d="M533 132v-15h12m-6-6l7 6-7 6" stroke-width="3"/>
+<g id="wide-top-lanes" fill="none" stroke="#edf5fc" stroke-width="2.2" stroke-linecap="square">
+ <!-- P0.9.10: arrow + lane separators x 487..524, y 100..120 inside the arrow box x 367..642, y 89..124 -->
+ <path d="M487 100v20M524 100v20" opacity=".85"/>
+ <path d="M505 118v-13m-5 5l5-5 5 5" stroke-width="3"/>
 </g>
 <g id="wide-side-panels">
- <!-- Measured: straight inner edges 162->231 (left) and 847->777 (right) from y 0 to 330, rounded into the bottom bar. -->
- <path d="M0 0H162L231 330Q233 350 210 356L0 376Z" fill="url(#w-panel)"/>
- <path d="M1010 0H847L777 330Q775 350 798 356L1010 376Z" fill="url(#w-panel)"/>
+ <!-- P0.9.10 measured: straight opaque inner edges x=0.2008*y+162.6 (left) and x=847.9-0.2023*y (right), y 0..334; bottom bar from y 334. -->
+ <path d="M0 0H162.6L229.7 334H0Z" fill="url(#w-panel)"/>
+ <path d="M1010 0H847.9L780.3 334H1010Z" fill="url(#w-panel)"/>
  <path d="M0 158H195M815 158H1010" stroke="#bcc9d9" stroke-opacity=".42" stroke-width="1.7"/>
- <path d="M162 0L231 330Q233 350 210 356M847 0L777 330Q775 350 798 356" fill="none" stroke="#ebf2fb" stroke-width="3" opacity=".84"/>
+ <path d="M162.6 0L229.7 334M847.9 0L780.3 334" fill="none" stroke="#ebf2fb" stroke-width="3" opacity=".84"/>
 </g>
 <g id="wide-left-info" text-anchor="middle">
  <text x="97" y="69" font-size="18" class="w-primary">7:20 h</text>
@@ -2695,8 +2702,8 @@ connect();
  <path id="wide-turn-silhouette" d="M803 262v-33q0-14 16-14h11v-12l25 19-25 18v-11h-10v33z" fill="url(#w-turn)" stroke="#f7fcff" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/>
 </g></g>
 <g id="wide-dial-distance" transform="translate(94 -66)" fill="#f4f8ff"><text x="821" y="296" text-anchor="middle" font-size="23" font-weight="650">300 m</text></g>
-<g id="wide-speed" fill="#f6f9ff"><text x="908" y="343" text-anchor="middle" font-size="46" font-weight="600">0</text><text x="908" y="364" text-anchor="middle" font-size="17">km/h</text></g>
-<!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views (P0.9.9: measured on rectified photos) -->
+<!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views (P0.9.10: measured on rectified photos, per-view band positions) -->
+<path id="wide-bottom-strip" d="M224.1 306H786L780.3 334H229.7Z" fill="#3b4354"/>
 <g id="wide-bottom-info" fill="#edf5ff" font-size="21" font-weight="600">
   <g id="wide-bottom-distance">
     <circle cx="376" cy="321" r="8.5" fill="none" stroke="#dce8f5" stroke-width="1.8"/>
@@ -2704,17 +2711,17 @@ connect();
     <text x="392" y="328">1.4 km</text>
   </g>
   <g id="wide-bottom-eta">
-    <text id="wide-bottom-eta-label" x="562" y="328">23:22</text>
-    <circle cx="631" cy="321" r="9" stroke="#e4eef8" stroke-width="1.8" fill="none"/>
-    <path d="M631 314v7l5 4" stroke="#e4eef8" fill="none" stroke-width="1.6"/>
+    <text id="wide-bottom-eta-label" x="570" y="328">23:22</text>
+    <circle cx="634" cy="321" r="9" stroke="#e4eef8" stroke-width="1.8" fill="none"/>
+    <path d="M634 314v7l5 4" stroke="#e4eef8" fill="none" stroke-width="1.6"/>
   </g>
 </g>
 <g id="wide-footer" fill="#d2deeb" font-size="21" font-weight="500">
-  <path d="M216 335H816" stroke="#b6c8d9" stroke-width="1.3" opacity=".6"/>
-  <rect x="262" y="336" width="486" height="40" fill="#0c1728" opacity=".8"/>
-  <text x="283" y="362"><tspan font-size="15">trip</tspan> 5936.7 km</text>
+  <rect id="wide-bottom-bar" x="0" y="334" width="1010" height="42" fill="#0c1728"/>
+  <path d="M0 334.5H1010" stroke="#b6c8d9" stroke-width="1.3" opacity=".7"/>
+  <text x="285" y="362"><tspan font-size="15">trip</tspan> 5936.7 km</text>
   <!-- Demonstration icons only; not evidence of independently writable BAP channels. -->
-  <g id="wide-seatbelt-warning" transform="translate(453 342) scale(1.15)" fill="none" stroke="#ff3047" stroke-linecap="round" stroke-linejoin="round">
+  <g id="wide-seatbelt-warning" transform="translate(454 338) scale(1.15)" fill="none" stroke="#ff3047" stroke-linecap="round" stroke-linejoin="round">
     <!-- Seated occupant, lap/shoulder restraint and buckle: warning pictogram, not a pedestrian. -->
     <circle cx="7" cy="3.5" r="2.5" fill="#ff3047" stroke="none"/>
     <path d="M5 8.5L4 15q0 2 3 3h5l4 3" stroke-width="2"/>
@@ -2723,8 +2730,8 @@ connect();
     <path d="M11 12.5l5.5 5.5" stroke-width="1.6"/>
     <rect x="12.5" y="18" width="3.8" height="2.4" rx=".6" fill="#ff3047" stroke="none"/>
   </g>
-  <path d="M484 376l11-38h20l11 38" fill="#6c8097" opacity=".83"/>
-  <path d="M494 338l-10 38m31-38l10 38" fill="none" stroke="#becbd9" stroke-width="1.8"/>
+  <path d="M478 371l11-34h22l11 34" fill="#6c8097" opacity=".83"/>
+  <path d="M489 337l-11 34m33-34l11 34" fill="none" stroke="#becbd9" stroke-width="1.8"/>
   <g id="wide-yellow-road-guidance" transform="translate(576 345) scale(1.5 1.4) translate(-566 -341)" fill="none" stroke="#f8d843" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
     <!-- Perspective road edges and an unmistakable dashed centre line, not two chevrons. -->
     <path d="M566 356l5-15M588 356l-5-15"/>
@@ -2736,6 +2743,7 @@ connect();
   <text x="647" y="362">--- km/h</text>
 </g>
 <!-- MIBR_SHARED_BOTTOM_END -->
+<g id="wide-speed" fill="#f6f9ff"><text x="908" y="343" text-anchor="middle" font-size="46" font-weight="600">0</text><text x="908" y="364" text-anchor="middle" font-size="17">km/h</text></g>
 <image id="wide-photo" x="0" y="0" width="1010" height="376" preserveAspectRatio="none" opacity=".55" pointer-events="none" style="display:none"/>
 <g id="wide-carplay-overlay" style="display:none">
  <rect x="402" y="217" width="198" height="62" rx="8" fill="#122338" stroke="#6bafc9" stroke-width="1.4"/>
@@ -2750,9 +2758,9 @@ connect();
 <linearGradient id="f-cutout" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#111a2a"/><stop offset="1" stop-color="#060911"/></linearGradient>
 <pattern id="f-grid-fine" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#8f9cb0" stroke-opacity=".2" stroke-width=".6"/></pattern>
 <pattern id="f-grid-major" width="100" height="50" patternUnits="userSpaceOnUse"><path d="M100 0H0V50" fill="none" stroke="#a9b7c8" stroke-opacity=".34" stroke-width="1.2"/></pattern>
-<clipPath id="f-mainclip"><path d="M0 0H1010V276H871Q863 276 857 284L816 335H216L174 284Q168 276 160 276H0Z"/></clipPath>
+<clipPath id="f-mainclip"><path d="M94 0H910C940 4 985 16 1010 27V274.3L862 276.6Q850 279 844 285.7L822.4 306L798.4 334H210.2L186.9 306L162 283.2Q150 277 138 275.8L0 273.7V16C30 8 70 2 94 0Z"/></clipPath>
 </defs>
-<!-- P0.9.9: the AID10 display IS the 1010x376 stream; no bezel inset (geometry from rectified photos, AID10_CLUSTER_GEOMETRY_P099.json) -->
+<!-- P0.9.10: the AID10 display IS the 1010x376 stream; no bezel inset (geometry from rectified photos, AID10_CLUSTER_GEOMETRY_P099.json) -->
 <rect x="0" y="0" width="1010" height="376" fill="url(#f-display)"/>
 <g id="full-map-surface" clip-path="url(#f-mainclip)">
  <rect x="0" y="0" width="1010" height="376" fill="url(#f-mapbg)"/>
@@ -2774,49 +2782,55 @@ connect();
  <g id="full-app-placeholder" style="display:none"><rect x="389" y="145" width="234" height="85" rx="10" fill="#0c1728" stroke="#527891" stroke-opacity=".6"/><text x="506" y="180" fill="#d8e7f5" text-anchor="middle" font-size="18" font-weight="600">CarPlay-App</text><text x="506" y="204" fill="#94acbd" text-anchor="middle" font-size="12">Vorschau · nur Editor</text></g>
  <g id="full-off-placeholder" style="display:none"><text x="506" y="183" fill="#8ea4ba" text-anchor="middle" font-size="19" font-weight="600">CarPlay aus</text><text x="506" y="209" fill="#6f8398" text-anchor="middle" font-size="12">nur Editor</text></g>
 </g>
-<!-- MIBR_SHARED_TOP_BEGIN: common OEM status coordinates across Center/Wide/Voll (P0.9.9: measured on rectified photos) -->
+<!-- MIBR_SHARED_TOP_BEGIN: common OEM status coordinates across Center/Wide/Voll (P0.9.10: measured on rectified photos, per-view bar/scrim/arrow box) -->
+<defs><linearGradient id="full-scrim-grad" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#04070d" stop-opacity=".66"/><stop offset=".55" stop-color="#04070d" stop-opacity=".5"/><stop offset="1" stop-color="#04070d" stop-opacity="0"/></linearGradient><linearGradient id="full-bar-grad" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#18263c" stop-opacity=".4"/><stop offset=".15" stop-color="#18263c" stop-opacity=".8"/><stop offset=".85" stop-color="#18263c" stop-opacity=".8"/><stop offset="1" stop-color="#18263c" stop-opacity=".4"/></linearGradient></defs>
+<rect id="full-top-scrim" x="0" y="37" width="1010" height="59" fill="url(#full-scrim-grad)"/>
+<path id="full-top-bar" d="M0 0H1010V37H555L536 50.5H476L455 37H0Z" fill="url(#full-bar-grad)"/>
+<path id="full-top-corners" d="M0 0H94C70 2 30 8 0 16ZM1010 0H910C940 4 985 16 1010 27Z" fill="#05080e"/>
 <g id="full-top-status" fill="#f5f9ff">
   <path d="M296 13l-6 17h12z" fill="#e7f0fb"/><text x="304" y="30" font-size="22" font-weight="600">W</text>
   <text x="505" y="40" text-anchor="middle" font-size="31" font-weight="600" letter-spacing=".5">23:22</text>
   <g transform="translate(654 22)" stroke="#2bc7eb" stroke-width="2.2" stroke-linecap="round"><path d="M0-10V10M-8.7-5L8.7 5M-8.7 5L8.7-5"/></g>
   <text x="665" y="30" font-size="22" font-weight="600">4.0°C</text>
-  <path d="M0 38H454L474 51H539L559 38H1010" fill="none" stroke="#dce7f3" stroke-width="1.6" opacity=".83"/>
+  <path d="M0 37H455L476 50.5H536L555 37H1010" fill="none" stroke="#dce7f3" stroke-width="1.6" opacity=".83"/>
 </g>
 <g id="full-top-text" fill="#f7fbff" text-anchor="middle">
-  <rect x="395" y="60" width="220" height="27" rx="3" fill="#0b1423" opacity=".5"/>
-  <text id="full-top-label" x="505" y="80" font-size="21" font-weight="600">100 m · Hauptstraße</text>
+  <rect id="full-top-text-zone" x="367" y="60" width="275" height="24" rx="3" fill="#0b1423" opacity=".5"/>
+  <text id="full-top-label" x="505" y="77" font-size="21" font-weight="600">100 m · Hauptstraße</text>
 </g>
+<rect id="full-arrow-box" x="367" y="89" width="275" height="35" fill="#4d5566"/>
 <!-- MIBR_SHARED_TOP_END -->
-<g id="full-top-lanes" transform="translate(0 -20)" fill="none" stroke="#f1f5fc" stroke-width="2.2" stroke-linecap="square">
- <path d="M449 112v23m31-23v23m31-23v23m33-23v23" stroke-opacity=".7"/>
- <path d="M455 116l14 14m0-14l-14 14M487 116l14 14m0-14l-14 14"/>
- <path d="M526 131v-15h12m-6-6l8 6-8 6" stroke-width="3"/>
+<g id="full-top-lanes" fill="none" stroke="#f1f5fc" stroke-width="2.2" stroke-linecap="square">
+ <!-- P0.9.10: arrow + lane separators x 487..524, y 100..120 inside the arrow box x 367..642, y 89..124 -->
+ <path d="M487 100v20M524 100v20" stroke-opacity=".7"/>
+ <path d="M505 118v-13m-5 5l5-5 5 5" stroke-width="3"/>
 </g>
 <g id="full-lower-corners">
- <!-- Measured: flat top at y 276 out to x 160 / 871, slope to x 250 / 782 at the bottom edge. -->
- <path d="M0 276H160Q168 276 174 284L250 376H0Z" fill="url(#f-cutout)"/>
- <path d="M1010 276H871Q863 276 857 284L782 376H1010Z" fill="url(#f-cutout)"/>
- <path d="M0 276H160Q168 276 174 284L250 376M1010 276H871Q863 276 857 284L782 376" fill="none" stroke="#dce9f5" stroke-width="2" opacity=".93"/>
+ <!-- P0.9.10 measured: flat shoulder y 274..276 (left to x 138, right from x 862), curve to the strip corners (187,306)/(822,306), diagonals x=0.8335y-68.2 / x=1084-0.8548y down to the bottom edge. -->
+ <path d="M0 273.7L138 275.8Q150 277 162 283.2L180 301.3L186.9 306L245 376H0Z" fill="url(#f-cutout)"/>
+ <path d="M1010 274.3L1006 274.3L862 276.6Q850 279 844 285.7L826 304.5L822.4 306L763 376H1010Z" fill="url(#f-cutout)"/>
+ <path d="M0 273.7L138 275.8Q150 277 162 283.2L180 301.3L186.9 306L245 376M1010 274.3L1006 274.3L862 276.6Q850 279 844 285.7L826 304.5L822.4 306L763 376" fill="none" stroke="#dce9f5" stroke-width="2" opacity=".93"/>
 </g>
-<!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views (P0.9.9: measured on rectified photos) -->
+<!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views (P0.9.10: measured on rectified photos, per-view band positions) -->
+<path id="full-bottom-strip" d="M186.9 306H822.4L798.4 334H210.2Z" fill="#3b4354" fill-opacity=".8"/>
 <g id="full-bottom-info" fill="#edf5ff" font-size="21" font-weight="600">
   <g id="full-bottom-distance">
-    <circle cx="376" cy="321" r="8.5" fill="none" stroke="#dce8f5" stroke-width="1.8"/>
-    <path d="M376 309v24m-12-12h24" fill="none" stroke="#dce8f5" stroke-width="1.2"/>
-    <text x="392" y="328">1.2 km</text>
+    <circle cx="321.5" cy="321" r="8.5" fill="none" stroke="#dce8f5" stroke-width="1.8"/>
+    <path d="M321.5 309v24m-12-12h24" fill="none" stroke="#dce8f5" stroke-width="1.2"/>
+    <text x="339" y="328">1.2 km</text>
   </g>
   <g id="full-bottom-eta">
-    <text id="full-bottom-eta-label" x="562" y="328">23:23</text>
-    <circle cx="631" cy="321" r="9" stroke="#e4eef8" stroke-width="1.8" fill="none"/>
-    <path d="M631 314v7l5 4" stroke="#e4eef8" fill="none" stroke-width="1.6"/>
+    <text id="full-bottom-eta-label" x="633" y="328">23:23</text>
+    <circle cx="698" cy="321" r="9" stroke="#e4eef8" stroke-width="1.8" fill="none"/>
+    <path d="M698 314v7l5 4" stroke="#e4eef8" fill="none" stroke-width="1.6"/>
   </g>
 </g>
 <g id="full-footer" fill="#d2deeb" font-size="21" font-weight="500">
-  <path d="M216 335H816" stroke="#b6c8d9" stroke-width="1.3" opacity=".6"/>
-  <rect x="262" y="336" width="486" height="40" fill="#0c1728" opacity=".8"/>
-  <text x="283" y="362"><tspan font-size="15">trip</tspan> 5936.7 km</text>
+  <rect id="full-bottom-bar" x="0" y="334" width="1010" height="42" fill="#0c1728"/>
+  <path d="M0 334.5H1010" stroke="#b6c8d9" stroke-width="1.3" opacity=".7"/>
+  <text x="285" y="362"><tspan font-size="15">trip</tspan> 5936.7 km</text>
   <!-- Demonstration icons only; not evidence of independently writable BAP channels. -->
-  <g id="full-seatbelt-warning" transform="translate(453 342) scale(1.15)" fill="none" stroke="#ff3047" stroke-linecap="round" stroke-linejoin="round">
+  <g id="full-seatbelt-warning" transform="translate(454 338) scale(1.15)" fill="none" stroke="#ff3047" stroke-linecap="round" stroke-linejoin="round">
     <!-- Seated occupant, lap/shoulder restraint and buckle: warning pictogram, not a pedestrian. -->
     <circle cx="7" cy="3.5" r="2.5" fill="#ff3047" stroke="none"/>
     <path d="M5 8.5L4 15q0 2 3 3h5l4 3" stroke-width="2"/>
@@ -2825,8 +2839,8 @@ connect();
     <path d="M11 12.5l5.5 5.5" stroke-width="1.6"/>
     <rect x="12.5" y="18" width="3.8" height="2.4" rx=".6" fill="#ff3047" stroke="none"/>
   </g>
-  <path d="M484 376l11-38h20l11 38" fill="#6c8097" opacity=".83"/>
-  <path d="M494 338l-10 38m31-38l10 38" fill="none" stroke="#becbd9" stroke-width="1.8"/>
+  <path d="M478 371l11-34h22l11 34" fill="#6c8097" opacity=".83"/>
+  <path d="M489 337l-11 34m33-34l11 34" fill="none" stroke="#becbd9" stroke-width="1.8"/>
   <g id="full-yellow-road-guidance" transform="translate(576 345) scale(1.5 1.4) translate(-566 -341)" fill="none" stroke="#f8d843" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
     <!-- Perspective road edges and an unmistakable dashed centre line, not two chevrons. -->
     <path d="M566 356l5-15M588 356l-5-15"/>

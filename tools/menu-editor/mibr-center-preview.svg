@@ -40,7 +40,7 @@
  <g id="center-app-placeholder" style="display:none"><rect x="416" y="157" width="180" height="67" rx="7" fill="#0c1728" stroke="#527891" stroke-opacity=".6"/><text x="506" y="185" fill="#d8e7f5" text-anchor="middle" font-size="15" font-weight="600">CarPlay-App</text><text x="506" y="205" fill="#94acbd" text-anchor="middle" font-size="11">Vorschau · nur Editor</text></g>
  <g id="center-off-placeholder" style="display:none"><text x="506" y="182" fill="#8ea4ba" text-anchor="middle" font-size="14" font-weight="600">CarPlay aus</text><text x="506" y="203" fill="#6f8398" text-anchor="middle" font-size="11">nur Editor</text></g>
 </g>
-<!-- MIBR_SHARED_TOP_BEGIN: common OEM status coordinates across Center/Wide/Voll (P0.9.9: measured on rectified photos) -->
+<!-- MIBR_SHARED_TOP_BEGIN: common OEM status coordinates across Center/Wide/Voll (P0.9.10: measured on rectified photos, per-view bar/scrim/arrow box) -->
 <g id="center-top-status" fill="#f5f9ff">
   <path d="M296 13l-6 17h12z" fill="#e7f0fb"/><text x="304" y="30" font-size="22" font-weight="600">W</text>
   <text x="505" y="40" text-anchor="middle" font-size="31" font-weight="600" letter-spacing=".5">23:22</text>
@@ -102,7 +102,7 @@
 <g id="center-dial-distance" transform="translate(-69.14 -30.6) scale(1.1772)" text-anchor="middle" fill="#f7fbff">
   <text x="757" y="256" font-size="20.5" font-weight="600">200 m</text>
 </g>
-<!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views (P0.9.9: measured on rectified photos) -->
+<!-- MIBR_SHARED_BOTTOM_BEGIN: identical OEM navigation/assist baseline across views (P0.9.10: measured on rectified photos, per-view band positions) -->
 <g id="center-bottom-info" fill="#edf5ff" font-size="21" font-weight="600">
   <g id="center-bottom-distance">
     <circle cx="376" cy="321" r="8.5" fill="none" stroke="#dce8f5" stroke-width="1.8"/>
