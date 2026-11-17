@@ -241,7 +241,7 @@ class NativeRowsCallbacks(unittest.TestCase):
         harness.parent.mkdir(parents=True, exist_ok=True)
         harness.write_text(HARNESS, encoding="utf-8")
         sources.append(str(harness))
-        for name in ("MibrControlProtocol", "MibrControlClient", "MibrControlSession", "MibrOwnedSsmRows", "MibrOemPageEntry", "MibrElementDetailRows", "MibrNativeDropdownEditor",
+        for name in ("MibrControlProtocol", "MibrControlClient", "MibrControlSession", "MibrOwnedSsmRows", "MibrWirelessBackend", "MibrWirelessSession", "MibrOemPageEntry", "MibrElementDetailRows", "MibrNativeDropdownEditor",
                      "MibrElementSpec", "MibrElementEngine", "MibrElementTree", "MibrCanonicalElementMenu", "MibrPopupEditorModel",
                      "MibrDraftChoiceModel", "MibrScalingState", "MibrCarPlayMenuModel", "MibrVdataDiag", "MibrEngineState", "MibrViewState", "MibrMenuDefinition", "MibrI18n",
                      "MibrDurableSwitch", "MibrPlatformDefaults", "MibrSafeArea", "MibrGpsDemoState", "MibrVersionInfo",

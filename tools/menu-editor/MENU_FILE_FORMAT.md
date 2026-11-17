@@ -32,6 +32,6 @@ Entry lines have five tab-separated fields: `id`, `parent`, `flags`, `de`, `en`.
 
 Last line: `crc32=<8 lower-case hex digits>`, CRC-32 (IEEE, as in zip) of all bytes before that line, including the LF before it. Nothing may follow it except one LF.
 
-The unit refuses a file with a wrong checksum, wrong magic or broken structure and keeps the stored one. It skips unknown IDs and reports how many. Catalog functions added in a later catalog than the file names are appended under `advanced`.
+The unit refuses a file with a wrong checksum, wrong magic or broken structure and keeps the stored one. It skips unknown IDs and reports how many. Catalog functions added in a later catalog than the file names are appended under `advanced`, except `wireless.control`, which is appended at the root for pre-catalog-3 files. In catalog 3 and newer it can be omitted, moved, renamed or made expert-only. It is a fixed page with no children; its controls require a native backend.
 
-`standard-menu.txt` is the full menu an installation ships as `config/mibr-menu.conf`. The JAR holds only a basic menu (Version, Erweitert > Menü laden) for a missing or damaged file.
+`standard-menu.txt` is the full menu an installation ships as `config/mibr-menu.conf`. The JAR holds only a basic menu (Version, Erweitert > Menü laden, Wireless CarPlay) for a missing or damaged file.

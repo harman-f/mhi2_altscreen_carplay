@@ -79,3 +79,14 @@ PROFILE=seat-mu1409-p4708 bash modules/menu/source/build.sh   # default: skoda-m
 Each profile carries its OEM patch anchors as data in `modules/profiles/<id>/hmi/oem-anchors.json`; `prepare_oem_sources.py --profile <id>` applies them (default Skoda output is unchanged and checked against a frozen copy of the previous patcher). The SEAT gear overlay PNG named by `MibrSeatGearOverlayImage` is a profile asset that is not part of this source tree yet.
 
 Status: the SEAT profiles are source only. No J9 build of any SEAT JAR and no device test has been run; the exact per-firmware `lsd.jar` and OEM source inputs are local-only. Host checks: `python3 modules/menu/source/check_java12_syntax.py` (Java 1.2 syntax lint, no compiler needed) and the unit tests above.
+
+
+## Wireless CarPlay page (native adapter pending)
+
+The owned settings page appends a `Wireless CarPlay` link to the current menu and exposes a separate page for an enable request, pairing request, status refresh, and stop request. These controls are outside the settings registry and do not use the MIBR/3 settings store. Existing HOME, CarPlay view ownership, and the current CarPlay session remain unchanged.
+
+`MibrWirelessBackend` is an injectable Java boundary; this source snapshot has no production implementation bound to it. The native page therefore displays the adapter as unavailable and keeps all request actions disabled. There is no JNI bridge, socket daemon, fake success path, or installer in this change. The C control API is a separate component contract and is not called by Java here.
+
+Any future backend must echo both the menu-page generation and unique request ID, report the required ABI/capability mask and a confirmed finite state snapshot, and dispatch replies asynchronously to the supplied UI dispatcher. Stale, duplicate, wrong-generation, unacknowledged, or incomplete replies are ignored or shown as unconfirmed. Pairing is shown as confirmed only when an acknowledged pairing request carries a confirmed `PAIRED` snapshot. Stop can supersede an outstanding enable/pairing request. Withheld replies expire from the page's bounded refresh loop and clear the snapshot; the next operation requires a fresh status read. This Java wall-clock expiry is a UI timeout only; native operation deadlines must use the monotonic clock at the native control boundary.
+
+The host session test injects a fake backend solely to test request and lifecycle gates. It is not a runtime adapter and provides no radio or pairing implementation. Java source checks and host tests do not establish IBM J9 class-file output, OEM rendering, physical behavior, or device acceptance.

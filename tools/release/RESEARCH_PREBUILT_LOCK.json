@@ -29,7 +29,7 @@
     "tools/build_support_tools.sh": "5d5bbc3992447d333d1e3e9e0c4fd55d3765749b",
     "tools/ci_qnx65_image.sh": "11ac40ee99d2c3cb7f84152f4667938430c37340",
     "tools/qnx65-image.lock": "6304e13a38bbe5ca2f306ba820dcebc8a8cacc64",
-    "modules/module-index.json": "34a453af1df99419b112a246cda608b1bf7f1a95",
+    "modules/module-index.json": "79d2210d4eab85258c5a49438752198d2a32df5f",
     "settings/registry.json": "73be7b9876ceb692b7031af3f1cf0c15aa729e2d"
   }
 }

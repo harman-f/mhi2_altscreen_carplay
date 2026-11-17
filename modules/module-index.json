@@ -114,6 +114,27 @@
       ],
       "build_coverage": "target-specific-incomplete",
       "evidence": "docs/build/MU1440_MENU_RGI_SOURCE.md"
+    },
+    "wireless": {
+      "status": "indexed",
+      "distribution": "common/wireless",
+      "depends_on": [],
+      "source": [
+        "modules/wireless/source"
+      ],
+      "runtime": [],
+      "build_scripts": [
+        "modules/wireless/build/build.sh"
+      ],
+      "support_tools": [
+        "modules/wireless/tests"
+      ],
+      "outputs": [
+        "libmibr-wireless.a",
+        "wireless-fixtures"
+      ],
+      "build_coverage": "compile-only-external-adapter-required",
+      "evidence": "modules/wireless/README.md"
     }
   },
   "profiles": [

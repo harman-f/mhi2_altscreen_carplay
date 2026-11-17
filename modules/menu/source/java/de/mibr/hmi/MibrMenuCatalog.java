@@ -2,7 +2,7 @@
 package de.mibr.hmi;
 final class MibrMenuCatalog {
  private MibrMenuCatalog(){}
- static final int CATALOG=2;
+ static final int CATALOG=3;
  static final String[] IDS={
   "viewarea.selected",
   "navigation.surface",
@@ -67,7 +67,8 @@ final class MibrMenuCatalog {
   "scaling.main.physicalSize",
   "scaling.hint",
   "diagnostics",
-  "version"
+  "version",
+  "wireless.control"
  };
  static final String[] KINDS={
   "list",
@@ -132,6 +133,7 @@ final class MibrMenuCatalog {
   "list",
   "list",
   "hint",
+  "fixedpage",
   "fixedpage",
   "fixedpage"
  };
@@ -199,7 +201,8 @@ final class MibrMenuCatalog {
   "Physische Displaygröße Hauptdisplay",
   "Änderungen werden bei der nächsten CarPlay-Verbindung übertragen.",
   "Diagnose",
-  "Version"
+  "Version",
+  "Wireless CarPlay"
  };
  static final String[] EN={
   "View",
@@ -265,8 +268,9 @@ final class MibrMenuCatalog {
   "Main display physical size",
   "Changes are sent on the next CarPlay connection.",
   "Diagnostics",
-  "Version"
+  "Version",
+  "Wireless CarPlay"
  };
- static final int[] SINCE={1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
- static final String BASIC="MIBR_MENU/1\ncatalog=2\nbrand=skoda\nname=Basic\nversion\troot\t-\t\t\nadvanced\troot\t-\t\t\nmenu.load\tadvanced\t-\t\t\ncrc32=9907a544\n";
+ static final int[] SINCE={1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3};
+ static final String BASIC="MIBR_MENU/1\ncatalog=3\nbrand=skoda\nname=Basic\nversion\troot\t-\t\t\nadvanced\troot\t-\t\t\nmenu.load\tadvanced\t-\t\t\nwireless.control\troot\t-\t\t\ncrc32=3e8ccdb5\n";
 }

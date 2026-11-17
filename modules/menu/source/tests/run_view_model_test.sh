@@ -28,11 +28,14 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/java/de/mibr/hmi/MibrMenuCatalog.java" \
   "$MODULE/java/de/mibr/hmi/MibrMenuFunctions.java" \
   "$MODULE/java/de/mibr/hmi/MibrMenuLayout.java" \
+  "$MODULE/java/de/mibr/hmi/MibrCalibration.java" \
   "$MODULE/java/de/mibr/hmi/MibrExpert.java" \
   "$MODULE/java/de/mibr/hmi/MibrDraftChoiceModel.java" \
   "$MODULE/java/de/mibr/hmi/MibrPopupEditorModel.java" \
   "$MODULE/java/de/mibr/hmi/MibrVdataDiag.java" \
   "$MODULE/java/de/mibr/hmi/MibrCarPlayMenuModel.java" \
+  "$MODULE/java/de/mibr/hmi/MibrWirelessBackend.java" \
+  "$MODULE/java/de/mibr/hmi/MibrWirelessSession.java" \
   "$MODULE/java/de/mibr/hmi/MibrV3Protocol.java" \
   "$MODULE/java/de/mibr/hmi/MibrV3Client.java" \
   "$MODULE/java/de/mibr/hmi/MibrV3Session.java" \
@@ -43,6 +46,8 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/tests/MibrViewStateTest.java" \
   "$MODULE/tests/MibrCanonicalElementMenuTest.java" \
   "$MODULE/tests/MibrCarPlayMenuModelTest.java" \
+  "$MODULE/tests/MibrMenuLayoutTest.java" \
+  "$MODULE/tests/MibrWirelessSessionTest.java" \
   "$MODULE/tests/MibrV3BindingTest.java" \
   "$MODULE/tests/MibrV3BusyTest.java" \
   "$MODULE/tests/MibrV3QueueTest.java" \
@@ -54,6 +59,9 @@ python3 "$MODULE/generate_catalog.py" \
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrCanonicalElementMenuTest
 "$JAVA" -Dmibr.menu.standard="$(cd "$MODULE/../../.." && pwd)/tools/menu-editor/standard-menu.txt" \
   -cp "$OUT/classes" de.mibr.hmi.MibrCarPlayMenuModelTest
+"$JAVA" -Dmibr.menu.standard="$(cd "$MODULE/../../.." && pwd)/tools/menu-editor/standard-menu.txt" \
+  -cp "$OUT/classes" de.mibr.hmi.MibrMenuLayoutTest
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrWirelessSessionTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3BindingTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3BusyTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrV3QueueTest

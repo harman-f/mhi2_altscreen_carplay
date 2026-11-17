@@ -24,6 +24,7 @@ public final class MibrCarPlayMenuModel {
     private MibrMenuLayout.Node[] nodes = new MibrMenuLayout.Node[0];
     private int screen = HOME;
     private int selected = -1;
+    private MibrWirelessSession wireless;
 
     public MibrCarPlayMenuModel(View view) {
         if (view == null) throw new IllegalArgumentException("view");
@@ -46,6 +47,16 @@ public final class MibrCarPlayMenuModel {
         }
     }
     public Snapshot snapshot(){return new Snapshot(screen,group(),selected,layoutGeneration);}
+    public void setWirelessSession(MibrWirelessSession session){wireless=session;}
+    public boolean wirelessPageOpen(){return screen==ITEMS && page.kind==MibrMenuLayout.WIRELESS;}
+    /** Action row index within the private Wireless page, or -1 for read-only rows. */
+    public int wirelessActionForRow(int row){
+        if(!wirelessPageOpen()||row<1||row>4)return -1;
+        return row-1;
+    }
+    public boolean wirelessStatusRow(int row){return wirelessPageOpen()&&row==0;}
+    public boolean wirelessActionEnabled(int action){return wireless!=null&&wireless.enabled(action);}
+    public boolean performWirelessAction(int action){return wireless!=null&&wireless.perform(action);}
     public void restore(Snapshot s){
         if(s==null || s.screen<CATEGORIES || s.screen>DETAIL || s.page!=0)
             throw new IllegalArgumentException("MENU_SNAPSHOT_INVALID");
@@ -176,7 +187,15 @@ public final class MibrCarPlayMenuModel {
         if (screen == CATEGORIES || screen == ITEMS) {
             if (screen == ITEMS) title = page.title();
             visibleNodes();
-            if (page.kind == MibrMenuLayout.DIAGNOSTICS) {
+            if (wirelessPageOpen()) {
+                rows=wireless==null?new String[]{MibrI18n.pick("Nicht verfügbar: nativer Adapter fehlt","Unavailable: native adapter missing"),
+                    MibrI18n.pick("Wireless einschalten anfordern","Request wireless on"),
+                    MibrI18n.pick("Pairing anfordern","Request pairing"),
+                    MibrI18n.pick("Status aktualisieren","Refresh status"),
+                    MibrI18n.pick("Stop anfordern","Request stop")}:wireless.rows();
+                detail=MibrI18n.pick("Nur bestätigte native Antworten ändern die Anzeige. Ohne Adapter bleiben Aktionen gesperrt.",
+                    "Only confirmed native replies change the display. Actions stay disabled without an adapter.");
+            } else if (page.kind == MibrMenuLayout.DIAGNOSTICS) {
                 rows = new String[DIAG_ROWS];
                 String[] live = MibrVdataDiag.read();
                 for (int j = 0; j < rows.length && j < live.length; j++) rows[j] = live[j];

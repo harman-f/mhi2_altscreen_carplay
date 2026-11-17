@@ -29,8 +29,28 @@ const change=(s,val,event="change")=>{
   const e=query(s);assert.ok(e, "Missing input: "+s);e.value=val;
   e.dispatchEvent(new w.Event(event,{bubbles:true}));return e;
 };
+function catalogCompatibility(){
+  const catalog=JSON.parse(fs.readFileSync(path.join(__dirname,"function-catalog.json"),"utf8"));
+  for(const name of ["mibr-menu-editor.html","mibr-menu-editor-nav-views-mockup.html"]){
+    const source=fs.readFileSync(path.join(__dirname,name),"utf8");
+    const instrumented=source.replace(/\r\n/g,"\n").replace("\n})();\n</script>", "\nwindow.testMenu={parseMenuFile:parseMenuFile,hex8:hex8,crc32:crc32};\n})();\n</script>");
+    const v=new JSDOM(instrumented,{url:"https://localhost.local/",runScripts:"dangerously",virtualConsole:vc,beforeParse(x){x.TextEncoder=TextEncoder;x.TextDecoder=TextDecoder;x.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});x.scrollTo=()=>{};x.confirm=()=>true}}).window;
+    assert.deepEqual(JSON.parse(v.document.querySelector("#catalogData").textContent),catalog,name+" embedded catalog");
+    function parse(version,entries){const body="MIBR_MENU/1\ncatalog="+version+"\nbrand=skoda\nname=Test\n"+entries;return v.testMenu.parseMenuFile(new TextEncoder().encode(body+"crc32="+v.testMenu.hex8(v.testMenu.crc32(new TextEncoder().encode(body)))+"\n"))}
+    const old=parse(2,"page.wireless\troot\t-\tCustom\tCustom\n");
+    assert.ok(!old.error && old.st.tree.c.some(n=>n.id==="page.wireless") && old.st.tree.c.some(n=>n.id==="wireless.control"),name+" old layout migration and custom ID");
+    const hidden=parse(3,"");
+    assert.ok(!hidden.error && !hidden.st.tree.c.some(n=>n.id==="wireless.control") && hidden.st.unused.c.some(n=>n.id==="wireless.control"),name+" omitted wireless stays unused");
+    const moved=parse(3,"page.wireless\troot\t-\tCustom\tCustom\nwireless.control\tpage.wireless\tx\tOwn\tOwn\n");
+    assert.ok(!moved.error && moved.st.tree.c[0].c[0].id==="wireless.control" && moved.st.tree.c[0].c[0].x,name+" moved and expert wireless");
+    const invalid=parse(3,"wireless.control\troot\t-\t\t\nnav_side\twireless.control\t-\t\t\n");
+    assert.ok(invalid.error,name+" fixed wireless rejects children");
+    v.close();
+  }
+}
 async function main(){
   await new Promise(resolve=>setTimeout(resolve,20));
+  catalogCompatibility();
   assert.deepEqual(failures,[],"Startup runtime exception");
   assert.equal(query("#appTitle").textContent,"MIB-Konfigurator");
   assert.equal(d.querySelectorAll("#tabs button").length,4);

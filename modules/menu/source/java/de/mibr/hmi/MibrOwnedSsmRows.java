@@ -29,6 +29,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     private final MibrNativeDropdownEditor.StockBinding editor;
     private final MibrControlSession control;
     private final MibrV3Session v3;
+    private final MibrWirelessSession wireless;
     private final WidgetModel[] original;
     private final ListItemTransfer originalTransfer;
     private final Vector listeners=new Vector();
@@ -37,6 +38,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     private boolean detached;
     private boolean scalingPageVisible;
     private boolean advancedPageVisible;
+    private boolean wirelessPageVisible;
     private int epoch;
     private int lastScreen=-1;
     private int lastGroup=-2,lastPage=-1,lastSelected=-2;
@@ -59,11 +61,17 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     MibrOwnedSsmRows(AbstractViewHandler handler,MibrOemSsmTemplate.Binding stock,
                      Runnable leave,MibrPopupEditorModel preserved,
                      MibrCarPlayMenuModel.Snapshot snapshot,MibrControlClient client) {
-        this(handler,stock,leave,preserved,snapshot,client,null);
+        this(handler,stock,leave,preserved,snapshot,client,null,null);
     }
     MibrOwnedSsmRows(AbstractViewHandler handler,MibrOemSsmTemplate.Binding stock,
                      Runnable leave,MibrPopupEditorModel preserved,
                      MibrCarPlayMenuModel.Snapshot snapshot,MibrControlClient client,MibrV3Client v3Client) {
+        this(handler,stock,leave,preserved,snapshot,client,v3Client,null);
+    }
+    MibrOwnedSsmRows(AbstractViewHandler handler,MibrOemSsmTemplate.Binding stock,
+                     Runnable leave,MibrPopupEditorModel preserved,
+                     MibrCarPlayMenuModel.Snapshot snapshot,MibrControlClient client,MibrV3Client v3Client,
+                     MibrWirelessBackend wirelessBackend) {
         if(preserved==null)throw new IllegalArgumentException("SSM_DRAFT_OWNER_REQUIRED");
         this.handler=handler;this.stock=stock;this.leave=leave;
         drafts=preserved;resume=snapshot;
@@ -76,6 +84,10 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         v3=v3Client==null?null:new MibrV3Session(v3Client,drafts,new MibrV3Session.Dispatcher(){
             public void post(Runnable action){later(action);}
         },new Runnable(){public void run(){MibrOwnedSsmRows.this.changed();}});
+        wireless=new MibrWirelessSession(wirelessBackend,new MibrWirelessSession.Dispatcher(){
+            public void post(Runnable action){later(action);}
+        },new Runnable(){public void run(){MibrOwnedSsmRows.this.changed();}});
+        menu.setWirelessSession(wireless);
         stock.mainList.setListItemTransfer(this);
         stock.close.getController().addOutEventListener(back);
         stock.view.set_opaque(true);
@@ -90,7 +102,10 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         Thread t=new Thread(new Runnable(){public void run(){
             while(attached){
                 try{Thread.sleep(2000L);}catch(InterruptedException e){return;}
-                if(attached && menu.onDiagnostics())changed();
+                if(attached){
+                    wireless.checkTimeout();
+                    if(menu.onDiagnostics())changed();
+                }
             }
         }},"MibrDiagRefresh");
         t.setDaemon(true);t.start();
@@ -158,6 +173,9 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         if(screen==MibrCarPlayMenuModel.DETAIL)rows=MibrElementDetailRows.lines(detail);
         // Diagnostics has no settings keys: one read-only line with the
         // configuration service state. No write action is offered here.
+        boolean onWirelessPage=menu.wirelessPageOpen();
+        if(onWirelessPage&&!wirelessPageVisible){wirelessPageVisible=true;wireless.enterPage();}
+        else if(!onWirelessPage&&wirelessPageVisible){wirelessPageVisible=false;wireless.leavePage();}
         if(menu.onDiagnostics()){
             String[] withStatus=new String[rows.length+1];
             System.arraycopy(rows,0,withStatus,0,rows.length);
@@ -297,9 +315,8 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
             value.set_shorten(true);
         }
         item.set_visible(true);
-        if(scalingNotice){
-            // Plain stock text row. Disabled and listener-free: not focusable,
-            // not an editor, not a SCALE_SET source.
+        if(scalingNotice||menu.wirelessStatusRow(rank)){
+            // Plain read-only status text. No setting key or command is attached.
             item.set_enabled(false);button.set_enabled(false);
             return;
         }
@@ -308,9 +325,11 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         // session/VIEW action owner yet. The view dropdown has no owner at all.
         // r10: the yes/no CHECK rows are saved + applied live through V3; only the
         // two runtime actions stay disabled.
+        int wirelessAction=menu.wirelessActionForRow(rank);
         boolean runtimeActionBlocked=key>=0 && drafts.liveViewGated(key);
-        item.set_enabled(!runtimeActionBlocked);
-        button.set_enabled(!runtimeActionBlocked);
+        boolean enabled=wirelessAction>=0?menu.wirelessActionEnabled(wirelessAction):!runtimeActionBlocked;
+        item.set_enabled(enabled);
+        button.set_enabled(enabled);
         // Detail lines contain observations, not clickable actions or live setters.
         if(menu.screen()==MibrCarPlayMenuModel.DETAIL)return;
         for(int i=0;i<listeners.size();i++){RowListener existing=(RowListener)listeners.elementAt(i);
@@ -338,6 +357,8 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
                 try{
                     int key=menu.keyForRow(rank);
                     if(menu.onDiagnostics()||menu.onVersion())return;
+                    int wirelessAction=menu.wirelessActionForRow(rank);
+                    if(wirelessAction>=0){menu.performWirelessAction(wirelessAction);menu.refresh();return;}
                     if(menu.loadRow(rank)){
                         if(v3!=null)v3.menuLoad();
                         return;
@@ -384,7 +405,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     /** Called on native onLeave, before the original handler deinitializes. */
     void detach(){
         if(detached)return;
-        attached=false;epoch++;control.detach();if(v3!=null)v3.detach();
+        attached=false;epoch++;control.detach();if(v3!=null)v3.detach();wireless.detach();
         MibrCalibration.set(false);
         Throwable failure=null;
         boolean cleanupFailed=false;
