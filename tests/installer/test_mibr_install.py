@@ -54,6 +54,8 @@ class Base(unittest.TestCase):
         self.work.mkdir()
         self.pkg = self.tmp / "pkg"
         self.lock = self.tmp / "install.lock"
+        self.sd = self.tmp / "sda0"
+        self.sd.mkdir()
         self.train_file = self.tmp / "train.sh"
         self.set_train(TRAIN)
         self.build_unit()
@@ -114,7 +116,8 @@ class Base(unittest.TestCase):
     def env(self, extra=None):
         e = dict(os.environ, MIBR_APP=str(self.app), MIBR_ESO=str(self.eso), MIBR_SYSTEM=str(self.system),
                  MIBR_IFS=str(self.ifs), MIBR_NO_MOUNT="1", MIBR_LOCK_FILE=str(self.lock),
-                 MIBR_TRAIN_CMD=str(self.train_file), TMPDIR=str(self.work), MIBR_FREE_KB="100000")
+                 MIBR_TRAIN_CMD=str(self.train_file), TMPDIR=str(self.work), MIBR_FREE_KB="100000",
+                 MIBR_SD_ROOT=str(self.sd), MIBR_BACKUP_KEY="UNITKEY1")
         for k in ("MIBR_INSTALL_FAIL_AT", "MIBR_MIGRATE_FAIL_AT", "MIBR_SHA256"):
             e.pop(k, None)
         e.update(extra or {})
@@ -130,6 +133,10 @@ class Base(unittest.TestCase):
     @property
     def new(self):
         return self.app / "root/mibr"
+
+    @property
+    def bkroot(self):
+        return self.sd / "MIBR-Backup/UNITKEY1/backup"
 
     def unit_tree(self):
         return tree(self.unit)
@@ -172,7 +179,9 @@ class TestInstall(Base):
         self.assertEqual(len(list((v / "ownership").glob("*.owned"))), 2)
         self.assertEqual((n / "config/features/mibr-cpvc.enabled").read_text(), "1\n")
         self.assertEqual((n / "config/features/mibr-parity-drive.enabled").read_text(), "1\n")
-        bk = next((n / "backup").glob("p*/oem"))
+        bk = next(self.bkroot.glob("p*/oem"))
+        self.assertFalse((n / "backup").exists())
+        self.assertEqual((n / "state/backup-root").read_text(), "key=UNITKEY1\n")
         self.assertEqual((bk / "pre/mnt/system/etc/boot/startup.sh").read_bytes(), STARTUP_STOCK)
         self.assertEqual((bk / "pre/mnt/app/eso/hmi/lsd/lsd.sh").read_bytes(), LSD_STOCK)
         self.assertIn("REBOOT_REQUIRED=YES", r.stdout)
@@ -418,6 +427,8 @@ class TestInterrupted(Base):
 
     def tearDown_unit(self):
         shutil.rmtree(self.unit, True)
+        shutil.rmtree(self.sd, True)
+        self.sd.mkdir()
         self.build_unit()
         self.lock.unlink(missing_ok=True)
 
@@ -433,7 +444,8 @@ class TestUninstallRollback(Base):
         self.assertFalse((self.new / "bin").exists())
         self.assertFalse((self.new / "scripts").exists())
         self.assertFalse(list((self.new / "version/ownership").glob("*")) if (self.new / "version/ownership").exists() else False)
-        self.assertTrue(list((self.new / "backup").glob("p*/oem/MANIFEST")))
+        self.assertTrue(list(self.bkroot.glob("p*/oem/MANIFEST")))
+        self.assertFalse((self.new / "backup").exists())
         # second uninstall is a no-op
         self.assertEqual(self.run_inst("--uninstall").returncode, 0)
         r = self.run_inst("--uninstall", "--purge")
@@ -807,6 +819,230 @@ class TestOriginContract(Base):
         self.assertIn("/config/cockpit/scaling.conf", (self.new / "version/install-created.receipt").read_text())
         self.assertEqual(self.run_inst("--uninstall").returncode, 0)
         self.assertFalse(late.exists())
+
+
+class TestSdBackup(Base):
+    def iid(self):
+        return next((self.new / "version").glob("install-p*.receipt")).name[len("install-"):-len(".receipt")]
+
+    def test_no_backup_bytes_on_flash(self):
+        self.assertEqual(self.apply().returncode, 0)
+        self.assertFalse((self.new / "backup").exists())
+        self.assertEqual(sorted(p.name for p in (self.new / "state").iterdir() if p.is_file()), ["backup-root"])
+        self.assertTrue((self.sd / "MIBR-Backup/UNITKEY1/UNIT.txt").is_file())
+
+    def test_apply_without_sd_fails_closed_before_writing(self):
+        before = self.unit_tree()
+        shutil.rmtree(self.sd)
+        r = self.apply()
+        self.assertEqual(r.returncode, 12, r.stdout)
+        self.assertIn("BACKUP_SD_MISSING", r.stdout)
+        self.assertEqual(before, self.unit_tree())
+        self.assertNoLeftovers()
+
+    def test_apply_with_unwritable_sd_fails_closed(self):
+        (self.sd / "MIBR-Backup").write_text("a file, not a directory\n")
+        before = self.unit_tree()
+        r = self.apply()
+        self.assertEqual(r.returncode, 12, r.stdout)
+        self.assertIn("BACKUP_SD_MISSING", r.stdout)
+        self.assertEqual(before, self.unit_tree())
+
+    def test_check_warns_without_sd_and_writes_nothing(self):
+        shutil.rmtree(self.sd)
+        before = self.unit_tree()
+        r = self.run_inst("--check")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("BACKUP_SD_MISSING", r.stdout)
+        self.assertEqual(before, self.unit_tree())
+
+    def test_uninstall_without_sd_backup_fails_closed(self):
+        self.assertEqual(self.apply().returncode, 0)
+        shutil.move(str(self.sd / "MIBR-Backup"), str(self.tmp / "elsewhere"))
+        before = self.unit_tree()
+        r = self.run_inst("--uninstall")
+        self.assertEqual(r.returncode, 10, r.stdout)
+        self.assertIn("BACKUP_SD_MISSING", r.stdout)
+        self.assertEqual(before, self.unit_tree())
+        r = self.run_inst("--rollback", self.iid())
+        self.assertEqual(r.returncode, 10, r.stdout)
+        self.assertIn("BACKUP_SD_MISSING", r.stdout)
+        shutil.move(str(self.tmp / "elsewhere"), str(self.sd / "MIBR-Backup"))
+        r = self.run_inst("--uninstall")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(self.startup(), STARTUP_STOCK)
+        self.assertEqual(self.lsd(), LSD_STOCK)
+
+    def test_uninstall_with_damaged_sd_backup_blocks(self):
+        self.assertEqual(self.apply().returncode, 0)
+        bk = next(self.bkroot.glob("p*/oem"))
+        for f in bk.rglob("*"):
+            if f.is_file() and f.name != "MANIFEST":
+                f.write_bytes(b"damaged\n")
+        before = self.unit_tree()
+        r = self.run_inst("--uninstall")
+        self.assertEqual(r.returncode, 10, r.stdout)
+        self.assertEqual(before, self.unit_tree())
+
+    def test_rollback_reads_sd_backup(self):
+        self.assertEqual(self.apply().returncode, 0)
+        r = self.run_inst("--rollback", self.iid())
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(self.startup(), STARTUP_STOCK)
+        self.assertEqual(self.lsd(), LSD_STOCK)
+
+    def seed_flash_backups(self):
+        # a pre-r14 install: backups on flash, receipts referencing backup/<id>/..., no pointer
+        self.assertEqual(self.apply().returncode, 0)
+        shutil.move(str(self.sd / "MIBR-Backup/UNITKEY1/backup"), str(self.new / "backup"))
+        shutil.rmtree(self.sd / "MIBR-Backup")
+        (self.new / "state/backup-root").unlink()
+        return tree(self.new / "backup")
+
+    def test_flash_backups_migrate_to_sd_and_leave_flash(self):
+        flash = self.seed_flash_backups()
+        self.assertTrue(flash)
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse((self.new / "backup").exists())
+        sd = tree(self.bkroot)
+        for rel, v in flash.items():
+            if v[0] == "f":
+                self.assertEqual(sd[rel][:2], v[:2], rel)
+        r = self.run_inst("--uninstall")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(self.startup(), STARTUP_STOCK)
+        self.assertEqual(self.lsd(), LSD_STOCK)
+
+    def test_uninstall_of_unmigrated_flash_install_still_works(self):
+        self.seed_flash_backups()
+        shutil.rmtree(self.sd)
+        r = self.run_inst("--uninstall")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(self.startup(), STARTUP_STOCK)
+
+    def test_migration_is_idempotent_and_copies_all_flash_files(self):
+        self.seed_flash_backups()
+        extra = self.new / "backup/pold/oem/note.txt"
+        self.wr(extra, b"x\n")
+        self.assertEqual(self.apply().returncode, 0)
+        self.assertFalse(extra.exists())
+        self.assertTrue((self.bkroot / "pold/oem/note.txt").is_file())
+        before = (tree(self.new), tree(self.bkroot))
+        self.assertEqual(self.apply().returncode, 0)
+        self.assertEqual(before, (tree(self.new), tree(self.bkroot)))
+
+    def test_migration_conflict_on_sd_refuses(self):
+        self.seed_flash_backups()
+        flash_file = next((self.new / "backup").rglob("MANIFEST"))
+        rel = flash_file.relative_to(self.new / "backup")
+        self.wr(self.bkroot / rel, b"different\n")
+        r = self.apply()
+        self.assertEqual(r.returncode, 30, r.stdout)
+        self.assertTrue(flash_file.exists())
+
+    # ---- r14 review fixes (A1, A3, A4)
+    def fakebin(self):
+        d = self.tmp / "fakebin"
+        d.mkdir(exist_ok=True)
+        self.wr(d / "mount", '#!/bin/sh\necho "$*" >> "$MOUNT_LOG"\n'
+                'case "$*" in "-ur $FAIL_RO"*) exit 1;; esac\nexit 0\n', 0o755)
+        return d
+
+    def mount_env(self, **extra):
+        d = self.fakebin()
+        e = dict(MIBR_NO_MOUNT="", MIBR_TOOL_DIRS="%s:/bin:/usr/bin:/usr/sbin:/sbin" % d,
+                 MOUNT_LOG=str(self.tmp / "mount.log"), FAIL_RO="/nonexistent")
+        e.update(extra)
+        return e
+
+    def mount_log(self):
+        p = self.tmp / "mount.log"
+        return p.read_text().splitlines() if p.exists() else []
+
+    def test_a1_already_rw_sd_is_not_remounted_or_restored(self):
+        r = self.apply(env=self.mount_env(FAIL_RO=str(self.sd)))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual([l for l in self.mount_log() if str(self.sd) in l], [])
+        self.assertTrue([l for l in self.mount_log() if str(self.app) in l])  # flash handling unchanged
+
+    def test_a1_remounted_sd_ro_restore_failure_is_warn_not_ro_fail(self):
+        r = self.apply(env=self.mount_env(MIBR_SD_FORCE_RO="1", FAIL_RO=str(self.sd)))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("-uw %s" % self.sd, self.mount_log())
+        self.assertIn("-ur %s" % self.sd, self.mount_log())
+        self.assertRegex(r.stdout, r"WARN .*could not be set back to read-only")
+        self.assertNotIn("persistent filesystems could not be confirmed", r.stdout)
+
+    def test_a1_remounted_sd_is_restored(self):
+        r = self.apply(env=self.mount_env(MIBR_SD_FORCE_RO="1"))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("-ur %s" % self.sd, self.mount_log())
+
+    def test_a1_flash_ro_restore_failure_still_fails(self):
+        r = self.apply(env=self.mount_env(FAIL_RO=str(self.app)))
+        self.assertEqual(r.returncode, 21, r.stdout + r.stderr)
+
+    def test_a3_flash_backups_adopted_even_with_pointer(self):
+        self.assertEqual(self.apply().returncode, 0)
+        self.assertTrue((self.new / "state/backup-root").exists())
+        extra = self.new / "backup/pold/oem/note.txt"
+        self.wr(extra, b"leftover\n")
+        r = self.apply()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual((self.bkroot / "pold/oem/note.txt").read_bytes(), b"leftover\n")
+        self.assertFalse(extra.exists())
+
+    def test_a3_pointer_present_conflicting_bytes_refuse(self):
+        self.assertEqual(self.apply().returncode, 0)
+        self.wr(self.bkroot / "pold/oem/note.txt", b"sd\n")
+        self.wr(self.new / "backup/pold/oem/note.txt", b"flash\n")
+        r = self.apply()
+        self.assertEqual(r.returncode, 30, r.stdout)
+        self.assertEqual((self.bkroot / "pold/oem/note.txt").read_bytes(), b"sd\n")
+
+    def test_a5_apply_prints_backup_root_and_keep_notice(self):
+        r = self.apply()
+        self.assertIn("backup_root=%s" % self.bkroot, r.stdout)
+        self.assertIn("KEEP the SD folder", r.stdout)
+
+    def safe_replace(self, mode):
+        d = self.tmp / "mvbin"
+        d.mkdir(exist_ok=True)
+        # fat: mv refuses to overwrite an existing target; broken: moving a tmp file into place always fails
+        self.wr(d / "mv", '#!/bin/sh\ncase "$MV_MODE" in\n'
+                'fat) for a; do last=$a; done; [ -e "$last" ] && exit 1;;\n'
+                'broken) case "$1" in *mibr-tmp*) exit 1;; esac;;\nesac\nexec /bin/mv "$@"\n', 0o755)
+        dest = self.tmp / "dest.txt"
+        tmpf = self.tmp / "dest.txt.mibr-tmp.1"
+        self.wr(dest, b"old\n")
+        self.wr(tmpf, b"new\n")
+        code = '. "%s/installer/lib/mibr-common.ksh"; safe_replace "%s" "%s"' % (self.pkg, tmpf, dest)
+        r = subprocess.run(["sh", "-c", code], env=dict(self.env(), MIBR_TOOL_DIRS="%s:/bin:/usr/bin" % d,
+                           MV_MODE=mode, PKG=str(self.pkg)), capture_output=True, text=True)
+        return r, dest, tmpf
+
+    def test_a4_safe_replace_fallback_when_mv_cannot_overwrite(self):
+        r, dest, tmpf = self.safe_replace("fat")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(dest.read_bytes(), b"new\n")
+        self.assertFalse(tmpf.exists())
+        self.assertEqual([p.name for p in self.tmp.glob("dest.txt.mibr-old*")], [])
+
+    def test_a4_safe_replace_failure_keeps_old_and_tmp(self):
+        r, dest, tmpf = self.safe_replace("broken")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(dest.read_bytes(), b"old\n")
+        self.assertEqual(tmpf.read_bytes(), b"new\n")
+        self.assertEqual([p.name for p in self.tmp.glob("dest.txt.mibr-old*")], [])
+
+    def test_bad_pointer_blocks(self):
+        self.assertEqual(self.apply().returncode, 0)
+        (self.new / "state/backup-root").write_text("key=../evil\n")
+        for args in (("--check",), ("--apply",), ("--uninstall",)):
+            r = self.run_inst(*args)
+            self.assertEqual(r.returncode, 10, (args, r.stdout))
+            self.assertIn("BACKUP_POINTER_BAD", r.stdout)
 
 
 if __name__ == "__main__":

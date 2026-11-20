@@ -21,7 +21,9 @@
 #   4 classify every target by hash (stock / package / known-previous / owned / foreign), precompute
 #     every OEM transform and its result hash, check lsd.sh; any BLOCK ends here
 #   5 root migration (installer/lib/migrate-root.ksh run --id <id>; kill switch first)
-#   5b backups of every file about to change -> mibr/backup/<id>/oem/ (+ MANIFEST with hashes)
+#   4b backup root on the SD: $SDROOT/MIBR-Backup/<unit-key>/backup (remount rw + write test; BACKUP_SD_MISSING if
+#      absent), pointer mibr/state/backup-root; pre-r14 flash backups are copied (sha256) and removed at the end
+#   5b backups of every file about to change -> <backup root>/<id>/oem/ (+ MANIFEST with hashes)
 #   6 payload (tmp + chmod + mv + read-back), config only when absent
 #   7 OEM variants (ownership receipt first, then the write)
 #   8 defaults on a first install only
@@ -126,6 +128,7 @@ if [ -n "$ID_OPT" ]; then ID=$ID_OPT; else ID=p$PKG12; fi
 BLOCKVER=$PKG12
 BLOCKFILE=$PKG/installer/config/lsd-block.txt
 ok "package verified ($(grep -c . "$W/pkg.sums") files), install id $ID"
+bk_resolve || die 10 "BACKUP_POINTER_BAD: $BKPTR is malformed (nothing was written)"
 
 # An assembled package declares "package_status": "complete" only when every input
 # (native binaries, menu JARs, installer) is present; anything else is never installed.
@@ -247,7 +250,7 @@ payload_target_ok(){
 stock_source(){
   _rf=$OWN/$(own_name "$1").owned
   if [ -f "$_rf" ] && [ "$(getkey "$_rf" stock_sha256)" = "$2" ]; then
-    _sb=$NEW/$(getkey "$_rf" stock_backup)
+    _sb=$(bkfile "$(getkey "$_rf" stock_backup)")
     if [ "$(sha_of "$_sb")" = "$2" ]; then echo "$_sb"; return 0; fi
   fi
   _lb=$ROOT/mibr-kit/backup$1
@@ -294,7 +297,7 @@ plan_payload(){
     elif _lbl=$(known_state "$KNOWN" "$_t" "$_cur"); then _act=replace; _cls=known-previous:$_lbl
     else block "foreign file at $_t (sha256 $_cur is neither stock, package nor a known previous state)"; continue
     fi
-    if ! under_new "$_t" && mf_find "$PREVMF" "$_t" && [ "$MF_STATE" = replaced ] && ! known_state "$KNOWN" "$_t" "$MF_PRE" >/dev/null && [ "$(sha_of "$NEW/$MF_BK")" != "$MF_PRE" ]; then
+    if ! under_new "$_t" && mf_find "$PREVMF" "$_t" && [ "$MF_STATE" = replaced ] && ! known_state "$KNOWN" "$_t" "$MF_PRE" >/dev/null && [ "$(sha_of "$(bkfile "$MF_BK")")" != "$MF_PRE" ]; then
       block "original-state backup of $_t ($MF_BK) is missing or damaged; cannot carry the uninstall origin"; continue
     fi
     echo "$_act $_h $_m $_t $_s $_cls" >> "$W/payload.plan"
@@ -552,17 +555,97 @@ step_migrate(){
   [ "$_mrc" -eq 0 ] || die 20 "root migration failed (exit $_mrc); the kill switch stays as migrate-root left it"
 }
 
+# ---------------------------------------------------------------- backup root on the SD
+# bk_need_sd: uninstall/rollback with a pointer need the SD backup tree; fail closed, never guess.
+bk_need_sd(){
+  [ "$BKMODE" = sd ] || return 0
+  [ -d "$BKBASE" ] || die 10 "BACKUP_SD_MISSING: backups of this unit are on the SD at $BKBASE (insert the SD that holds $SDTOP/$BKKEY); nothing was written"
+  return 0
+}
+
+# bk_sd_open (before any flash write): SD present, remounted read-write, write-tested; unit key chosen.
+bk_sd_open(){
+  say "[4b] backup root on SD ($SDROOT)"
+  [ -d "$SDROOT" ] || die 12 "BACKUP_SD_MISSING: $SDROOT is not available (backups never go to flash); nothing was written"
+  mnt_sd_rw || die 12 "BACKUP_SD_MISSING: cannot remount $SDROOT read-write; nothing was written"
+  _pr=$SDROOT/$SDTOP/.probe.$$
+  mkdir -p "$SDROOT/$SDTOP" 2>/dev/null && echo probe > "$_pr" 2>/dev/null && [ "$(cat "$_pr" 2>/dev/null)" = probe ] \
+    || { rm -f "$_pr" 2>/dev/null; die 12 "BACKUP_SD_MISSING: $SDROOT is not writable; nothing was written"; }
+  rm -f "$_pr"
+  if [ -z "$BKKEY" ]; then
+    # unit key: train + 12 hex of a hash over run-specific data; persisted in the flash pointer
+    echo "${RANDOM:-0}.${RANDOM:-0}.$$.$SECONDS $(ls -ld /tmp /dev/shmem /ramdisk 2>/dev/null)" > "$W/key.seed"
+    _kh=$(sha_of "$W/key.seed"); _k12=${_kh%"${_kh#????????????}"}
+    NEWKEY=${MIBR_BACKUP_KEY:-${TRAIN:-unit}-$_k12}
+    case $NEWKEY in *[!A-Za-z0-9._-]*) NEWKEY=unit-$_k12 ;; esac
+  fi
+}
+
+# bk_adopt (flash writable): copy pre-r14 flash backups to the SD (verified), then write the pointer.
+# Flash copies are removed only afterwards by bk_flash_cleanup.
+bk_adopt(){
+  if [ -z "$BKKEY" ]; then
+    _nb=$SDROOT/$SDTOP/$NEWKEY/backup
+    mkdir -p "$_nb" || die 12 "BACKUP_SD_MISSING: cannot create $_nb"
+    echo "train=${TRAIN:-unknown} first_install_id=$ID" | sdput_text "$SDROOT/$SDTOP/$NEWKEY/UNIT.txt" || die 30 "cannot write UNIT.txt on the SD"
+  else
+    _nb=$BKBASE
+  fi
+  # Flash backups are adopted whenever any exist, also when a pointer is already set (leftovers of an
+  # interrupted adoption or an older install): verify-then-copy, identical SD files skipped.
+  if [ -d "$NEW/backup" ]; then
+    walk "$NEW/backup" > "$W/fb.list"
+    _nf=0
+    while IFS= read -r _f; do
+      _rel=${_f#"$NEW"/backup/}
+      case $_rel in *.mibr-tmp.*) continue ;; esac
+      _h=$(sha_of "$_f")
+      if [ "$_h" = missing ] || [ "$_h" = error ]; then die 30 "cannot hash flash backup $_rel"; fi
+      _d=$_nb/$_rel
+      _dh=$(sha_of "$_d")
+      if [ "$_dh" = "$_h" ]; then continue; fi
+      [ "$_dh" = missing ] || die 30 "SD backup $_rel exists with different bytes; refusing to overwrite"
+      sdput "$_f" "$_d" "$_h" || die 30 "cannot copy flash backup $_rel to the SD"
+      _nf=$((_nf + 1))
+    done < "$W/fb.list"
+    if [ "$_nf" != 0 ] || [ -z "$BKKEY" ]; then say "  copied $_nf flash backup file(s) to $_nb (sha256 verified)"; fi
+  fi
+  sync
+  if [ -z "$BKKEY" ]; then
+    echo "key=$NEWKEY" | put_text "$BKPTR" 644 || die 30 "cannot write backup pointer $BKPTR"
+  fi
+  bk_resolve || die 30 "backup pointer unreadable after write"
+  [ -d "$BKBASE" ] || die 12 "BACKUP_SD_MISSING: $BKBASE"
+  ok "backup root $BKBASE"
+}
+
+# bk_flash_cleanup (end of apply): drop flash backup files whose SD copy verifies; keep anything else.
+bk_flash_cleanup(){
+  [ "$BKMODE" = sd ] && [ -d "$NEW/backup" ] || return 0
+  walk "$NEW/backup" > "$W/fb.list"
+  _rm=0
+  while IFS= read -r _f; do
+    _rel=${_f#"$NEW"/backup/}
+    _h=$(sha_of "$_f")
+    if [ "$_h" != missing ] && [ "$_h" != error ] && [ "$(sha_of "$BKBASE/$_rel")" = "$_h" ]; then
+      rm -f "$_f" && _rm=$((_rm + 1))
+    else warn "flash backup $_rel has no verified SD copy: kept"; fi
+  done < "$W/fb.list"
+  prune "$NEW/backup"
+  if [ "$_rm" != 0 ]; then say "  removed $_rm flash backup file(s) (verified copies are on the SD)"; fi
+}
+
 step_backup(){
   say "[5b] backups"
-  BK=$NEW/backup/$ID/oem
+  BK=$BKBASE/$ID/oem
   BKM=$BK/MANIFEST
   mkdir -p "$BK/pre" "$BK/stock" || die 30 "cannot create $BK"
   # installed.manifest as it was before this install (kept once, an interrupted re-run must not
   # capture the half-written new one); --rollback puts the origin rows of restored files back from it
-  _mfp=$NEW/backup/$ID
+  _mfp=$BKBASE/$ID
   if [ ! -f "$_mfp/installed.manifest.pre" ] && [ ! -f "$_mfp/installed.manifest.none" ]; then
-    if [ -f "$PREVMF" ]; then put "$PREVMF" "$_mfp/installed.manifest.pre" "$(sha_of "$PREVMF")" 644 || die 30 "cannot back up installed.manifest"
-    else echo none | put_text "$_mfp/installed.manifest.none" 644 || die 30 "cannot back up installed.manifest"
+    if [ -f "$PREVMF" ]; then sdput "$PREVMF" "$_mfp/installed.manifest.pre" "$(sha_of "$PREVMF")" || die 30 "cannot back up installed.manifest"
+    else echo none | sdput_text "$_mfp/installed.manifest.none" || die 30 "cannot back up installed.manifest"
     fi
   fi
   : > "$W/bk.cand"
@@ -594,7 +677,7 @@ step_backup(){
     fi
   done < "$W/bk.cand"
   { [ -f "$BKM" ] && cat "$BKM"; cat "$W/bk.new"; } > "$W/bk.merged"
-  put "$W/bk.merged" "$BKM" "$(sha_of "$W/bk.merged")" 644 || die 30 "cannot write backup manifest"
+  sdput "$W/bk.merged" "$BKM" "$(sha_of "$W/bk.merged")" || die 30 "cannot write backup manifest"
   sync
   ok "backup manifest $(grep -c . "$BKM") rows"
 }
@@ -623,7 +706,7 @@ write_variant_receipt(){ # n target stock patched mode
     bk_row "$2" && [ "$BK_PRE" = "$3" ] || die 30 "no stock backup for $2"
     _sbk=backup/$ID/oem/$BK_REL
   fi
-  [ "$(sha_of "$NEW/$_sbk")" = "$3" ] || die 30 "stock backup of $2 does not hash to the stock sha"
+  [ "$(sha_of "$(bkfile "$_sbk")")" = "$3" ] || die 30 "stock backup of $2 does not hash to the stock sha"
   mkdir -p "$OWN" || die 30 "cannot create ownership dir"
   {
     echo "kind=variant"
@@ -797,8 +880,10 @@ step_lsd(){
 apply_main(){
   plan_apply
   if [ "$BLOCKS" -gt 0 ]; then die 10 "$BLOCKS BLOCK(s); nothing was written"; fi
+  bk_sd_open
   say "[5-10] writing"
   mnt_rw "$NEW" || die 12 "cannot remount $APP read-write"
+  bk_adopt
   [ -z "$(cat "$W/var.plan")" ] || mnt_rw "$SYSTEM/x" || die 12 "cannot remount $SYSTEM read-write"
   step_migrate; inject after_migrate
   step_backup; inject after_backup
@@ -809,6 +894,7 @@ apply_main(){
   step_receipts pending; inject after_receipts
   step_lsd; inject after_lsd
   step_receipts complete
+  bk_flash_cleanup
   if [ -n "${MIG_DONE:-}" ]; then _vo="MIBR_MIGRATE_VERIFY=OK (migrated earlier, id $MIG_DONE)"
   else _vo=$("$SH_BIN" "$PKG/installer/lib/migrate-root.ksh" verify --app "$APP" --id "$ID" 2>&1); fi
   case $_vo in
@@ -818,6 +904,8 @@ apply_main(){
   esac
   inject final
   sync
+  say "backup_root=$BKBASE"
+  say "KEEP the SD folder $SDROOT/$SDTOP (unit key ${BKKEY:-?}): uninstall/rollback need these backups. Without them --uninstall is refused."
   say "MIBR_INSTALL=OK id=$ID profile=$PROFILE warnings=$WARNS"
   say "REBOOT_REQUIRED=YES"
 }
@@ -828,6 +916,13 @@ check_main(){
   if [ "$BLOCKS" -gt 0 ]; then
     say "MIBR_INSTALL=CHECK_BLOCKED blocks=$BLOCKS profile=$PROFILE"
     exit 10
+  fi
+  if [ "$BKMODE" = sd ]; then
+    if [ -d "$BKBASE" ]; then ok "backup root $BKBASE"; else warn "backup SD tree $BKBASE not present (uninstall/rollback would fail BACKUP_SD_MISSING)"; fi
+  elif [ -d "$SDROOT" ]; then
+    say "  backup root will be $SDROOT/$SDTOP/<unit-key>/backup (flash backups, if any, are migrated)"
+  else
+    warn "$SDROOT not available: --apply would fail BACKUP_SD_MISSING (backups never go to flash)"
   fi
   say "MIBR_INSTALL=CHECK_OK profile=$PROFILE id=$ID warnings=$WARNS"
 }
@@ -881,7 +976,7 @@ un_plan(){
     [ -f "$_rf" ] || continue
     [ "$(getkey "$_rf" kind)" = variant ] || continue
     _t=$(getkey "$_rf" target); _ss=$(getkey "$_rf" stock_sha256); _ps=$(getkey "$_rf" patched_sha256)
-    _bk=$NEW/$(getkey "$_rf" stock_backup); _m=$(getkey "$_rf" mode)
+    _bk=$(bkfile "$(getkey "$_rf" stock_backup)"); _m=$(getkey "$_rf" mode)
     _real=$(rebase "$_t") || { block "bad target in $_rf"; continue; }
     _cur=$(sha_of "$_real")
     if [ "$_cur" = "$_ps" ]; then
@@ -913,7 +1008,8 @@ un_plan(){
           new) if [ "$_cur" = "$_s" ]; then echo "delete $_t - -" >> "$W/un.pay"; elif [ "$_cur" != missing ]; then warn "kept modified file $_t"; fi ;;
           replaced)
             if [ "$_cur" = "$_s" ]; then
-              if [ "$(sha_of "$NEW/$_bk")" != "$_pre" ]; then block "backup of replaced $_t is missing or damaged"; else echo "restore $_t $NEW/$_bk $_m" >> "$W/un.pay"; fi
+              _bkf=$(bkfile "$_bk")
+              if [ "$(sha_of "$_bkf")" != "$_pre" ]; then block "backup of replaced $_t is missing or damaged ($BKMODE backup $_bkf)"; else echo "restore $_t $_bkf $_m" >> "$W/un.pay"; fi
             elif [ "$_cur" != "$_pre" ]; then warn "kept modified file $_t"; fi ;;
         esac
       fi
@@ -965,7 +1061,9 @@ un_apply(){
     [ -f "$_f" ] || continue
     case $_f in */install-defaults.receipt|*/install-created.receipt) continue ;; esac
     _iid=$(getkey "$_f" install_id)
-    if [ -n "$_iid" ] && [ -d "$NEW/backup/$_iid" ]; then cp "$_f" "$NEW/backup/$_iid/install.receipt.uninstalled" 2>/dev/null; fi
+    if [ -n "$_iid" ] && [ -d "$BKBASE/$_iid" ]; then
+      if [ "$BKMODE" = flash ] || mnt_sd_rw; then cp "$_f" "$BKBASE/$_iid/install.receipt.uninstalled" 2>/dev/null; fi
+    fi
     rm -f "$_f"
   done
   rm -f "$NEW/version/install-defaults.receipt" "$NEW/version/install-created.receipt" "$NEW/version/components.manifest" "$NEW/version/installed-version.properties"
@@ -984,6 +1082,7 @@ un_apply(){
 
 uninstall_main(){
   if [ ! -d "$NEW" ]; then say "MIBR_INSTALL=NOTHING_INSTALLED ($LNEW absent)"; return 0; fi
+  bk_need_sd
   un_plan
   if [ "$BLOCKS" -gt 0 ]; then die 10 "$BLOCKS BLOCK(s); nothing was written"; fi
   un_apply
@@ -991,7 +1090,8 @@ uninstall_main(){
 
 # ---------------------------------------------------------------- rollback
 rollback_main(){
-  BK=$NEW/backup/$RB_ID/oem
+  bk_need_sd
+  BK=$BKBASE/$RB_ID/oem
   BKM=$BK/MANIFEST
   say "[rollback plan] id $RB_ID"
   [ -f "$BKM" ] || die 10 "no OEM backup manifest for install id $RB_ID ($BKM)"
@@ -1029,7 +1129,7 @@ rollback_main(){
   # installed.manifest: the rows of every restored file go back to what they were before install <id>
   # (dropped when the file did not exist), so a following --apply does not see the restored bytes as foreign
   if [ -f "$PREVMF" ]; then
-    _mfp=$NEW/backup/$RB_ID/installed.manifest.pre
+    _mfp=$BKBASE/$RB_ID/installed.manifest.pre
     : > "$W/rb.targets"
     while read -r _k _t _x; do
       case $_k in payload) echo "$_t" >> "$W/rb.targets" ;; esac
@@ -1039,7 +1139,7 @@ rollback_main(){
         case $_s in ''|'#'*) continue ;; esac
         if grep -qxF "$_t" "$W/rb.targets"; then
           if [ -f "$_mfp" ] && mf_find "$_mfp" "$_t"; then echo "$MF_SHA $MF_MODE $_t $MF_STATE $MF_BK $MF_PRE"
-          elif [ ! -f "$_mfp" ] && [ ! -f "$NEW/backup/$RB_ID/installed.manifest.none" ]; then echo "$_s $_m $_t $_st $_bk $_pre"
+          elif [ ! -f "$_mfp" ] && [ ! -f "$BKBASE/$RB_ID/installed.manifest.none" ]; then echo "$_s $_m $_t $_st $_bk $_pre"
           fi
         else echo "$_s $_m $_t $_st $_bk $_pre"
         fi
