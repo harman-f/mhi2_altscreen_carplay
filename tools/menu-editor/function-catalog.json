@@ -597,8 +597,8 @@
 "id": "scaling.hint",
 "parent": "scaling",
 "kind": "hint",
-"de": "Wirkt nach Neuverbinden",
-"en": "Applies after reconnect"
+"de": "Mehr % = kleinere Darstellung. Wirkt nach Neuverbinden",
+"en": "More % = smaller display. Applies after reconnect"
 },
 {
 "id": "diagnostics",
