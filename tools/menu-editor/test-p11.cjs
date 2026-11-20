@@ -57,6 +57,7 @@ async function main(){
   press(1,3);assert.equal(num(),"100 %");press(1,9);assert.equal(num(),"150 %","last step");press(0,9);assert.equal(num(),"Automatisch");
   assert.ok(Array.from(d.querySelectorAll(".pvnote")).some(n=>/ab r15j/.test(n.textContent)),"scaling note");
   click("Zoomfaktor Hauptdisplay");assert.equal(num(),"Automatisch","main display zoom is a slider too");
+  assert.ok(rows().some(r=>r.textContent==="Mehr % = kleinere Darstellung. Wirkt nach Neuverbinden"),"r15k scaling hint");
   // physical size: 50-200 % in 10 % steps, 100 % = Original
   const ph="Physische Displaygröße Virtual Cockpit";
   assert.ok(row(ph).classList.contains("sl"),"physical size is a slider row");

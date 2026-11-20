@@ -91,6 +91,23 @@ async function main(){
   assert.ok(!query("#menuTools").hidden);
   assert.ok(!query("#menuWorkspaceControls").hidden, "Menu tools did not return on menu tab");
   assert.notEqual(w.getComputedStyle(query("#menuWorkspaceControls")).display,"none");
+  /* retired catalog IDs (gps.demo): a saved menu that still holds them restores without them, in both editors */
+  const saved=JSON.stringify({v:2,brand:"skoda",name:"",tree:[{id:"advanced",c:[{id:"gps.demo"},{id:"sd_log"}]},{id:"gps.demo"}],unused:[{id:"gps.demo"}]});
+  const restored=async(file,openFile)=>{
+    const errs=[];const vc2=new VirtualConsole();vc2.on("jsdomError",x=>errs.push(String(x)));
+    const dm=new JSDOM(fs.readFileSync(path.join(__dirname,file),"utf8"),{url:"https://localhost.local/"+file,runScripts:"dangerously",virtualConsole:vc2,
+      beforeParse(win){win.TextEncoder=TextEncoder;win.TextDecoder=TextDecoder;win.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});win.scrollTo=()=>{};win.confirm=()=>true;win.localStorage.setItem("mibr-menu-editor/2",saved)}});
+    await new Promise(resolve=>setTimeout(resolve,20));
+    const doc=dm.window.document;doc.querySelector(openFile).click();
+    const txt=doc.querySelector("#filetext").textContent;
+    assert.deepEqual(errs,[],file+": runtime exception");
+    assert.ok(!/^gps\.demo\t/m.test(txt),file+": gps.demo kept after restore");
+    assert.ok(/^sd_log\tadvanced\t/m.test(txt),file+": sibling of retired ID lost");
+    assert.ok(/^crc32=[0-9a-f]{8}$/m.test(txt),file+": menu file not built");
+    dm.window.close();
+  };
+  await restored("mibr-menu-editor-nav-views-mockup.html","#menuSections [data-pane=file]");
+  await restored("mibr-menu-editor.html","#tabs [data-t=file]");
   await new Promise(resolve=>setTimeout(resolve,20));
   assert.deepEqual(failures,[],"Runtime exceptions during interactions");
   w.close();
