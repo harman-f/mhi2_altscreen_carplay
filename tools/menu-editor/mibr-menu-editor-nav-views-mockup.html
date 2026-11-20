@@ -1094,7 +1094,7 @@ de:{
  saStd:"Standard",saStdLine:"Standard dieser Ansicht: links {0}, oben {1}, rechts {2}, unten {3}",
  saChanged:"Geändert",saIsStd:"Standard",
  saSeatStd:"SEAT-Testprofil (MU1409/MU1447): Die Standardwerte stammen aus dem Plattform-Testprofil und sind nicht im Auto vermessen.",
- pvSliderBrand:"Regler: gleicher Aufbau wie bei Skoda. Die SEAT-Firmwares (MU1409, MU1447) enthalten dieselben OEM-Regler-Bausteine; Farben und Optik für diese Marke sind nicht belegt. Im Auto sind die Regler bei SEAT noch gesperrt, dort erscheinen bis zur Freigabe die bisherigen Zeilen mit Auswahlliste.",pvSliderZoom:"Zoom als Regler mit festen Stufen: Fahrzeugseite folgt.",pvDec:"Verringern",pvInc:"Erhöhen",
+ pvSliderBrand:"Regler: gleicher Aufbau wie bei Skoda. Die SEAT-Firmwares (MU1409, MU1447) enthalten dieselben OEM-Regler-Bausteine; Farben und Optik für diese Marke sind nicht belegt. Im Auto sind die Regler bei SEAT noch gesperrt, dort erscheinen bis zur Freigabe die bisherigen Zeilen mit Auswahlliste.",pvSliderZoom:"Skalierung als Regler wie im Auto ab r15j (1.5.0-beta.16, noch nicht abgenommen): Zoom in 6 festen Stufen, physische Größe 50–200 % in 10-%-Schritten (100/120/130/150 % werden wie bisher als Original/P20/P30/P50 gespeichert). Bei SEAT bleiben im Auto die Auswahllisten.",pvDec:"Verringern",pvInc:"Erhöhen",
 saStored:"Gespeichert als x,y,w,h",
  saInfoVal:"Wie im Auto (ab r15): Regler in 10-px-Schritten, Knöpfe ±1, ±10 und ±50 px. Eine Kante stoppt am Limit, die anderen drei bleiben stehen.",
  saKeyx:"{0}: linke Kante = gespeichert als x",saKeyy:"{0}: obere Kante = gespeichert als y",saKeyw:"{0}: rechte Kante; gespeichert wird die Breite w = rechte − linke Kante",saKeyh:"{0}: untere Kante; gespeichert wird die Höhe h = untere − obere Kante",
@@ -1172,7 +1172,7 @@ en:{
  saStd:"Default",saStdLine:"Default of this view: left {0}, top {1}, right {2}, bottom {3}",
  saChanged:"Changed",saIsStd:"Default",
  saSeatStd:"SEAT test profile (MU1409/MU1447): the defaults come from the platform test profile and are not measured in a car.",
- pvSliderBrand:"Slider: same layout as Skoda. The SEAT firmwares (MU1409, MU1447) contain the same OEM slider parts; colours and look for this brand are not documented. In the car the sliders are still disabled for SEAT; until they are released the previous rows with a dropdown appear there.",pvSliderZoom:"Zoom as a slider with fixed steps: vehicle side follows.",pvDec:"Decrease",pvInc:"Increase",
+ pvSliderBrand:"Slider: same layout as Skoda. The SEAT firmwares (MU1409, MU1447) contain the same OEM slider parts; colours and look for this brand are not documented. In the car the sliders are still disabled for SEAT; until they are released the previous rows with a dropdown appear there.",pvSliderZoom:"Scaling as sliders as in the car from r15j (1.5.0-beta.16, not yet accepted): zoom in 6 fixed steps, physical size 50–200 % in 10 % steps (100/120/130/150 % are stored as Original/P20/P30/P50 as before). SEAT keeps the dropdowns in the car.",pvDec:"Decrease",pvInc:"Increase",
 saStored:"Stored as x,y,w,h",
  saInfoVal:"As in the car (from r15): slider in 10 px steps, buttons ±1, ±10 and ±50 px. An edge stops at its limit and the other three stay put.",
  saKeyx:"{0}: left edge = stored as x",saKeyy:"{0}: top edge = stored as y",saKeyw:"{0}: right edge; stored as width w = right − left edge",saKeyh:"{0}: bottom edge; stored as height h = bottom − top edge",
@@ -1707,6 +1707,7 @@ function sliderSpec(n){
   var m=/^safe_(voll|wide|center)\.([xywh])$/.exec(n.id);
   if(m){var i=SL_EDGE[m[2]];return {type:"px",view:m[1],edge:i,min:0,max:i%2?376:1010,step:10,fine:1}}
   if(/^scaling\.(main|cluster)\.zoomFactor$/.test(n.id)){var d=C[n.id];if(d&&d.values)return {type:"stops",stops:d.values.split(", ")}}
+  if(/^scaling\.(main|cluster)\.physicalSize$/.test(n.id))return {type:"pct",min:50,max:200,step:10,fine:10};
   return null;
 }
 function slEdges(view){
@@ -1714,17 +1715,18 @@ function slEdges(view){
   for(var i=0;i<4;i++){var v=pvNum["safe_"+view+"."+"xywh"[i]];if(v!==undefined)a[i]=v}
   return a;
 }
-function slGet(n,sp){return sp.type==="px"?slEdges(sp.view)[sp.edge]:(pvVal[n.id]||0)%sp.stops.length}
+function slGet(n,sp){if(sp.type==="pct")return pvNum[n.id]===undefined?100:pvNum[n.id];return sp.type==="px"?slEdges(sp.view)[sp.edge]:(pvVal[n.id]||0)%sp.stops.length}
 /* Same limits as the unit: edges inside the stream, at least 100 x 60 px. */
 function slSet(n,sp,v){
   if(sp.type==="stops"){pvVal[n.id]=Math.max(0,Math.min(sp.stops.length-1,v));return}
+  if(sp.type==="pct"){pvNum[n.id]=Math.max(sp.min,Math.min(sp.max,Math.round(v/sp.step)*sp.step));return}
   var a=slEdges(sp.view),e=sp.edge,minGap=e%2?60:100;
   v=Math.max(sp.min,Math.min(sp.max,Math.round(v)));
   if(e<2)v=Math.min(v,a[e+2]-minGap);else v=Math.max(v,a[e-2]+minGap);
   pvNum[n.id]=v;
 }
-function slFrac(n,sp){var v=slGet(n,sp);return sp.type==="px"?(v-sp.min)/(sp.max-sp.min):(sp.stops.length>1?v/(sp.stops.length-1):0)}
-function slText(n,sp){var v=slGet(n,sp);return sp.type==="px"?String(v):(v===0?sp.stops[0]:sp.stops[v]+" %")}
+function slFrac(n,sp){var v=slGet(n,sp);return sp.type!=="stops"?(v-sp.min)/(sp.max-sp.min):(sp.stops.length>1?v/(sp.stops.length-1):0)}
+function slText(n,sp){var v=slGet(n,sp);if(sp.type==="pct")return v===100?"Original":v+" %";return sp.type==="px"?String(v):(v===0?sp.stops[0]:sp.stops[v]+" %")}
 function slChanged(view){var a=slEdges(view),b=SAFE_STD[view];return a.some(function(v,i){return v!==b[i]})}
 function sampleVal(n){
   var rm=/^safe_(voll|wide|center)\.reset$/.exec(n.id);
@@ -1769,7 +1771,7 @@ function renderPreview(host){
   var hasZoom=false;
   kids.forEach(function(k){
     var sp=sliderSpec(k);
-    if(sp){if(sp.type==="stops")hasZoom=true;list.appendChild(sliderRow(k,sp,list));if(pvOpen===k.id)list.appendChild(sliderSub(k,sp));return}
+    if(sp){if(sp.type!=="px")hasZoom=true;list.appendChild(sliderRow(k,sp,list));if(pvOpen===k.id)list.appendChild(sliderSub(k,sp));return}
     var kind=kindOf(k),r=el("div","pr"+(kind==="hint"?" h":"")+(pvFocus===k.id?" f":""));
     r.appendChild(el("div","lbl",titleOf(k)||"–"));
     if(kind==="hint"){/* plain text */}
@@ -1823,16 +1825,16 @@ function sliderSub(k,sp){
   tr.appendChild(fb);tr.appendChild(th);
   function paint(){var f=slFrac(k,sp);fb.style.width=(f*100)+"%";th.style.left=(f*100)+"%";tr.setAttribute("aria-valuetext",slText(k,sp));
     var num=document.querySelector('.pr.sl.o[data-id="'+k.id+'"] .num');if(num)num.textContent=slText(k,sp)}
-  function bump(dir){slSet(k,sp,sp.type==="px"?slGet(k,sp)+dir*sp.fine:slGet(k,sp)+dir);paint()}
+  function bump(dir){slSet(k,sp,sp.type!=="stops"?slGet(k,sp)+dir*sp.fine:slGet(k,sp)+dir);paint()}
   function fromX(x){var b=tr.getBoundingClientRect();if(!b.width)return;var f=Math.max(0,Math.min(1,(x-b.left)/b.width));
-    if(sp.type==="px")slSet(k,sp,Math.round((sp.min+f*(sp.max-sp.min))/sp.step)*sp.step);else slSet(k,sp,Math.round(f*(sp.stops.length-1)));paint()}
+    if(sp.type!=="stops")slSet(k,sp,Math.round((sp.min+f*(sp.max-sp.min))/sp.step)*sp.step);else slSet(k,sp,Math.round(f*(sp.stops.length-1)));paint()}
   var drag=false;
   tr.addEventListener("pointerdown",function(e){drag=true;try{tr.setPointerCapture(e.pointerId)}catch(_){}fromX(e.clientX);e.preventDefault()});
   tr.addEventListener("pointermove",function(e){if(drag)fromX(e.clientX)});
   var end=function(){if(drag){drag=false;renderPreviewOnly()}};
   tr.addEventListener("pointerup",end);tr.addEventListener("pointercancel",end);
   tr.addEventListener("keydown",function(e){var d={ArrowLeft:-1,ArrowDown:-1,ArrowRight:1,ArrowUp:1}[e.key];if(!d)return;e.preventDefault();
-    if(sp.type==="px")slSet(k,sp,slGet(k,sp)+d*(e.shiftKey?sp.step:sp.fine));else slSet(k,sp,slGet(k,sp)+d);paint()});
+    if(sp.type!=="stops")slSet(k,sp,slGet(k,sp)+d*(e.shiftKey?sp.step:sp.fine));else slSet(k,sp,slGet(k,sp)+d);paint()});
   dec.addEventListener("click",function(e){e.stopPropagation();bump(-1);renderPreviewOnly()});
   inc.addEventListener("click",function(e){e.stopPropagation();bump(1);renderPreviewOnly()});
   sub.appendChild(dec);sub.appendChild(tr);sub.appendChild(inc);paint();
@@ -3023,8 +3025,8 @@ connect();
 <div class="navv-card"><h3>Skalierung</h3><p class="navv-note">Zoom und physische Größe je Display (scaling.*). Wirkt nach dem Neuverbinden.</p>
 <div class="navv-row"><label for="sys-scaling-mainZoom">Hauptdisplay: Zoom</label><select id="sys-scaling-mainZoom" data-sys="options.scaling.mainZoom"><option value="AUTO">Automatisch</option><option value="70">70 %</option><option value="85">85 %</option><option value="100">100 %</option><option value="125">125 %</option><option value="150">150 %</option></select></div>
 <div class="navv-row"><label for="sys-scaling-clusterZoom">Kombiinstrument: Zoom</label><select id="sys-scaling-clusterZoom" data-sys="options.scaling.clusterZoom"><option value="AUTO">Automatisch</option><option value="70">70 %</option><option value="85">85 %</option><option value="100">100 %</option><option value="125">125 %</option><option value="150">150 %</option></select></div>
-<div class="navv-row"><label for="sys-scaling-mainPhysical">Hauptdisplay: physische Größe</label><select id="sys-scaling-mainPhysical" data-sys="options.scaling.mainPhysical"><option value="BASE">BASE</option><option value="P20">P20</option><option value="P30">P30</option><option value="P50">P50</option></select></div>
-<div class="navv-row"><label for="sys-scaling-clusterPhysical">Kombiinstrument: physische Größe</label><select id="sys-scaling-clusterPhysical" data-sys="options.scaling.clusterPhysical"><option value="BASE">BASE</option><option value="P20">P20</option><option value="P30">P30</option><option value="P50">P50</option></select></div></div>
+<div class="navv-row"><label for="sys-scaling-mainPhysical">Hauptdisplay: physische Größe</label><select id="sys-scaling-mainPhysical" data-sys="options.scaling.mainPhysical"><option value="BASE">100 % (Original)</option></select></div>
+<div class="navv-row"><label for="sys-scaling-clusterPhysical">Kombiinstrument: physische Größe</label><select id="sys-scaling-clusterPhysical" data-sys="options.scaling.clusterPhysical"><option value="BASE">100 % (Original)</option></select></div></div>
 <div class="navv-card"><h3>Tasten</h3><p class="navv-note">Lenkrad- und Head-Unit-Tasten (Keyboard/Key). Lange Druckfunktionen bieten nur Tasten an, die einen langen Druck auswerten. Fahrzeugseite folgt.</p>
 <div class="navv-row"><label for="sys-keys-viewStep">View weiterschalten (key.view_step)</label><select id="sys-keys-viewStep" data-sys="keys.viewStep"></select></div>
 <div class="navv-row"><label for="sys-keys-viewResyncLong">View-Zähler neu synchronisieren, lang (key.view_resync_long)</label><select id="sys-keys-viewResyncLong" data-sys="keys.viewResyncLong"></select></div>
@@ -3390,7 +3392,11 @@ var KEYS=[
 var MENU_KEYS=[{code:16,de:"MENU",en:"MENU"},{code:1,de:"MEDIA",en:"MEDIA"},{code:2,de:"TELEFON",en:"TELEPHONE"},{code:3,de:"NAVIGATION",en:"NAVIGATION"},{code:5,de:"CAR",en:"CAR"},{code:6,de:"SETTINGS",en:"SETTINGS"},{code:17,de:"KLIMA",en:"CLIMATE"},{code:33,de:"HOME",en:"HOME"},{code:34,de:"SMARTPHONE",en:"SMARTPHONE"}];
 /* zoom.wheel_source: encoder id of the wheel detents. */
 var WHEEL_SRC=[{code:40,de:"Lenkrad rechts (40)",en:"Right wheel (40)"},{code:44,de:"Lenkrad links (44)",en:"Left wheel (44)"}];
-var ZOOMS=["AUTO","70","85","100","125","150"],PHYS=["BASE","P20","P30","P50"];
+var ZOOMS=["AUTO","70","85","100","125","150"];
+/* Physical size 50-200 % in 10 % steps (r15j): 100/120/130/150 % keep the stored tokens BASE/P20/P30/P50, all other steps are stored as the number. */
+var PHYS_TOKEN={100:"BASE",120:"P20",130:"P30",150:"P50"},PHYS=[];
+for(var pp=50;pp<=200;pp+=10)PHYS.push(PHYS_TOKEN[pp]||String(pp));
+function physPct(v){for(var k in PHYS_TOKEN)if(PHYS_TOKEN[k]===v)return Number(k);return Number(v)}
 function defaults(){return {
  options:{viewConfigMode:"global",carplayNav:false,language:"AUTO",expertMode:false,sdLog:false,scaling:{mainZoom:"AUTO",clusterZoom:"AUTO",mainPhysical:"BASE",clusterPhysical:"BASE"}},
  keys:{viewStep:"4/40",viewResyncLong:"4/40",carplaySwitchLong:"4/44",menu:16,zoomWheelSource:40,zoomWheelAuto:seatUnit()}}}
@@ -3432,7 +3438,7 @@ function fill(sel,list,fnLabel,only){
  var cur=sel.value;sel.textContent="";
  list.forEach(function(k){if(only&&!only(k))return;var o=document.createElement("option");o.value=String(k.code);o.textContent=fnLabel(k);sel.appendChild(o)});
  if(cur)sel.value=cur}
-var PHYS_LABEL={BASE:["BASE (OEM)","BASE (OEM)"],P20:["P20","P20"],P30:["P30","P30"],P50:["P50","P50"]};
+function physLabel(v,en){var n=physPct(v);return n===100?(en?"100 % (Original)":"100 % (Original)"):n+" %"+(v!==String(n)?" ("+v+")":"")}
 function ui(){
  var en=english(),box=$("#navv-system");if(!box)return;
  var tab=function(k){return k.code+" · "+(en?k.en:k.de)};
@@ -3441,7 +3447,7 @@ function ui(){
  fill($("#sys-keys-carplaySwitchLong"),KEYS,tab,function(k){return k.long});
  fill($("#sys-keys-menu"),MENU_KEYS,function(k){return k.code+" · "+(en?k.en:k.de)});
  fill($("#sys-keys-zoomWheelSource"),WHEEL_SRC,function(k){return en?k.en:k.de});
- ["main","cluster"].forEach(function(n){var s=$("#sys-scaling-"+n+"Physical");Array.from(s.options).forEach(function(o){o.textContent=PHYS_LABEL[o.value][0]})});
+ ["main","cluster"].forEach(function(n){var s=$("#sys-scaling-"+n+"Physical");s.textContent="";PHYS.forEach(function(v){var o=document.createElement("option");o.value=v;o.textContent=physLabel(v,en);s.appendChild(o)})});
  Array.from(box.querySelectorAll("[data-sys]")).forEach(function(c){
   var p=c.dataset.sys.split("."),val=state[p[0]];
   if(p[1]==="scaling")val=val.scaling[p[2]];else val=val[p[1]];

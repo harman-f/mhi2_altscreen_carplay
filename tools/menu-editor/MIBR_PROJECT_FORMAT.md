@@ -123,7 +123,7 @@ Projektweite Einstellungen der Einheit, im Reiter „View-Konfigurator“ unter 
 | `options.expertMode` | `expert_mode` | Boolean, `false` |
 | `options.sdLog` | `sd_log` | Boolean, `false` |
 | `options.scaling.mainZoom` / `clusterZoom` | `scaling.main.zoomFactor` / `scaling.cluster.zoomFactor` | `AUTO`, `70`, `85`, `100`, `125`, `150`; `AUTO` |
-| `options.scaling.mainPhysical` / `clusterPhysical` | `scaling.main.physicalSize` / `scaling.cluster.physicalSize` | `BASE`, `P20`, `P30`, `P50`; `BASE` |
+| `options.scaling.mainPhysical` / `clusterPhysical` | `scaling.main.physicalSize` / `scaling.cluster.physicalSize` | 50–200 % in 10-%-Schritten (r15j): 100/120/130/150 % als `BASE`/`P20`/`P30`/`P50`, alle anderen Stufen als Zahl `50` … `200`; `BASE` |
 | `keys.viewStep` | `key.view_step` | Taste aus der Tabelle, `4/40` |
 | `keys.viewResyncLong` | `key.view_resync_long` | nur Tasten mit langem Druck (`4/40`, `4/41`, `4/44`), `4/40` |
 | `keys.carplaySwitchLong` | `key.carplay_switch_long` | wie oben, `4/44` |
