@@ -113,7 +113,7 @@ Der Fahrzeug-Loader ist für r13 geplant und **noch nicht vorhanden**. Bis dahin
 
 ## Systemeinstellungen (P0.10)
 
-Projektweite Einstellungen der Einheit, im Reiter „View-Konfigurator“ unter „System (Einheit)“. Gespeichert als optionale Top-Level-Felder `options` und `keys`; fehlende Teile werden mit den Standardwerten ergänzt, ungültige Werte lehnt der Import ab. Es gibt **keinen SD-Export** dieser Werte (kein Fahrzeug-Loader), die Oberfläche zeigt „Fahrzeugseite folgt“.
+Projektweite Einstellungen der Einheit, im Reiter „View-Konfigurator“ unter „System (Einheit)“. Gespeichert als optionale Top-Level-Felder `options` und `keys`; fehlende Teile werden mit den Standardwerten ergänzt, ungültige Werte lehnt der Import ab. Der SD-Export schreibt sie nach `/mibr-config/keys.conf` und `/mibr-config/options.conf` (s. „SD-Export“). Die Unit lädt diese Dateien noch nicht, die Oberfläche zeigt „Fahrzeugseite folgt“.
 
 | JSON | Einheit-Schlüssel | Werte, Standard |
 | --- | --- | --- |
@@ -152,3 +152,27 @@ Fahrzeugseitig werden diese Werte je View noch nicht ausgewertet („Fahrzeugsei
 Die GitHub-Action `menu-editor-p04-smoke.yml` prüft mit jsdom und JSZip den bisherigen Menüeditor, vier Hauptreiter, das modulare Center-Mockup, View-/Safe-Area-Einstellungen, gemeinsame JSON-Autosicherung, den nativen CRC32-Menütext, den ZIP-Inhalt und den simulierten Schreibpfad unter `mibr-menu/mibr-menu.txt`.
 
 Es handelt sich um einen Browser-Mock-up-Test, **nicht** um einen Fahrzeugtest. Änderungen an BAP-/RGI-Navigation oder Java-Native-Runtime werden hierdurch nicht implementiert.
+
+## SD-Export (P0.12)
+
+„Auf SD-Karte exportieren“ schreibt in das gewählte SD-Stammverzeichnis. Ohne Ordnerzugriff wird ein ZIP mit derselben Struktur erzeugt. Der Export ist nur für Škoda MU1440/AID10 freigegeben, und Prüffehler im Menü verhindern ihn.
+
+| SD-Datei | Inhalt | Lädt die Unit heute |
+| --- | --- | --- |
+| `/mibr-menu/mibr-menu.txt` | `MIBR_MENU/1`, unverändert (kein `export.id`, das Format ist streng) | ja |
+| `/mibr-config/view-profiles.conf` | `MIBR_NAV_VIEW_PROFILES/3` wie der `.conf`-Export, plus Zeile 3 `export.id=` | nein, Fahrzeugseite folgt |
+| `/mibr-config/keys.conf` | `MIBR_KEYS/1`: `version=1`, `export.id`, `key.view_step`, `key.view_resync_long`, `key.carplay_switch_long`, `key.menu`, `zoom.wheel_source`, `zoom.wheel_auto` (`0`/`1`) | nein |
+| `/mibr-config/options.conf` | `MIBR_OPTIONS/1`: `version=1`, `export.id`, `view_config_mode` (`global`/`per_view`), `carplay_nav`, `expert_mode`, `sd_log` (`on`/`off`), `menu.language` (`AUTO`/`de`/`en`), `scaling.{main,cluster}.zoomFactor`, `scaling.{main,cluster}.physicalSize` | nein |
+| `/mibr-config/mibr-project.json` | Projektdatei mit `exportId`, nur zum Zurückladen in den Editor | wird ignoriert |
+
+Alle `/mibr-config/*.conf` enden mit `crc32=<8 hex>`, berechnet über alle Bytes davor. Jede Datei ist höchstens 16384 Byte groß. Alle Dateien eines Exports tragen dieselbe `export.id=<JJJJMMTTThhmmssZ>-<8 hex>`. Eine `export.id`, die beim Import eines Profils als unbekannter Schlüssel übernommen wurde, ersetzt der nächste Export.
+
+## SEAT-Testprofil (MU1409/MU1447)
+
+Steht die Head Unit auf MU1409 oder MU1447, verwendet der Editor die Vorgaben des SEAT-Plattform-Testprofils (`modules/navigation/source/platform-defaults/seat-mu1409.conf`/`seat-mu1447.conf`). Diese Werte sind nicht im Auto vermessen.
+
+- Safe Areas (x,y,w,h): Voll 264,56,482,244; Wide 151,56,708,244; Center 377,56,256,244.
+- `zoom.wheel_auto=1`. Die Tasten sind wie bei Škoda, eine eigene SEAT-Tastenkarte ist nicht dokumentiert.
+
+Die Menüvorschau zeigt die Regler wie bei Škoda. Im Auto sind sie für SEAT noch gesperrt (Profil-Gate in `MibrSafeSliderSource`).
+

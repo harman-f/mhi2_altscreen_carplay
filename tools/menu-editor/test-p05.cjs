@@ -363,20 +363,39 @@ async function main(){
   const zipped=w.MIBR_project.zipFiles([{path:"mibr-menu/mibr-menu.txt",text:native}]);
   const archive=await JSZip.loadAsync(Buffer.from(zipped));
   assert.equal(await archive.file("mibr-menu/mibr-menu.txt").async("string"),native,"ZIP entry exact match");
-  assert.equal(Object.keys(archive.files).length,1,"Only runtime-supported output is exported");
 
-  let folderName="",fileName="",written="";
+  // SD export: menu unchanged plus /mibr-config files with one shared export.id
+  const written={};
   w.showDirectoryPicker=async ()=>({
-    getDirectoryHandle:async (name,opts)=>{folderName=name;assert.ok(opts.create);return{
-      getFileHandle:async (fname,opts)=>{fileName=fname;
+    getDirectoryHandle:async (dir,opts)=>{assert.ok(opts.create);return{
+      getFileHandle:async (fname,opts)=>{
         if(!opts){const e=new Error("Missing file");e.name="NotFoundError";throw e}
-        return {createWritable:async()=>({write:async text=>{written=text},close:async()=>{},abort:async()=>{}})}
+        return {createWritable:async()=>({write:async text=>{written[dir+"/"+fname]=text},close:async()=>{},abort:async()=>{}})}
       }
     }}
   });
   click("#sdExport");await delay(50);
-  assert.equal(folderName,"mibr-menu");assert.equal(fileName,"mibr-menu.txt");
-  assert.equal(written,native,"SD write must be native menu only");
+  assert.deepEqual(Object.keys(written).sort(),["mibr-config/keys.conf","mibr-config/mibr-project.json","mibr-config/options.conf","mibr-config/view-profiles.conf","mibr-menu/mibr-menu.txt"]);
+  assert.equal(written["mibr-menu/mibr-menu.txt"],native,"menu file stays the native menu");
+  const crcOk=t=>{const i=t.lastIndexOf("crc32=");const body=t.slice(0,i);return t.slice(i)==="crc32="+(require("node:zlib").crc32(Buffer.from(body,"utf8"))>>>0).toString(16).padStart(8,"0")+"\n"};
+  const ids=new Set();
+  for(const [f,magic] of [["view-profiles.conf","MIBR_NAV_VIEW_PROFILES/3"],["keys.conf","MIBR_KEYS/1"],["options.conf","MIBR_OPTIONS/1"]]){
+    const t=written["mibr-config/"+f];
+    assert.ok(t.startsWith(magic+"\n"),f+" magic");assert.ok(crcOk(t),f+" crc32");
+    const m=t.match(/^export\.id=(\d{8}T\d{6}Z-[0-9a-f]{8})$/m);assert.ok(m,f+" export.id");ids.add(m[1]);
+    assert.equal(t.split("\n").filter(l=>l.startsWith("export.id=")).length,1,f+" one export.id");
+  }
+  const proj=JSON.parse(written["mibr-config/mibr-project.json"]);ids.add(proj.exportId);
+  assert.equal(ids.size,1,"one shared export.id");
+  assert.match(written["mibr-config/keys.conf"],/\nkey\.view_step=4\/40\n[\s\S]*\nzoom\.wheel_auto=0\n/);
+  assert.match(written["mibr-config/options.conf"],/\nview_config_mode=global\ncarplay_nav=off\nmenu\.language=AUTO\n/);
+  // the exported profile re-imports in the editor; its export.id is dropped again on the next export
+  w.MIBR_project.apply(proj);
+  assert.equal(w.MIBR_project.sdFiles("20260101T000000Z-00000000")[1].text.split("\n").filter(l=>l.startsWith("export.id=")).length,1,"no duplicate export.id after round trip");
+  // ZIP fallback carries the same five files
+  const all=w.MIBR_project.sdFiles();
+  const zipAll=await JSZip.loadAsync(Buffer.from(w.MIBR_project.zipFiles(all)));
+  assert.equal(Object.keys(zipAll.files).length,5,"ZIP holds all SD files");
 
   set("#unitModel","MU1447");
   assert.throws(()=>w.MIBR_project.nativeFile(),/MU1440/,"Unverified hardware must be blocked");
