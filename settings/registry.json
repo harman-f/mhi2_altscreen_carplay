@@ -2027,6 +2027,7 @@
     "/tmp/mibr-parity-drive-boot.log",
     "/tmp/mibr-parity-drive-launch.log",
     "/tmp/mibr-parity-drive-profile-applied",
+    "/tmp/mibr-parity-drive-supervisor.log",
     "/tmp/mibr-parity-drive-supervisor.pid",
     "/tmp/mibr-parity-drive.heartbeat",
     "/tmp/mibr-parity-drive.pause",
