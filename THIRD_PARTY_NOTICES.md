@@ -129,6 +129,28 @@ Because that license is materially different from this repository's GPL-3.0-or-l
 yuedizhibo/MHI2Q-CarPlay-AltScreen source/binaries are treated as **comparative research/prior art only**. They must not be copied
 into project-owned GPL source merely because they are publicly visible.
 
+### P1 media — omonob information module (source-only reference)
+
+Selected GPL-3.0 files are copied verbatim under
+[`modules/media/reference/omonob/`](modules/media/reference/PROVENANCE.md)
+from [omonob/MHI2-Carplay-Maps](https://github.com/omonob/MHI2-Carplay-Maps)
+commit `5ba6f7f579305960f8cae941fd4a4061f759b054`: the artwork
+helper, ASL dispatch helper, and artwork launcher. All exact upstream blob IDs
+are recorded in the provenance document. They are **not active runtime code**.
+No OEM JAR, original firmware binary, external decoder headers or `mm-ipod`
+replacement is included from this source.
+
+### P2 phone — ProManiFest2122 / K3346 source-only reference
+
+Selected independently written GPLv3 Java classes are copied verbatim under
+[`modules/phone/reference/k3346/`](modules/phone/reference/PROVENANCE.md)
+from [ProManiFest2122/mhi2-k3346-carplay-vc](https://github.com/ProManiFest2122/mhi2-k3346-carplay-vc)
+commit `1aaef38b1acd468702e05ffa21965cff682a22fc`.
+Upstream credits the luka-dev phone-gating approach. Original Audi OEM-derived
+`ServiceManagerPhone`, related OSGi binary inputs and compiled adapters are
+**not copied**. Our new platform-neutral `modules/phone/source/` is
+first-party source, independently written for this project.
+
 ## Apple / CarPlay reverse engineering
 
 Research may document behavior observed in Apple CarPlay frameworks and AirPlay components, including symbols, state transitions, protocol roles, build identities and hashes.

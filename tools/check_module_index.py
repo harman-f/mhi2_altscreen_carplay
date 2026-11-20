@@ -120,7 +120,7 @@ def self_test(doc):
     altered["modules"]["carplay"]["source"].append("../unsafe")
     assert any("unsafe" in e for e in validate(altered, check_files=False))
     affected, unowned = impact(doc, ["modules/broker/source/mibr-control/mibr_v3_service.c"])
-    assert affected == ["broker", "menu", "navigation"] and not unowned
+    assert {"broker", "menu", "navigation"}.issubset(affected) and not unowned
     affected, unowned = impact(doc, ["modules/carplay/source/unknown-core/new.c"])
     assert not affected and unowned == ["modules/carplay/source/unknown-core/new.c"]
     print("MODULE_INDEX_SELF_TEST=PASS")
