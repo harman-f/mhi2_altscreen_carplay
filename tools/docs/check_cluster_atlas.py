@@ -122,7 +122,7 @@ def audit(path: Path) -> None:
     for marker in ('<title>MIB Atlas', 'id="mib1-retrofit"', 'data-atlas-filter-table="native"', 'data-atlas-filter-table="emulators"', 'data-atlas-filter-table="ha-tools"', 'data-atlas-filter-table="contitool"', 'data-atlas-filter-table="roadmap"', 'data-atlas-filter-table="misc"', 'data-atlas-filter-table="lineage"', 'data-atlas-filter-table="oem-hud"', 'data-atlas-filter-table="aftermarket-hud"', 'id="atlas-theme-toggle"'):
         if marker not in data:
             errors.append("MIB Atlas required feature missing: "+marker)
-    for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 16 NOV 2026'):
+    for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 20 NOV 2026'):
         if marker not in data:
             errors.append("Missing evidence date boundary: "+marker)
     # Interaction contract: all nine research matrices have actual search/filter/reset handlers.
@@ -145,18 +145,30 @@ def audit(path: Path) -> None:
         errors.append("raw Markdown emphasis inside public HTML")
     if 'MHI2Q_WiFi_CarPlay' not in data or 'perkthefox/mqb_contitool' not in data:
         errors.append("source-anchored native wireless or ContiTool evidence missing")
-    if 'Wireless CarPlay Maps V3.1' not in data or 'data-proof="Experimental release"' not in data:
-        errors.append("omonob V3.1 experimental native wireless entry missing")
-    if 'MU1367 / AID 790+791' not in data or 'Škoda MU1440 / AID 790' not in data:
-        errors.append("MU1367/790+791 and MU1440/790 new wireless profiles missing")
-    if 'MU1440 / 791 unsupported' not in data or 'MU1433/MU1447 wired-only' not in data:
-        errors.append("unsupported MU1440/791 or wired-only 1433/1447 boundary missing")
-    if '396 current' not in data or '1,071 historical' not in data or 'headunit_accessed=false' not in data:
-        errors.append("V3.1 offline-only validation boundaries missing")
-    if 'https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/releases/tag/v3.1' not in data:
-        errors.append("V3.1 canonical release link missing")
+    if 'Wireless CarPlay Maps V3.2' not in data or 'data-proof="Experimental release"' not in data:
+        errors.append("omonob latest V3.2 native wireless entry missing")
+    if 'MU1367 790/791' not in data or 'Škoda MU1440 / AID 790' not in data:
+        errors.append("native MU1367 and Skoda MU1440 firmware constraints missing")
+    if 'MU1440/791 unsupported' not in data and 'MU1440 / 791 unsupported' not in data:
+        errors.append("unsupported MU1440 AID 791 not stated")
+    if 'MU1433/MU1447 wired-only' not in data:
+        errors.append("MU1433 / MU1447 native wireless boundary missing")
+    if 'MU1367 / AID 790' not in data or 'SD manager registration and complete feature installation' not in data:
+        errors.append("new MU1367 V3.2 installation-only evidence missing")
+    if 'not released the complete receiver implementation/build sources' not in data.lower():
+        errors.append("full omonob receiver implementation source remains unavailable")
+    if 'tomasz-twardzicki' not in data or 'MU1367-v1.6.1' not in data:
+        errors.append("native wireless MU1367 downstream vehicle port missing")
+    if 'CatPlay / CarPlay2Air V0.32.0' not in data or 'kamgurgul V1.5' not in data:
+        errors.append("November 20 dongle and Android Auto source deltas missing")
+    if '20 Nov</b><span>Last source review' not in data:
+        errors.append("source review date stale")
+    if '7 / 7' not in data or data.count('data-search="tomasz-twardzicki MHI2 CarPlay Maps') != 1:
+        errors.append("seven documented native leads including one downstream port required")
+    if 'https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/releases/tag/v3.2' not in data:
+        errors.append("omonob latest v3.2 release link missing")
     if 'MU1440 is NOT wireless compatible in V3.0' in data or 'V3.0 (MU1102 only)' in data:
-        errors.append("stale V3.0 MU1440 wired-only result remains")
+        errors.append("stale original native wireless scope persists")
     if 'issues/187' not in data or 'id="oem-hud-overview"' not in data or 'id="aftermarket-hud-overview"' not in data:
         errors.append("HUD taxonomy or feedback issue missing")
     if data.count('data-lineage-edge="1"') != 38 or data.count('class="atlas-lineage-svg"') != 4:

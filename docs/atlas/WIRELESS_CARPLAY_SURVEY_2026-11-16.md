@@ -1,6 +1,7 @@
 # AltScreen Cluster Atlas — wireless CarPlay / Android Auto evidence refresh
 
 **Snapshot:** 2026-11-16 (Europe/Berlin)  
+**20 Nov update:** This is the historical 16 Nov source survey; its older V3.1-only claims are superseded by the [20 Nov source/proof refresh](ATLAS_REFRESH_2026-11-20.md) and the current site. In particular, omonob V3.2 has MU1367/790 **SD installation** acceptance (not full wireless acceptance), while a distinct omonob-derived MU1367/791 vehicle integration has been released by tomasz-twardzicki. The historical descriptions below are retained for provenance.  
 **Scope:** public source/release/issue verification; no vehicle test or firmware installation performed in this survey.  
 **Base:** the 58-repository, 22-capability Atlas edition in `docs/index.html` (2026-11-04). The existing matrix is **not** represented as revalidated for every one of its 58 entries. This addendum records reviewed changes and explicit source gaps.
 
