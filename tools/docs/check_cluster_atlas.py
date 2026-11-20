@@ -155,7 +155,7 @@ def audit(path: Path) -> None:
         errors.append("MU1433 / MU1447 native wireless boundary missing")
     if 'MU1367 / AID 790' not in data or 'SD manager registration and complete feature installation' not in data:
         errors.append("new MU1367 V3.2 installation-only evidence missing")
-    if 'no separate implementation-source archive' not in data:
+    if 'no separate complete receiver implementation source package' not in data.lower():
         errors.append("full omonob receiver implementation source remains unavailable")
     if 'tomasz-twardzicki' not in data or 'MU1367-v1.6.1' not in data:
         errors.append("native wireless MU1367 downstream vehicle port missing")
