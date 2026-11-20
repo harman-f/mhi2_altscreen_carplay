@@ -972,8 +972,8 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 "id": "scaling.hint",
 "parent": "scaling",
 "kind": "hint",
-"de": "Wirkt nach Neuverbinden",
-"en": "Applies after reconnect"
+"de": "Mehr % = kleinere Darstellung. Wirkt nach Neuverbinden",
+"en": "More % = smaller display. Applies after reconnect"
 },
 {
 "id": "diagnostics",
@@ -1256,13 +1256,16 @@ function nextNum(prefix){var max=0,re=new RegExp("^"+prefix+"\\.(\\d+)$");walk(S
 
 /* ---- serialize / legacy ---- */
 function ser(n){var o={id:n.id};if(n.de)o.de=n.de;if(n.en)o.en=n.en;if(n.x)o.x=1;if(n.note)o.note=n.note;if(n.c)o.c=n.c.map(ser);return o}
-function de1(o){var n={id:String(o.id),de:o.de||"",en:o.en||"",x:!!o.x,note:o.note||""};if(o.c)n.c=o.c.map(de1);return n}
+/* IDs dropped from the catalog: removed when a saved menu is restored */
+var RETIRED={"gps.demo":1};
+function live(o){return!!o&&!RETIRED[String(o.id)]}
+function de1(o){var n={id:String(o.id),de:o.de||"",en:o.en||"",x:!!o.x,note:o.note||""};if(o.c)n.c=o.c.filter(live).map(de1);return n}
 function serialize(){return JSON.stringify({v:2,build:BUILD,brand:S.brand,name:S.name,rootDe:S.tree.de,rootEn:S.tree.en,tree:S.tree.c.map(ser),unused:S.unused.c.map(ser)})}
 function deserialize(text){
   var o=JSON.parse(text);
   if(o&&o.v===2){
     var b=BRANDS[o.brand]?o.brand:"skoda";setBrandFuncs(b);
-    var st={brand:b,name:o.name||"",rootDe:o.rootDe||"",rootEn:o.rootEn||"",tree:{id:"root",c:(o.tree||[]).map(de1)},unused:{id:"@unused",c:(o.unused||[]).map(de1)}};
+    var st={brand:b,name:o.name||"",rootDe:o.rootDe||"",rootEn:o.rootEn||"",tree:{id:"root",c:(o.tree||[]).filter(live).map(de1)},unused:{id:"@unused",c:(o.unused||[]).filter(live).map(de1)}};
     return{st:fixRoot(st),skipped:0,legacy:false};
   }
   if(o&&Array.isArray(o.tree))return legacy(o.tree,true,null);              /* other editor (r2h) */
