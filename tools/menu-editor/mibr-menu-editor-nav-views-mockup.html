@@ -194,6 +194,21 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 .pgc{position:absolute;right:calc(var(--u) * 18);top:50%;margin-top:calc(var(--u) * -9);width:calc(var(--u) * 11);height:calc(var(--u) * 11);border:solid var(--pv-tri);border-width:calc(var(--u) * 2.4) calc(var(--u) * 2.4) 0 0;transform:rotate(45deg)}
 .endc{height:calc(var(--u) * 46);display:grid;place-items:center}
 .endc i{display:block;width:calc(var(--u) * 12);height:calc(var(--u) * 12);border:solid var(--pv-dim);border-width:0 calc(var(--u) * 2.2) calc(var(--u) * 2.2) 0;transform:rotate(45deg) translateY(-30%)}
+.pr.sl .mini{position:absolute;right:calc(var(--u) * 16);top:50%;width:calc(var(--u) * 72);height:calc(var(--u) * 3);margin-top:calc(var(--u) * -1.5);background:rgba(255,255,255,.55);border-radius:calc(var(--u) * 2)}
+.pr.sl .mini b{position:absolute;left:0;top:0;bottom:0;background:rgb(var(--pv-glow));border-radius:calc(var(--u) * 2)}
+.pr.sl .mini i{position:absolute;top:50%;width:calc(var(--u) * 9);height:calc(var(--u) * 9);margin:calc(var(--u) * -4.5) 0 0 calc(var(--u) * -4.5);border-radius:50%;background:var(--pv-text)}
+.pr.sl .num{position:absolute;right:calc(var(--u) * 16);font-weight:400}
+.prs{position:relative;display:flex;align-items:center;height:calc(var(--u) * 70);margin-bottom:calc(var(--u) * 4);border-bottom:max(1.5px,calc(var(--u) * 2.4)) solid var(--pv-text)}
+.prs::before,.prs::after{content:"";position:absolute;bottom:0;width:max(1.5px,calc(var(--u) * 2.4));height:calc(var(--u) * 10);background:var(--pv-text)}
+.prs::before{left:0}.prs::after{right:0}
+.prs .slb{flex:0 0 calc(var(--u) * 76);height:100%;border:0;background:none;color:var(--pv-text);font:300 calc(var(--u) * 40)/1 var(--pv-font);padding:0;min-height:0;cursor:pointer;display:grid;place-items:center}
+.prs .slb:hover{background:rgba(255,255,255,.06)}
+.prs .slt{position:relative;flex:1 1 auto;height:100%;margin:0 calc(var(--u) * 14);cursor:pointer;touch-action:none;outline:none}
+.prs .slt::before{content:"";position:absolute;left:0;right:0;top:50%;height:max(1px,calc(var(--u) * 2.4));margin-top:calc(var(--u) * -1.2);background:rgba(255,255,255,.5)}
+.prs .slt b{position:absolute;left:0;top:50%;height:max(1px,calc(var(--u) * 2.4));margin-top:calc(var(--u) * -1.2);background:rgba(255,255,255,.88)}
+.prs .slt i{position:absolute;top:50%;width:calc(var(--u) * 26);height:calc(var(--u) * 26);margin:calc(var(--u) * -13) 0 0 calc(var(--u) * -13);border:max(1.5px,calc(var(--u) * 3)) solid var(--pv-text);border-radius:50%;background:var(--pv-bg2);box-sizing:border-box}
+.prs .slt:focus-visible i{box-shadow:0 0 0 max(2px,calc(var(--u) * 3)) rgba(var(--pv-glow),.9)}
+.prs .slt .tick{position:absolute;top:50%;width:max(1px,calc(var(--u) * 2));height:calc(var(--u) * 12);margin:calc(var(--u) * -6) 0 0 calc(var(--u) * -1);background:rgba(255,255,255,.6)}
 .pvtoast{position:absolute;left:50%;bottom:calc(var(--u) * 20);transform:translateX(-50%);background:rgba(0,0,0,.8);border:1px solid rgba(255,255,255,.4);color:#fff;padding:calc(var(--u) * 8) calc(var(--u) * 16);border-radius:calc(var(--u) * 6);font-size:calc(var(--u) * 22);white-space:nowrap;pointer-events:none}
 @media (max-width:1099px){
   .row{padding-left:calc(var(--d) * 11px)}
@@ -689,8 +704,8 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 "id": "safe_voll.hint",
 "parent": "safe_voll",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach CarPlay-Neuverbindung. Regler 10 px, -/+ 1 px",
+"en": "Applies after CarPlay reconnects. Slider 10 px, -/+ 1 px"
 },
 {
 "id": "safe_wide",
@@ -751,8 +766,8 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 "id": "safe_wide.hint",
 "parent": "safe_wide",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach CarPlay-Neuverbindung. Regler 10 px, -/+ 1 px",
+"en": "Applies after CarPlay reconnects. Slider 10 px, -/+ 1 px"
 },
 {
 "id": "safe_center",
@@ -813,8 +828,8 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 "id": "safe_center.hint",
 "parent": "safe_center",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach CarPlay-Neuverbindung. Regler 10 px, -/+ 1 px",
+"en": "Applies after CarPlay reconnects. Slider 10 px, -/+ 1 px"
 },
 {
 "id": "advanced",
@@ -1077,7 +1092,9 @@ de:{
  e_id:"Zeile {0}: ungültige ID „{1}“.",e_dupe:"Zeile {0}: ID „{1}“ kommt doppelt vor.",e_parent:"Zeile {0}: „{1}“ hat einen Elternteil, der nicht vorher in der Datei steht („{2}“).",
  e_nopage:"Zeile {0}: „{1}“ steht unter „{2}“, das keine Seite ist.",e_flag:"Zeile {0}: ungültige Markierung „{1}“ (erlaubt: - oder x).",
  saStd:"Standard",saStdLine:"Standard dieser Ansicht: links {0}, oben {1}, rechts {2}, unten {3}",
- saChanged:"Geändert",saIsStd:"Standard",saStored:"Gespeichert als x,y,w,h",
+ saChanged:"Geändert",saIsStd:"Standard",
+ pvSliderBrand:"Regler: gleicher Aufbau wie bei Skoda. Die SEAT-Firmwares (MU1409, MU1447) enthalten dieselben OEM-Regler-Bausteine; Farben und Optik für diese Marke sind nicht belegt, die Fahrzeugseite folgt.",pvSliderZoom:"Zoom als Regler mit festen Stufen: Fahrzeugseite folgt.",pvDec:"Verringern",pvInc:"Erhöhen",
+saStored:"Gespeichert als x,y,w,h",
  saInfoVal:"Mit dem Regler (Schritt 2) oder den Knöpfen ändern. Eine Kante stoppt am Limit, die anderen drei bleiben stehen.",
  saStoredInfo:"So steht der Bereich im Auto und in der Datei der Unit: linke Kante, obere Kante, Breite, Höhe. Diese Zeile ändert nichts.",
  saSuggestNote:"Die Standardwerte sind grob von Fotos abgelesen, etwa ±20 Pixel.",
@@ -1151,7 +1168,9 @@ en:{
  e_id:"Line {0}: invalid ID “{1}”.",e_dupe:"Line {0}: ID “{1}” appears twice.",e_parent:"Line {0}: the parent of “{1}” is not listed earlier in the file (“{2}”).",
  e_nopage:"Line {0}: “{1}” sits under “{2}”, which is not a page.",e_flag:"Line {0}: invalid flag “{1}” (allowed: - or x).",
  saStd:"Default",saStdLine:"Default of this view: left {0}, top {1}, right {2}, bottom {3}",
- saChanged:"Changed",saIsStd:"Default",saStored:"Stored as x,y,w,h",
+ saChanged:"Changed",saIsStd:"Default",
+ pvSliderBrand:"Slider: same layout as Skoda. The SEAT firmwares (MU1409, MU1447) contain the same OEM slider parts; colours and look for this brand are not documented, the vehicle side follows.",pvSliderZoom:"Zoom as a slider with fixed steps: vehicle side follows.",pvDec:"Decrease",pvInc:"Increase",
+saStored:"Stored as x,y,w,h",
  saInfoVal:"Change it with the slider (step 2) or the buttons. An edge stops at its limit and the other three stay put.",
  saStoredInfo:"This is how the area is stored on the car and in the unit: left edge, top edge, width, height. This line changes nothing.",
  saSuggestNote:"The standard values are rough readings from photos, about ±20 pixels.",
@@ -1677,7 +1696,35 @@ function renderPanel(){
 
 /* ================= preview ================= */
 var pvPath=[],pvFocus=null,pvExpert=false,pvChecked={},pvVal={},pvToast="",pvToastT=0,pvScroll=0,tab="menu",menuPane="preview";
+var pvOpen=null,pvNum={};
+/* OEM slider rows (r15): safe-area edges in px (slider step 10, -/+ 1 px), zoom with fixed steps. */
+var SL_EDGE={x:0,y:1,w:2,h:3};
+function sliderSpec(n){
+  var m=/^safe_(voll|wide|center)\.([xywh])$/.exec(n.id);
+  if(m){var i=SL_EDGE[m[2]];return {type:"px",view:m[1],edge:i,min:0,max:i%2?376:1010,step:10,fine:1}}
+  if(/^scaling\.(main|cluster)\.zoomFactor$/.test(n.id)){var d=C[n.id];if(d&&d.values)return {type:"stops",stops:d.values.split(", ")}}
+  return null;
+}
+function slEdges(view){
+  var a=(typeof safe!=="undefined"&&safe.a&&safe.a[view])||SAFE_STD[view];a=a.slice();
+  for(var i=0;i<4;i++){var v=pvNum["safe_"+view+"."+"xywh"[i]];if(v!==undefined)a[i]=v}
+  return a;
+}
+function slGet(n,sp){return sp.type==="px"?slEdges(sp.view)[sp.edge]:(pvVal[n.id]||0)%sp.stops.length}
+/* Same limits as the unit: edges inside the stream, at least 100 x 60 px. */
+function slSet(n,sp,v){
+  if(sp.type==="stops"){pvVal[n.id]=Math.max(0,Math.min(sp.stops.length-1,v));return}
+  var a=slEdges(sp.view),e=sp.edge,minGap=e%2?60:100;
+  v=Math.max(sp.min,Math.min(sp.max,Math.round(v)));
+  if(e<2)v=Math.min(v,a[e+2]-minGap);else v=Math.max(v,a[e-2]+minGap);
+  pvNum[n.id]=v;
+}
+function slFrac(n,sp){var v=slGet(n,sp);return sp.type==="px"?(v-sp.min)/(sp.max-sp.min):(sp.stops.length>1?v/(sp.stops.length-1):0)}
+function slText(n,sp){var v=slGet(n,sp);return sp.type==="px"?String(v):(v===0?sp.stops[0]:sp.stops[v]+" %")}
+function slChanged(view){var a=slEdges(view),b=SAFE_STD[view];return a.some(function(v,i){return v!==b[i]})}
 function sampleVal(n){
+  var rm=/^safe_(voll|wide|center)\.reset$/.exec(n.id);
+  if(rm)return slChanged(rm[1])?t("saChanged"):t("saIsStd");
   var d=C[n.id],k=kindOf(n);
   if(d&&d.values){var a=d.values.split(", "),i=pvVal[n.id]||0;return a[i%a.length]}
   if(k==="number")return"0";
@@ -1710,12 +1757,15 @@ function renderPreview(host){
   var ttl=el("div","pvt"),tt=el("div","tt",titleOf(cur)||"–"),bk=el("button","pvb");bk.type="button";bk.setAttribute("aria-label",t("pvBack"));bk.disabled=false;
   var sv=document.createElementNS("http://www.w3.org/2000/svg","svg");sv.setAttribute("viewBox","0 0 24 24");
   var pth=document.createElementNS("http://www.w3.org/2000/svg","path");pth.setAttribute("d","M19 5v8a2 2 0 0 1-2 2H5M9 10l-5 5 5 5");sv.appendChild(pth);bk.appendChild(sv);
-  bk.addEventListener("click",function(){if(pvPath.length){pvPath.pop();pvFocus=null;pvScroll=0;renderPreviewOnly()}});
+  bk.addEventListener("click",function(){if(pvPath.length){pvPath.pop();pvFocus=null;pvOpen=null;pvScroll=0;renderPreviewOnly()}});
   ttl.appendChild(tt);ttl.appendChild(bk);pv.appendChild(ttl);
   var list=el("div","pvl");
   var kids=(cur.c||[]).filter(function(k){return pvExpert||!k.x});
   if(kindOf(cur)==="fixedpage")kids=[];
+  var hasZoom=false;
   kids.forEach(function(k){
+    var sp=sliderSpec(k);
+    if(sp){if(sp.type==="stops")hasZoom=true;list.appendChild(sliderRow(k,sp,list));if(pvOpen===k.id)list.appendChild(sliderSub(k,sp));return}
     var kind=kindOf(k),r=el("div","pr"+(kind==="hint"?" h":"")+(pvFocus===k.id?" f":""));
     r.appendChild(el("div","lbl",titleOf(k)||"–"));
     if(kind==="hint"){/* plain text */}
@@ -1727,8 +1777,9 @@ function renderPreview(host){
       pvFocus=k.id;pvScroll=list.scrollTop;
       if(kind==="hint"){renderPreviewOnly();return}
       if(kind==="toggle")pvChecked[k.id]=pvChecked[k.id]===false;
+      else if(/^safe_(voll|wide|center)\.reset$/.test(k.id)){var rv=k.id.split(".")[0].slice(5);"xywh".split("").forEach(function(c){delete pvNum["safe_"+rv+"."+c]});pvNum["safe_"+rv+".x"]=SAFE_STD[rv][0];pvNum["safe_"+rv+".y"]=SAFE_STD[rv][1];pvNum["safe_"+rv+".w"]=SAFE_STD[rv][2];pvNum["safe_"+rv+".h"]=SAFE_STD[rv][3]}
       else if(kind==="list"||kind==="number"){var d=C[k.id];if(d&&d.values){var n=d.values.split(", ").length;pvVal[k.id]=((pvVal[k.id]||0)+1)%n;if(k.id==="expert.mode")pvExpert=pvVal[k.id]!==0}}
-      else if(kind==="page"){pvPath.push(k.id);pvFocus=null;pvScroll=0}
+      else if(kind==="page"){pvPath.push(k.id);pvFocus=null;pvOpen=null;pvScroll=0}
       else if(kind==="fixedpage"){pvToast=t("pvFixed");pvToastT=setTimeout(function(){pvToast="";var q=document.querySelector(".pvtoast");if(q)q.remove()},1800)}
       else if(kind==="action"){pvToast=t("pvAction");pvToastT=setTimeout(function(){pvToast="";var q=document.querySelector(".pvtoast");if(q)q.remove()},1800)}
       renderPreviewOnly();
@@ -1742,6 +1793,8 @@ function renderPreview(host){
   host.appendChild(pv);
   list.scrollTop=pvScroll;
   if(B.note)host.appendChild(el("div","pvnote",B.note[lang]));
+  if(list.querySelector(".pr.sl")&&S.brand!=="skoda")host.appendChild(el("div","pvnote",t("pvSliderBrand")));
+  if(hasZoom)host.appendChild(el("div","pvnote",t("pvSliderZoom")));
   watchSize(pv);
 }
 var pvU=0,ro=null;
@@ -1749,6 +1802,37 @@ function watchSize(pv){
   var set=function(){var w=pv.getBoundingClientRect().width;if(w>0){pvU=w/800;pv.style.setProperty("--u",pvU+"px")}};
   set();
   if(window.ResizeObserver){if(ro)ro.disconnect();ro=new ResizeObserver(set);ro.observe(pv)}
+}
+function sliderRow(k,sp,list){
+  var open=pvOpen===k.id,r=el("div","pr sl"+(open?" o":"")+(pvFocus===k.id?" f":""));
+  r.dataset.id=k.id;r.appendChild(el("div","lbl",titleOf(k)||"–"));
+  if(open)r.appendChild(el("div","num",slText(k,sp)));
+  else{var mi=el("div","mini"),f=slFrac(k,sp);var fb=el("b");fb.style.width=(f*100)+"%";var dot=el("i");dot.style.left=(f*100)+"%";mi.appendChild(fb);mi.appendChild(dot);r.appendChild(mi)}
+  r.addEventListener("click",function(){pvFocus=k.id;pvOpen=open?null:k.id;pvScroll=list.scrollTop;renderPreviewOnly()});
+  return r;
+}
+function sliderSub(k,sp){
+  var sub=el("div","prs"),dec=el("button","slb","\u2212"),inc=el("button","slb","+"),tr=el("div","slt"),fb=el("b"),th=el("i");
+  dec.type=inc.type="button";dec.setAttribute("aria-label",t("pvDec"));inc.setAttribute("aria-label",t("pvInc"));
+  tr.tabIndex=0;tr.setAttribute("role","slider");tr.setAttribute("aria-label",titleOf(k)||k.id);
+  if(sp.type==="stops")sp.stops.forEach(function(_,i){var tk=el("span","tick");tk.style.left=(i/(sp.stops.length-1)*100)+"%";tr.appendChild(tk)});
+  tr.appendChild(fb);tr.appendChild(th);
+  function paint(){var f=slFrac(k,sp);fb.style.width=(f*100)+"%";th.style.left=(f*100)+"%";tr.setAttribute("aria-valuetext",slText(k,sp));
+    var num=document.querySelector('.pr.sl.o[data-id="'+k.id+'"] .num');if(num)num.textContent=slText(k,sp)}
+  function bump(dir){slSet(k,sp,sp.type==="px"?slGet(k,sp)+dir*sp.fine:slGet(k,sp)+dir);paint()}
+  function fromX(x){var b=tr.getBoundingClientRect();if(!b.width)return;var f=Math.max(0,Math.min(1,(x-b.left)/b.width));
+    if(sp.type==="px")slSet(k,sp,Math.round((sp.min+f*(sp.max-sp.min))/sp.step)*sp.step);else slSet(k,sp,Math.round(f*(sp.stops.length-1)));paint()}
+  var drag=false;
+  tr.addEventListener("pointerdown",function(e){drag=true;try{tr.setPointerCapture(e.pointerId)}catch(_){}fromX(e.clientX);e.preventDefault()});
+  tr.addEventListener("pointermove",function(e){if(drag)fromX(e.clientX)});
+  var end=function(){if(drag){drag=false;renderPreviewOnly()}};
+  tr.addEventListener("pointerup",end);tr.addEventListener("pointercancel",end);
+  tr.addEventListener("keydown",function(e){var d={ArrowLeft:-1,ArrowDown:-1,ArrowRight:1,ArrowUp:1}[e.key];if(!d)return;e.preventDefault();
+    if(sp.type==="px")slSet(k,sp,slGet(k,sp)+d*(e.shiftKey?sp.step:sp.fine));else slSet(k,sp,slGet(k,sp)+d);paint()});
+  dec.addEventListener("click",function(e){e.stopPropagation();bump(-1);renderPreviewOnly()});
+  inc.addEventListener("click",function(e){e.stopPropagation();bump(1);renderPreviewOnly()});
+  sub.appendChild(dec);sub.appendChild(tr);sub.appendChild(inc);paint();
+  return sub;
 }
 function renderPreviewOnly(){if(tab==="menu"&&menuPane==="preview")renderPreview($("vbody"))}
 

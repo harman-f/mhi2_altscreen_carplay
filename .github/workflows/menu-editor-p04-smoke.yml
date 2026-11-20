@@ -6,6 +6,7 @@ on:
       - 'tools/menu-editor/test-p04.cjs'
       - 'tools/menu-editor/test-p05.cjs'
       - 'tools/menu-editor/test-p10.cjs'
+      - 'tools/menu-editor/test-p11.cjs'
       - 'tools/menu-editor/mibr-project-controller.js'
       - 'tools/menu-editor/mibr-center-preview.svg'
       - 'tools/menu-editor/mibr-wide-preview.svg'
@@ -24,4 +25,4 @@ jobs:
       - name: Install test-only DOM runtime
         run: npm install --no-save --no-package-lock --ignore-scripts jsdom@24 jszip@3
       - name: Run standalone editor smoke
-        run: node tools/menu-editor/test-p04.cjs && node tools/menu-editor/test-p05.cjs && node tools/menu-editor/test-p10.cjs
+        run: node tools/menu-editor/test-p04.cjs && node tools/menu-editor/test-p05.cjs && node tools/menu-editor/test-p10.cjs && node tools/menu-editor/test-p11.cjs
