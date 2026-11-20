@@ -11,7 +11,58 @@ public final class MibrScalingState {
     public static boolean valid(String value){return "AUTO".equals(value)||"70".equals(value)||"85".equals(value)||"100".equals(value)||"125".equals(value)||"150".equals(value);}
     public static boolean physicalValid(String value){return "BASE".equals(value)||"P20".equals(value)||"P30".equals(value)||"P50".equals(value);}
     public static boolean valid(int index,String value){return (index==MibrPopupEditorModel.SCALE_PHYSICAL||index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL)?physicalValid(value):valid(value);}
-    public static void reset(){for(int i=0;i<4;i++){desired[i]=advertised[i]=effective[i]=stored[i]=pending[i]=writer[i]=revision[i]=advertisedScope[i]=message[i]=null;requested[i]=stale[i]=saving[i]=refreshing[i]=false;}}
+    public static void reset(){for(int i=0;i<4;i++){desired[i]=advertised[i]=effective[i]=stored[i]=pending[i]=writer[i]=revision[i]=advertisedScope[i]=message[i]=null;requested[i]=stale[i]=saving[i]=refreshing[i]=false;wanted[i]=null;wantedAt[i]=0L;staleRetry[i]=false;}}
+
+    /* ---- r15i: cockpit zoom as a stock-like slider row (6 discrete positions), Skoda owned rows only ---- */
+
+    /** Slider positions 0..5 = the six broker values, in the order of the old dropdown. */
+    static final String[] ZOOM={"AUTO","70","85","100","125","150"};
+    /** Only the cockpit (cluster) zoom gets the slider row; the main-display zoom stays a dropdown. */
+    static boolean zoomSlider(int index){return index==MibrPopupEditorModel.SCALE_CLUSTER;}
+    static int zoomPosition(String value){for(int i=0;i<ZOOM.length;i++)if(ZOOM[i].equals(value))return i;return -1;}
+    static String zoomValue(int position){return position>=0&&position<ZOOM.length?ZOOM[position]:null;}
+    /** Right-aligned value of the expanded header: "Auto" for AUTO, else the plain number (stock shows numbers only). */
+    static String zoomLabel(String value){return value==null?"":"AUTO".equals(value)?"Auto":value;}
+    /** Position 0..5 onto the 9 stock mini-slider preview images 0..8, linear and rounded: 0,2,3,5,6,8. */
+    static int zoomPreviewStep(int position){
+        int p=Math.max(0,Math.min(ZOOM.length-1,position));
+        return (p*8+(ZOOM.length-1)/2)/(ZOOM.length-1);
+    }
+    private static final String[] wanted=new String[4];
+    private static final long[] wantedAt=new long[4];
+    private static final boolean[] staleRetry=new boolean[4];
+    /** The value the slider row shows: the unsent/unconfirmed wish, else the readback (null = unread). */
+    static String shown(int index){int n=slot(index);return n<0?null:wanted[n]!=null?wanted[n]:desired[n];}
+    static String wanted(int index){int n=slot(index);return n<0?null:wanted[n];}
+    static long wantedAt(int index){int n=slot(index);return n<0?0L:wantedAt[n];}
+    /** A slider move or -/+: the newest wish, shown at once; the durable SET waits for IDLE_MS (same rule as r15 edges). */
+    static void want(int index,String value,long now){
+        int n=slot(index);if(n<0||!valid(value))return;
+        wanted[n]=value;wantedAt[n]=now;
+    }
+    /** The value to SET now, or null: nothing new, still moving, or the service busy (SET or GET in flight). */
+    static String due(int index,long now,boolean busy){
+        int n=slot(index);if(n<0||wanted[n]==null||busy)return null;
+        if(wanted[n].equals(desired[n])&&revision[n]!=null&&!stale[n]&&!saving[n]){wanted[n]=null;staleRetry[n]=false;return null;}
+        if(now-wantedAt[n]<MibrSafeArea.IDLE_MS)return null;
+        return wanted[n];
+    }
+    /** Milliseconds until the newest wish becomes due (0 = now), or -1 when there is none. */
+    static long waitMs(int index,long now){
+        int n=slot(index);if(n<0||wanted[n]==null)return -1L;
+        long left=MibrSafeArea.IDLE_MS-(now-wantedAt[n]);
+        return left>0L?left:0L;
+    }
+    /** A refused/failed SET drops the wish: the row shows the stored value again. */
+    static void drop(int index){int n=slot(index);if(n>=0){wanted[n]=null;staleRetry[n]=false;}}
+    /** A verified SET: a later stale answer may retry again. */
+    static void saved(int index){int n=slot(index);if(n>=0)staleRetry[n]=false;}
+    /** STALE_REVISION: keep the wish once (it is resent after the re-read), drop it the second time (no loop). */
+    static boolean retryAfterStale(int index){
+        int n=slot(index);if(n<0||wanted[n]==null)return false;
+        if(!staleRetry[n]){staleRetry[n]=true;return true;}
+        drop(index);return false;
+    }
     public static void beginRefresh(){for(int i=0;i<4;i++)refreshing[i]=true;}
     public static void finishRefresh(){for(int i=0;i<4;i++)refreshing[i]=false;}
     public static boolean begin(int index){int n=slot(index);if(n<0||requested[n])return false;requested[n]=true;message[n]=MibrI18n.pick("Wert wird gelesen", "Reading value");return true;}

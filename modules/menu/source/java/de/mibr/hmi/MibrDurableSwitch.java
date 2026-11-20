@@ -73,6 +73,14 @@ final class MibrDurableSwitch {
     private String fileValue;
     /* Session state of the menu's broker connection. */
     boolean available,asked,setInFlight;
+    /** r15 safe areas only: the newest live-edit wish not yet confirmed by the broker (MibrSafeArea), else null. */
+    String wanted;
+    /** Time of the newest wish (ms); the durable SET waits until the value was idle for MibrSafeArea.IDLE_MS. */
+    long wantedAt;
+    /** r15f: one STALE_REVISION was answered by a re-read; the next stale SET gives the wish up. */
+    boolean staleRetry;
+    /** r15f: re-send the newest wish once the running GET has read the current revision. */
+    boolean resendAfterRead;
 
     final String profileKey;
     final int profileKind;
@@ -98,6 +106,17 @@ final class MibrDurableSwitch {
         return false;
     }
     synchronized String value(){return value;}
+    /**
+     * r15f: profile-backed switches (view-profiles.conf) share ONE CAS revision (broker unit.revision). A verified SET of
+     * any of them moves it for all; the others keep their value and take the new revision (never invent one).
+     */
+    synchronized void adoptRevision(String rev){
+        if(profileKey!=null&&revision!=null&&rev!=null&&canonicalRevision(rev,0,rev.length()))revision=rev;
+    }
+    static void sharedRevision(MibrDurableSwitch writer,String rev){
+        if(writer==null||writer.profileKey==null)return;
+        for(int i=0;i<ALL.length;i++)if(ALL[i]!=writer)ALL[i].adoptRevision(rev);
+    }
     synchronized String revision(){return revision;}
     synchronized boolean writable(){return writer&&revision!=null;}
     synchronized String message(){return MibrI18n.localize(message);}

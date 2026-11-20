@@ -17,6 +17,8 @@ final class MibrMenuLayout {
     static final String SD_FILE="/net/mmx/fs/sda0/mibr-menu/mibr-menu.txt";
     static final int MAX_BYTES=16384,MAX_DEPTH=5,MAX_TITLE=60;
     static final int PAGE=0,KEY=1,DIAGNOSTICS=2,VERSION=3,NOTE=4,LOAD=5;
+    /** r15: OEM slider row under a safe-area edge row; never in a menu file, added by the model at render time. */
+    static final int SLIDER=6;
 
     static final class Node {
         final String id;

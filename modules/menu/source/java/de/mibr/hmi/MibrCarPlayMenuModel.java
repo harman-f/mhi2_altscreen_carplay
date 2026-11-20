@@ -95,6 +95,35 @@ public final class MibrCarPlayMenuModel {
     /** Read-only text: never a setting or dropdown target. */
     public boolean noteRow(int row){MibrMenuLayout.Node n=node(row);return n!=null&&n.kind==MibrMenuLayout.NOTE;}
     public boolean loadRow(int row){MibrMenuLayout.Node n=node(row);return n!=null&&n.kind==MibrMenuLayout.LOAD;}
+    /** Rows of the current list page (0 outside a list). */
+    public int rowCount(){return listed()?nodes.length:0;}
+    /** r15i: keys whose row is a collapsed stock Item header with an expandable OEM slider row: the four safe-area
+     * edges (r15) and the cockpit zoom (6 discrete positions). Only while the owned slider rows are shown. */
+    static boolean sliderKey(int key){
+        return MibrPopupEditorModel.isSafe(key)&&MibrPopupEditorModel.safeField(key)<MibrSafeArea.RESET_FIELD||
+            MibrScalingState.zoomSlider(key);
+    }
+    /** r15i: the current page has at least one slider-capable row (resolve the owned slider source first). */
+    public boolean sliderPage(){
+        if(screen!=ITEMS)return false;
+        for(int i=0;i<page.children.size();i++){
+            MibrMenuLayout.Node n=(MibrMenuLayout.Node)page.children.elementAt(i);
+            if(n.kind==MibrMenuLayout.KEY&&sliderKey(n.key))return true;
+        }
+        return false;
+    }
+    /** r15: the safe-area edge (or r15i cockpit zoom) key behind an OEM slider row, else -1 (never a dropdown key). */
+    public int sliderKeyForRow(int row){MibrMenuLayout.Node n=node(row);return n!=null&&n.kind==MibrMenuLayout.SLIDER?n.key:-1;}
+    /** True when the current page shows safe-area edge rows (slider rows may be added). */
+    public boolean safeEdgePage(){
+        if(screen!=ITEMS)return false;
+        for(int i=0;i<page.children.size();i++){
+            MibrMenuLayout.Node n=(MibrMenuLayout.Node)page.children.elementAt(i);
+            if(n.kind==MibrMenuLayout.KEY&&MibrPopupEditorModel.isSafe(n.key)&&
+               MibrPopupEditorModel.safeField(n.key)<MibrSafeArea.RESET_FIELD)return true;
+        }
+        return false;
+    }
     /** Page number behind a row, or -1 when the row opens nothing. */
     public int groupForRow(int row) {
         MibrMenuLayout.Node n=node(row);
@@ -121,10 +150,39 @@ public final class MibrCarPlayMenuModel {
         render();
     }
 
+    /** r15g: the edge whose slider row is expanded (-1 none); reset on every page change. */
+    private int expandedSafe=-1;
+    private boolean builtWithSliders;
+    public int expandedSafe(){return expandedSafe;}
+    /** True when the current rows were computed while slider rows were shown. */
+    public boolean builtWithSliders(){return builtWithSliders;}
+    /** True for an edge row that expands a slider (instead of the pre-r15 dropdown). */
+    public boolean safeToggleRow(int row){
+        MibrMenuLayout.Node n=node(row);
+        return MibrSafeArea.slidersShown()&&n!=null&&n.kind==MibrMenuLayout.KEY&&sliderKey(n.key);
+    }
+    /** r15i polish: set by a tap that expanded/collapsed a row, consumed by the next layout (keep header+slider on screen). */
+    private boolean toggled;
+    /** True once after a toggle render: the view keeps the scroll position and reveals the expanded pair. */
+    public boolean consumeToggle(){boolean t=toggled;toggled=false;return t;}
+    /** Row of the expanded header in the current rows, or -1. */
+    public int expandedRow(){
+        for(int i=0;i<nodes.length;i++)if(nodes[i].kind==MibrMenuLayout.KEY&&nodes[i].key==expandedSafe)return i;
+        return -1;
+    }
+    /** Tap on an edge row: expand its slider (collapsing any other), or collapse it again. */
+    public void toggleSafe(int row){
+        if(!safeToggleRow(row))return;
+        int key=node(row).key;
+        expandedSafe=expandedSafe==key?-1:key;
+        toggled=true;
+        render();
+    }
     public void select(int row) {
         MibrMenuLayout.Node n=node(row);
         if(n==null)return;
         if(n.opens()){
+            expandedSafe=-1;
             page=n;selected=-1;screen=ITEMS;render();
         }else if(n.kind==MibrMenuLayout.KEY&&n.key>=0&&n.key<MibrSettingsCatalog.KEYS.length){
             selected=n.key;screen=DETAIL;render();
@@ -136,6 +194,7 @@ public final class MibrCarPlayMenuModel {
             screen = page == layout.root ? CATEGORIES : ITEMS;
             selected = -1;
         } else if (screen == ITEMS) {
+            expandedSafe = -1;
             page = page.parent;
             screen = page == layout.root ? CATEGORIES : ITEMS;
         } else {
@@ -154,6 +213,7 @@ public final class MibrCarPlayMenuModel {
 
     private void visibleNodes() {
         Vector out=new Vector();
+        builtWithSliders=MibrSafeArea.slidersShown();
         boolean expert=MibrExpert.on();
         if(restoredNotice==null)restoredNotice=MibrMenuLayout.restoredNotice();
         if(page==layout.root&&restoredNotice!=null)
@@ -163,7 +223,13 @@ public final class MibrCarPlayMenuModel {
                 MibrMenuLayout.recoveryNote(),MibrMenuLayout.recoveryNote()));
         for(int i=0;i<page.children.size();i++){
             MibrMenuLayout.Node n=(MibrMenuLayout.Node)page.children.elementAt(i);
-            if(expert||!n.expert)out.addElement(n);
+            if(expert||!n.expert){
+                out.addElement(n);
+                // r15g: like the stock sound Item/SubItem pair: the edge row is collapsed; tapping it expands its OEM
+                // slider row directly below (one at a time). Only while the native slider source resolved.
+                if(MibrSafeArea.slidersShown()&&n.kind==MibrMenuLayout.KEY&&n.key==expandedSafe&&sliderKey(n.key))
+                    out.addElement(new MibrMenuLayout.Node(n.id+".slider",MibrMenuLayout.SLIDER,n.key,-1,n.expert,page,"",""));
+            }
         }
         nodes=new MibrMenuLayout.Node[out.size()];
         out.copyInto(nodes);

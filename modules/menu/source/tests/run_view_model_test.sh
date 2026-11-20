@@ -51,7 +51,8 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/tests/MibrV3ShowTest.java" \
   "$MODULE/tests/MibrDurableRevisionTest.java" \
   "$MODULE/tests/MibrDropdownFrameTest.java" \
-  "$MODULE/tests/MibrMenuRestoredNoticeTest.java"
+  "$MODULE/tests/MibrMenuRestoredNoticeTest.java"   "$MODULE/tests/MibrSafeSliderTest.java"   "$MODULE/tests/MibrSafeRevisionTest.java" \
+  "$MODULE/tests/MibrScalingBindingTest.java" "$MODULE/tests/MibrZoomSliderTest.java"
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrViewStateTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrCanonicalElementMenuTest
 "$JAVA" -Dmibr.menu.standard="$(cd "$MODULE/../../.." && pwd)/tools/menu-editor/standard-menu.txt" \
@@ -63,3 +64,7 @@ python3 "$MODULE/generate_catalog.py" \
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrDurableRevisionTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrDropdownFrameTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrMenuRestoredNoticeTest
+"$JAVA" -Dmibr.menu.standard="$REPO/tools/menu-editor/standard-menu.txt" -cp "$OUT/classes" de.mibr.hmi.MibrSafeSliderTest
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrSafeRevisionTest
+"$JAVA" -Dmibr.menu.standard="$REPO/tools/menu-editor/standard-menu.txt" -cp "$OUT/classes" de.mibr.hmi.MibrZoomSliderTest
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrScalingBindingTest
