@@ -565,8 +565,8 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 "id": "safe_voll.hint",
 "parent": "safe_voll",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach Neuverbinden",
+"en": "Applies after reconnect"
 },
 {
 "id": "safe_wide",
@@ -627,8 +627,8 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 "id": "safe_wide.hint",
 "parent": "safe_wide",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach Neuverbinden",
+"en": "Applies after reconnect"
 },
 {
 "id": "safe_center",
@@ -689,8 +689,8 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 "id": "safe_center.hint",
 "parent": "safe_center",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach Neuverbinden",
+"en": "Applies after reconnect"
 },
 {
 "id": "advanced",
@@ -843,8 +843,8 @@ ul.list li ul{margin:2px 0 0 18px;padding:0;list-style:disc}
 "id": "scaling.hint",
 "parent": "scaling",
 "kind": "hint",
-"de": "Änderungen werden bei der nächsten CarPlay-Verbindung übertragen.",
-"en": "Changes are sent on the next CarPlay connection."
+"de": "Wirkt nach Neuverbinden",
+"en": "Applies after reconnect"
 },
 {
 "id": "diagnostics",
@@ -949,7 +949,8 @@ de:{
  e_nopage:"Zeile {0}: „{1}“ steht unter „{2}“, das keine Seite ist.",e_flag:"Zeile {0}: ungültige Markierung „{1}“ (erlaubt: - oder x).",
  saStd:"Standard",saStdLine:"Standard dieser Ansicht: links {0}, oben {1}, rechts {2}, unten {3}",
  saChanged:"Geändert",saIsStd:"Standard",saStored:"Gespeichert als x,y,w,h",
- saInfoVal:"Mit dem Regler (Schritt 2) oder den Knöpfen ändern. Eine Kante stoppt am Limit, die anderen drei bleiben stehen.",
+ saInfoVal:"Wie im Auto (ab r15): Regler in 10-px-Schritten, Knöpfe ±1, ±10 und ±50 px. Eine Kante stoppt am Limit, die anderen drei bleiben stehen.",
+ saKeyx:"{0}: linke Kante = gespeichert als x",saKeyy:"{0}: obere Kante = gespeichert als y",saKeyw:"{0}: rechte Kante; gespeichert wird die Breite w = rechte − linke Kante",saKeyh:"{0}: untere Kante; gespeichert wird die Höhe h = untere − obere Kante",
  saStoredInfo:"So steht der Bereich im Auto und in der Datei der Unit: linke Kante, obere Kante, Breite, Höhe. Diese Zeile ändert nichts.",
  saSuggestNote:"Die Standardwerte sind grob von Fotos abgelesen, etwa ±20 Pixel.",
  saPicAria:"Kalibrierbild 1010 mal 376 mit gelbem Rahmen von {0},{1} bis {2},{3}",
@@ -1023,7 +1024,8 @@ en:{
  e_nopage:"Line {0}: “{1}” sits under “{2}”, which is not a page.",e_flag:"Line {0}: invalid flag “{1}” (allowed: - or x).",
  saStd:"Default",saStdLine:"Default of this view: left {0}, top {1}, right {2}, bottom {3}",
  saChanged:"Changed",saIsStd:"Default",saStored:"Stored as x,y,w,h",
- saInfoVal:"Change it with the slider (step 2) or the buttons. An edge stops at its limit and the other three stay put.",
+ saInfoVal:"As in the car (from r15): slider in 10 px steps, buttons ±1, ±10 and ±50 px. An edge stops at its limit and the other three stay put.",
+ saKeyx:"{0}: left edge = stored as x",saKeyy:"{0}: top edge = stored as y",saKeyw:"{0}: right edge; stored as width w = right − left edge",saKeyh:"{0}: bottom edge; stored as height h = bottom − top edge",
  saStoredInfo:"This is how the area is stored on the car and in the unit: left edge, top edge, width, height. This line changes nothing.",
  saSuggestNote:"The standard values are rough readings from photos, about ±20 pixels.",
  saPicAria:"Calibration picture 1010 by 376 with a yellow frame from {0},{1} to {2},{3}",
@@ -1795,11 +1797,12 @@ function renderSafe(host){
     var d=C[id]?C[id]["desc_"+lang]:"";
     var fh=fieldHead(row,ttl(id),"sa-"+nm,"sa:"+nm,(d?d+" ":"")+t("saInfoVal"));
     var num=el("b","sa-num");fh.insertBefore(num,fh.lastChild);nums.push(num);
-    var sl=el("input");sl.type="range";sl.id="sa-"+nm;sl.min=0;sl.max=(f%2?SAFE_H:SAFE_W);sl.step=1;
+    row.appendChild(el("div","small sa-key",t("saKey"+nm,id)));
+    var sl=el("input");sl.type="range";sl.id="sa-"+nm;sl.min=0;sl.max=(f%2?SAFE_H:SAFE_W);sl.step=10;
     sl.addEventListener("input",function(){setEdge(f,+sl.value)});
     row.appendChild(sl);sls.push(sl);
     var st=el("div","sa-steps");
-    [-50,-10,-2,2,10,50].forEach(function(dl){btn(st,(dl>0?"+":"")+dl,false,function(){setEdge(f,cur()[f]+dl)})});
+    [-50,-10,-1,1,10,50].forEach(function(dl){btn(st,(dl>0?"+":"")+dl,false,function(){setEdge(f,cur()[f]+dl)})});
     btn(st,t("saStd"),false,function(){setEdge(f,SAFE_STD[view][f])},"std");
     row.appendChild(st);card.appendChild(row);
   });

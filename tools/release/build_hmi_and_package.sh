@@ -202,11 +202,13 @@ mkdir -p "$OUT/hmi/common"
 for name in MIBR-NavIgnore.jar MIBR-Most20FPS.jar; do
   install -m 0644 "$MIBR_SUPPORT_JAR_DIR/$name" "$OUT/hmi/common/$name"
 done
+# build_modular requires the HMI JARs' source commit beside them.
+git -C "$ROOT" rev-parse HEAD > "$OUT/hmi/SOURCE_COMMIT.txt"
 NATIVE="$OUT/native"
 mkdir -p "$NATIVE/bin/navigation"
 QNX_TARGET="$QNX_TARGET" IAP2_LIB="$IAP2_LIB" CLANG="$CLANG" LLD="$LLD" \
   sh "$ROOT/modules/navigation/source/build.sh" "$NATIVE/bin/navigation"
-ffmpeg -hide_banner -loglevel error -y -version >/dev/null
+"$FFMPEG" -hide_banner -loglevel error -y -version >/dev/null
 python3 "$ROOT/modules/navigation/source/tools/make_calib_clip.py" \
   "$NATIVE/bin/navigation/mibr-calib.avcc" "$FFMPEG"
 # selectable test patterns (menu Kalibrierbild); keep in step with CALIB_PATTERNS in build_modular.py
