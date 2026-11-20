@@ -50,6 +50,19 @@ LOCKED=0
 MOUNTED=0
 TMPD=
 
+# safe_replace TMP DEST: put TMP at DEST without ever losing the only copy of DEST.
+# mv first; if that fails (FAT/fs-dos refusing to overwrite) move DEST aside, move TMP in, and only
+# then drop the aside copy. On any failure DEST is restored and TMP is kept (return 1).
+safe_replace(){
+  mv "$1" "$2" 2>/dev/null && return 0
+  [ -e "$2" ] || return 1
+  _so=$2.mibr-old.$$
+  mv "$2" "$_so" 2>/dev/null || return 1
+  if mv "$1" "$2" 2>/dev/null; then rm -f "$_so"; return 0; fi
+  mv "$_so" "$2" 2>/dev/null
+  return 1
+}
+
 cleanup(){
   rc=$?
   trap '' 0
@@ -228,6 +241,12 @@ cp_into(){
   cp -p "$1" "$2"
 }
 
+# snapshot copy: plain cp (the snapshot may sit on the FAT backup SD: no -p / chmod there)
+cp_snap(){
+  case $2 in */*) mkdir -p "${2%/*}" || return 1 ;; esac
+  cp "$1" "$2"
+}
+
 acquire_lock(){
   n=0
   while [ $n -lt 3 ]; do
@@ -355,7 +374,7 @@ do_run(){
   load_map
   enter_rw
   RC=$NEW/version/migration-$ID.receipt
-  BK=$NEW/backup/$ID
+  BK=${MIBR_BACKUP_ROOT:-$NEW/backup}/$ID
   ST=$NEW/.staging-$ID
 
   # b. idempotence
@@ -404,10 +423,10 @@ do_run(){
   : > "$BK/SHA256SUMS.tmp" || die 30 "cannot write backup sums"
   while read -r rel; do
     h=$(hashf "$ROOT/$rel") || die 30 "hash failed: $rel"
-    cp_into "$ROOT/$rel" "$BK/legacy/$rel" || die 30 "snapshot copy failed: $rel"
+    cp_snap "$ROOT/$rel" "$BK/legacy/$rel" || die 30 "snapshot copy failed: $rel"
     echo "$h  $rel" >> "$BK/SHA256SUMS.tmp"
   done < "$TMPD/legacy.list"
-  mv "$BK/SHA256SUMS.tmp" "$BK/SHA256SUMS" || die 30 "cannot write SHA256SUMS"
+  safe_replace "$BK/SHA256SUMS.tmp" "$BK/SHA256SUMS" || die 30 "cannot write SHA256SUMS"
   verify_sums "$BK/legacy" "$BK/SHA256SUMS" > "$TMPD/v.out" \
     || die 30 "snapshot verify failed: $(cat "$TMPD/v.out")"
   sync
@@ -485,7 +504,7 @@ do_verify(){
     case $pl in install-in-progress*) echo "kill switch still install-in-progress"; vf=1 ;; esac
   fi
   VSKIP=$VERIFY_SKIP
-  verify_sums "$ROOT" "$NEW/backup/$ID/SHA256SUMS" > "$TMPD/v.out" || {
+  verify_sums "$ROOT" "${MIBR_BACKUP_ROOT:-$NEW/backup}/$ID/SHA256SUMS" > "$TMPD/v.out" || {
     while IFS= read -r vo; do out "legacy $vo"; done < "$TMPD/v.out"; vf=1; }
   if [ $vf = 0 ]; then echo "MIBR_MIGRATE_VERIFY=OK id=$ID"; return 0; fi
   echo "MIBR_MIGRATE_VERIFY=FAIL id=$ID"
@@ -500,9 +519,9 @@ do_rollback(){
     enter_rw
     for s in "$NEW"/.staging-*; do [ -e "$s" ] && rm -rf "$s"; done
   fi
-  if [ -f "$NEW/backup/$ID/SHA256SUMS" ]; then
+  if [ -f "${MIBR_BACKUP_ROOT:-$NEW/backup}/$ID/SHA256SUMS" ]; then
     VSKIP=$VERIFY_SKIP
-    if verify_sums "$ROOT" "$NEW/backup/$ID/SHA256SUMS" > "$TMPD/v.out"; then
+    if verify_sums "$ROOT" "${MIBR_BACKUP_ROOT:-$NEW/backup}/$ID/SHA256SUMS" > "$TMPD/v.out"; then
       echo "legacy trees intact"
     else
       cat "$TMPD/v.out"; echo "MIBR_MIGRATE_ROLLBACK=LEGACY_CHANGED"; return 1
