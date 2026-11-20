@@ -81,7 +81,14 @@ public final class MibrSafeRevisionTest {
         MibrDurableSwitch.sharedRevision(MibrDurableSwitch.SAFE_CENTER,"12");
         check("12".equals(MibrDurableSwitch.SAFE_VOLL.revision()),"profile-backed sibling takes the shared revision");
         check("4".equals(MibrDurableSwitch.CARPLAY_NAV.revision()),"own-file switch keeps its own revision");
-        s.detach();
+        // r15j review: an edge wish pending at page leave is written by the final writer (stale -> GET -> resend)
+        b.alwaysStale=false;b.rev="40";
+        int setsBefore=b.sets;
+        s.safeEdge(key,350);
+        check(b.sets==setsBefore,"debounced before leave");
+        s.detach();s.finalWriter.join(5000L);
+        check(b.value.startsWith("350,")&&log.toString().indexOf("MIBR_FINAL_SET SAFE_CENTER_SET value=350,")>=0&&
+              log.toString().indexOf("result=OK")>=0,"page leave writes the pending edge: "+b.value+" sets="+(b.sets-setsBefore));
         System.out.println("MIBR_SAFE_REVISION_HOST_PASS");
         System.exit(0);
     }

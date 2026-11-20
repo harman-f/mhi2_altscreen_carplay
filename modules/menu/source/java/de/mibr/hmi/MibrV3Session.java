@@ -847,26 +847,95 @@ final class MibrV3Session {
         if(loaded)MibrMenuLayout.loaded();
         changed();
     }
+    /** r15j: the page-leave writer of the last run (host tests join it). */
+    Thread finalWriter;
     void detach(){
-        // Leaving the page never loses the final edge: an unsent wish is written now (reply ignored after detach).
+        // Leaving the page never loses a final value: every unsent slider wish (safe-area edges, all four scaling
+        // rows) is queued and written one after another by a detached worker, each SET with the revision of the
+        // previous reply (a GET first when a SET was still in flight). The loopback client is one connection per
+        // request and does not belong to the page, so it outlives the detach.
+        java.util.Vector items=new java.util.Vector();
+        boolean profileBusy=false;
+        for(int i=0;i<MibrDurableSwitch.ALL.length;i++)
+            if(MibrDurableSwitch.ALL[i].profileKey!=null&&MibrDurableSwitch.ALL[i].setInFlight)profileBusy=true;
         for(int a=0;a<3;a++){
             MibrDurableSwitch sw=MibrPopupEditorModel.durable(MibrPopupEditorModel.SAFE_FIRST+5*a);
             String last;
             synchronized(sw){last=sw.wanted;}
-            if(last!=null&&!sw.setInFlight&&attached)try{switchSet(sw,MibrPopupEditorModel.SAFE_FIRST+5*a,last);}
-                catch(Throwable failure){System.err.println("MIBR_SAFE_FINAL_SET_FAILED "+failure);}
+            if(last!=null&&sw.available&&(sw.setInFlight||!last.equals(sw.value())))
+                items.addElement(new FinalItem(sw.verb+"_SET",sw.verb+"_GET",null,last,profileBusy?null:sw.revision(),true));
             MibrSafeArea.drop(sw);
         }
-        // r15i/r15j: same for an unsent scaling slider wish (only when the service is idle; the reply is ignored after
-        // detach). One SET per CAS revision: a second unsent wish on another scaling row cannot follow and is logged.
+        boolean scaleBusy=scalingSetInFlight||scalingRefreshInFlight;
         for(int i=0;i<SCALE_KEYS.length;i++){
             int k=SCALE_KEYS[i];String zoom=MibrScalingState.wanted(k);
-            if(zoom==null||zoom.equals(MibrScalingState.desired(k)))continue;
-            if(attached&&!scalingSetInFlight&&!scalingRefreshInFlight)
-                try{zoomSend(k,zoom);}catch(Throwable failure){System.err.println("MIBR_ZOOM_FINAL_SET_FAILED "+failure);}
-            else MibrSafeArea.diag("MIBR_ZOOM_SLIDER_FINAL_DROPPED "+MibrScalingState.id(k)+" value="+zoom);
+            if(zoom==null||!scalingAvailable||!scaleBusy&&zoom.equals(MibrScalingState.desired(k)))continue;
+            items.addElement(new FinalItem("SCALE_SET","SCALE_GET",MibrScalingState.id(k),zoom,scaleBusy?null:MibrScalingState.revision(k),false));
+        }
+        finalWriter=null;
+        if(attached&&items.size()>0){
+            final FinalItem[] list=new FinalItem[items.size()];items.copyInto(list);
+            final MibrV3Client c=client;final String base=prefix+"f"+(++sequence);
+            finalWriter=new Thread(new Runnable(){public void run(){writeFinal(c,base,list);}},"MibrFinalWriter");
+            finalWriter.setDaemon(true);finalWriter.start();
         }
         attached=false;epoch++;menuLoading=false;MibrMenuLayout.message(null);resetWireQueue();busy=false;loaded=false;writable=false;scalingAvailable=false;scalingRefreshInFlight=false;scalingSetInFlight=false;scalingRefreshPending=false;MibrScalingState.reset();
         for(int i=0;i<dirty.length;i++){dirty[i]=false;attempts[i]=0;}
+    }
+
+    /* ---- r15j: page-leave queue (runs on its own thread; touches no UI or session state) ---- */
+    static final class FinalItem {
+        final String setVerb,getVerb,id,value;final boolean profile;String revision;
+        FinalItem(String set,String get,String id,String value,String revision,boolean profile){
+            setVerb=set;getVerb=get;this.id=id;this.value=value;this.revision=revision;this.profile=profile;
+        }
+    }
+    /** Blocking request: waits for a free client slot (another request may still be in flight), then the reply. */
+    private static MibrV3Protocol.Frame call(MibrV3Client c,String rid,String verb,String[] names,String[] values){
+        final Object[] box=new Object[2];final boolean[] done=new boolean[1];
+        MibrV3Client.Listener l=new MibrV3Client.Listener(){public void onReply(MibrV3Protocol.Frame f,String e){
+            synchronized(box){box[0]=f;box[1]=e;done[0]=true;box.notifyAll();}}};
+        for(int tries=0;!c.send(rid,verb,names,values,l);tries++){
+            if(tries>=40)return null; // 6 s without a free slot: never sent
+            try{Thread.sleep(150L);}catch(InterruptedException e){return null;}
+        }
+        synchronized(box){
+            long end=System.currentTimeMillis()+8000L;
+            while(!done[0]){long left=end-System.currentTimeMillis();if(left<=0L)return null;
+                try{box.wait(left);}catch(InterruptedException e){return null;}}
+            return box[1]==null?(MibrV3Protocol.Frame)box[0]:null;
+        }
+    }
+    private static String rev(MibrV3Protocol.Frame f){
+        String r=f==null||!f.ok()?null:f.get("revision");
+        return MibrScalingState.revisionValidForProtocol(r)?r:null;
+    }
+    static void writeFinal(MibrV3Client c,String base,FinalItem[] items){
+        // One revision per store: scaling file and the shared profile unit.revision are independent CAS counters.
+        String scaleRev=null,profileRev=null;boolean scaleKnown=false,profileKnown=false;int n=0;
+        for(int i=0;i<items.length;i++){
+            FinalItem it=items[i];
+            String rev=it.profile?(profileKnown?profileRev:it.revision):(scaleKnown?scaleRev:it.revision);
+            String result="UNCONFIRMED";
+            for(int attempt=0;attempt<3;attempt++){
+                if(rev==null){
+                    MibrV3Protocol.Frame g=it.id==null?call(c,base+"_"+(++n),it.getVerb,new String[0],new String[0]):
+                        call(c,base+"_"+(++n),it.getVerb,new String[]{"id"},new String[]{it.id});
+                    rev=rev(g);
+                    String now=g==null?null:it.id==null?g.get("value"):g.get("desired");
+                    if(rev!=null&&it.value.equals(now)){result="ALREADY";break;}
+                    if(rev==null){result="GET_FAILED";break;}
+                }
+                String rid=base+"_"+(++n);
+                MibrV3Protocol.Frame f=it.id==null?
+                    call(c,rid,it.setVerb,new String[]{"value","expected_revision","request_id"},new String[]{it.value,rev,rid}):
+                    call(c,rid,it.setVerb,new String[]{"id","value","expected_revision","request_id"},new String[]{it.id,it.value,rev,rid});
+                if(f!=null&&"STALE_REVISION".equals(f.error)){rev=null;result="STALE";continue;}
+                rev=rev(f);result=rev!=null?"OK":"UNCONFIRMED";
+                break;
+            }
+            if(it.profile){profileRev=rev;profileKnown=true;}else{scaleRev=rev;scaleKnown=true;}
+            MibrSafeArea.diag("MIBR_FINAL_SET "+it.setVerb+(it.id==null?"":" "+it.id)+" value="+it.value+" result="+result);
+        }
     }
 }

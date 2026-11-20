@@ -150,7 +150,7 @@ public final class MibrZoomSliderTest implements MibrCarPlayMenuModel.View {
         check(fake.sets==sets+2&&"AUTO".equals(MibrScalingState.shown(c))&&MibrScalingState.wanted(c)==null,"stale twice: dropped, no loop");
         // leaving the page writes an unsent wish
         sets=fake.sets;
-        s.zoomSlide(c,1);s.detach();
+        s.zoomSlide(c,1);s.detach();s.finalWriter.join(5000L);
         check(fake.sets==sets+1&&"70".equals(fake.setValues.lastElement()),"page leave sends the final wish");
         // r15j: main zoom and both physical sizes use the same debounced CAS save
         Broker other=new Broker();MibrPopupEditorModel m2=new MibrPopupEditorModel();m2.setAvailable(true);
@@ -176,8 +176,18 @@ public final class MibrZoomSliderTest implements MibrCarPlayMenuModel.View {
         s2.zoomSlide(m,5);s2.zoomSlide(ph,0);waitIdle();waitIdle();
         check(other.setValues.size()==before+2&&"150".equals(MibrScalingState.desired(m))&&"50".equals(MibrScalingState.desired(ph))&&
               MibrScalingState.wanted(m)==null&&MibrScalingState.wanted(ph)==null,"two sliders, two SETs in sequence: "+other.setValues);
-        s2.zoomSlide(mp,15);s2.detach();
-        check("200".equals(other.setValues.lastElement()),"page leave sends the final size wish");
+        s2.zoomSlide(mp,15);s2.detach();s2.finalWriter.join(5000L);
+        check("200".equals(other.setValues.lastElement())&&"200".equals(other.mainPhysical),"page leave sends the final size wish");
+        // r15j review: several rows pending at page leave -> all written in sequence, none dropped (one stale on the way)
+        Broker third=new Broker();MibrPopupEditorModel m3=new MibrPopupEditorModel();m3.setAvailable(true);
+        MibrV3Session s3=session(third,m3);s3.open();s3.scaleRefresh();
+        s3.zoomSlide(m,1);s3.zoomSlide(c,4);s3.zoomSlide(ph,15);s3.zoomSlide(mp,0);
+        check(third.setValues.size()==0,"four wishes pending, nothing written yet");
+        third.staleSets=1;
+        s3.detach();s3.finalWriter.join(5000L);
+        check(!s3.finalWriter.isAlive()&&"70".equals(third.main)&&"125".equals(third.cluster)&&"200".equals(third.physical)&&"50".equals(third.mainPhysical),
+              "all four pending rows reach the store after leave: "+third.setValues);
+        check(third.setValues.size()==5,"4 SETs + 1 stale resend: "+third.setValues);
         System.out.println("MIBR_ZOOM_SLIDER_HOST_PASS");
     }
 }
