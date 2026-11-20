@@ -42,6 +42,6 @@ The file format does not change: the safe-area edges stay `number` and the zoom 
 
 - **Safe-area edges** (`safe_voll|safe_wide|safe_center` `.x/.y/.w/.h`): collapsed, the row shows the label and a small slider with a green fill. Tapping a row opens it: the value is on the right, and below it is a row with −, the track with a ring thumb, and +, closed off by a bracket line. Only one row is open at a time. The track snaps to 10 px, and −/+ move 1 px. Left/right range over 0–1010 and top/bottom over 0–376. The area stays at least 100 × 60 px. The reset row shows “Standard”/“Geändert” and restores the view default.
 - **Zoom** (`scaling.main|cluster.zoomFactor`): a slider with the fixed steps Automatisch, 70, 85, 100, 125, 150. The vehicle side follows.
-- **SEAT** (MU1409/MU1447): the same rows are shown. The SEAT firmwares contain the same OEM slider parts, but the brand look is not documented, so the preview stays neutral.
+- **SEAT** (MU1409/MU1447): the same rows are shown. The SEAT firmwares contain the same OEM slider parts, but the brand look is not documented, so the preview stays neutral. In the car the sliders are still disabled for SEAT (profile gate), and the previous rows with a dropdown appear until they are released.
 
 Preview values are for demonstration only. They do not change the safe areas in the configuration.

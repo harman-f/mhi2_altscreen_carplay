@@ -1,6 +1,8 @@
 /* MIB-Konfigurator P0.5: shared browser project + SD export.
    Embedded in the standalone HTML by the release workflow.
-   The vehicle runtime currently knows only /mibr-menu/mibr-menu.txt.
+   The vehicle runtime currently loads only /mibr-menu/mibr-menu.txt; the SD export
+   also writes /mibr-config/{view-profiles.conf,keys.conf,options.conf,mibr-project.json}
+   with one shared export.id (vehicle loaders follow).
    Options/keys (unit system settings) are optional top-level fields.
    P0.9.10: optional working folder (File System Access API, Chrome/Edge):
    chosen once, handle kept in IndexedDB, project auto-saved to and
@@ -89,27 +91,73 @@ function nativeFile(){
     throw Error(tr("SD-Export ist nur für Škoda MU1440/AID10 freigegeben.","SD export is enabled only for Škoda MU1440/AID10."));
   return window.MIBR_menu.nativeText();
 }
-function fallbackZip(text){
-  download("mibr-sd-menu.zip",zipFiles([{path:"mibr-menu/mibr-menu.txt",text:text}]),"application/zip");
-  status(tr("ZIP-Download gestartet. Ordner mibr-menu auf die SD-Karte entpacken; keine View-Profile enthalten.","ZIP download started. Extract mibr-menu to SD card; view profiles excluded."));
+/* SD export (requirements 1.2): the menu file stays byte-identical to MIBR_MENU/1;
+   the config files carry one shared export.id and end with crc32 over all lines before it. */
+var SD_LIMIT=16384;
+function hex8(n){return ("0000000"+(n>>>0).toString(16)).slice(-8)}
+function exportId(){
+  var stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+Z$/,"Z"),r=new Uint8Array(4);
+  if(window.crypto&&window.crypto.getRandomValues)window.crypto.getRandomValues(r);else for(var i=0;i<4;i++)r[i]=Math.floor(Math.random()*256);
+  return stamp+"-"+Array.from(r).map(function(b){return ("0"+b.toString(16)).slice(-2)}).join("");
+}
+function withCrc(lines){var body=lines.join("\n")+"\n";return body+"crc32="+hex8(crc32(encode(body)))+"\n"}
+function onOff(b){return b?"on":"off"}
+function profileText(id){
+  var lines=window.MIBR_views.nativeConf().split("\n").filter(function(l){return l&&!/^crc32=/.test(l)&&!/^export\.id=/.test(l)});
+  lines.splice(2,0,"export.id="+id);
+  return withCrc(lines);
+}
+function keysText(id,k){
+  return withCrc(["MIBR_KEYS/1","version=1","export.id="+id,"key.view_step="+k.viewStep,"key.view_resync_long="+k.viewResyncLong,
+    "key.carplay_switch_long="+k.carplaySwitchLong,"key.menu="+k.menu,"zoom.wheel_source="+k.zoomWheelSource,"zoom.wheel_auto="+(k.zoomWheelAuto?1:0)]);
+}
+function optionsText(id,o){
+  return withCrc(["MIBR_OPTIONS/1","version=1","export.id="+id,"view_config_mode="+(o.viewConfigMode==="perView"?"per_view":"global"),
+    "carplay_nav="+onOff(o.carplayNav),"menu.language="+o.language,"expert_mode="+onOff(o.expertMode),"sd_log="+onOff(o.sdLog),
+    "scaling.main.zoomFactor="+o.scaling.mainZoom,"scaling.cluster.zoomFactor="+o.scaling.clusterZoom,
+    "scaling.main.physicalSize="+o.scaling.mainPhysical,"scaling.cluster.physicalSize="+o.scaling.clusterPhysical]);
+}
+/* All SD files, validated; throws (with the reason) instead of exporting a partial set. */
+function sdFiles(id){
+  var menu=nativeFile(),p=capture();validate(p);id=id||exportId();
+  var files=[{path:"mibr-menu/mibr-menu.txt",text:menu},
+    {path:"mibr-config/view-profiles.conf",text:profileText(id)},
+    {path:"mibr-config/keys.conf",text:keysText(id,p.keys)},
+    {path:"mibr-config/options.conf",text:optionsText(id,p.options)},
+    {path:"mibr-config/mibr-project.json",text:JSON.stringify(Object.assign({exportId:id},p),null,2)+"\n"}];
+  files.forEach(function(f){if(!/\.json$/.test(f.path)&&encode(f.text).length>SD_LIMIT)throw Error(tr("Datei zu groß: ","File too large: ")+f.path)});
+  return files;
+}
+function sdList(files){return files.map(function(f){return "/"+f.path}).join(", ")}
+function sdDone(files,how){
+  status(how+tr(" · Heute lädt die Unit nur das Menü; Ansichtsprofile, Tasten und Optionen: Fahrzeugseite folgt."," · The unit loads only the menu today; view profiles, keys and options: vehicle side follows."));
+}
+function fallbackZip(files){
+  download("mibr-sd-export.zip",zipFiles(files),"application/zip");
+  sdDone(files,tr("ZIP-Download gestartet. Inhalt ins SD-Stammverzeichnis entpacken: ","ZIP download started. Extract into the SD-card root: ")+sdList(files));
 }
 async function sdExport(){
-  var text;
-  try{text=nativeFile()}catch(e){status(e.message,true);return}
+  var files;
+  try{files=sdFiles()}catch(e){status(e.message,true);return}
   if(typeof window.showDirectoryPicker!=="function"){
-    if(window.confirm(tr("Direkter Ordnerzugriff nicht verfügbar. ZIP mit /mibr-menu/mibr-menu.txt herunterladen?","No direct folder access. Download a ZIP with /mibr-menu/mibr-menu.txt?")))fallbackZip(text);
+    if(window.confirm(tr("Direkter Ordnerzugriff nicht verfügbar. ZIP mit allen SD-Dateien herunterladen?","No direct folder access. Download a ZIP with all SD files?")))fallbackZip(files);
     return;
   }
   try{
     var root=await window.showDirectoryPicker({mode:"readwrite",id:"mibr-sd"});
-    if(!window.confirm(tr("Bitte bestätigen: gewählter Ordner ist das SD-Karten-Stammverzeichnis. Nur mibr-menu/mibr-menu.txt wird geschrieben.","Confirm: the selected folder is the SD-card root. Only mibr-menu/mibr-menu.txt will be written.")))return;
-    var folder=await root.getDirectoryHandle("mibr-menu",{create:true}),found=null;
-    try{found=await folder.getFileHandle("mibr-menu.txt")}catch(e){if(e.name!=="NotFoundError")throw e}
-    if(found&&!window.confirm(tr("Die Menüdatei ist vorhanden. Überschreiben?","Menu file exists. Overwrite?")))return;
-    var handle=found||await folder.getFileHandle("mibr-menu.txt",{create:true});
-    var writer=await handle.createWritable();
-    try{await writer.write(text);await writer.close()}catch(e){try{await writer.abort()}catch(ignored){}throw e}
-    status(tr("SD-Datei geschrieben: /mibr-menu/mibr-menu.txt · View-Profile nicht enthalten","SD file written: /mibr-menu/mibr-menu.txt · view profiles excluded"));
+    if(!window.confirm(tr("Bitte bestätigen: gewählter Ordner ist das SD-Karten-Stammverzeichnis. Geschrieben werden: ","Confirm: the selected folder is the SD-card root. Files written: ")+sdList(files)))return;
+    var dirs={},existing=[];
+    for(var f of files){
+      var parts=f.path.split("/"),dn=parts[0];
+      if(!dirs[dn])dirs[dn]=await root.getDirectoryHandle(dn,{create:true});
+      try{await dirs[dn].getFileHandle(parts[1]);existing.push("/"+f.path)}catch(e){if(e.name!=="NotFoundError")throw e}
+    }
+    if(existing.length&&!window.confirm(tr("Vorhandene Dateien überschreiben: ","Overwrite existing files: ")+existing.join(", ")+"?"))return;
+    for(var g of files){
+      var q=g.path.split("/"),handle=await dirs[q[0]].getFileHandle(q[1],{create:true}),writer=await handle.createWritable();
+      try{await writer.write(g.text);await writer.close()}catch(e){try{await writer.abort()}catch(ignored){}throw e}
+    }
+    sdDone(files,tr("SD-Dateien geschrieben: ","SD files written: ")+sdList(files));
   }catch(e){if(e&&e.name==="AbortError")return;status(tr("SD-Export fehlgeschlagen: ","SD export failed: ")+e.message,true)}
 }
 function saveProject(){
@@ -263,5 +311,5 @@ try{var raw=localStorage.getItem(STORE);if(raw)applyProject(JSON.parse(raw));els
 catch(e){status(tr("Vorherige Einstellungen erhalten. Projekt-Wiederherstellung gescheitert: ","Previous settings preserved. Project restore failed: ")+e.message,true)}
 folderInit();
 labels();
-window.MIBR_project={capture:capture,validate:validate,apply:applyProject,nativeFile:nativeFile,zipFiles:zipFiles};
+window.MIBR_project={capture:capture,validate:validate,apply:applyProject,nativeFile:nativeFile,zipFiles:zipFiles,sdFiles:sdFiles};
 })();

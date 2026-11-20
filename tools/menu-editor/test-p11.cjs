@@ -60,6 +60,15 @@ async function main(){
   const b=d.getElementById("brand");b.value="seat";b.dispatchEvent(new w.Event("change",{bubbles:true}));await delay(20);
   assert.ok(row(z).classList.contains("sl"),"slider rows for SEAT");
   assert.ok(Array.from(d.querySelectorAll(".pvnote")).some(n=>/SEAT-Firmwares/.test(n.textContent)),"SEAT slider note");
+  // SEAT head unit: platform test-profile defaults (seat-mu14xx.conf) for safe areas and wheel zoom
+  const um=d.getElementById("unitModel");um.value="MU1409";um.dispatchEvent(new w.Event("change",{bubbles:true}));await delay(20);
+  assert.equal(w.MIBR_system.defaults().keys.zoomWheelAuto,true,"SEAT: zoom.wheel_auto=1");
+  d.querySelector("#pv .pvb").click();d.querySelector("#pv .pvb").click();
+  click("Ansichten");click("Safe Area Voll");click("Zurücksetzen");click("Linke Kante");
+  assert.equal(num(),"264","SEAT voll default left edge");click("Obere Kante");assert.equal(num(),"56");
+  um.value="MU1440";um.dispatchEvent(new w.Event("change",{bubbles:true}));await delay(20);
+  assert.equal(w.MIBR_system.defaults().keys.zoomWheelAuto,false,"Skoda: zoom.wheel_auto=0");
+  click("Zurücksetzen");click("Linke Kante");assert.equal(num(),"10","Skoda voll default again");
   assert.deepEqual(errors,[],"No runtime errors");
   console.log("P0.11 menu preview slider tests PASS");
 }
