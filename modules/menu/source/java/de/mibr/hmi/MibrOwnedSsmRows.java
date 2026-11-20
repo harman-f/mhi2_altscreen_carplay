@@ -387,13 +387,14 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         if(key<0||!(item instanceof ListItem))return;
         MibrSafeSliderSource.Row row=sliderRow(item);
         if(row==null)row=MibrSafeSliderSource.parts((ListItem)item);
-        boolean zoom=MibrScalingState.zoomSlider(key);
-        // r15i: cockpit zoom = 6 discrete positions 0..5 (step 1; -/+ one position); edges = stream px (step 10, -/+ 1 px)
+        boolean zoom=MibrScalingState.scaleSlider(key);
+        // r15i/r15j: scaling = discrete positions (zoom 0..5, physical size 0..15 = 50..200 %; step 1, -/+ one position);
+        // edges = stream px (step 10, -/+ 1 px)
         MibrDurableSwitch sw=zoom?null:MibrPopupEditorModel.durable(key);
         int field=zoom?-1:MibrPopupEditorModel.safeField(key);
-        int edge=zoom?Math.max(0,MibrScalingState.zoomPosition(MibrScalingState.shown(key))):
+        int edge=zoom?Math.max(0,MibrScalingState.position(key,MibrScalingState.shown(key))):
             MibrSafeArea.edgeValue(MibrSafeArea.shown(sw),sw.defaultValue(),field);
-        int max=zoom?MibrScalingState.ZOOM.length-1:MibrSafeArea.span(field),step=zoom?1:MibrSafeArea.SLIDER_STEP;
+        int max=zoom?MibrScalingState.positions(key)-1:MibrSafeArea.span(field),step=zoom?1:MibrSafeArea.SLIDER_STEP;
         SliderListener listener=null;
         for(int i=0;i<sliderListeners.size();i++){SliderListener l=(SliderListener)sliderListeners.elementAt(i);
             if(l.row.item==item){listener=l;break;}}
@@ -416,7 +417,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
             row.increase.getController().setOutEventMapping("pressed",-1);
             listener=new SliderListener(row,epoch);
             sliderListeners.addElement(listener);listener.add();
-            if(zoom)MibrOemSsmTemplate.diag("MIBR_ZOOM_SLIDER_ATTACH rank="+rank+" listeners="+sliderListeners.size()+
+            if(zoom)MibrOemSsmTemplate.diag("MIBR_ZOOM_SLIDER_ATTACH id="+MibrScalingState.id(key)+" max="+max+" rank="+rank+" listeners="+sliderListeners.size()+
                 " enabled="+slider.is_enabled()+" interactive="+slider.is_interactive()+" position="+edge+
                 " writable="+MibrScalingState.writable(key)+" rev="+MibrScalingState.revision(key)+" v3="+(v3!=null));
             else MibrOemSsmTemplate.diag("MIBR_SAFE_SLIDER_ATTACH edge="+field+" rank="+rank+" listeners="+sliderListeners.size()+
@@ -434,15 +435,15 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         int key=menu.keyForRow(rank);
         if(key<0||!(item instanceof ListItem)||sliders==null)return;
         MibrSafeSliderSource.Item parts=MibrSafeSliderSource.itemParts((ListItem)item);
-        boolean zoom=MibrScalingState.zoomSlider(key);
+        boolean zoom=MibrScalingState.scaleSlider(key);
         int field=zoom?-1:MibrPopupEditorModel.safeField(key);
         String valueText;int previewStep;
         if(zoom){
             // r15i: "Auto" or the number; an unread value shows the read/failure message instead
             String shown=MibrScalingState.shown(key);
             String message=shown==null?MibrScalingState.uiMessage(key):null;
-            valueText=message!=null?message:MibrScalingState.zoomLabel(shown);
-            previewStep=MibrScalingState.zoomPreviewStep(Math.max(0,MibrScalingState.zoomPosition(shown)));
+            valueText=message!=null?message:MibrScalingState.sliderLabel(key,shown);
+            previewStep=MibrScalingState.previewStep(key,Math.max(0,MibrScalingState.position(key,shown)));
         }else{
             MibrDurableSwitch sw=MibrPopupEditorModel.durable(key);
             int edge=MibrSafeArea.edgeValue(MibrSafeArea.shown(sw),sw.defaultValue(),field);
@@ -503,7 +504,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         /** Native DefaultSliderController.fire_valueChanged -> fireIntegerEvent("valueChanged",value) -> listeners. */
         public void outIntegerEventFired(String name,final int value){
             int k=menu.sliderKeyForRow(rank);
-            MibrOemSsmTemplate.diag("MIBR_SAFE_SLIDER_EVT kind="+name+" value="+value+(MibrScalingState.zoomSlider(k)?" zoom=1":" edge="+
+            MibrOemSsmTemplate.diag("MIBR_SAFE_SLIDER_EVT kind="+name+" value="+value+(MibrScalingState.scaleSlider(k)?" zoom=1":" edge="+
                 MibrPopupEditorModel.safeField(Math.max(MibrPopupEditorModel.SAFE_FIRST,k)))+" live="+live());
             if(!"valueChanged".equals(name)||!live())return;
             touched=System.currentTimeMillis();
@@ -512,7 +513,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
             later(new Runnable(){public void run(){
                 if(!live())return;
                 try{
-                    if(MibrScalingState.zoomSlider(key))v3.zoomSlide(key,value);
+                    if(MibrScalingState.scaleSlider(key))v3.zoomSlide(key,value);
                     else v3.safeEdge(key,value);
                 }catch(Throwable failure){failed(failure);}
             }});
@@ -525,7 +526,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
             later(new Runnable(){public void run(){
                 if(!live())return;
                 try{
-                    if(MibrScalingState.zoomSlider(key))v3.zoomNudge(key,delta);
+                    if(MibrScalingState.scaleSlider(key))v3.zoomNudge(key,delta);
                     else v3.safeNudge(key,delta);
                 }catch(Throwable failure){failed(failure);}
             }});

@@ -48,7 +48,33 @@ public final class MibrZoomSliderTest implements MibrCarPlayMenuModel.View {
         int[] preview={0,2,3,5,6,8};
         for(int p=0;p<6;p++)check(MibrScalingState.zoomPreviewStep(p)==preview[p],"preview mapping "+p+" -> "+MibrScalingState.zoomPreviewStep(p));
         check("Auto".equals(MibrScalingState.zoomLabel("AUTO"))&&"85".equals(MibrScalingState.zoomLabel("85")),"value text: Auto or the number");
-        check(MibrScalingState.zoomSlider(c)&&!MibrScalingState.zoomSlider(m)&&!MibrScalingState.zoomSlider(MibrPopupEditorModel.SCALE_PHYSICAL),"only the cockpit zoom is a slider");
+        int ph=MibrPopupEditorModel.SCALE_PHYSICAL,mp=MibrPopupEditorModel.SCALE_MAIN_PHYSICAL;
+        check(MibrScalingState.scaleSlider(c)&&MibrScalingState.scaleSlider(m)&&MibrScalingState.scaleSlider(ph)&&MibrScalingState.scaleSlider(mp)&&
+              !MibrScalingState.scaleSlider(MibrPopupEditorModel.SAFE_FIRST),"r15j: all four scaling keys are sliders");
+        check(MibrScalingState.positions(m)==6&&MibrScalingState.positions(c)==6&&MibrScalingState.positions(ph)==16&&MibrScalingState.positions(mp)==16,"6 zoom / 16 size positions");
+        // r15j physical: 16 positions = 50..200 %, legacy presets stay BASE/P20/P30/P50
+        String[] tokens={"50","60","70","80","90","BASE","110","P20","P30","140","P50","160","170","180","190","200"};
+        int[] previews={0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8};
+        for(int p=0;p<16;p++){
+            for(int k=0;k<2;k++){int idx=k==0?ph:mp;
+                check(tokens[p].equals(MibrScalingState.valueAt(idx,p))&&MibrScalingState.position(idx,tokens[p])==p&&MibrScalingState.valid(idx,tokens[p]),"size position "+p);}
+            check(MibrScalingState.physicalPercent(tokens[p])==50+10*p,"percent "+p);
+            check(MibrScalingState.previewStep(ph,p)==previews[p],"size preview "+p+" -> "+MibrScalingState.previewStep(ph,p));
+        }
+        check(MibrScalingState.valueAt(ph,16)==null&&MibrScalingState.valueAt(ph,-1)==null,"size range");
+        String[] bad={"100","120","130","150","40","210","55","050","0","P60","AUTO","","60 "};
+        for(int i=0;i<bad.length;i++)check(!MibrScalingState.physicalValid(bad[i])&&MibrScalingState.position(ph,bad[i])==-1,"invalid size "+bad[i]);
+        check(!MibrScalingState.physicalValid(null),"null size");
+        check(!MibrScalingState.valid(m,"60")&&!MibrScalingState.valid(c,"BASE"),"zoom keys keep their own value set");
+        MibrI18n.forced="de_DE";
+        check("Original".equals(MibrScalingState.sliderLabel(ph,"BASE"))&&"120 %".equals(MibrScalingState.sliderLabel(mp,"P20"))&&
+              "50 %".equals(MibrScalingState.sliderLabel(ph,"50"))&&"200 %".equals(MibrScalingState.sliderLabel(mp,"200"))&&
+              "Auto".equals(MibrScalingState.sliderLabel(m,"AUTO"))&&"125".equals(MibrScalingState.sliderLabel(m,"125")),"header value text");
+        MibrPopupEditorModel lm=new MibrPopupEditorModel();
+        check("+20 % (240 x 89 mm)".equals(lm.label(ph,"P20"))&&"-50 % (100 x 37 mm)".equals(lm.label(ph,"50"))&&
+              "+100 % (400 x 148 mm)".equals(lm.label(ph,"200"))&&"+10 % (220 x 81 mm)".equals(lm.label(ph,"110"))&&
+              "Original (200 x 74 mm)".equals(lm.label(ph,"BASE")),"cluster dropdown labels incl. mm: "+lm.label(ph,"50"));
+        check("-40 %".equals(lm.label(mp,"60"))&&"+50 %".equals(lm.label(mp,"P50"))&&"Original".equals(lm.label(mp,"BASE")),"main dropdown labels without invented mm");
 
         // reveal rule (r15h polish 4): keep the scroll position, move only to show header + slider
         check(MibrSafeArea.revealFirst(0,6,0,7)==0,"top row expanded: nothing scrolls");
@@ -76,7 +102,7 @@ public final class MibrZoomSliderTest implements MibrCarPlayMenuModel.View {
         check(menu.sliderPage()&&!menu.safeEdgePage(),"zoom page resolves the slider source (no safe-area refresh)");
         check(!menu.safeToggleRow(1)&&menu.keyForRow(1)==c,"fallback (no owned rows, e.g. SEAT): the dropdown row stays");
         MibrSafeArea.sliderRows=true;menu.refresh();
-        check(menu.safeToggleRow(1)&&!menu.safeToggleRow(0)&&!menu.safeToggleRow(2)&&!menu.safeToggleRow(3)&&!menu.safeToggleRow(4),"only the cockpit zoom row toggles");
+        check(menu.safeToggleRow(0)&&menu.safeToggleRow(1)&&menu.safeToggleRow(2)&&menu.safeToggleRow(3)&&!menu.safeToggleRow(4),"r15j: all four scaling rows toggle, the hint does not");
         check(!menu.consumeToggle(),"no toggle yet");
         menu.toggleSafe(1);
         check(menu.consumeToggle()&&!menu.consumeToggle(),"toggle flag is one-shot");
@@ -84,6 +110,11 @@ public final class MibrZoomSliderTest implements MibrCarPlayMenuModel.View {
         check("Wirkt nach Neuverbinden".equals(view.rows[5])&&menu.noteRow(5),"short reconnect hint (single row)");
         menu.toggleSafe(1);
         check(view.rows.length==5&&menu.expandedRow()==-1,"second tap collapses");
+        menu.toggleSafe(3);
+        check(view.rows.length==6&&menu.sliderKeyForRow(4)==mp&&menu.expandedRow()==3,"main size expands below its header");
+        menu.toggleSafe(0);
+        check(view.rows.length==6&&menu.sliderKeyForRow(1)==m&&menu.expandedRow()==0&&menu.sliderKeyForRow(4)==-1,"one slider at a time");
+        menu.toggleSafe(0);
         menu.toggleSafe(1);menu.back();
         check(menu.expandedSafe()==-1,"page change collapses");
         MibrSafeArea.sliderRows=false;
@@ -121,12 +152,32 @@ public final class MibrZoomSliderTest implements MibrCarPlayMenuModel.View {
         sets=fake.sets;
         s.zoomSlide(c,1);s.detach();
         check(fake.sets==sets+1&&"70".equals(fake.setValues.lastElement()),"page leave sends the final wish");
-        // main display zoom is not a slider
+        // r15j: main zoom and both physical sizes use the same debounced CAS save
         Broker other=new Broker();MibrPopupEditorModel m2=new MibrPopupEditorModel();m2.setAvailable(true);
         MibrV3Session s2=session(other,m2);s2.open();s2.scaleRefresh();
         s2.zoomSlide(m,3);waitIdle();
-        check(other.setValues.size()==0,"main zoom never takes slider wishes");
-        s2.detach();
+        check(other.setValues.size()==1&&"100".equals(MibrScalingState.desired(m)),"main zoom slider: one SET "+other.setValues);
+        check("BASE".equals(MibrScalingState.shown(ph))&&MibrScalingState.position(ph,"BASE")==5,"size readback BASE = position 5");
+        for(int p=6;p<=15;p++)s2.zoomSlide(ph,p); // drag 110 -> 200 %
+        check("200".equals(MibrScalingState.shown(ph))&&other.setValues.size()==1,"size wish shown at once, nothing written yet");
+        waitIdle();
+        check(other.setValues.size()==2&&"200".equals(other.setValues.lastElement())&&"200".equals(MibrScalingState.desired(ph)),"one SET of 200 %: "+other.setValues);
+        s2.zoomNudge(ph,1);waitIdle();
+        check(other.setValues.size()==2&&"200".equals(MibrScalingState.shown(ph)),"+ clamps at 200 %");
+        for(int i=0;i<15;i++)s2.zoomNudge(mp,-1);
+        check("50".equals(MibrScalingState.shown(mp)),"- clamps at 50 %");
+        s2.zoomNudge(mp,2);
+        waitIdle();
+        check(other.setValues.size()==3&&"70".equals(other.setValues.lastElement())&&"70".equals(MibrScalingState.desired(mp)),"main size: 17 presses, one SET of 70 %");
+        s2.zoomSlide(ph,7);waitIdle();
+        check("P20".equals(other.setValues.lastElement())&&"P20".equals(MibrScalingState.desired(ph)),"120 % is stored as the legacy P20");
+        // two rows moved within the idle time: both reach the store, one SET at a time (shared CAS revision)
+        int before=other.setValues.size();
+        s2.zoomSlide(m,5);s2.zoomSlide(ph,0);waitIdle();waitIdle();
+        check(other.setValues.size()==before+2&&"150".equals(MibrScalingState.desired(m))&&"50".equals(MibrScalingState.desired(ph))&&
+              MibrScalingState.wanted(m)==null&&MibrScalingState.wanted(ph)==null,"two sliders, two SETs in sequence: "+other.setValues);
+        s2.zoomSlide(mp,15);s2.detach();
+        check("200".equals(other.setValues.lastElement()),"page leave sends the final size wish");
         System.out.println("MIBR_ZOOM_SLIDER_HOST_PASS");
     }
 }

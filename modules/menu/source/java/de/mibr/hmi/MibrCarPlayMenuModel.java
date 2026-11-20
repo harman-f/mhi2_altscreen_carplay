@@ -101,7 +101,7 @@ public final class MibrCarPlayMenuModel {
      * edges (r15) and the cockpit zoom (6 discrete positions). Only while the owned slider rows are shown. */
     static boolean sliderKey(int key){
         return MibrPopupEditorModel.isSafe(key)&&MibrPopupEditorModel.safeField(key)<MibrSafeArea.RESET_FIELD||
-            MibrScalingState.zoomSlider(key);
+            MibrScalingState.scaleSlider(key);
     }
     /** r15i: the current page has at least one slider-capable row (resolve the owned slider source first). */
     public boolean sliderPage(){

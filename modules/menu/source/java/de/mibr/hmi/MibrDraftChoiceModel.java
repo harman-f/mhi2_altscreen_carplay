@@ -132,20 +132,9 @@ public final class MibrDraftChoiceModel {
             return MibrI18n.pick("Unbekannt","Unknown");
         }
         if (MibrPopupEditorModel.isScaling(index)) {
-            if (index==MibrPopupEditorModel.SCALE_PHYSICAL || index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL) {
-                boolean main=index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL;
-                if("BASE".equals(value))return MibrI18n.pick("Original","Original");
-                if(main){
-                    if("P20".equals(value))return "+20 %";
-                    if("P30".equals(value))return "+30 %";
-                    if("P50".equals(value))return "+50 %";
-                }
-                if ("BASE".equals(value)) return MibrI18n.pick("Original (200 x 74 mm)","Baseline (200 x 74 mm)");
-                if ("P20".equals(value)) return "+20 % (240 x 89 mm)";
-                if ("P30".equals(value)) return "+30 % (260 x 96 mm)";
-                if ("P50".equals(value)) return "+50 % (300 x 111 mm)";
-                return value;
-            }
+            if (index==MibrPopupEditorModel.SCALE_PHYSICAL || index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL)
+                // r15j: legacy presets and the 50..200 % steps (a slider value read on a dropdown profile)
+                return MibrScalingState.physicalLabel(index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL,value);
             if("AUTO".equals(value))return MibrI18n.pick("Automatisch", "Automatic");
             if("70".equals(value)||"85".equals(value)||"100".equals(value)||"125".equals(value)||"150".equals(value))return value+" %";
             return value;

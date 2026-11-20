@@ -9,25 +9,79 @@ public final class MibrScalingState {
     public static int slot(int index){return index==MibrPopupEditorModel.SCALE_MAIN?0:index==MibrPopupEditorModel.SCALE_CLUSTER?1:index==MibrPopupEditorModel.SCALE_PHYSICAL?2:index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL?3:-1;}
     public static String id(int index){int n=slot(index);return n<0?null:IDS[n];}
     public static boolean valid(String value){return "AUTO".equals(value)||"70".equals(value)||"85".equals(value)||"100".equals(value)||"125".equals(value)||"150".equals(value);}
-    public static boolean physicalValid(String value){return "BASE".equals(value)||"P20".equals(value)||"P30".equals(value)||"P50".equals(value);}
+    public static boolean physicalValid(String value){return physicalPercent(value)>0;}
+    /** r15j: physical size = percent of the base size, 50..200 in 10 % steps. The legacy presets stay the canonical
+     * spelling of 100/120/130/150 (BASE/P20/P30/P50, same as the native store); the other twelve are the plain number.
+     * Returns -1 for anything else (also the non-canonical "100"/"120"/"130"/"150"). */
+    public static int physicalPercent(String value){
+        if(value==null)return -1;
+        if("BASE".equals(value))return 100;
+        if("P20".equals(value))return 120;
+        if("P30".equals(value))return 130;
+        if("P50".equals(value))return 150;
+        int n=value.length();if(n<2||n>3||value.charAt(0)=='0')return -1;
+        int p=0;for(int i=0;i<n;i++){char c=value.charAt(i);if(c<'0'||c>'9')return -1;p=p*10+(c-'0');}
+        if(p<PHYS_MIN||p>PHYS_MAX||p%10!=0||p==100||p==120||p==130||p==150)return -1;
+        return p;
+    }
+    /** The canonical stored value of a percentage (legacy token for 100/120/130/150), null when off-grid. */
+    public static String physicalValue(int percent){
+        if(percent<PHYS_MIN||percent>PHYS_MAX||percent%10!=0)return null;
+        if(percent==100)return "BASE";
+        if(percent==120)return "P20";
+        if(percent==130)return "P30";
+        if(percent==150)return "P50";
+        return String.valueOf(percent);
+    }
+    static final int PHYS_MIN=50,PHYS_MAX=200,PHYS_STEP=10;
+    /** Base millimetres scaled like the native store (nearest, half up). */
+    static int scaleMm(int base,int percent){return (base*percent+50)/100;}
+    /** Dropdown/status text of a physical value: main = change against the OEM size, cluster with the advertised mm. */
+    static String physicalLabel(boolean main,String value){
+        int p=physicalPercent(value);if(p<0)return value;
+        if(p==100)return main?MibrI18n.pick("Original","Original"):MibrI18n.pick("Original (200 x 74 mm)","Baseline (200 x 74 mm)");
+        String delta=(p>100?"+":"-")+Math.abs(p-100)+" %";
+        return main?delta:delta+" ("+scaleMm(200,p)+" x "+scaleMm(74,p)+" mm)";
+    }
     public static boolean valid(int index,String value){return (index==MibrPopupEditorModel.SCALE_PHYSICAL||index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL)?physicalValid(value):valid(value);}
     public static void reset(){for(int i=0;i<4;i++){desired[i]=advertised[i]=effective[i]=stored[i]=pending[i]=writer[i]=revision[i]=advertisedScope[i]=message[i]=null;requested[i]=stale[i]=saving[i]=refreshing[i]=false;wanted[i]=null;wantedAt[i]=0L;staleRetry[i]=false;}}
 
-    /* ---- r15i: cockpit zoom as a stock-like slider row (6 discrete positions), Skoda owned rows only ---- */
+    /* ---- r15i/r15j: the four scaling keys as stock-like slider rows, Skoda owned rows only ---- */
 
-    /** Slider positions 0..5 = the six broker values, in the order of the old dropdown. */
+    /** Zoom slider positions 0..5 = the six broker values, in the order of the old dropdown. */
     static final String[] ZOOM={"AUTO","70","85","100","125","150"};
-    /** Only the cockpit (cluster) zoom gets the slider row; the main-display zoom stays a dropdown. */
-    static boolean zoomSlider(int index){return index==MibrPopupEditorModel.SCALE_CLUSTER;}
+    /** r15i cockpit zoom; r15j also the main-display zoom and both physical sizes. */
+    static boolean scaleSlider(int index){return MibrPopupEditorModel.isScaling(index);}
+    static boolean physical(int index){return index==MibrPopupEditorModel.SCALE_PHYSICAL||index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL;}
     static int zoomPosition(String value){for(int i=0;i<ZOOM.length;i++)if(ZOOM[i].equals(value))return i;return -1;}
     static String zoomValue(int position){return position>=0&&position<ZOOM.length?ZOOM[position]:null;}
     /** Right-aligned value of the expanded header: "Auto" for AUTO, else the plain number (stock shows numbers only). */
     static String zoomLabel(String value){return value==null?"":"AUTO".equals(value)?"Auto":value;}
-    /** Position 0..5 onto the 9 stock mini-slider preview images 0..8, linear and rounded: 0,2,3,5,6,8. */
-    static int zoomPreviewStep(int position){
-        int p=Math.max(0,Math.min(ZOOM.length-1,position));
-        return (p*8+(ZOOM.length-1)/2)/(ZOOM.length-1);
+    /** Number of slider positions: 6 zoom values, 16 physical steps (50..200 %). */
+    static int positions(int index){return physical(index)?(PHYS_MAX-PHYS_MIN)/PHYS_STEP+1:ZOOM.length;}
+    /** Slider position of a value, -1 when unknown. */
+    static int position(int index,String value){
+        if(!physical(index))return zoomPosition(value);
+        int p=physicalPercent(value);return p<0?-1:(p-PHYS_MIN)/PHYS_STEP;
     }
+    /** Broker value of a slider position, null when out of range. */
+    static String valueAt(int index,int position){
+        if(!physical(index))return zoomValue(position);
+        return position<0||position>=positions(index)?null:physicalValue(PHYS_MIN+PHYS_STEP*position);
+    }
+    /** Header value text: zoom "Auto"/number, physical "Original" or the percentage of the base size. */
+    static String sliderLabel(int index,String value){
+        if(!physical(index))return zoomLabel(value);
+        int p=physicalPercent(value);
+        return value==null?"":p==100?MibrI18n.pick("Original","Original"):p<0?value:p+" %";
+    }
+    /** Position onto the 9 stock mini-slider preview images 0..8, linear and rounded (zoom 0,2,3,5,6,8). */
+    static int previewStep(int index,int position){
+        int last=positions(index)-1;
+        int p=Math.max(0,Math.min(last,position));
+        return (p*8+last/2)/last;
+    }
+    static int zoomPreviewStep(int position){return previewStep(MibrPopupEditorModel.SCALE_CLUSTER,position);}
     private static final String[] wanted=new String[4];
     private static final long[] wantedAt=new long[4];
     private static final boolean[] staleRetry=new boolean[4];
@@ -37,7 +91,7 @@ public final class MibrScalingState {
     static long wantedAt(int index){int n=slot(index);return n<0?0L:wantedAt[n];}
     /** A slider move or -/+: the newest wish, shown at once; the durable SET waits for IDLE_MS (same rule as r15 edges). */
     static void want(int index,String value,long now){
-        int n=slot(index);if(n<0||!valid(value))return;
+        int n=slot(index);if(n<0||!valid(index,value))return;
         wanted[n]=value;wantedAt[n]=now;
     }
     /** The value to SET now, or null: nothing new, still moving, or the service busy (SET or GET in flight). */
@@ -99,16 +153,7 @@ public final class MibrScalingState {
         return text+MibrI18n.pick(" · aktuelle Wirkung unbekannt", " · current effect unknown");
     }
     private static String valueLabel(int index,String value){
-        if(index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL){
-            if("BASE".equals(value))return MibrI18n.pick("Original","Original");
-            if("P20".equals(value))return "+20 %";
-            if("P30".equals(value))return "+30 %";
-            if("P50".equals(value))return "+50 %";
-        }
-        if("BASE".equals(value))return "200 x 74 mm";
-        if("P20".equals(value))return "240 x 89 mm";
-        if("P30".equals(value))return "260 x 96 mm";
-        if("P50".equals(value))return "300 x 111 mm";
+        if(physical(index))return physicalLabel(index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL,value);
         return "AUTO".equals(value)?MibrI18n.pick("Automatisch","Automatic"):value+" %";
     }
     /** The validated broker readback advertises writer support; storage ACK never implies display effect. */

@@ -641,7 +641,9 @@ final class MibrV3Session {
         scalingRefreshInFlight=false;
         MibrScalingState.finishRefresh();
         // r15i: a slider wish that waited for this refresh (SET reply, stale re-read) goes out now or re-arms its timer
-        if(MibrScalingState.wanted(MibrPopupEditorModel.SCALE_CLUSTER)!=null)zoomFlush(MibrPopupEditorModel.SCALE_CLUSTER);
+        // r15j: all four scaling sliders; the first due wish starts a SET, the others wait for its refresh end
+        for(int i=0;i<SCALE_KEYS.length;i++)
+            if(MibrScalingState.wanted(SCALE_KEYS[i])!=null&&!scalingSetInFlight&&!scalingRefreshInFlight)zoomFlush(SCALE_KEYS[i]);
     }
     private void scaleReadback(int index,String key,MibrV3Protocol.Frame f,boolean set,String wanted){
         if(f==null||!f.ok()||!key.equals(f.get("id")))throw new IllegalArgumentException("SCALING_ID_MISMATCH");
@@ -687,19 +689,22 @@ final class MibrV3Session {
         });
     }
 
-    /** r15i: the cockpit zoom slider moved to position 0..5 (AUTO,70,85,100,125,150); shown at once, saved debounced. */
+    private static final int[] SCALE_KEYS={MibrPopupEditorModel.SCALE_MAIN,MibrPopupEditorModel.SCALE_CLUSTER,
+        MibrPopupEditorModel.SCALE_PHYSICAL,MibrPopupEditorModel.SCALE_MAIN_PHYSICAL};
+    /** r15i/r15j: a scaling slider moved (zoom 0..5 = AUTO,70,85,100,125,150; physical 0..15 = 50..200 %);
+     *  shown at once, saved debounced. */
     void zoomSlide(int index,int position){
-        String value=MibrScalingState.zoomValue(position);
-        if(!attached||!MibrScalingState.zoomSlider(index)||value==null)return;
+        String value=MibrScalingState.valueAt(index,position);
+        if(!attached||!MibrScalingState.scaleSlider(index)||value==null)return;
         MibrScalingState.want(index,value,System.currentTimeMillis());
         zoomFlush(index);
     }
     /** r15i: the slider row's own -/+ buttons, one position per press (clamped at AUTO / 150). */
     void zoomNudge(int index,int delta){
-        if(!attached||!MibrScalingState.zoomSlider(index)||delta==0)return;
-        int at=MibrScalingState.zoomPosition(MibrScalingState.shown(index));
+        if(!attached||!MibrScalingState.scaleSlider(index)||delta==0)return;
+        int at=MibrScalingState.position(index,MibrScalingState.shown(index));
         if(at<0)at=0;
-        int next=Math.max(0,Math.min(MibrScalingState.ZOOM.length-1,at+delta));
+        int next=Math.max(0,Math.min(MibrScalingState.positions(index)-1,at+delta));
         if(next==at&&MibrScalingState.wanted(index)==null)return;
         zoomSlide(index,next);
     }
@@ -852,12 +857,15 @@ final class MibrV3Session {
                 catch(Throwable failure){System.err.println("MIBR_SAFE_FINAL_SET_FAILED "+failure);}
             MibrSafeArea.drop(sw);
         }
-        // r15i: same for an unsent cockpit zoom wish (only when the service is idle; the reply is ignored after detach)
-        String zoom=MibrScalingState.wanted(MibrPopupEditorModel.SCALE_CLUSTER);
-        if(zoom!=null&&attached&&!scalingSetInFlight&&!scalingRefreshInFlight&&
-           !zoom.equals(MibrScalingState.desired(MibrPopupEditorModel.SCALE_CLUSTER)))
-            try{zoomSend(MibrPopupEditorModel.SCALE_CLUSTER,zoom);}
-            catch(Throwable failure){System.err.println("MIBR_ZOOM_FINAL_SET_FAILED "+failure);}
+        // r15i/r15j: same for an unsent scaling slider wish (only when the service is idle; the reply is ignored after
+        // detach). One SET per CAS revision: a second unsent wish on another scaling row cannot follow and is logged.
+        for(int i=0;i<SCALE_KEYS.length;i++){
+            int k=SCALE_KEYS[i];String zoom=MibrScalingState.wanted(k);
+            if(zoom==null||zoom.equals(MibrScalingState.desired(k)))continue;
+            if(attached&&!scalingSetInFlight&&!scalingRefreshInFlight)
+                try{zoomSend(k,zoom);}catch(Throwable failure){System.err.println("MIBR_ZOOM_FINAL_SET_FAILED "+failure);}
+            else MibrSafeArea.diag("MIBR_ZOOM_SLIDER_FINAL_DROPPED "+MibrScalingState.id(k)+" value="+zoom);
+        }
         attached=false;epoch++;menuLoading=false;MibrMenuLayout.message(null);resetWireQueue();busy=false;loaded=false;writable=false;scalingAvailable=false;scalingRefreshInFlight=false;scalingSetInFlight=false;scalingRefreshPending=false;MibrScalingState.reset();
         for(int i=0;i<dirty.length;i++){dirty[i]=false;attempts[i]=0;}
     }
