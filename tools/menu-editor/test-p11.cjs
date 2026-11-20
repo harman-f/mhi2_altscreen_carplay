@@ -55,7 +55,12 @@ async function main(){
   click(z);assert.equal(num(),"Automatisch");
   assert.equal(d.querySelectorAll("#pv .prs .tick").length,6,"six fixed steps");
   press(1,3);assert.equal(num(),"100 %");press(1,9);assert.equal(num(),"150 %","last step");press(0,9);assert.equal(num(),"Automatisch");
-  assert.ok(Array.from(d.querySelectorAll(".pvnote")).some(n=>/Fahrzeugseite folgt/.test(n.textContent)),"zoom note");
+  assert.ok(Array.from(d.querySelectorAll(".pvnote")).some(n=>/ab r15j/.test(n.textContent)),"scaling note");
+  click("Zoomfaktor Hauptdisplay");assert.equal(num(),"Automatisch","main display zoom is a slider too");
+  // physical size: 50-200 % in 10 % steps, 100 % = Original
+  const ph="Physische Displaygröße Virtual Cockpit";
+  assert.ok(row(ph).classList.contains("sl"),"physical size is a slider row");
+  click(ph);assert.equal(num(),"Original");press(1,2);assert.equal(num(),"120 %");press(1,20);assert.equal(num(),"200 %");press(0,30);assert.equal(num(),"50 %");
   // SEAT: same rows, note that the brand look is not documented
   const b=d.getElementById("brand");b.value="seat";b.dispatchEvent(new w.Event("change",{bubbles:true}));await delay(20);
   assert.ok(row(z).classList.contains("sl"),"slider rows for SEAT");

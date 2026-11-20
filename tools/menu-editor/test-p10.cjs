@@ -145,7 +145,11 @@ async function main(){
   const bads=[["keys","viewStep","13/88"],["keys","viewStep","99/1"],["keys","viewResyncLong","4/53"],["keys","carplaySwitchLong","13/116"],
     ["keys","menu",99],["keys","zoomWheelSource",41],["keys","zoomWheelAuto","yes"],["options","language","fr"],["options","viewConfigMode","view"],["options","carplayNav","on"],["options","sdLog",1]];
   for(const [grp,k,v] of bads){const b=clone(p0);b[grp][k]=v;throwsMsg(()=>w.MIBR_project.validate(b),grp+"."+k+"="+v);throwsMsg(()=>w.MIBR_project.apply(b),"apply "+k);}
-  for(const [k,v] of [["mainZoom","90"],["clusterPhysical","P40"]]){const b=clone(p0);b.options.scaling[k]=v;throwsMsg(()=>w.MIBR_project.validate(b),k);}
+  // physical size: tokens for 100/120/130/150 %, numbers for the other 10 % steps 50-200
+  assert.deepEqual(opts("#sys-scaling-mainPhysical"),["50","60","70","80","90","BASE","110","P20","P30","140","P50","160","170","180","190","200"]);
+  assert.equal($("#sys-scaling-mainPhysical").options[7].textContent,"120 % (P20)");
+  {const b=clone(p0);b.options.scaling.mainPhysical="70";b.options.scaling.clusterPhysical="200";w.MIBR_project.validate(b);}
+  for(const [k,v] of [["mainZoom","90"],["clusterPhysical","P40"],["mainPhysical","120"],["mainPhysical","55"],["clusterPhysical","210"]]){const b=clone(p0);b.options.scaling[k]=v;throwsMsg(()=>w.MIBR_project.validate(b),k);}
   throwsMsg(()=>w.MIBR_project.validate(Object.assign(clone(p0),{keys:"x"})),"keys not an object");
   assert.equal(JSON.stringify(w.MIBR_project.capture()),before,"rejected project leaves state unchanged");
   assert.deepEqual(errors,[],"No runtime errors");
