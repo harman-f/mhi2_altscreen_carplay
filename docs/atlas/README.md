@@ -1,13 +1,14 @@
 # MIB Atlas — source library
 
-**Research status · source review and public comparison; 2026-11-16.** This directory contains dated, independently scoped public-source evidence for the [single-file interactive MIB Atlas](../index.html). Individual project versions, target hardware and proof strength are not interchangeable.
+**Research status · latest targeted public source refresh 2026-11-20; original 58×22 scoring baseline still 2026-11-04.** This directory contains dated, independently scoped public-source evidence for the [single-file interactive MIB Atlas](../index.html). Individual project versions, target hardware and proof strength are not interchangeable.
 
 - [MIB Atlas recurring editorial and publication rules](MAINTENANCE_RULES.md)
+- [20 Nov 2026 targeted source refresh: native wireless V3.2, MU1367 vehicle port, receiver source audit and open dongle firmware](ATLAS_REFRESH_2026-11-20.md) — exact release dates, hardware acceptance and GitHub source/build limits.
 - [Overview-only site hero and slightly enlarged brand, 16 Nov](OVERVIEW_HERO_SCOPE_2026-11-16.md) — large title, four statistics and introductory feedback banner restricted to Overview; other nine-tab views remain content-first.
 - [Primary navigation placement and contrast refinement, 16 Nov](TOP_NAVIGATION_UI_2026-11-16.md) — topic bar directly beneath compact header, above hero; readable active/hover/focus states and mobile sticky behavior.
 - [Comparison-first navigation and emulator host OS UI, 16 Nov](COMPARISON_EMULATOR_OS_UI_2026-11-16.md) — matrix first, MIB1 contextual below, OEM HUD last; Windows/WSL versus Windows-only tools, Linux/macOS and unverified hosts visible and filterable.
 - [Branch-aware 14-fork comparison and expanded lineage audit, 16 Nov](FORK_DIFF_LINEAGE_AUDIT_2026-11-16.md) — 2 default-only dormant forks suppressed from 56 curated rows, contributor PRs and branch offsets preserved; 4 source-family lineage graphs and 38 independently classified edges.
-- [omonob Wireless CarPlay Maps V3.1 release audit, 16 Nov](OMONOB_WIRELESS_V31_2026-11-16.md) — experimental native Wireless packaged for MU1102/790+791, MU1367/790+791 and **Škoda MU1440/790**; still no vehicle acceptance, MU1440/791 unsupported.
+- [omonob V3.1 historical audit, 16 Nov, superseded by V3.2](OMONOB_WIRELESS_V31_2026-11-16.md) — experimental native Wireless packaged for MU1102/790+791, MU1367/790+791 and **Škoda MU1440/790**; still no vehicle acceptance, MU1440/791 unsupported.
 - [omonob V3.0 historical audit, 16 Nov 10:19 CET](OMONOB_WIRELESS_V3_2026-11-16.md) — superseded by V3.1 on the same day; original MU1440 wired-only claim retained as dated history only.
 - [HUD classification and public feedback release, 16 Nov](HUD_FEEDBACK_RELEASE_2026-11-16.md) — factory projector software vs add-on CAN/OBD/Android hardware; public corrections issue #187.
 - [Nine-tab structured matrix snapshot (16 Nov)](STRUCTURED_MATRIX_SNAPSHOT_2026-11-16.md) — native wireless receiver vs dongle routes; non-additive inventory counts, fork/HA/ContiTool evidence, future QA gates. — canonical update contract, source status, platforms, evidence, tabs, matrices, themes, publication gates.
