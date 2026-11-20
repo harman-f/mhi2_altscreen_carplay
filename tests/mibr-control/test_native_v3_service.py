@@ -235,6 +235,23 @@ class ServiceTest(unittest.TestCase):
             "id":"scaling.cluster.physicalSize","value":"P25","expected_revision":"2",
             "request_id":"size_bad"})
         self.assertEqual(invalid["error"],"INVALID_REQUEST")
+        # r15j: 50..200 % in 10 % steps; legacy presets stay the spelling of 100/120/130/150
+        pct=self.req("size60","SCALE_SET",{
+            "id":"scaling.main.physicalSize","value":"60","expected_revision":"2",
+            "request_id":"size60"})
+        self.assertIsNone(pct["error"],pct)
+        self.assertEqual(pct["fields"]["desired"],"60")
+        self.assertIn("main_physical=60\n",Path(self.env["MIBR_V3_HOST_SCALING_PATH"]).read_text())
+        big=self.req("size200","SCALE_SET",{
+            "id":"scaling.cluster.physicalSize","value":"200","expected_revision":"3",
+            "request_id":"size200"})
+        self.assertIsNone(big["error"],big)
+        read=self.req("size_get","SCALE_GET",{"id":"scaling.cluster.physicalSize"})
+        self.assertEqual((read["fields"]["desired"],read["fields"]["revision"]),("200","4"))
+        for rid,value in (("noncanon","120"),("toosmall","40"),("toobig","210"),("offstep","55")):
+            bad=self.req(rid,"SCALE_SET",{"id":"scaling.cluster.physicalSize","value":value,
+                "expected_revision":"4","request_id":rid})
+            self.assertEqual(bad["error"],"INVALID_REQUEST",value)
 
     def test_bad_scaling_input_is_rejected_without_persistence(self):
         for rid,key,value in (("badrow","display.zoomFactor","125"),

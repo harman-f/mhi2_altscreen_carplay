@@ -33,5 +33,11 @@ int main(int argc,char **argv){
         if(rc){fputs("INVALID_DIMENSIONS\n",stderr);return 5;}
         printf("%d|%d\n",w,h);return 0;
     }
+    if(argc==3&&!strcmp(argv[1],"cluster")){
+        int w=0,h=0;
+        rc=mibr_display_physical_dimensions(argv[2],&w,&h);
+        if(rc){fputs("INVALID_DIMENSIONS\n",stderr);return 5;}
+        printf("%d|%d\n",w,h);return 0;
+    }
     return 64;
 }
