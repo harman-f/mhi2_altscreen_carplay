@@ -122,7 +122,7 @@ def audit(path: Path) -> None:
     for marker in ('<title>MIB Atlas', 'id="mib1-retrofit"', 'data-atlas-filter-table="native"', 'data-atlas-filter-table="emulators"', 'data-atlas-filter-table="ha-tools"', 'data-atlas-filter-table="contitool"', 'data-atlas-filter-table="roadmap"', 'data-atlas-filter-table="misc"', 'data-atlas-filter-table="lineage"', 'data-atlas-filter-table="oem-hud"', 'data-atlas-filter-table="aftermarket-hud"', 'id="atlas-theme-toggle"'):
         if marker not in data:
             errors.append("MIB Atlas required feature missing: "+marker)
-    for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 16 NOV 2026'):
+    for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 20 NOV 2026'):
         if marker not in data:
             errors.append("Missing evidence date boundary: "+marker)
     # Interaction contract: all nine research matrices have actual search/filter/reset handlers.
@@ -147,7 +147,7 @@ def audit(path: Path) -> None:
         errors.append("source-anchored native wireless or ContiTool evidence missing")
     if 'Wireless CarPlay Maps V3.2' not in data or 'data-proof="Experimental release"' not in data:
         errors.append("omonob latest V3.2 native wireless entry missing")
-    if 'MU1367 / AID 790+791' not in data or 'Škoda MU1440 / AID 790' not in data:
+    if 'MU1367 790/791' not in data or 'Škoda MU1440 / AID 790' not in data:
         errors.append("native MU1367 and Skoda MU1440 firmware constraints missing")
     if 'MU1440/791 unsupported' not in data and 'MU1440 / 791 unsupported' not in data:
         errors.append("unsupported MU1440 AID 791 not stated")
@@ -155,7 +155,7 @@ def audit(path: Path) -> None:
         errors.append("MU1433 / MU1447 native wireless boundary missing")
     if 'MU1367 / AID 790' not in data or 'SD manager registration and complete feature installation' not in data:
         errors.append("new MU1367 V3.2 installation-only evidence missing")
-    if 'no separate complete receiver implementation source package' not in data.lower():
+    if 'not released the complete receiver implementation/build sources' not in data.lower():
         errors.append("full omonob receiver implementation source remains unavailable")
     if 'tomasz-twardzicki' not in data or 'MU1367-v1.6.1' not in data:
         errors.append("native wireless MU1367 downstream vehicle port missing")
