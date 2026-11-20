@@ -69,6 +69,12 @@ async function main(){
   um.value="MU1440";um.dispatchEvent(new w.Event("change",{bubbles:true}));await delay(20);
   assert.equal(w.MIBR_system.defaults().keys.zoomWheelAuto,false,"Skoda: zoom.wheel_auto=0");
   click("Zurücksetzen");click("Linke Kante");assert.equal(num(),"10","Skoda voll default again");
+  // Safe Area tab follows the r15 car steps and names what w/h store
+  d.querySelector('#tabs [data-t=safe]').click();await delay(20);
+  assert.equal(d.getElementById("sa-x").step,"10","slider snaps to 10 px");
+  assert.deepEqual(Array.from(d.querySelectorAll(".sa-menu .sa-row")[0].querySelectorAll(".sa-steps button")).map(b=>b.textContent).slice(0,6),["-50","-10","-1","+1","+10","+50"]);
+  const keys=Array.from(d.querySelectorAll(".sa-menu .sa-key")).map(e=>e.textContent);
+  assert.match(keys[2],/\.w: rechte Kante; gespeichert wird die Breite w/);assert.match(keys[3],/\.h: untere Kante; gespeichert wird die Höhe h/);
   assert.deepEqual(errors,[],"No runtime errors");
   console.log("P0.11 menu preview slider tests PASS");
 }
