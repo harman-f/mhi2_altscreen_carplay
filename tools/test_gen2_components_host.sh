@@ -12,7 +12,8 @@ CORE=(modules/carplay/source/alt111-settings/settings_core.c modules/carplay/sou
       "$G/src/alt111_policy.c" modules/carplay/source/display-scaling/mibr_display_scaling.c
       modules/carplay/source/sha256sum-compat/sha256sum_compat.c)
 PURE=("$G/src/alt111_profile.c" "$G/src/alt111_control.c" "$G/src/alt111_resync.c"
-      "$G/src/alt111_video.c" "$G/src/alt111_zoom.c" "$G/src/alt111_zoom_debugspi.c")
+      "$G/src/alt111_video.c" "$G/src/alt111_zoom.c" "$G/src/alt111_zoom_debugspi.c"
+      "$G/src/alt111_viewscale.c")
 for name in settings_core gen2_settings_session policy video_queue_recovery resync_bridge tcp_nodelay; do
   EXTRA=()
   if [[ "$name" == gen2_settings_session ]]; then
@@ -39,6 +40,8 @@ done
 "$CC" -std=c99 -Wall -Wextra -Werror -pthread -I"$G/include" tests/seat_zoom_auto_context_test.c \
   "$G/src/alt111_zoom.c" -o "$OUT/seat_zoom_auto_context"
 "$OUT/seat_zoom_auto_context"
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic -I"$G/include" "$G/src/alt111_viewscale.c" tests/alt111_viewscale_test.c -o "$OUT/alt111_viewscale_test"
+"$OUT/alt111_viewscale_test"
 bash tools/test_alt111_zoom_host.sh
 python3 -B tests/alt111_settings_integration.py
 python3 -B tests/seat_mu1409_platform_defaults_test.py

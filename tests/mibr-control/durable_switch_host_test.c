@@ -8,6 +8,74 @@
 #include <sys/stat.h>
 static int granted(void *x){(void)x;return 0;}
 static int restored(void *x){(void)x;return 0;}
+
+static void write_profile(const char *ppath,const char *body){
+    char buf[4096];FILE *f;
+    snprintf(buf,sizeof(buf),"%scrc32=%08x\n",body,(unsigned)mibr_view_profile_crc32(body,strlen(body)));
+    f=fopen(ppath,"w");assert(f);fputs(buf,f);fclose(f);
+}
+static void read_all(const char *p,char *buf,size_t cap){
+    FILE *f=fopen(p,"r");size_t n;assert(f);n=fread(buf,1,cap-1,f);fclose(f);buf[n]=0;
+}
+/* Profile-backed switch: one shared MIBR_NAV_VIEW_PROFILES/3 file, legacy file only as migration source. */
+static void profile_one(const struct mibr_switch_def *def,const char *path,const char *a,const char *b){
+    char ppath[600],lgood[620],raw[4096],error[80],legacy[96];
+    struct mibr_switch state,after;
+    struct mibr_switch_guard guard={granted,restored,NULL};
+    FILE *f;
+    snprintf(ppath,sizeof(ppath),"%s.profile",path);
+    /* migration: a legacy value is reported until the first SET */
+    snprintf(legacy,sizeof(legacy),"%s\nrevision=7\nvalue=%s\n",def->magic,a);
+    f=fopen(path,"w");assert(f);fputs(legacy,f);fclose(f);
+    assert(!mibr_switch_load(def,path,&state,error,sizeof(error)));
+    assert(state.stored&&state.revision==7&&!strcmp(state.value,a));
+    assert(!mibr_switch_set(def,path,&state,b,7,&guard,error,sizeof(error)));
+    assert(!mibr_switch_load(def,path,&after,error,sizeof(error)));
+    assert(after.stored&&after.revision==8&&!strcmp(after.value,b));
+    read_all(ppath,raw,sizeof(raw));
+    assert(!strncmp(raw,"MIBR_NAV_VIEW_PROFILES/3\nversion=3\n",35)&&strstr(raw,"\nunit.revision=8\n")&&strstr(raw,"\ncrc32="));
+    /* the legacy file is never written again */
+    read_all(path,raw,sizeof(raw));assert(!strcmp(raw,legacy));
+    assert(!unlink(path));
+    /* stale revision and invalid value refused; same value is a no-op */
+    assert(mibr_switch_set(def,path,&state,a,7,&guard,error,sizeof(error))!=0);
+    assert(mibr_switch_set(def,path,&after,"maybe",8,&guard,error,sizeof(error))!=0);
+    assert(mibr_switch_set(def,path,&after,b,8,&guard,error,sizeof(error))==1);
+    /* configurator keys the unit does not know survive a SET byte for byte */
+    read_all(ppath,raw,sizeof(raw));
+    *strstr(raw,"crc32=")=0;
+    strcat(raw,"view.center.native.tube=on\nview.center.geometry.zoom=70\n");
+    write_profile(ppath,raw);
+    assert(!mibr_switch_load(def,path,&state,error,sizeof(error))&&state.revision==8&&!strcmp(state.value,b));
+    assert(!mibr_switch_set(def,path,&state,a,8,&guard,error,sizeof(error)));
+    read_all(ppath,raw,sizeof(raw));
+    assert(strstr(raw,"\nview.center.native.tube=on\nview.center.geometry.zoom=70\n")&&strstr(raw,"\nunit.revision=9\n"));
+    assert(!mibr_switch_load(def,path,&state,error,sizeof(error))&&!strcmp(state.value,a));
+    /* .lastgood = the previous valid file (revision 8); a damaged main file falls back to it, and the next SET
+     * rebuilds the main file from it without touching the backup */
+    snprintf(lgood,sizeof(lgood),"%s.lastgood",ppath);
+    read_all(lgood,raw,sizeof(raw));
+    assert(strstr(raw,"\nunit.revision=8\n")&&strstr(raw,"\nview.center.native.tube=on\n"));
+    f=fopen(ppath,"w");assert(f);fputs("MIBR_NAV_VIEW_PROFILES/3\nversion=3\ncrc32=00000000\n",f);fclose(f);
+    assert(!mibr_switch_load(def,path,&state,error,sizeof(error))&&state.revision==8&&!strcmp(state.value,b));
+    assert(!mibr_switch_set(def,path,&state,a,8,&guard,error,sizeof(error)));
+    read_all(ppath,raw,sizeof(raw));
+    assert(strstr(raw,"\nunit.revision=9\n")&&strstr(raw,"\nview.center.native.tube=on\n"));
+    read_all(lgood,raw,sizeof(raw));assert(strstr(raw,"\nunit.revision=8\n"));
+    assert(!unlink(lgood));
+    /* a configurator file without unit.revision is revision 0; a missing key means the default */
+    write_profile(ppath,"MIBR_NAV_VIEW_PROFILES/3\nversion=3\nbrand=skoda\n");
+    assert(!mibr_switch_load(def,path,&state,error,sizeof(error))&&state.revision==0&&!state.stored&&!strcmp(state.value,b));
+    /* damaged crc, duplicate key or foreign magic: not taken */
+    f=fopen(ppath,"w");assert(f);fputs("MIBR_NAV_VIEW_PROFILES/3\nversion=3\ncrc32=00000000\n",f);fclose(f);
+    assert(mibr_switch_load(def,path,&state,error,sizeof(error))!=0);
+    write_profile(ppath,"MIBR_NAV_VIEW_PROFILES/3\nversion=3\nversion=3\n");
+    assert(mibr_switch_load(def,path,&state,error,sizeof(error))!=0);
+    write_profile(ppath,"MIBR_NAV_VIEW_PROFILES/2\nversion=2\n");
+    assert(mibr_switch_load(def,path,&state,error,sizeof(error))!=0);
+    assert(!unlink(ppath));
+    (void)unlink(lgood);
+}
 static void one(const struct mibr_switch_def *def){
     char dir[]="/tmp/mibr-switch-host-XXXXXX",expect[96],damaged[96],path[512],error[80];
     struct mibr_switch state,after;
@@ -28,6 +96,7 @@ static void one(const struct mibr_switch_def *def){
     /* missing file = default off */
     assert(!mibr_switch_load(def,path,&state,error,sizeof(error)));
     assert(state.revision==0&&!state.stored&&!strcmp(state.value,b));
+    if(mibr_switch_profile_backed(def)){profile_one(def,path,a,b);assert(!rmdir(dir));return;}
     assert(!mibr_switch_set(def,path,&state,a,0,&guard,error,sizeof(error)));
     assert(!mibr_switch_load(def,path,&after,error,sizeof(error)));
     assert(after.stored&&after.revision==1&&!strcmp(after.value,a));

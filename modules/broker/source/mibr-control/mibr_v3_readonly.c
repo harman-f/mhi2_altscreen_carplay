@@ -285,6 +285,7 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
     struct request req;struct writer w;unsigned i;int rc,id;
     const char *scope="ui";
     const struct mibr_switch_def *switch_def;int switch_set=0;
+    unsigned switch_slot=0;int view_key=0;   /* VIEW_PROFILE_GET/SET key=<profile key> */
     enum mibr_v3_visible_route action_target=MIBR_ROUTE_UNKNOWN;
     uint64_t action_session=0,action_generation=0;
     if(!out||cap<80)return -1;
@@ -298,6 +299,15 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
         error_frame(out,cap,req.rid,"FORBIDDEN");return -1;
     }
     switch_def=mibr_switch_for_op(req.op,&switch_set);
+    if(switch_def)switch_slot=(unsigned)(switch_def-mibr_switch_defs);
+    else if(!strcmp(req.op,"VIEW_PROFILE_GET")||!strcmp(req.op,"VIEW_PROFILE_SET")){
+        /* profile-only keys share the view profile, its CAS revision and the writer of a profile-backed switch */
+        const struct mibr_switch_def *host=mibr_switch_for_op("NAV_SOURCE_GET",NULL);
+        for(i=0;i<req.count;i++)if(!strcmp(req.f[i].key,"key"))switch_def=mibr_view_key_for(req.f[i].value);
+        if(!switch_def||!host){error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;}
+        switch_set=!strcmp(req.op,"VIEW_PROFILE_SET");view_key=1;
+        switch_slot=(unsigned)(host-mibr_switch_defs);
+    }
     w.s=out;w.n=0;w.cap=cap<OUTPUT_MAX?cap:OUTPUT_MAX;w.failed=0;w.fields=0;
     if(!strcmp(req.op,"HELLO")||!strcmp(req.op,"CAPABILITIES")||
        !strcmp(req.op,"STATUS")||!strcmp(req.op,"SHOW_STATUS")){
@@ -312,6 +322,8 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
             field(&w,"menu_language",r&&r->menu_language_ready?"1":"0");
             for(i=0;i<MIBR_SWITCH_COUNT;i++)
                 field(&w,mibr_switch_defs[i].capability,r&&r->switches[i].ready?"1":"0");
+            {const struct mibr_switch_def *host=mibr_switch_for_op("NAV_SOURCE_GET",NULL);
+             field(&w,"view_profile",r&&host&&r->switches[host-mibr_switch_defs].ready?"1":"0");}
             /* Owner readiness is a *live current-session GET*, not the
              * presence of the broker's always-registered IPC callback.
              * Missing DIO original-owner socket must advertise unavailable. */
@@ -565,7 +577,8 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
         field(&w,"apply","IMMEDIATE");
     }else if(switch_def){
         struct mibr_switch fresh;
-        struct mibr_v3_switch_slot *slot=r?&r->switches[switch_def-mibr_switch_defs]:NULL;
+        struct mibr_v3_switch_slot *slot=r?&r->switches[switch_slot]:NULL;
+        struct mibr_switch vstate,*state=slot?&slot->state:&vstate;
         int set=switch_set;
         const char *value=NULL,*rv=NULL,*rid=NULL;
         uint64_t revision=0;char err[80]={0};
@@ -575,9 +588,10 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
                 if(!strcmp(req.f[i].key,"value"))value=req.f[i].value;
                 else if(!strcmp(req.f[i].key,"expected_revision"))rv=req.f[i].value;
                 else if(!strcmp(req.f[i].key,"request_id"))rid=req.f[i].value;
+                else if(view_key&&!strcmp(req.f[i].key,"key"))continue;
                 else {error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;}
             }
-            if(req.count!=3||!mibr_switch_valid(switch_def,value)||!rv||!rid||
+            if(req.count!=3u+(unsigned)view_key||!mibr_switch_valid(switch_def,value)||!rv||!rid||
                strcmp(rid,req.rid)||!*rv||(rv[0]=='0'&&rv[1])){
                 error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
             }
@@ -596,14 +610,16 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
                 if(strlen(receipt->response)+1>cap){error_frame(out,cap,req.rid,"SNAPSHOT_TOO_LARGE");return -1;}
                 strcpy(out,receipt->response);return 0;
             }
-        }else if(req.count){
+        }else if(req.count!=(unsigned)view_key){
             error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
         }
         if(!slot||!slot->ready||!slot->path[0]||
            mibr_switch_load(switch_def,slot->path,&fresh,err,sizeof(err))){
             error_frame(out,cap,req.rid,"NOT_READY");return -1;
         }
-        slot->state=fresh;
+        /* a view key never overwrites the cached state of the switch whose slot serves it */
+        if(view_key)state=&vstate;
+        *state=fresh;
         if(set){
             int result;
             if(!slot->set){error_frame(out,cap,req.rid,"POLICY_BLOCKED");return -1;}
@@ -613,18 +629,20 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
                  !strcmp(err,"STALE_REVISION")?"STALE_REVISION":
                  !strcmp(err,"RO_RESTORE_FAILED")?"RO_RESTORE_FAILED":
                  !strcmp(err,"UNKNOWN_COMMIT")?"UNKNOWN_COMMIT":"STORAGE_UNAVAILABLE");return -1;}
-            if(mibr_switch_load(switch_def,slot->path,&slot->state,err,sizeof(err))||
-               strcmp(slot->state.value,value)){
-                slot->ready=0;error_frame(out,cap,req.rid,"UNKNOWN_COMMIT");return -1;
+            if(mibr_switch_load(switch_def,slot->path,state,err,sizeof(err))||
+               strcmp(state->value,value)){
+                if(!view_key)slot->ready=0;
+                error_frame(out,cap,req.rid,"UNKNOWN_COMMIT");return -1;
             }
         }
         response_start(&w,req.rid,"OK");
-        field(&w,"value",slot->state.value);
-        field(&w,"stored",slot->state.stored?"VERIFIED":"DEFAULT");
+        if(view_key)field(&w,"key",mibr_view_key_name(switch_def));
+        field(&w,"value",state->value);
+        field(&w,"stored",state->stored?"VERIFIED":"DEFAULT");
         field(&w,"writer",slot->set?"ENABLED":"DISABLED");
-        numeric(&w,"revision",slot->state.revision);
+        numeric(&w,"revision",state->revision);
         field(&w,"scope","MIBR_ONLY");
-        field(&w,"apply","IMMEDIATE");
+        field(&w,"apply",view_key?"NEXT_VIEW_CHANGE":"IMMEDIATE");
     }else if(!strcmp(req.op,"SCALE_GET")||!strcmp(req.op,"SCALE_SET")){
         int set=!strcmp(req.op,"SCALE_SET");const char *idv=NULL,*value=NULL,*revtext=NULL,*request_id=NULL;
         uint64_t revision=0;char err[80]={0};const char *desired=NULL,*advertised="UNKNOWN";
@@ -1110,7 +1128,7 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
               saved->n=length;strcpy(saved->response,out);}
     }
     if(r&&switch_def&&switch_set){
-        struct mibr_v3_switch_slot *slot=&r->switches[switch_def-mibr_switch_defs];
+        struct mibr_v3_switch_slot *slot=&r->switches[switch_slot];
         struct mibr_v3_scaling_receipt *saved=&slot->receipts[slot->receipt_cursor++%8];
         if(length>=sizeof(saved->frame)||strlen(out)>=sizeof(saved->response))saved->rid[0]=0;
         else {strcpy(saved->rid,req.rid);memcpy(saved->frame,frame,length);saved->frame[length]=0;

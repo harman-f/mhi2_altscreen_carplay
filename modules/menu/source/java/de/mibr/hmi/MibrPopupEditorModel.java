@@ -91,7 +91,7 @@ public final class MibrPopupEditorModel {
      * (App-Vorgabe) is not offered, but a read-back "user" is shown unchecked.
      */
     public boolean directToggle(int index) {
-        if(durableCheck(index)||index==NAV_DEMO||index==CALIB_IMAGE)return true;
+        if(durableCheck(index)||index==NAV_DEMO)return true;
         if(!visible(index) || isVirtual(index))return false;
         String key=MibrSettingsCatalog.KEYS[index];
         return "navigation.ETA".equals(key) || "navigation.speedLimit".equals(key) ||
@@ -187,7 +187,7 @@ public final class MibrPopupEditorModel {
         String value = drafts[index].hasDraft() ? drafts[index].draft() : current[index];
         // First explicit tap selects 1 if current UNKNOWN. Never display an
         // inferred effective value: the draft is only local and not ACKed.
-        if (durableCheck(index)||index==NAV_DEMO||index==CALIB_IMAGE) return drafts[index].chooseDraft(checked(index, value) ? "off" : "on");
+        if (durableCheck(index)||index==NAV_DEMO) return drafts[index].chooseDraft(checked(index, value) ? "off" : "on");
         String on = "TRISTATE".equals(MibrSettingsCatalog.UI_KINDS[index]) ? "yes" : "1";
         String off = "TRISTATE".equals(MibrSettingsCatalog.UI_KINDS[index]) ? "no" : "0";
         return drafts[index].chooseDraft(checked(index, value) ? off : on);

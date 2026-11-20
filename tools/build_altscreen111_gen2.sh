@@ -14,7 +14,7 @@ mkdir -p "$(dirname "$OUT")"
   "$SRC_ROOT/libaltscreen111_gen2.c" "$SRC_ROOT/src/alt111_profile.c" \
   "$SRC_ROOT/src/alt111_control.c" "$SRC_ROOT/src/alt111_zoom.c" \
   "$SRC_ROOT/src/alt111_zoom_debugspi.c" "$SRC_ROOT/src/alt111_policy.c" \
-  "$SRC_ROOT/src/alt111_video.c" "$SRC_ROOT/src/alt111_resync.c" \
+  "$SRC_ROOT/src/alt111_video.c" "$SRC_ROOT/src/alt111_resync.c" "$SRC_ROOT/src/alt111_viewscale.c" \
   "$VDATA/mvs_core.c" "$VDATA/mibr_vdata.c" "$VDATA/mibr_vstatus.c" "$VDATA/mibr_vdata_hook.c" \
   modules/carplay/source/display-scaling/mibr_display_scaling.c \
   modules/carplay/source/alt111-settings/settings_core.c modules/carplay/source/alt111-settings/settings_posix.c \

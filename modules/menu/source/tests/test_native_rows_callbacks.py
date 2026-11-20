@@ -121,7 +121,7 @@ static final class Binding {final ViewModel view;final ListItem plain,value,chec
 """,
     "de/mibr/hmi/MibrRgiCockpit.java": "package de.mibr.hmi;final class MibrRgiCockpit {static String statusLine(){return \"\";}static boolean demoRequested(){return false;}static void requestDemo(boolean enabled){}}",
     "de/mibr/hmi/MibrServiceHealth.java": "package de.mibr.hmi;final class MibrServiceHealth {static String statusLine(){return \"\";}}",
-    "de/mibr/hmi/MibrCalibration.java": "package de.mibr.hmi;final class MibrCalibration {static boolean on(){return false;}static void set(boolean enabled){}}",
+    "de/mibr/hmi/MibrCalibration.java": "package de.mibr.hmi;final class MibrCalibration {static final String[] IDS={\"off\",\"grid\",\"black\",\"white\",\"contrast\",\"motion\"};static boolean on(){return false;}static String get(){return \"off\";}static void set(boolean enabled){}static void set(String id){}}",
 }
 
 
@@ -244,7 +244,7 @@ class NativeRowsCallbacks(unittest.TestCase):
         for name in ("MibrControlProtocol", "MibrControlClient", "MibrControlSession", "MibrOwnedSsmRows", "MibrOemPageEntry", "MibrElementDetailRows", "MibrNativeDropdownEditor",
                      "MibrElementSpec", "MibrElementEngine", "MibrElementTree", "MibrCanonicalElementMenu", "MibrPopupEditorModel",
                      "MibrDraftChoiceModel", "MibrScalingState", "MibrCarPlayMenuModel", "MibrVdataDiag", "MibrEngineState", "MibrViewState", "MibrMenuDefinition", "MibrI18n",
-                     "MibrDurableSwitch", "MibrPlatformDefaults", "MibrSafeArea", "MibrGpsDemoState", "MibrVersionInfo",
+                     "MibrDurableSwitch", "MibrViewProfile", "MibrPlatformDefaults", "MibrSafeArea", "MibrGpsDemoState", "MibrVersionInfo",
                      "MibrMenuCatalog", "MibrMenuFunctions", "MibrMenuLayout", "MibrDropdownFrame", "MibrExpert",
                      "MibrV3Protocol", "MibrV3Client", "MibrV3Session",
                      "MibrSettingsCatalog"):
