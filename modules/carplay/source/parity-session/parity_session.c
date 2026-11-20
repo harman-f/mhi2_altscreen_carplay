@@ -62,6 +62,11 @@ static unsigned gate_backend,bridge_created;
 static uint64_t gate_token,native_process,gate_dropped_before,gate_request_ms;
 static uint64_t owner_token;
 static uint64_t monotonic_ms(void);
+/* Diagnostic only: AU marker lifecycle trace (stderr -> session log). */
+static void au_unlink(const char *who) {
+    int r=unlink(AU_MARKER);
+    fprintf(stderr,"AU_MARKER unlink by=%s rc=%d errno=%d t=%llu\n",who,r,r?errno:0,(unsigned long long)monotonic_ms());
+}
 static int route_restore(void);
 
 static int gate_snapshot_once(struct alt111_native_gate_status *out)
@@ -409,7 +414,7 @@ static int emergency_restore(void) {
         (void)write_text(STATE_PATH,"blocked_stop_unconfirmed\n");
         return -1; /* Keep markers/lock; never restore over an unknown writer. */
     }
-    unlink(AU_MARKER);
+    au_unlink("emergency_restore");
     restored=backend_restore()==0;
     (void)write_text(STATE_PATH,restored ? "emergency_restored\n" : "emergency_restore_failed\n");
     unlink(BRIDGE_PID_PATH);
@@ -715,7 +720,7 @@ int main(int argc, char **argv) {
         gate_backend=!strcmp(b,"writev_gate");
         (void)write_text(STATE_PATH, "manual_restoring_backend\n");
         rr=backend_restore();
-        unlink(AU_MARKER);
+        au_unlink("manual_restore");
         (void)write_text(STATE_PATH, rr==0 ? "manual_stock\n" : "manual_restore_failed\n");
         if(rr==0 && lock_fd_matches_path(session_lock_fd)) {
             unlink(LOCK_PATH); unlink(BRIDGE_PID_PATH); unlink(PID_PATH);
@@ -819,9 +824,13 @@ int main(int argc, char **argv) {
         if(read_trimmed(WATCHDOG_PID_PATH,actual,sizeof(actual))!=0 || strcmp(actual,expected))goto done;
     }
 
-    if (gate_backend && touch_file(AU_MARKER) != 0) {
-        fprintf(stderr, "ERROR cannot arm M1AU marker\n");
-        goto done;
+    if (gate_backend) {
+        int tr=touch_file(AU_MARKER);
+        fprintf(stderr,"AU_MARKER touched rc=%d errno=%d t=%llu\n",tr,tr?errno:0,(unsigned long long)monotonic_ms());
+        if (tr != 0) {
+            fprintf(stderr, "ERROR cannot arm M1AU marker\n");
+            goto done;
+        }
     }
 
     if(g_stop)goto done;
@@ -839,11 +848,18 @@ int main(int argc, char **argv) {
         rc=21;goto done;
     }
     (void)write_text(STATE_PATH,"waiting_native_gate_drain\n");
+    fprintf(stderr,"GATE_TAKE begin t=%llu\n",(unsigned long long)monotonic_ms());
     if(gate_take()) {
+        {struct alt111_native_gate_status gs;int sr=gate_snapshot(&gs);
+         fprintf(stderr,"GATE_TAKE fail snap=%d state=%u tracked=%d inflight=%d token_match=%d dropped=%llu/%llu t=%llu\n",
+            sr,sr?0u:(unsigned)gs.state,sr?0:(int)gs.tracked,sr?0:(int)gs.inflight,sr?0:(int)(gs.token==gate_token),
+            (unsigned long long)(sr?0:gs.dropped),(unsigned long long)gate_dropped_before,(unsigned long long)monotonic_ms());}
         fprintf(stderr,"ERROR native gate ownership unproven; custom payload not started\n");
         rc=21;goto done;
     }
     route_owned=1;
+    fprintf(stderr,"GATE_TAKE ok token=%llu dropped_before=%llu t=%llu\n",(unsigned long long)gate_token,
+        (unsigned long long)gate_dropped_before,(unsigned long long)monotonic_ms());
     if(g_stop)goto done;
 
     (void)write_text(STATE_PATH, "starting_bridge\n");
@@ -854,6 +870,7 @@ int main(int argc, char **argv) {
         goto done;
         }
         close(exec_gate);exec_gate=-1;
+        fprintf(stderr,"BRIDGE_TOKEN released pid=%ld t=%llu\n",(long)bridge_pid,(unsigned long long)monotonic_ms());
     }
     (void)write_text(STATE_PATH, "direct\n");
 
@@ -872,6 +889,8 @@ int main(int argc, char **argv) {
         if (w == bridge_pid) {
             bridge_stopped=1;
             bridge_pid = -1;
+            fprintf(stderr,"BRIDGE_EXIT exited=%d code=%d signaled=%d sig=%d t=%llu\n",WIFEXITED(st)?1:0,
+                WIFEXITED(st)?WEXITSTATUS(st):-1,WIFSIGNALED(st)?1:0,WIFSIGNALED(st)?WTERMSIG(st):0,(unsigned long long)monotonic_ms());
             if (!WIFEXITED(st) || WEXITSTATUS(st) != 0) rc = 15;
             break;
         }
@@ -907,7 +926,7 @@ done:
         /* A partial release can still leave routing inconsistent. */
         restore_ok = backend_restore() == 0;
     }
-    if(bridge_stopped)unlink(AU_MARKER);
+    if(bridge_stopped)au_unlink("done");
 
     if (restore_ok) {
         (void)write_text(STATE_PATH,  (rc == 0 || rc == 130) ? "complete_stock\n" : rc==21 ? "ownership_unproven_stock\n" : "failed_stock\n");

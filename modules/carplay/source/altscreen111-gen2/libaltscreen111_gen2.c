@@ -346,6 +346,7 @@ static unsigned g_settings_active_confirmed;
 static uint64_t g_settings_active_control_generation;
 static AirPlayReceiverSessionRef g_settings_advertised_session;
 static AirPlayReceiverSessionRef g_settings_active_session;
+static uint64_t g_settings_active_since_ms; /* diagnostic: age of the active descriptor owner */
 static char g_settings_error[256];
 static char g_settings_advertised_version[192], g_settings_active_version[192];
 static char g_alt_uuid[96] = ALT_UUID_DEFAULT;
@@ -915,7 +916,6 @@ static int settings_refresh(void)
         if(failed_attempts<0xffffffffu)++failed_attempts;
         if(failed_attempts==1u || (failed_attempts%16u)==0u)log_failed=failed_attempts;
     }else{recovered=failed_attempts;failed_attempts=0;}
-    pthread_mutex_unlock(&g_settings_io_lock);
     if(log_failed || recovered){
         struct timespec stamp={0,0};
         unsigned long long ms;
@@ -926,6 +926,7 @@ static int settings_refresh(void)
         else logf_u2("SETTINGS_REFRESH_RECOVERED mono_ms=%llu pid=%ld failed_attempts=%u",
                      ms,(long)getpid(),recovered);
     }
+    /* Publish under the same IO mutex as the load: a slower concurrent refresh must not overwrite a newer snapshot. */
     pthread_mutex_lock(&g_settings_lock);
     g_settings_valid=rc==0;
     if(rc==0){
@@ -934,6 +935,7 @@ static int settings_refresh(void)
     }
     else snprintf(g_settings_error,sizeof(g_settings_error),"%s",error);
     pthread_mutex_unlock(&g_settings_lock);
+    pthread_mutex_unlock(&g_settings_io_lock);
     if(rc==0){
         alt111_settings_policy(next,&policy);
         pthread_mutex_lock(&g2_core_lock);
@@ -2333,6 +2335,7 @@ static void *tee_accept_thread(void *arg)
 {
     (void)arg;
     for (;;) {
+        int marker_dbg_rc=0,marker_dbg_errno=0; long long marker_dbg_mtime=-1LL;
         int c = accept(g_tee_listen, NULL, NULL);
         if (c < 0) { if (errno == EINTR) continue; sleep(1); continue; }
         {
@@ -2342,13 +2345,22 @@ static void *tee_accept_thread(void *arg)
         pthread_mutex_lock(&g_lock);
         tee_drop_client_locked();
         g_tee_client = c;
-        g_tee_framed = access(g_au_framing_marker,F_OK)==0 ? 1 : 0;
+        {
+            struct stat mst; int mrc,merr,sr;
+            errno=0; mrc=access(g_au_framing_marker,F_OK); merr=mrc?errno:0;
+            g_tee_framed = mrc==0 ? 1 : 0;
+            sr=stat(g_au_framing_marker,&mst);
+            marker_dbg_rc=mrc; marker_dbg_errno=merr; marker_dbg_mtime=sr==0?(long long)mst.st_mtime:-1LL;
+        }
         g_tee_frame_header_off = 0;
         g_tee_frame_header_sequence = 0;
         pthread_mutex_unlock(&g_lock);
         tee_nodelay_poll(); /* apply A/B immediately to the new local socket */
         logf_u2("gen2 renderer connected nonblocking on 127.0.0.1:%d mode=%s; waiting for config+complete IDR",
                 g_tee_port,g_tee_framed?"m1au-v1":"raw-annexb");
+        logf_u2("GEN2 TEE_ACCEPT marker_access=%d errno=%d marker_mtime=%lld now=%lld mode=%s consumer_gen_prev=%llu",
+                marker_dbg_rc,marker_dbg_errno,marker_dbg_mtime,(long long)time(NULL),
+                g_tee_framed?"m1au-v1":"raw-annexb",(unsigned long long)g_tee_consumer_generation);
         gen2_consumer_attach();
     }
     return NULL;
@@ -4188,8 +4200,12 @@ static int gen2_control_projection_on(AirPlayReceiverSessionRef session)
     if(!scope || !g_settings_scope_ready){free(scope);return 0;}
     pthread_mutex_lock(&g_settings_lock);
     if(g_settings_have_active && session!=g_settings_active_session){
+        unsigned long long own_s=(unsigned long long)(uintptr_t)g_settings_active_session,
+            own_age=(unsigned long long)(monotonic_ms()-g_settings_active_since_ms);
+        unsigned conf=g_settings_active_confirmed;
         pthread_mutex_unlock(&g_settings_lock);free(scope);
-        logf_u2("GEN2 SETUP rejected: another private session still owns the active descriptor");
+        logf_u2("GEN2 SETUP rejected: another private session still owns the active descriptor owner_session=0x%llx owner_age_ms=%llu owner_confirmed=%u new_session=0x%llx",
+                own_s,own_age,conf,(unsigned long long)(uintptr_t)session);
         return 0;
     }
     if(g_settings_have_active && session==g_settings_active_session){
@@ -4208,6 +4224,7 @@ static int gen2_control_projection_on(AirPlayReceiverSessionRef session)
     if(!g_settings_have_active || session!=g_settings_active_session){
         g_settings_active=scope->settings;g_settings_have_active=1u;
         g_settings_active_session=session ? (AirPlayReceiverSessionRef)p_CFRetain(session) : NULL;
+        g_settings_active_since_ms=monotonic_ms();
         g_settings_active_confirmed=session && session==g_settings_advertised_session;
         snprintf(g_settings_active_version,sizeof(g_settings_active_version),"%s",g_settings_advertised_version);
     }
@@ -6148,6 +6165,17 @@ static void mibr_session_teardown(AirPlayReceiverSessionRef s, CFDictionaryRef r
         pthread_mutex_unlock(&g2_obs_lock);
         logf_u2("GEN2 OBS TEARDOWN t=%llu full=%d has110=%d has111=%d td110_count=%llu td111_count=%llu tdfull_count=%llu",
                 (unsigned long long)monotonic_ms(),full_session,has_main,has_alt,c110,c111,cf);
+    }
+
+    {
+        unsigned long long own_s=0,own_age=0;unsigned have;
+        pthread_mutex_lock(&g_settings_lock);
+        have=g_settings_have_active;
+        if(have){own_s=(unsigned long long)(uintptr_t)g_settings_active_session;own_age=(unsigned long long)(monotonic_ms()-g_settings_active_since_ms);}
+        pthread_mutex_unlock(&g_settings_lock);
+        logf_u2("GEN2 TEARDOWN DECISION full=%d why=%s has111=%d active_owner=%u owner_session=0x%llx owner_age_ms=%llu req_session=0x%llx descriptor_release=%s",
+                full_session,request?"request_is_dict_not_NULL":"request_NULL",has_alt,have,own_s,own_age,
+                (unsigned long long)(uintptr_t)s,has_alt?"yes_explicit111":"NO_no111_in_request");
     }
 
     if(has_alt){

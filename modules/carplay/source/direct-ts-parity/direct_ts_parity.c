@@ -1648,6 +1648,7 @@ static int host_self_test(void) {
 }
 
 int main(int argc,char **argv) {
+    char bad_hdr[24]="";
     const char *input,*output,*exit_reason="startup_error";int in_fd=-1,out_fd=-1,regular_file=0,rc=1;
     struct stat st;pthread_t writer;int writer_started=0;
     struct au_queue queue;struct clock_state clock;struct bridge_stats stats;struct writer_ctx wctx;
@@ -1707,7 +1708,7 @@ int main(int argc,char **argv) {
             else exit_reason="input_header_read_error";
             break;
         }
-        if(memcmp(h,"M1AU",4)||be16(h+4)!=1u||be16(h+6)!=M1AU_HEADER_BYTES){fprintf(stderr,"ERROR invalid M1AU header\n");exit_reason="invalid_header";break;}
+        if(memcmp(h,"M1AU",4)||be16(h+4)!=1u||be16(h+6)!=M1AU_HEADER_BYTES){fprintf(stderr,"ERROR invalid M1AU header\n");snprintf(bad_hdr,sizeof(bad_hdr),"%02x%02x%02x%02x/%u",h[0],h[1],h[2],h[3],(unsigned)be16(h+4));exit_reason="invalid_header";break;}
         flags=be32(h+8);payload_n=be32(h+12);stream=be64(h+16);codec=be64(h+24);consumer=be64(h+32);seq=be64(h+40);frac=le32(h+48);sec=le32(h+52);idr=(flags&M1AU_FLAG_IDR)?1:0;
         if(!payload_n||payload_n>M1AU_MAX_PAYLOAD){fprintf(stderr,"ERROR invalid M1AU payload=%u\n",payload_n);exit_reason="invalid_payload_size";break;}
         payload=(uint8_t*)malloc(payload_n);if(!payload){exit_reason="allocation_error";break;}
@@ -1809,6 +1810,8 @@ done:
     pthread_mutex_destroy(&stats.lock);
     fprintf(stderr,"PARITY_EXIT reason=%s signal=%d rc=%d write_errors=%llu\n",
         exit_reason,(int)g_stop_signal,rc,(unsigned long long)stats.write_errors);
+    fprintf(stderr,"DIRECT_TS_EXIT reason=%s rc=%d signal=%d invalid_header=%d first4_ver=%s write_errors=%llu\n",
+        exit_reason,rc,(int)g_stop_signal,!strcmp(exit_reason,"invalid_header"),bad_hdr[0]?bad_hdr:"-",(unsigned long long)stats.write_errors);
     fprintf(stderr,"PARITY_DONE rc=%d\n",rc);
     return rc;
 }

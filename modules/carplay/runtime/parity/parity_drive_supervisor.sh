@@ -177,6 +177,38 @@ stamp(){
 
 publish(){
   echo "$1" > "$STATE" 2>/dev/null || true
+  PUBLISHED=$1
+}
+
+# Diagnostic RAM log: always kept (also with SD logging off), size-capped without wc/du.
+RAMLOG=/tmp/mibr-parity-drive-supervisor.log
+RAMLOG_MAX=262144
+PUBLISHED=none
+LAST_PASS=
+dlog(){
+  echo "t=$SECONDS $*" >> "$RAMLOG" 2>/dev/null || true
+  [ "$MASTER_LOG" = "/dev/null" ] || echo "$*" >> "$MASTER_LOG" 2>/dev/null || true
+  RSZ=$(ls -l "$RAMLOG" 2>/dev/null | awk '{print $5}')
+  if [ -n "$RSZ" ] && [ "$RSZ" -gt "$RAMLOG_MAX" ]; then
+    mv -f "$RAMLOG" "$RAMLOG.1" 2>/dev/null || true
+    : > "$RAMLOG" 2>/dev/null || true
+  fi
+}
+# One line per loop pass whose observable state changed (keeps the 1 s polling quiet).
+pass_state(){
+  PM=no; [ -e /tmp/mibr-alt111-au-framing.enabled ] && PM=yes
+  PL=no; [ -e "$SESSION_LOCK" ] && PL=yes
+  PG=nofile
+  if [ -r "$GATE_STATUS" ]; then
+    PG=
+    while IFS= read -r GL; do PG="$PG$GL;"; done < "$GATE_STATUS"
+  fi
+  # dedup key excludes the gate content (it carries a moving heartbeat); the line still shows it
+  PS="au_marker=$PM session_lock=$PL published=$PUBLISHED src=${CUR:-?}"
+  if [ "$PS" != "$LAST_PASS" ] || [ "$1" != loop ]; then
+    LAST_PASS=$PS
+    dlog "PASS $1 $PS gate=[$PG]"
+  fi
 }
 
 heartbeat(){
@@ -476,7 +508,7 @@ LATEST_STATS=/dev/null
 if ! sd_enable_logs; then
   SD_LOG=0
 fi
-echo "SUPERVISOR_START pid=$SELF_PID sd_log=$SD_LOG" >> "$MASTER_LOG" 2>/dev/null || true
+dlog "SUPERVISOR_START pid=$SELF_PID sd_log=$SD_LOG"
 log_mirror &
 MPID=$!
 
@@ -484,6 +516,7 @@ publish waiting_stream111
 
 while enabled; do
   heartbeat
+  pass_state loop
 
   # r21: explicit user pause. The Parity owner was stopped gracefully by mibr-key40d (stock is
   # restored by the owner itself). Resume = pause file removed: reopen on the live stream.
@@ -499,7 +532,7 @@ while enabled; do
     WAIT_NEW_STREAM=0
     OBSERVED_DISCONNECT=0
     FASTSHOW=1
-    echo "RESUME_BY_USER" >> "$MASTER_LOG" 2>/dev/null || true
+    dlog "RESUME_BY_USER"
   fi
 
   # A parity owner already present is never disturbed by the supervisor.
@@ -575,7 +608,8 @@ while enabled; do
     echo "diagnostics_statistics=$STATS_ON source=$(cfg_source "$STATS_CFG_TEMP" "$STATS_CFG_PERSIST")"
     echo "sd_log_root=$LOGROOT"
   } >> "$SESSION_LOG" 2>/dev/null
-  echo "SESSION_START session=$SESSION mode=$SESSION_MODE dir=$RUN" >> "$MASTER_LOG" 2>/dev/null || true
+  dlog "SESSION_START session=$SESSION mode=$SESSION_MODE dir=$RUN"
+  pass_state before_session
 
   # r29: after a resume/reopen on the SAME stream generation the cockpit is not told to show the
   # view area again (the log shows only the keyframe cadence). Ask GEN2 for the proven explicit
@@ -589,7 +623,8 @@ while enabled; do
   RC=$?
   SESS_DUR=$((SECONDS-SESS_T0))
   echo "PARITY_DRIVE_SESSION_DONE rc=$RC" >> "$SESSION_LOG" 2>/dev/null
-  echo "SESSION_DONE session=$SESSION rc=$RC dir=$RUN" >> "$MASTER_LOG" 2>/dev/null || true
+  dlog "SESSION_DONE session=$SESSION rc=$RC dur=$SESS_DUR dir=$RUN"
+  pass_state after_session
 
   [ -z "$EPID" ] || wait "$EPID" 2>/dev/null || true
   if [ "$SD_LOG" -eq 1 ]; then
@@ -634,7 +669,7 @@ while enabled; do
         # explicit re-show so the cockpit does not keep the stock initialisation picture.
         FASTSHOW=1
         publish retry_ownership_unproven
-        echo "RETRY_OWNERSHIP_UNPROVEN try=$OWN_RETRY" >> "$MASTER_LOG" 2>/dev/null || true
+        dlog "RETRY_OWNERSHIP_UNPROVEN try=$OWN_RETRY"
         sleep "$OWN_RETRY_DELAY"
         continue
       fi
@@ -654,13 +689,13 @@ while enabled; do
         if [ "$SESS_DUR" -ge "$QUICK_SECS" ]; then REOPEN_COUNT=0; fi
         REOPEN_COUNT=$((REOPEN_COUNT+1))
         if [ "$REOPEN_COUNT" -gt "$REOPEN_MAX" ]; then
-          echo "REOPEN_BACKOFF count=$REOPEN_COUNT dur=$SESS_DUR" >> "$MASTER_LOG" 2>/dev/null || true
+          dlog "REOPEN_BACKOFF count=$REOPEN_COUNT dur=$SESS_DUR"
           sleep "$REOPEN_BACKOFF"
         fi
         WAIT_NEW_STREAM=0
         OBSERVED_DISCONNECT=0
         FASTSHOW=1
-        echo "REOPEN_SAME_GENERATION count=$REOPEN_COUNT gen=$LAST_STREAM_GEN dur=$SESS_DUR rc=$RC" >> "$MASTER_LOG" 2>/dev/null || true
+        dlog "REOPEN_SAME_GENERATION count=$REOPEN_COUNT gen=$LAST_STREAM_GEN dur=$SESS_DUR rc=$RC"
         publish reopening_same_generation
       fi
     fi

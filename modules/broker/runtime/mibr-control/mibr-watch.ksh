@@ -24,6 +24,9 @@ STOP=$T/mibr-watch.stop
 HMI_UP=$T/mibr-hmi-up
 LOG=$T/mibr-watch.log
 PROFILE_READY=$T/mibr-cpvc-profile-ready
+CP_STATE=$T/mibr-carplay111.state
+VIEW=$MIBR_ROOT/scripts/mibr-view.ksh
+cp_last=
 
 alive(){
     p=; [ -s "$1" ] && read p < "$1"
@@ -79,6 +82,16 @@ check_supervisor(){
     note "RESTART supervisor attempt $sup_n"
     "$SHELLX" "$SUP" >>"$T/mibr-parity-drive-boot.log" 2>&1 &
 }
+check_view_sync(){
+    # r14: on every new CarPlay 111 stream (state file goes to "streaming"), re-apply the counted cockpit
+    # view once, so the safe area matches the counter after boot and after every (re)connect.
+    s=; [ -s "$CP_STATE" ] && read s < "$CP_STATE"
+    if [ "$s" = streaming ] && [ "$cp_last" != streaming ] && [ -r "$VIEW" ]; then
+        note "VIEW_SYNC on streaming"
+        "$SHELLX" "$VIEW" sync >/dev/null 2>&1 &
+    fi
+    cp_last=$s
+}
 check_guard(){
     [ "$guard_cleared" -eq 0 ] && [ -e "$HMI_UP" ] && [ "$waited" -ge "$HMI_STABLE" ] || return 0
     guard_cleared=1
@@ -91,6 +104,7 @@ while [ ! -e "$STOP" ]; do
     check_broker
     check_key40
     check_supervisor
+    check_view_sync
     check_guard
     publish
     sleep "$TICK"
