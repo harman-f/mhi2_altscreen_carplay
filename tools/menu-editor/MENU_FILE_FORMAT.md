@@ -35,3 +35,13 @@ Last line: `crc32=<8 lower-case hex digits>`, CRC-32 (IEEE, as in zip) of all by
 The unit refuses a file with a wrong checksum, wrong magic or broken structure and keeps the stored one. It skips unknown IDs and reports how many. Catalog functions added in a later catalog than the file names are appended under `advanced`.
 
 `standard-menu.txt` is the full menu an installation ships as `config/mibr-menu.conf`. The JAR holds only a basic menu (Version, Erweitert > Menü laden) for a missing or damaged file.
+
+## Slider rows in the preview
+
+The file format does not change: the safe-area edges stay `number` and the zoom factors stay `list`. The unit adds the OEM slider rows when it renders the page (r15), and the configurator preview shows them the same way:
+
+- **Safe-area edges** (`safe_voll|safe_wide|safe_center` `.x/.y/.w/.h`): collapsed, the row shows the label and a small slider with a green fill. Tapping a row opens it: the value is on the right, and below it is a row with −, the track with a ring thumb, and +, closed off by a bracket line. Only one row is open at a time. The track snaps to 10 px, and −/+ move 1 px. Left/right range over 0–1010 and top/bottom over 0–376. The area stays at least 100 × 60 px. The reset row shows “Standard”/“Geändert” and restores the view default.
+- **Zoom** (`scaling.main|cluster.zoomFactor`): a slider with the fixed steps Automatisch, 70, 85, 100, 125, 150. The vehicle side follows.
+- **SEAT** (MU1409/MU1447): the same rows are shown. The SEAT firmwares contain the same OEM slider parts, but the brand look is not documented, so the preview stays neutral.
+
+Preview values are for demonstration only. They do not change the safe areas in the configuration.

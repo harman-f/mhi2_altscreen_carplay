@@ -329,8 +329,8 @@
 "id": "safe_voll.hint",
 "parent": "safe_voll",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach CarPlay-Neuverbindung. Regler 10 px, -/+ 1 px",
+"en": "Applies after CarPlay reconnects. Slider 10 px, -/+ 1 px"
 },
 {
 "id": "safe_wide",
@@ -391,8 +391,8 @@
 "id": "safe_wide.hint",
 "parent": "safe_wide",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach CarPlay-Neuverbindung. Regler 10 px, -/+ 1 px",
+"en": "Applies after CarPlay reconnects. Slider 10 px, -/+ 1 px"
 },
 {
 "id": "safe_center",
@@ -453,8 +453,8 @@
 "id": "safe_center.hint",
 "parent": "safe_center",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach CarPlay-Neuverbindung. Regler 10 px, -/+ 1 px",
+"en": "Applies after CarPlay reconnects. Slider 10 px, -/+ 1 px"
 },
 {
 "id": "advanced",
