@@ -32,7 +32,7 @@ async function main(){
   for(const e of edges){assert.ok(row(e).classList.contains("sl"),e+" is a slider row");assert.ok(row(e).querySelector(".mini"),e+" mini preview")}
   assert.equal(sub().length,0,"no row open");
   assert.equal(val("Zurücksetzen"),"Standard");
-  assert.match(rows().at(-1).textContent,/Wirkt nach CarPlay-Neuverbindung/);
+  assert.match(rows().at(-1).textContent,/^Wirkt nach Neuverbinden$/);
   // open: value on the right, -/track/+ row below, only one open at a time
   click("Linke Kante");
   assert.equal(sub().length,1);assert.equal(num(),"10");
