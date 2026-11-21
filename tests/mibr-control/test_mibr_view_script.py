@@ -53,6 +53,18 @@ class ViewScript(unittest.TestCase):
                     self.assertEqual((rc, o["result"]), (1, "BAD_VALUE"), (k, v))
                 self.assertEqual(b.cli_values(), [])
 
+    def test_set_logs_a_note_line_only_for_valid_values(self):
+        for sh in self.shells():
+            with self.subTest(shell=sh), tempfile.TemporaryDirectory() as d:
+                b = Box(Path(d), sh)
+                b.run("set", "pos", "9")
+                self.assertFalse((Path(d) / "log").exists() and "SET" in (Path(d) / "log").read_text())
+                self.assertEqual(b.run("set", "pos", "1")[0], 0)
+                self.assertEqual(b.run("set", "follow", "1")[0], 0)
+                lines = (Path(d) / "log").read_text().splitlines()
+                self.assertIn("SET pos=1", lines)
+                self.assertIn("SET follow=1", lines)
+
     def test_counts_without_follow_and_never_touches_cli(self):
         for sh in self.shells():
             with self.subTest(shell=sh), tempfile.TemporaryDirectory() as d:
@@ -90,8 +102,21 @@ class ViewScript(unittest.TestCase):
                     b.run("step")
                     seen.append((Path(d) / "pos").read_text().strip())
                 self.assertEqual(seen, ["1", "2", "4", "0", "1"])
-                # Wide->0, Reichweite none, Center->1 (mapped), Voll->1 (area unchanged, no call), Wide->0
-                self.assertEqual(b.cli_values(), ["0", "1", "0"])
+                # Wide->0, Reichweite none, Center->1 (mapped), Voll->1 (no dedupe: always applied), Wide->0
+                self.assertEqual(b.cli_values(), ["0", "1", "1", "0"])
+
+    def test_no_stale_dedupe_and_sync_reapplies(self):
+        for sh in self.shells():
+            with self.subTest(shell=sh), tempfile.TemporaryDirectory() as d:
+                b = Box(Path(d), sh)
+                b.run("set", "follow", "1")
+                b.calls.write_text("")
+                b.area.write_text("0\\n")                            # stale RAM file already equals the target of step 1
+                b.run("step")                                         # Wide -> area 0 must still reach the CLI
+                self.assertEqual(b.cli_values(), ["0"])
+                rc, o = b.run("sync")                                 # connect hook: re-apply the counted position
+                self.assertEqual((rc, o["pos"], o["result"]), (0, "1", "OK"))
+                self.assertEqual(b.cli_values(), ["0", "0"])
 
     def test_resync_sets_position_and_applies(self):
         for sh in self.shells():

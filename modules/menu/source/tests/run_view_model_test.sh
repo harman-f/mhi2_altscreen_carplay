@@ -20,6 +20,7 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/java/de/mibr/hmi/MibrElementEngine.java" \
   "$MODULE/java/de/mibr/hmi/MibrCanonicalElementMenu.java" \
   "$MODULE/java/de/mibr/hmi/MibrDurableSwitch.java" \
+  "$MODULE/java/de/mibr/hmi/MibrViewProfile.java" \
   "$MODULE/java/de/mibr/hmi/MibrPlatformDefaults.java" \
   "$MODULE/java/de/mibr/hmi/MibrSafeArea.java" \
   "$MODULE/java/de/mibr/hmi/MibrScalingState.java" \
@@ -29,6 +30,7 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/java/de/mibr/hmi/MibrMenuFunctions.java" \
   "$MODULE/java/de/mibr/hmi/MibrMenuLayout.java" \
   "$MODULE/java/de/mibr/hmi/MibrExpert.java" \
+  "$MODULE/java/de/mibr/hmi/MibrCalibration.java" \
   "$MODULE/java/de/mibr/hmi/MibrDraftChoiceModel.java" \
   "$MODULE/java/de/mibr/hmi/MibrPopupEditorModel.java" \
   "$MODULE/java/de/mibr/hmi/MibrVdataDiag.java" \
@@ -49,7 +51,8 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/tests/MibrV3ShowTest.java" \
   "$MODULE/tests/MibrDurableRevisionTest.java" \
   "$MODULE/tests/MibrDropdownFrameTest.java" \
-  "$MODULE/tests/MibrMenuRestoredNoticeTest.java"
+  "$MODULE/tests/MibrMenuRestoredNoticeTest.java"   "$MODULE/tests/MibrSafeSliderTest.java"   "$MODULE/tests/MibrSafeRevisionTest.java" \
+  "$MODULE/tests/MibrScalingBindingTest.java" "$MODULE/tests/MibrZoomSliderTest.java"
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrViewStateTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrCanonicalElementMenuTest
 "$JAVA" -Dmibr.menu.standard="$(cd "$MODULE/../../.." && pwd)/tools/menu-editor/standard-menu.txt" \
@@ -61,3 +64,7 @@ python3 "$MODULE/generate_catalog.py" \
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrDurableRevisionTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrDropdownFrameTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrMenuRestoredNoticeTest
+"$JAVA" -Dmibr.menu.standard="$REPO/tools/menu-editor/standard-menu.txt" -cp "$OUT/classes" de.mibr.hmi.MibrSafeSliderTest
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrSafeRevisionTest
+"$JAVA" -Dmibr.menu.standard="$REPO/tools/menu-editor/standard-menu.txt" -cp "$OUT/classes" de.mibr.hmi.MibrZoomSliderTest
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrScalingBindingTest

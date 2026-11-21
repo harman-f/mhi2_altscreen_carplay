@@ -27,6 +27,8 @@ final class MibrSsmNativePage implements MibrOwnedSsmPageHost.Driver {
     private SmartViewHandler own;
     private ViewModel ownedView,returnView;
     private MibrOwnedSsmRows rows;
+    /** r15: private, never-entered Tsmv handler that supplies the safe-area slider rows (fail closed). */
+    private MibrSafeSliderSource sliders;
     private Timer checkTimer;
     private boolean cancelled,left,returning,checkScheduled,nativeEntryUncertain;
     private int epoch,phase,checks,homeSelected,homeFocused,homeFirst;
@@ -39,6 +41,9 @@ final class MibrSsmNativePage implements MibrOwnedSsmPageHost.Driver {
                 MibrV3Client product=MibrV3Bootstrap.devClient();
                 rows=new MibrOwnedSsmRows(handler,template,new Runnable(){public void run(){MibrOemPageEntry.back();}},
                     new MibrPopupEditorModel(),null,product==null?MibrControlBootstrap.devClient():null,product);
+                releaseSliders();
+                sliders=new MibrSafeSliderSource();
+                rows.sliders(sliders);
                 rows.open();
                 MibrMenuKeyBack.arm();
                 probeLater();
@@ -51,6 +56,7 @@ final class MibrSsmNativePage implements MibrOwnedSsmPageHost.Driver {
             try{if(rows!=null){rows.detach();rows=null;}}
             catch(Throwable failure){System.err.println("MIBR_SSM_LEAVE_CLEANUP_FAILED "+failure);
                 completion.failed("MIBR_SSM_CLEANUP_FAILED "+failure);}
+            releaseSliders();
             if(!returning)completion.failed("MIBR_SSM_EXTERNAL_PAGE_LEAVE");
             probeLater();
         }
@@ -62,6 +68,11 @@ final class MibrSsmNativePage implements MibrOwnedSsmPageHost.Driver {
     private static abstract class NativeListener implements ViewChangedListener {
         public void viewCovered(){} public void viewUncovered(){}
         public void viewInited(View view){} public void viewEntered(View view){} public void viewLeft(View view){}
+    }
+    /** After the rows released their clones: tear the private Tsmv handler down (never throws). */
+    private void releaseSliders(){
+        MibrSafeSliderSource s=sliders;sliders=null;
+        if(s!=null)try{s.dispose();}catch(Throwable failure){System.err.println("MIBR_SAFE_SLIDER_RELEASE_FAILED "+failure);}
     }
     private static void later(Runnable action){de.vw.mib.widgets.internal.ServiceManager.eventDispatcher.invoke(action);}
     static synchronized void enable(){enabled=true;bindIfReady();}
@@ -205,6 +216,7 @@ final class MibrSsmNativePage implements MibrOwnedSsmPageHost.Driver {
         if(ownedView!=null)ownedView.removeViewChangedListener(listener);
         MibrMenuKeyBack.disarm();
         if(rows!=null){rows.detach();rows=null;}
+        releaseSliders();
         if(handler!=null){
             int state=MibrSsmSourceBinding.lifecycle(handler);
             if(state==4){handler.deactivate();state=3;}

@@ -1,5 +1,5 @@
 #!/bin/ksh
-# mibr-view.ksh step | resync | get | set <key> <value> | persistnow <gen>
+# mibr-view.ksh step | sync | resync | get | set <key> <value> | persistnow <gen>
 # "Bildbereich folgt Cockpit-Ansicht" (r55). The virtual cockpit cycles through five views with the right roller PUSH
 # (KEY40, one step per KST=1). This helper keeps the position of that cycle and, when "follow" is on, sets the live
 # safe area (viewarea.selected, temp layer) for the three map views.
@@ -104,8 +104,7 @@ apply(){
     [ "$(cfgget follow 0)" = 1 ] || return 0
     a=$(areafor "$1")
     [ -n "$a" ] || return 0
-    c=; [ -s "$AREA" ] && read c < "$AREA"
-    [ "$c" = "$a" ] && return 0
+    # No dedupe against $AREA: that RAM file can be stale (GEN2 reconnect, restart, other writer) and the CLI is idempotent.
     if [ -f "$CLI" ]; then
         $CLIPFX "$CLI" set --key viewarea.selected --value "$a" --layer temp >/dev/null 2>&1 || { note "APPLY_FAILED pos=$1 area=$a"; return 1; }
         note "APPLY pos=$1 area=$a"
@@ -170,6 +169,7 @@ case "$1" in
         exit 0 ;;
     set)
         valid "$2" "$3" || finish BAD_VALUE
+        note "SET $2=$3"
         if [ "$2" = pos ]; then
             if [ "$3" -eq 3 ] && [ "$(cfgget sport 1)" = 0 ]; then finish BAD_VALUE; fi
             echo "$3" > "$POS" 2>/dev/null
@@ -192,6 +192,14 @@ rs=$q" || finish WRITE_FAILED
             echo 4 > "$POS" 2>/dev/null; putfile pos 4
         fi
         apply "$(curpos)"
+        finish OK ;;
+    sync)
+        # re-apply the counted position (call at CarPlay 111 connect / session start): the cockpit may have been
+        # switched while GEN2 was not following, or GEN2 re-advertised its own initial view
+        p=$(curpos)
+        apply "$p"
+        bump >/dev/null
+        note "SYNC pos=$p"
         finish OK ;;
     resync)
         r=$(cfgget rs 0)

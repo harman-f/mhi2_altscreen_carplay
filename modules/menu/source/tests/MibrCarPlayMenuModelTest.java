@@ -207,15 +207,20 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         check(menu.keyForRow(9) == -1 && menu.groupForRow(9) == 6,
               "Skalierung link is a page, not a registry key");
         menu.select(9);
-        check(view.screen == MibrCarPlayMenuModel.ITEMS && "Skalierung".equals(view.title) && view.rows.length == 5, "Skalierung has four controls and one read-only notice");
+        check(view.screen == MibrCarPlayMenuModel.ITEMS && "Skalierung".equals(view.title) && view.rows.length == 5, "Skalierung has four controls and one read-only notice (r14c: no apply row)");
         check("Zoomfaktor Hauptdisplay".equals(view.rows[0]) && "Zoomfaktor Virtual Cockpit".equals(view.rows[1]) && "Physische Displaygröße Virtual Cockpit".equals(view.rows[2]) && "Physische Displaygröße Hauptdisplay".equals(view.rows[3]), "exact scaling row labels");
         check(menu.scalingPageOpen() && menu.keyForRow(0)==MibrPopupEditorModel.SCALE_MAIN && menu.keyForRow(1)==MibrPopupEditorModel.SCALE_CLUSTER && menu.keyForRow(2)==MibrPopupEditorModel.SCALE_PHYSICAL && menu.keyForRow(3)==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL, "four virtual scaling keys with main physical appended");
-        check("\u00c4nderungen werden bei der n\u00e4chsten CarPlay-Verbindung \u00fcbertragen.".equals(view.rows[4]) && menu.keyForRow(4)==-1 && menu.noteRow(4), "read-only notice appears exactly once outside registry and SCALE_SET");
+        for(int r=0;r<view.rows.length;r++)check(view.rows[r].indexOf("übernehmen")<0 && !menu.loadRow(r), "r14c: no zoom apply action in the standard menu");
+        check("Wirkt nach Neuverbinden".equals(view.rows[4]) && menu.keyForRow(4)==-1 && menu.noteRow(4), "read-only notice appears exactly once outside registry and SCALE_SET");
         menu.select(4);check(menu.scalingPageOpen() && view.rows.length==5, "notice is not selectable");
         MibrI18n.forced="en_GB";menu.refresh();
-        check("Changes are sent on the next CarPlay connection.".equals(view.rows[4]) && "Main display zoom factor".equals(view.rows[0]), "English notice and controls");
+        check("Applies after reconnect".equals(view.rows[4]) && "Main display zoom factor".equals(view.rows[0]), "English notice and controls");
         MibrI18n.forced="de_DE";menu.refresh();
         menu.select(0);check(view.screen==MibrCarPlayMenuModel.ITEMS && view.rows.length==5, "scaling row selection remains on flat page");
+        boolean refused=false;
+        try{MibrV3Protocol.request("rc1","CARPLAY_RECONNECT",new String[0],new String[0],"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");}
+        catch(RuntimeException noVerb){refused=true;}
+        check(refused, "r15i: the client no longer knows the removed CARPLAY_RECONNECT verb");
         menu.back();check("Erweitert".equals(view.title), "Scaling back to Erweitert");
         check(menu.keyForRow(10) == -1 && menu.groupForRow(10) == 7, "Diagnose link follows Skalierung");
         menu.select(10);

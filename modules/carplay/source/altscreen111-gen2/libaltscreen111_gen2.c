@@ -25,6 +25,7 @@
 #include "alt111_zoom.h"
 #include "alt111_zoom_adapter.h"
 #include "alt111_zoom_debugspi.h"
+#include "alt111_viewscale.h"
 #include "alt111_settings.h"
 #include "mibr_display_scaling.h"
 #define ALT111_RECOVERY_POSIX 1
@@ -345,6 +346,7 @@ static unsigned g_settings_active_confirmed;
 static uint64_t g_settings_active_control_generation;
 static AirPlayReceiverSessionRef g_settings_advertised_session;
 static AirPlayReceiverSessionRef g_settings_active_session;
+static uint64_t g_settings_active_since_ms; /* diagnostic: age of the active descriptor owner */
 static char g_settings_error[256];
 static char g_settings_advertised_version[192], g_settings_active_version[192];
 static char g_alt_uuid[96] = ALT_UUID_DEFAULT;
@@ -394,6 +396,52 @@ static const char *g2_reacquire_marker = "/tmp/mibr-alt111-gen2-reacquire";
 static const char *g2_diag_stop_marker = "/tmp/mibr-alt111-stop-only";
 static const char *g2_diag_show_marker = "/tmp/mibr-alt111-show-only";
 static const char *g2_diag_keyframe_marker = "/tmp/mibr-alt111-keyframe-only";
+/* observability counters and a one-shot display-update probe.
+ * The probe runs ONLY when an operator creates g2_probe186_marker (parked test);
+ * nothing in the normal runtime writes it, so the default is OFF. */
+static const char *g2_probe186_marker = "/tmp/mibr-alt111-probe186";
+static pthread_mutex_t g2_obs_lock = PTHREAD_MUTEX_INITIALIZER;
+struct gen2_obs {
+    unsigned long long setup110, setup111, td110, td111, tdfull;
+    unsigned long long info_builds, preflights;
+    unsigned long long probe_runs, probe_sent, probe_done, probe_failed;
+    long long probe_last_status;
+    unsigned long long probe_last_ms;
+    char probe_last[48];
+};
+static struct gen2_obs g2_obs = { 0,0,0,0,0, 0,0, 0,0,0,0, -1, 0, "none" };
+/* P8 window: after a probe panel update, a phone-initiated SETUP(111) WITHOUT
+ * features may re-advertise from desired settings instead of being withheld. */
+#define G2_PROBE186_WINDOW_MS 15000u
+static uint64_t g2_probe186_window_until_ms;
+
+/* per-view scaling. Same key names as the HTML configurator
+ * view-profile format (MIBR_NAV_VIEW_PROFILES, view.<center|wide|full>.*), so the
+ * configurator can later write exactly what GEN2 applies. Interim: GEN2-local
+ * reader, NOT yet in the settings registry (menu/broker untouched); unknown keys
+ * (safeArea, carplay, native, guidance, crc32, magic line) are ignored here.
+ * Temp file wins over flash.
+ *   global.transition.enabled=0|1   global.transition.mode=cycle|panels
+ *   global.transition.gap_ms=100..3000   global.transition.min_interval_ms=500..60000
+ *   view.wide.geometry.zoom / view.full.geometry.zoom / view.center.geometry.zoom
+ *     = inherit|70|85|100|125|150   (inherit = cockpit/scaling.conf cluster value)
+ *   (unit area index: 0 Wide, 1 Voll/full, 2 Center)
+ * enabled=0 (default) keeps r11 behaviour: /info uses scaling.conf, no 111 op. */
+#define G2_VS_TEMP "/tmp/mibr-view-profiles.conf"
+#define G2_VS_FLASH MIBR_CONFIG_DIR "/cockpit/view-profiles.conf"
+#define G2_VS_MAX_BYTES 16384
+struct g2_view_scaling_cfg {
+    unsigned enabled, cycle, gap_ms, min_interval_ms, confirm_timeout_ms;
+    char zoom[3][8];
+    const char *source;
+};
+/* r13: the transition state lives in the pure coordinator (src/alt111_viewscale.c):
+ * requested -> applying -> confirmed | restoring -> rolled_back | failed, plus
+ * pending_reconnect. Guarded by g2_obs_lock. A request is only queued here by an
+ * acknowledged updateViewArea; the control worker turns it into a coordinator request. */
+static struct alt111_vs g2_vss;
+static unsigned g2_vs_req_pending, g2_vs_req_area;
+static int g2_vs_logged_state = -1;
 static const char *g2_view_request_path = "/tmp/mibr-alt111-viewarea-request";
 static const char *g2_resync_enable_marker = "/tmp/mibr-alt111-resync.enabled";
 static const char *g2_resync_arm_marker = "/tmp/mibr-alt111-resync-arm";
@@ -836,6 +884,7 @@ struct gen2_settings_scope {
     char actual_source_version[192];
     unsigned descriptor_complete;
     unsigned valid;
+    unsigned internal_build;  /* r13: probe/transition descriptor build, not a phone /info */
 };
 
 static void settings_scope_init(void)
@@ -867,7 +916,6 @@ static int settings_refresh(void)
         if(failed_attempts<0xffffffffu)++failed_attempts;
         if(failed_attempts==1u || (failed_attempts%16u)==0u)log_failed=failed_attempts;
     }else{recovered=failed_attempts;failed_attempts=0;}
-    pthread_mutex_unlock(&g_settings_io_lock);
     if(log_failed || recovered){
         struct timespec stamp={0,0};
         unsigned long long ms;
@@ -878,6 +926,7 @@ static int settings_refresh(void)
         else logf_u2("SETTINGS_REFRESH_RECOVERED mono_ms=%llu pid=%ld failed_attempts=%u",
                      ms,(long)getpid(),recovered);
     }
+    /* Publish under the same IO mutex as the load: a slower concurrent refresh must not overwrite a newer snapshot. */
     pthread_mutex_lock(&g_settings_lock);
     g_settings_valid=rc==0;
     if(rc==0){
@@ -886,6 +935,7 @@ static int settings_refresh(void)
     }
     else snprintf(g_settings_error,sizeof(g_settings_error),"%s",error);
     pthread_mutex_unlock(&g_settings_lock);
+    pthread_mutex_unlock(&g_settings_io_lock);
     if(rc==0){
         alt111_settings_policy(next,&policy);
         pthread_mutex_lock(&g2_core_lock);
@@ -1289,18 +1339,92 @@ static unsigned viewarea_safe_stored(int i)
  * "...\nrevision=N\nvalue=x,y,w,h\n") > a stored registry value > the
  * platform default > the compiled profile. A present but invalid broker file
  * leaves the configured area untouched. */
+/* safe areas live in the shared view profile (MIBR_NAV_VIEW_PROFILES/3, broker is the only
+ * writer, same file as the HTML configurator). Returns 1 and the rectangle when the profile holds all four keys of the
+ * view, 0 when the profile exists without them (=> platform default / stored registry value), -1 when there is no
+ * valid profile (=> legacy safe-<view>.conf, migration source until the broker writes the profile). */
+#ifndef MIBR_GEN2_VIEW_PROFILE
+#define MIBR_GEN2_VIEW_PROFILE MIBR_CONFIG_DIR "/cockpit/view-profiles.conf"
+#endif
+static uint32_t g2_profile_crc32(const char *p,size_t n)
+{
+    uint32_t v=0xFFFFFFFFu;size_t i;int j;
+    for(i=0;i<n;i++){v^=(unsigned char)p[i];for(j=0;j<8;j++)v=(v>>1)^((v&1u)?0xEDB88320u:0u);}
+    return v^0xFFFFFFFFu;
+}
+/* Validated profile text (magic + crc32 last) from path into a malloc'd buffer, or NULL. */
+static char *g2_profile_text(const char *path,const char **why)
+{
+    static const char magic[]="MIBR_NAV_VIEW_PROFILES/3\n";
+    char *b,*crc,want[24];
+    int fd,n=-1;
+    *why="missing";
+    fd=open(path,O_RDONLY);
+    if(fd<0)return NULL;
+    b=(char*)malloc(16384);
+    if(b)n=(int)read(fd,b,16383);
+    close(fd);
+    if(!b)return NULL;
+    if(n<=0){free(b);*why="empty";return NULL;}
+    b[n]='\0';
+    crc=strstr(b,"\ncrc32=");
+    if(strncmp(b,magic,sizeof(magic)-1)||!crc){free(b);*why="format";return NULL;}
+    snprintf(want,sizeof(want),"\ncrc32=%08x\n",(unsigned)g2_profile_crc32(b,(size_t)(crc-b)+1));
+    if(strcmp(crc,want)){free(b);*why="crc";return NULL;}
+    return b;
+}
+/* Main profile, else its .lastgood backup (written by the broker before each replace). */
+static char *g2_profile_effective(void)
+{
+    const char *why=NULL,*why2=NULL;
+    char *b=g2_profile_text(MIBR_GEN2_VIEW_PROFILE,&why);
+    if(b||!strcmp(why,"missing"))return b;
+    b=g2_profile_text(MIBR_GEN2_VIEW_PROFILE ".lastgood",&why2);
+    logf_u2("GEN2 ViewArea profile invalid (%s); %s",why,b?"using .lastgood":"legacy safe files used");
+    return b;
+}
+static int g2_profile_safe(const char *view,int *x,int *y,int *w,int *h)
+{
+    char *b,key[48];
+    const char *part[4]={"x","y","w","h"};
+    int k,vals[4],rc;
+    b=g2_profile_effective();
+    if(!b)return -1;
+    rc=1;
+    for(k=0;k<4&&rc==1;k++){
+        char *v;int used=-1;
+        snprintf(key,sizeof(key),"\nview.%s.safeArea.%s=",view,part[k]);
+        v=strstr(b,key);
+        if(!v||sscanf(v+strlen(key),"%d%n",&vals[k],&used)!=1||used<1||v[strlen(key)+used]!='\n')rc=0;
+    }
+    free(b);
+    if(rc==1){*x=vals[0];*y=vals[1];*w=vals[2];*h=vals[3];}
+    return rc;
+}
 static void apply_safe_override(struct mibr_viewareas_config *cfg,int i,const char *name)
 {
     char path[128],buf[96];
     const char *v;
     int x,y,w,h,n=-1,fd;
     ssize_t got;
+    int prof;
     if(i>=(int)cfg->count)return;
-    snprintf(path,sizeof(path),MIBR_GEN2_SAFE_PATH_FMT,name);
-    fd=open(path,O_RDONLY);
-    got=fd<0?-1:read(fd,buf,sizeof(buf)-1);
-    if(fd>=0)close(fd);
-    if(got>0){
+    /* name is safe-<view>; profile view ids: voll -> full, wide, center */
+    prof=g2_profile_safe(!strcmp(name,"safe-voll")?"full":name+5,&x,&y,&w,&h);
+    if(prof==1){
+        logf_u2("GEN2 ViewArea safe area=%d from view profile",i);
+        got=0;fd=-1;
+    }else if(prof==0){
+        got=0;fd=-1;   /* profile without this view: same as "no choice yet" */
+    }else{
+        snprintf(path,sizeof(path),MIBR_GEN2_SAFE_PATH_FMT,name);
+        fd=open(path,O_RDONLY);
+        got=fd<0?-1:read(fd,buf,sizeof(buf)-1);
+        if(fd>=0)close(fd);
+    }
+    if(prof==1){
+        /* taken from the profile */
+    }else if(got>0){
         buf[got]=0;
         v=strstr(buf,"\nvalue=");
         if(!v||sscanf(v+7,"%d,%d,%d,%d\n%n",&x,&y,&w,&h,&n)!=4||n<0||v[7+n])return;
@@ -2211,6 +2335,7 @@ static void *tee_accept_thread(void *arg)
 {
     (void)arg;
     for (;;) {
+        int marker_dbg_rc=0,marker_dbg_errno=0; long long marker_dbg_mtime=-1LL;
         int c = accept(g_tee_listen, NULL, NULL);
         if (c < 0) { if (errno == EINTR) continue; sleep(1); continue; }
         {
@@ -2220,13 +2345,22 @@ static void *tee_accept_thread(void *arg)
         pthread_mutex_lock(&g_lock);
         tee_drop_client_locked();
         g_tee_client = c;
-        g_tee_framed = access(g_au_framing_marker,F_OK)==0 ? 1 : 0;
+        {
+            struct stat mst; int mrc,merr,sr;
+            errno=0; mrc=access(g_au_framing_marker,F_OK); merr=mrc?errno:0;
+            g_tee_framed = mrc==0 ? 1 : 0;
+            sr=stat(g_au_framing_marker,&mst);
+            marker_dbg_rc=mrc; marker_dbg_errno=merr; marker_dbg_mtime=sr==0?(long long)mst.st_mtime:-1LL;
+        }
         g_tee_frame_header_off = 0;
         g_tee_frame_header_sequence = 0;
         pthread_mutex_unlock(&g_lock);
         tee_nodelay_poll(); /* apply A/B immediately to the new local socket */
         logf_u2("gen2 renderer connected nonblocking on 127.0.0.1:%d mode=%s; waiting for config+complete IDR",
                 g_tee_port,g_tee_framed?"m1au-v1":"raw-annexb");
+        logf_u2("GEN2 TEE_ACCEPT marker_access=%d errno=%d marker_mtime=%lld now=%lld mode=%s consumer_gen_prev=%llu",
+                marker_dbg_rc,marker_dbg_errno,marker_dbg_mtime,(long long)time(NULL),
+                g_tee_framed?"m1au-v1":"raw-annexb",(unsigned long long)g_tee_consumer_generation);
         gen2_consumer_attach();
     }
     return NULL;
@@ -2666,6 +2800,107 @@ static void remove_key(CFMutableDictionaryRef d, const char *name)
  * One immutable settings snapshot is used for both cloned displays. The broker
  * is the only persistent writer; GEN2 only reads the shared finite format. */
 #define MIBR_SCALING_PROFILE MIBR_CONFIG_DIR "/cockpit/scaling.conf"
+static void g2_vs_defaults(struct g2_view_scaling_cfg *c)
+{
+    unsigned i;
+    memset(c,0,sizeof(*c));
+    c->cycle=1u;c->gap_ms=500u;c->min_interval_ms=3000u;c->confirm_timeout_ms=10000u;c->source="default";
+    for(i=0;i<3u;++i)snprintf(c->zoom[i],sizeof(c->zoom[i]),"inherit");
+}
+/* r13: the flash file is the broker-written shared view profile (MIBR_NAV_VIEW_PROFILES/3,
+ * crc32 line mandatory, same check as the safe-area reader). The /tmp file is the operator
+ * test override and may be plain key=value. Parsed results are cached by path/inode/mtime/size,
+ * so the per-tick and per-status reads do not re-read the file (F9). */
+static pthread_mutex_t g2_vs_cfg_lock = PTHREAD_MUTEX_INITIALIZER;
+static void g2_vs_parse(struct g2_view_scaling_cfg *c,char *b)
+{
+    static const char *const view_ids[3]={"wide","full","center"};
+    char *line,*save=NULL;
+    unsigned i;
+    for(line=strtok_r(b,"\r\n",&save);line;line=strtok_r(NULL,"\r\n",&save)){
+        char *eq=strchr(line,'='),*v;
+        long x;
+        if(!eq||line[0]=='#')continue;
+        *eq='\0';v=eq+1;
+        x=strtol(v,NULL,10);
+        if(!strcmp(line,"global.transition.enabled"))c->enabled=(x==1);
+        else if(!strcmp(line,"global.transition.mode"))c->cycle=strcmp(v,"panels")!=0;
+        else if(!strcmp(line,"global.transition.gap_ms")&&x>=100&&x<=3000)c->gap_ms=(unsigned)x;
+        else if(!strcmp(line,"global.transition.min_interval_ms")&&x>=500&&x<=60000)c->min_interval_ms=(unsigned)x;
+        else if(!strcmp(line,"global.transition.confirm_timeout_ms")&&x>=2000&&x<=30000)c->confirm_timeout_ms=(unsigned)x;
+        else for(i=0;i<3u;++i){
+            char key[40];
+            snprintf(key,sizeof(key),"view.%s.geometry.zoom",view_ids[i]);
+            if(strcmp(line,key))continue;
+            if(!strcmp(v,"inherit")||(mibr_display_scaling_value_valid(v)&&strcmp(v,"AUTO")))
+                snprintf(c->zoom[i],sizeof(c->zoom[0]),"%s",v);
+            break;
+        }
+    }
+}
+static void g2_vs_load(struct g2_view_scaling_cfg *c)
+{
+    static const char magic[]="MIBR_NAV_VIEW_PROFILES/";
+    static const char temp_path[]=G2_VS_TEMP,flash_path[]=G2_VS_FLASH;
+    static struct g2_view_scaling_cfg cached;
+    static unsigned have;
+    static const char *cached_path;
+    static struct stat cached_st;
+    struct g2_view_scaling_cfg fresh;
+    struct stat st;
+    const char *path=temp_path,*source="temp";
+    char *b=NULL;
+    int fd,n=-1;
+    if(stat(path,&st)!=0){
+        path=flash_path;source="flash";
+        if(stat(path,&st)!=0){g2_vs_defaults(c);return;}
+    }
+    pthread_mutex_lock(&g2_vs_cfg_lock);
+    if(have && cached_path==path && cached_st.st_ino==st.st_ino &&
+       cached_st.st_mtime==st.st_mtime && cached_st.st_size==st.st_size){
+        *c=cached;
+        pthread_mutex_unlock(&g2_vs_cfg_lock);
+        return;
+    }
+    pthread_mutex_unlock(&g2_vs_cfg_lock);
+    g2_vs_defaults(&fresh);
+    fd=open(path,O_RDONLY);
+    if(fd>=0){
+        b=(char*)malloc(G2_VS_MAX_BYTES);
+        if(b)n=(int)read(fd,b,G2_VS_MAX_BYTES-1);
+        close(fd);
+    }
+    if(b && n>0){
+        int is_profile;
+        b[n]='\0';
+        is_profile=!strncmp(b,magic,sizeof(magic)-1);
+        if(is_profile || path==flash_path){
+            char *crc=strstr(b,"\ncrc32=");
+            char want[24];
+            if(!is_profile || !crc){
+                fresh.source="invalid";
+            }else{
+                snprintf(want,sizeof(want),"\ncrc32=%08x\n",(unsigned)g2_profile_crc32(b,(size_t)(crc-b)+1));
+                if(strcmp(crc,want))fresh.source="invalid";
+            }
+        }
+        if(strcmp(fresh.source,"invalid")){fresh.source=source;g2_vs_parse(&fresh,b);}
+        else logf_u2("GEN2 VIEWSCALE %s view profile invalid (format/crc); per-view zoom off",source);
+    }
+    free(b);
+    pthread_mutex_lock(&g2_vs_cfg_lock);
+    cached=fresh;cached_path=path;cached_st=st;have=1u;
+    pthread_mutex_unlock(&g2_vs_cfg_lock);
+    *c=fresh;
+}
+/* Effective 111 zoom for an area: per-view value when enabled, else scaling.conf. */
+static void g2_vs_zoom_for_area(const struct g2_view_scaling_cfg *c,unsigned area,
+                                const char *scaling_cluster,char *out,size_t cap)
+{
+    if(c->enabled && area<3u && strcmp(c->zoom[area],"inherit"))
+        snprintf(out,cap,"%s",c->zoom[area]);
+    else snprintf(out,cap,"%s",scaling_cluster?scaling_cluster:"AUTO");
+}
 static void scaling_log_display(const char *source, CFDictionaryRef display)
 {
     static const char *keys[]={"type","widthPixels","heightPixels",
@@ -3473,10 +3708,45 @@ static CFDictionaryRef gen2_serverinfo_scoped(AirPlayReceiverSessionRef session,
             return base;
         }
 
+        {
+            struct g2_view_scaling_cfg vsc;
+            struct gen2_settings_scope *vscope=settings_scope();
+            unsigned area=vscope?alt111_setting_integer(&vscope->settings,ALTSET_VIEWAREA_SELECTED):0u;
+            char eff[8],adv[ALT111_VS_ZOOM_CAP]="";
+            g2_vs_load(&vsc);
+            g2_vs_zoom_for_area(&vsc,area,scaling.cluster,eff,sizeof(eff));
+            if(vsc.enabled){
+                /* during a transition the coordinator decides (target, or the last
+                 * confirmed zoom while restoring); otherwise the selected view */
+                const char *a;
+                pthread_mutex_lock(&g2_obs_lock);
+                a=alt111_vs_advert_zoom(&g2_vss);
+                if(a)snprintf(adv,sizeof(adv),"%s",a);
+                pthread_mutex_unlock(&g2_obs_lock);
+                if(adv[0])snprintf(eff,sizeof(eff),"%s",adv);
+            }
+            if(strcmp(eff,scaling.cluster)){
+                logf_u2("GEN2 VIEWSCALE /info 111 zoom override area=%u zoom=%s (scaling.conf=%s source=%s%s)",
+                        area,eff,scaling.cluster,vsc.source,adv[0]?" transition":"");
+                snprintf(scaling.cluster,sizeof(scaling.cluster),"%s",eff);
+            }
+        }
         if(scaling_apply_display(alt,scaling.cluster,1)){
             logf_u2("GEN2 cluster ZoomFactor construction failed; stock fallback");
             p_CFRelease(alt);p_CFRelease(displays);
             p_CFRelease(kdisplays);p_CFRelease(info);return base;
+        }
+        logf_u2("GEN2 OBS /info 111 descriptor t=%llu zoomFactor=%s physical=%s mm=%dx%d scaling_rev=%llu",
+                (unsigned long long)monotonic_ms(),scaling.cluster,scaling.physical,
+                display.width_mm,display.height_mm,(unsigned long long)scaling.revision);
+        {
+            /* F1: only descriptors that go to the phone count, never the probe's own build */
+            struct gen2_settings_scope *oscope=settings_scope();
+            if(!oscope || !oscope->internal_build){
+                pthread_mutex_lock(&g2_obs_lock);
+                alt111_vs_observe_info(&g2_vss,scaling.cluster,monotonic_ms());
+                pthread_mutex_unlock(&g2_obs_lock);
+            }
         }
         p_CFArrayAppendValue(displays,alt);
         if(p_CFArrayGetCount(displays)!=p_CFArrayGetCount(old)+1){
@@ -3547,6 +3817,14 @@ CFDictionaryRef AirPlayCopyServerInfo(AirPlayReceiverSessionRef session, CFArray
 {
     struct gen2_settings_scope *scope,*previous;
     CFDictionaryRef result;
+    {
+        unsigned long long nb,np;
+        pthread_mutex_lock(&g2_obs_lock);
+        nb=++g2_obs.info_builds;np=g2_obs.preflights;
+        pthread_mutex_unlock(&g2_obs_lock);
+        logf_u2("GEN2 OBS /info build t=%llu count=%llu (of which local preflights=%llu)",
+                (unsigned long long)monotonic_ms(),nb,np);
+    }
     (void)settings_refresh();
     previous=settings_scope();
     scope=calloc(1,sizeof(*scope));
@@ -3638,6 +3916,8 @@ static CFMutableDictionaryRef command_update_view(unsigned view)
     set_str(req,"type","updateViewArea");
     set_str(params,"uuid",command_uuid());
     set_i64(params,"viewAreaIndex",(int64_t)view);
+    logf_u2("GEN2 OBS updateViewArea build t=%llu viewAreaIndex=%u count=%u transitionMs=%u",
+            (unsigned long long)monotonic_ms(),view,cfg.count,cfg.transition_ms);
     set_i64(params,"animationDurationMillis",(int64_t)cfg.transition_ms);
     if(cfg.count>1u)set_adjacent_views(params,view,cfg.count,cfg.view[view].adjacent);
     { CFStringRef k=s_cf("params"); p_CFDictionarySetValue(req,k,params); p_CFRelease(k); }
@@ -3841,6 +4121,47 @@ static void gen2_publish_status(void)
         if(zn<0 || (size_t)zn>=sizeof(b)-(size_t)n)return;
         n+=zn;
     }
+    {
+        struct gen2_obs o;
+        int on;
+        pthread_mutex_lock(&g2_obs_lock);
+        o=g2_obs;
+        pthread_mutex_unlock(&g2_obs_lock);
+        on=snprintf(b+n,sizeof(b)-(size_t)n,
+            "obs_setup110_count=%llu\nobs_setup111_count=%llu\nobs_teardown110_count=%llu\n"
+            "obs_teardown111_count=%llu\nobs_teardown_full_count=%llu\nobs_info_build_count=%llu\n"
+            "obs_info_preflight_count=%llu\nprobe186_runs=%llu\nprobe186_sent=%llu\nprobe186_done=%llu\n"
+            "probe186_failed=%llu\nprobe186_last=%s\nprobe186_last_status=%lld\nprobe186_last_ack_ms=%llu\n",
+            o.setup110,o.setup111,o.td110,o.td111,o.tdfull,o.info_builds,o.preflights,
+            o.probe_runs,o.probe_sent,o.probe_done,o.probe_failed,o.probe_last,
+            o.probe_last_status,o.probe_last_ms);
+        if(on<0 || (size_t)on>=sizeof(b)-(size_t)n)return;
+        n+=on;
+    }
+    {
+        struct alt111_vs v;
+        struct g2_view_scaling_cfg c;
+        int vn;
+        g2_vs_load(&c);
+        pthread_mutex_lock(&g2_obs_lock);
+        v=g2_vss;
+        pthread_mutex_unlock(&g2_obs_lock);
+        vn=snprintf(b+n,sizeof(b)-(size_t)n,
+            "viewscale_enabled=%u\nviewscale_source=%s\nviewscale_mode=%s\nviewscale_zoom_area0=%s\n"
+            "viewscale_zoom_area1=%s\nviewscale_zoom_area2=%s\nviewscale_state=%s\n"
+            "viewscale_active_zoom=%s\nviewscale_target_zoom=%s\nviewscale_target_area=%u\n"
+            "viewscale_runs=%llu\nviewscale_confirmed=%llu\nviewscale_failed=%llu\nviewscale_restored=%llu\n"
+            "viewscale_skipped_same=%llu\nviewscale_deferred=%llu\nviewscale_pending_reconnect=%llu\n"
+            "viewscale_last_result=%s\n",
+            c.enabled,c.source,c.cycle?"cycle":"panels",c.zoom[0],c.zoom[1],c.zoom[2],
+            alt111_vs_state_name(v.state),v.active[0]?v.active:"unknown",v.target[0]?v.target:"none",
+            v.target_area,(unsigned long long)v.runs,(unsigned long long)v.confirmed,
+            (unsigned long long)v.failed,(unsigned long long)v.restored,
+            (unsigned long long)v.skipped_same,(unsigned long long)v.deferred,
+            (unsigned long long)v.pending_reconnect,v.last_result[0]?v.last_result:"none");
+        if(vn<0 || (size_t)vn>=sizeof(b)-(size_t)n)return;
+        n+=vn;
+    }
     pthread_mutex_lock(&g2_status_lock);
     snprintf(tmp,sizeof(tmp),"%s.new.%ld",g2_status_path,(long)getpid());
     fd=open(tmp,O_WRONLY|O_CREAT|O_TRUNC,0644);
@@ -3879,8 +4200,12 @@ static int gen2_control_projection_on(AirPlayReceiverSessionRef session)
     if(!scope || !g_settings_scope_ready){free(scope);return 0;}
     pthread_mutex_lock(&g_settings_lock);
     if(g_settings_have_active && session!=g_settings_active_session){
+        unsigned long long own_s=(unsigned long long)(uintptr_t)g_settings_active_session,
+            own_age=(unsigned long long)(monotonic_ms()-g_settings_active_since_ms);
+        unsigned conf=g_settings_active_confirmed;
         pthread_mutex_unlock(&g_settings_lock);free(scope);
-        logf_u2("GEN2 SETUP rejected: another private session still owns the active descriptor");
+        logf_u2("GEN2 SETUP rejected: another private session still owns the active descriptor owner_session=0x%llx owner_age_ms=%llu owner_confirmed=%u new_session=0x%llx",
+                own_s,own_age,conf,(unsigned long long)(uintptr_t)session);
         return 0;
     }
     if(g_settings_have_active && session==g_settings_active_session){
@@ -3899,6 +4224,7 @@ static int gen2_control_projection_on(AirPlayReceiverSessionRef session)
     if(!g_settings_have_active || session!=g_settings_active_session){
         g_settings_active=scope->settings;g_settings_have_active=1u;
         g_settings_active_session=session ? (AirPlayReceiverSessionRef)p_CFRetain(session) : NULL;
+        g_settings_active_since_ms=monotonic_ms();
         g_settings_active_confirmed=session && session==g_settings_advertised_session;
         snprintf(g_settings_active_version,sizeof(g_settings_active_version),"%s",g_settings_advertised_version);
     }
@@ -3997,6 +4323,7 @@ static void gen2_control_release(void)
 struct gen2_command_context {
     uint64_t session;
     uint64_t request;
+    uint64_t dispatch_ms;
     unsigned type;
     unsigned view;
     struct alt111_settings settings;
@@ -4024,6 +4351,11 @@ static void gen2_command_completion(OSStatus status, CFDictionaryRef response, v
         if(g_settings_have_active && g_settings_active_control_generation==ctx->session){
             if(ctx->type==ALT111_CMD_SHOW)
                 alt111_settings_runtime_overlay(&g_settings_active,&ctx->settings,ALT111_OVERLAY_PRESENTATION);
+            if(ctx->type==ALT111_CMD_VIEW){
+                pthread_mutex_lock(&g2_obs_lock);
+                g2_vs_req_pending=1u;g2_vs_req_area=ctx->view; /* latest wins */
+                pthread_mutex_unlock(&g2_obs_lock);
+            }
             if(ctx->type==ALT111_CMD_VIEW ||
                (ctx->type==ALT111_CMD_SHOW && g2_control.view_count==1u))
                 snprintf(g_settings_active.value[ALTSET_VIEWAREA_SELECTED],
@@ -4036,6 +4368,9 @@ static void gen2_command_completion(OSStatus status, CFDictionaryRef response, v
 
     logf_u2("gen2 UI completion type=%u request=%llu status=%d core_rc=%d",
             ctx->type,(unsigned long long)ctx->request,(int)status,crc);
+    logf_u2("GEN2 OBS UI completion t=%llu type=%u view=%u request=%llu status=%d accepted=%d ack_ms=%llu",
+            (unsigned long long)now,ctx->type,ctx->view,(unsigned long long)ctx->request,(int)status,accepted,
+            (unsigned long long)(ctx->dispatch_ms && now>=ctx->dispatch_ms ? now-ctx->dispatch_ms : 0u));
     free(ctx);
     gen2_publish_status();
 }
@@ -4515,6 +4850,288 @@ static void gen2_zoom_worker_tick(void)
             zcmd.direction,send_rc);
 }
 
+/* ---- r12 display-update probe (marker-only, parked test) ----
+ * Marker content (one line): "<variant> <zoom> [gap_ms]"
+ *   info    -> {type:updateDisplayInfo,   params:{uuid, displays:[111']}}
+ *   infoall -> {type:updateDisplayInfo,   params:{uuid, displays:[110,111']}}
+ *   panels  -> {type:updateDisplayPanels, params:{displayPanels:[110,111']}}
+ *   cycle   -> panels without 111, wait gap_ms (100..3000, default 500), panels with 111'
+ * 111' = the exact GEN2 /info descriptor for 111 (desired settings) with zoomFactor=<zoom>.
+ * zoom is restricted to the finite scaling set 70|85|100|125|150. Wire shapes are
+ * UNPROVEN on iOS; completion status is a transport answer, not proof of rescale.
+ * No retry, no teardown, no reconnect, stream 110 is never touched by us. */
+struct gen2_probe_context {
+    uint64_t sent_ms;
+    char label[48];
+};
+static void gen2_probe_completion(OSStatus status, CFDictionaryRef response, void *opaque)
+{
+    struct gen2_probe_context *ctx=(struct gen2_probe_context *)opaque;
+    uint64_t now=monotonic_ms(),ms;
+    long keys=response?(long)p_CFDictionaryGetCount(response):-1;
+    if(!ctx)return;
+    ms=now>=ctx->sent_ms?now-ctx->sent_ms:0u;
+    pthread_mutex_lock(&g2_obs_lock);
+    g2_obs.probe_done++;
+    g2_obs.probe_last_status=(long long)status;
+    g2_obs.probe_last_ms=ms;
+    pthread_mutex_unlock(&g2_obs_lock);
+    logf_u2("GEN2 PROBE186 completion t=%llu step=%s status=%d ack_ms=%llu response_keys=%ld",
+            (unsigned long long)now,ctx->label,(int)status,(unsigned long long)ms,keys);
+    free(ctx);
+    gen2_publish_status();
+}
+static int gen2_probe_send(AirPlayReceiverSessionRef s,CFMutableDictionaryRef req,const char *label)
+{
+    struct gen2_probe_context *ctx;
+    OSStatus e=-1;
+    if(!s||!req||!g_sendcmd)return -1;
+    ctx=calloc(1,sizeof(*ctx));
+    if(!ctx)return -1;
+    snprintf(ctx->label,sizeof(ctx->label),"%s",label);
+    ctx->sent_ms=monotonic_ms();
+    e=g_sendcmd(s,req,gen2_probe_completion,ctx);
+    pthread_mutex_lock(&g2_obs_lock);
+    if(e==K_NO_ERR)g2_obs.probe_sent++;else g2_obs.probe_failed++;
+    snprintf(g2_obs.probe_last,sizeof(g2_obs.probe_last),"%s",label);
+    pthread_mutex_unlock(&g2_obs_lock);
+    if(e==K_NO_ERR && strncmp(label,"info",4)){
+        pthread_mutex_lock(&g2_obs_lock);
+        g2_probe186_window_until_ms=ctx->sent_ms+G2_PROBE186_WINDOW_MS;
+        pthread_mutex_unlock(&g2_obs_lock);
+    }
+    logf_u2("GEN2 PROBE186 send t=%llu step=%s rc=%d",(unsigned long long)ctx->sent_ms,label,(int)e);
+    if(e!=K_NO_ERR){free(ctx);return -1;}
+    return 0;
+}
+static CFMutableDictionaryRef gen2_probe_command(const char *type,const char *list_key,
+                                                 CFDictionaryRef d110,CFDictionaryRef d111,
+                                                 const char *uuid)
+{
+    CFMutableDictionaryRef req=dict_new(),params=dict_new();
+    CFMutableArrayRef list=p_CFArrayCreateMutable(NULL,0,p_array_callbacks);
+    CFStringRef k=NULL;
+    if(!req||!params||!list)goto fail;
+    if(d110)p_CFArrayAppendValue(list,d110);
+    if(d111)p_CFArrayAppendValue(list,d111);
+    if(set_str(req,"type",type))goto fail;
+    if(uuid && set_str(params,"uuid",uuid))goto fail;
+    k=s_cf(list_key);if(!k)goto fail;
+    p_CFDictionarySetValue(params,k,list);p_CFRelease(k);k=NULL;
+    k=s_cf("params");if(!k)goto fail;
+    p_CFDictionarySetValue(req,k,params);p_CFRelease(k);
+    p_CFRelease(params);p_CFRelease(list);
+    return req;
+fail:
+    if(k)p_CFRelease(k);
+    if(req)p_CFRelease(req);
+    if(params)p_CFRelease(params);
+    if(list)p_CFRelease(list);
+    return NULL;
+}
+static int gen2_probe_run(const char *variant,const char *zoom,int gap);
+static void gen2_probe186_poll(void)
+{
+    char b[64],variant[16]={0},zoom[8]={0};
+    int fd,n,gap=500,fields;
+
+    if(access(g2_probe186_marker,F_OK)!=0)return;
+    fd=open(g2_probe186_marker,O_RDONLY);
+    n=fd>=0?(int)read(fd,b,sizeof(b)-1u):-1;
+    if(fd>=0)close(fd);
+    unlink(g2_probe186_marker); /* one shot, never repeats by itself */
+    pthread_mutex_lock(&g2_obs_lock);
+    g2_obs.probe_runs++;
+    pthread_mutex_unlock(&g2_obs_lock);
+    if(n<=0){logf_u2("GEN2 PROBE186 rejected: empty marker");return;}
+    b[n]='\0';
+    fields=sscanf(b,"%15s %7s %d",variant,zoom,&gap);
+    if(fields<2 || (strcmp(variant,"info")&&strcmp(variant,"infoall")&&
+                    strcmp(variant,"panels")&&strcmp(variant,"cycle"))){
+        logf_u2("GEN2 PROBE186 rejected: variant");return;
+    }
+    if(!mibr_display_scaling_value_valid(zoom) || !strcmp(zoom,"AUTO")){
+        logf_u2("GEN2 PROBE186 rejected: zoom must be 70|85|100|125|150");return;
+    }
+    if(gap<100||gap>3000){logf_u2("GEN2 PROBE186 rejected: gap_ms 100..3000");return;}
+    {
+        struct mibr_display_scaling_state sc;
+        struct g2_view_scaling_cfg vsc;
+        char se[96],eff[8];
+        unsigned area;
+        if(mibr_display_scaling_load(MIBR_SCALING_PROFILE,&sc,se,sizeof(se))==0){
+            g2_vs_load(&vsc);
+            pthread_mutex_lock(&g_settings_lock);
+            area=alt111_setting_integer(&g_settings_desired,ALTSET_VIEWAREA_SELECTED);
+            pthread_mutex_unlock(&g_settings_lock);
+            g2_vs_zoom_for_area(&vsc,area,sc.cluster,eff,sizeof(eff));
+            if(strcmp(eff,zoom))
+                logf_u2("GEN2 PROBE186 WARNING: probe zoom=%s but a re-SETUP(111) would advertise %s (area=%u); set the same zoom first.",zoom,eff,area);
+            else logf_u2("GEN2 PROBE186 probe zoom matches the descriptor zoom %s",eff);
+        }
+    }
+    (void)gen2_probe_run(variant,zoom,gap);
+}
+
+/* Shared by the operator marker and the per-view scaling transition. */
+static int gen2_probe_run(const char *variant,const char *zoom,int gap)
+{
+    char uuid[ALT111_SETTING_VALUE_CAP];
+    unsigned ready;
+    int sent=-1;
+    struct gen2_settings_scope *scope=NULL,*previous;
+    AirPlayReceiverSessionRef s=NULL;
+    CFDictionaryRef info=NULL;
+    CFArrayRef displays=NULL;
+    CFStringRef kd=NULL,kt=NULL;
+    CFDictionaryRef d110=NULL,d111=NULL;
+    CFMutableDictionaryRef d111z=NULL,req=NULL;
+    OSStatus err=0;
+    uint8_t mac[6]={0};
+    CFIndex i,count;
+
+    pthread_mutex_lock(&g2_core_lock);
+    ready=g2_command_ready && g2_control.active && g2_control_session;
+    pthread_mutex_unlock(&g2_core_lock);
+    scope=calloc(1,sizeof(*scope));
+    pthread_mutex_lock(&g_settings_lock);
+    if(ready && scope && g_settings_valid && g_settings_have_active && g_settings_active_session){
+        s=(AirPlayReceiverSessionRef)p_CFRetain(g_settings_active_session);
+        scope->settings=g_settings_desired;scope->valid=1u;scope->internal_build=1u;
+    }
+    pthread_mutex_unlock(&g_settings_lock);
+    if(!s){logf_u2("GEN2 PROBE186 rejected: no active 111 session");free(scope);return -1;}
+    snprintf(uuid,sizeof(uuid),"%s",scope->settings.value[ALTSET_DISPLAY_UUID]);
+
+    /* Build the descriptor exactly like /info, but WITHOUT touching the
+     * advertised snapshot bookkeeping of AirPlayCopyServerInfo. */
+    previous=settings_scope();
+    if(g_settings_scope_ready && pthread_setspecific(g_settings_scope_key,scope)==0){
+        info=gen2_serverinfo_scoped(s,NULL,mac,&err);
+        (void)pthread_setspecific(g_settings_scope_key,previous);
+    }
+    if(!info || err!=K_NO_ERR || !scope->descriptor_complete){
+        logf_u2("GEN2 PROBE186 rejected: descriptor build failed err=%d complete=%u",(int)err,scope->descriptor_complete);
+        goto done;
+    }
+    kd=s_cf("displays");kt=s_cf("type");
+    displays=kd?(CFArrayRef)p_CFDictionaryGetValue(info,kd):NULL;
+    if(!displays || p_CFGetTypeID(displays)!=p_CFArrayGetTypeID()){logf_u2("GEN2 PROBE186 rejected: no displays");goto done;}
+    count=p_CFArrayGetCount(displays);
+    for(i=0;i<count;++i){
+        CFDictionaryRef d=(CFDictionaryRef)p_CFArrayGetValueAtIndex(displays,i);
+        OSStatus te=-1;int64_t t;
+        if(!d || p_CFGetTypeID(d)!=p_CFDictionaryGetTypeID())continue;
+        t=p_CFDictionaryGetInt64(d,kt,&te);
+        if(!te && t==111){if(!d111)d111=d;}
+        else if(!d110)d110=d;
+    }
+    if(!d110||!d111){logf_u2("GEN2 PROBE186 rejected: topology count=%ld has110=%u has111=%u",(long)count,d110?1u:0u,d111?1u:0u);goto done;}
+    d111z=dict_clone(d111);
+    if(!d111z || scaling_apply_display(d111z,zoom,1)){logf_u2("GEN2 PROBE186 rejected: zoom apply");goto done;}
+    scaling_log_display("PROBE186 111'",d111z);
+    logf_u2("GEN2 PROBE186 start t=%llu variant=%s zoom=%s gap_ms=%d displays=%ld uuid=%s",
+            (unsigned long long)monotonic_ms(),variant,zoom,gap,(long)count,uuid);
+
+    if(!strcmp(variant,"info")){
+        req=gen2_probe_command("updateDisplayInfo","displays",NULL,d111z,uuid);
+        sent=gen2_probe_send(s,req,"info");
+    }else if(!strcmp(variant,"infoall")){
+        req=gen2_probe_command("updateDisplayInfo","displays",d110,d111z,uuid);
+        sent=gen2_probe_send(s,req,"infoall");
+    }else if(!strcmp(variant,"panels")){
+        req=gen2_probe_command("updateDisplayPanels","displayPanels",d110,d111z,NULL);
+        sent=gen2_probe_send(s,req,"panels");
+    }else{
+        req=gen2_probe_command("updateDisplayPanels","displayPanels",d110,NULL,NULL);
+        if(gen2_probe_send(s,req,"cycleA_without111")==0){
+            if(req){p_CFRelease(req);req=NULL;}
+            usleep((useconds_t)gap*1000u); /* blocks this control worker for the gap only */
+            req=gen2_probe_command("updateDisplayPanels","displayPanels",d110,d111z,NULL);
+            sent=gen2_probe_send(s,req,"cycleB_with111");
+        }
+    }
+done:
+    if(req)p_CFRelease(req);
+    if(d111z)p_CFRelease(d111z);
+    if(kd)p_CFRelease(kd);
+    if(kt)p_CFRelease(kt);
+    if(info)p_CFRelease(info);
+    if(s)p_CFRelease(s);
+    free(scope);
+    gen2_publish_status();
+    return sent;
+}
+
+/* Per-view scaling transition (#186 r13): an acknowledged updateViewArea queues the
+ * selected view; the coordinator (alt111_viewscale.c) decides NOOP / pending_reconnect /
+ * one P8 operation / one restore. Applied only on phone evidence (SETUP 111 + /info with
+ * the target zoom); one transition at a time, latest request wins; no retry loop. */
+static void gen2_view_scaling_tick(void)
+{
+    struct g2_view_scaling_cfg c;
+    struct alt111_vs_config vc;
+    enum alt111_vs_action act;
+    unsigned pending,area,changed=0u;
+    char target[ALT111_VS_ZOOM_CAP],active[ALT111_VS_ZOOM_CAP],result[32];
+    int state,rc;
+    uint64_t now=monotonic_ms();
+
+    g2_vs_load(&c);
+    vc.enabled=c.enabled;vc.min_interval_ms=c.min_interval_ms;vc.confirm_timeout_ms=c.confirm_timeout_ms;
+    pthread_mutex_lock(&g2_obs_lock);
+    pending=g2_vs_req_pending;area=g2_vs_req_area;g2_vs_req_pending=0u;
+    pthread_mutex_unlock(&g2_obs_lock);
+    if(pending && c.enabled){
+        struct mibr_display_scaling_state sc;
+        char se[96],eff[8];
+        if(mibr_display_scaling_load(MIBR_SCALING_PROFILE,&sc,se,sizeof(se))!=0)
+            snprintf(sc.cluster,sizeof(sc.cluster),"AUTO");
+        g2_vs_zoom_for_area(&c,area,sc.cluster,eff,sizeof(eff));
+        pthread_mutex_lock(&g2_obs_lock);
+        alt111_vs_request(&g2_vss,area,eff);
+        pthread_mutex_unlock(&g2_obs_lock);
+        logf_u2("GEN2 VIEWSCALE request t=%llu area=%u zoom=%s",(unsigned long long)now,area,eff);
+    }
+    pthread_mutex_lock(&g2_obs_lock);
+    act=alt111_vs_tick(&g2_vss,&vc,now);
+    snprintf(target,sizeof(target),"%s",g2_vss.target);
+    snprintf(active,sizeof(active),"%s",g2_vss.active);
+    pthread_mutex_unlock(&g2_obs_lock);
+
+    if(act==ALT111_VS_ACT_START){
+        logf_u2("GEN2 VIEWSCALE start t=%llu zoom %s -> %s mode=%s gap_ms=%u timeout_ms=%u source=%s",
+                (unsigned long long)now,active,target,c.cycle?"cycle":"panels",c.gap_ms,
+                c.confirm_timeout_ms,c.source);
+        rc=gen2_probe_run(c.cycle?"cycle":"panels",target,(int)c.gap_ms);
+        pthread_mutex_lock(&g2_obs_lock);
+        alt111_vs_sent(&g2_vss,act,rc==0,monotonic_ms());
+        pthread_mutex_unlock(&g2_obs_lock);
+    }else if(act==ALT111_VS_ACT_RESTORE){
+        /* one panel update with 111 at the last confirmed zoom; no removal, no retry */
+        logf_u2("GEN2 VIEWSCALE restore t=%llu zoom %s (target %s not confirmed)",
+                (unsigned long long)now,active,target);
+        rc=gen2_probe_run("panels",active,(int)c.gap_ms);
+        pthread_mutex_lock(&g2_obs_lock);
+        alt111_vs_sent(&g2_vss,act,rc==0,monotonic_ms());
+        pthread_mutex_unlock(&g2_obs_lock);
+    }
+
+    pthread_mutex_lock(&g2_obs_lock);
+    state=(int)g2_vss.state;
+    snprintf(result,sizeof(result),"%s",g2_vss.last_result);
+    snprintf(target,sizeof(target),"%s",g2_vss.target);
+    snprintf(active,sizeof(active),"%s",g2_vss.active);
+    if(state!=g2_vs_logged_state){g2_vs_logged_state=state;changed=1u;}
+    pthread_mutex_unlock(&g2_obs_lock);
+    if(changed){
+        logf_u2("GEN2 VIEWSCALE state=%s active=%s target=%s result=%s",
+                alt111_vs_state_name((enum alt111_vs_state)state),active[0]?active:"unknown",
+                target[0]?target:"none",result[0]?result:"none");
+        gen2_publish_status();
+    }
+}
+
 static void *gen2_control_worker(void *arg)
 {
     uint64_t last_settings_poll=0;
@@ -4544,6 +5161,8 @@ static void *gen2_control_worker(void *arg)
 
         gen2_resync_poll();
         gen2_process_diag_markers();
+        gen2_probe186_poll();
+        gen2_view_scaling_tick();
         gen2_apply_selected_view();
 
         if(access(g2_reacquire_marker,F_OK)==0){
@@ -4589,6 +5208,7 @@ static void *gen2_control_worker(void *arg)
         }
 
         if(req&&s&&ctx){
+            ctx->dispatch_ms=monotonic_ms();
             e=g_sendcmd(s,req,gen2_command_completion,ctx);
             if(e==K_NO_ERR){
                 queued=1;
@@ -4762,7 +5382,11 @@ static void *gen2_zoom_spi_worker(void *arg)
 #define G2_CALIB_MAX_AGE_S 600
 #define G2_CALIB_FRAME_US 33333
 static const char *g2_calib_marker = "/tmp/mibr-calib.enabled";
-static const char *g2_calib_clip = MIBR_BIN_DIR "/mibr-calib.avcc";
+/* Test patterns (menu choice, marker content = pattern id): grid is the original clip; the others live next
+ * to it as mibr-calib-<id>.avcc. Missing/"1"/unknown content means grid (the former on/off marker). */
+static const char *const g2_calib_patterns[]={"grid","black","white","contrast","motion"};
+#define G2_CALIB_PATTERN_CAP 16u
+#define G2_CALIB_PATTERN_POLL_US 500000L
 static pthread_t g2_calib_thread;
 
 /* Reader thread: avcC -> SPS and PPS in 4-byte NAL lengths; nothing if the phone uses another length. */
@@ -4834,12 +5458,30 @@ static int gen2_calib_take_frame(const uint8_t *p,size_t n,const uint8_t ts[8])
     return 1;
 }
 
-static uint8_t *gen2_calib_load(size_t *size)
+/* Pattern id from the marker; always one of g2_calib_patterns. */
+static void gen2_calib_pattern(char out[G2_CALIB_PATTERN_CAP])
+{
+    char b[G2_CALIB_PATTERN_CAP+8u];
+    unsigned i;
+    int fd=open(g2_calib_marker,O_RDONLY),n=-1;
+    snprintf(out,G2_CALIB_PATTERN_CAP,"%s",g2_calib_patterns[0]);
+    if(fd>=0){n=(int)read(fd,b,sizeof(b)-1u);close(fd);}
+    if(n<=0)return;
+    b[n]='\0';
+    for(i=0;b[i];++i)if(b[i]=='\r'||b[i]=='\n'||b[i]==' '||b[i]=='\t'){b[i]='\0';break;}
+    for(i=0;i<sizeof(g2_calib_patterns)/sizeof(g2_calib_patterns[0]);++i)
+        if(!strcmp(b,g2_calib_patterns[i])){snprintf(out,G2_CALIB_PATTERN_CAP,"%s",b);return;}
+}
+static uint8_t *gen2_calib_load(const char *pattern,size_t *size)
 {
     struct stat st;
     uint8_t *clip;
     size_t off=0;
-    int fd=open(g2_calib_clip,O_RDONLY);
+    char path[160];
+    int fd;
+    if(!strcmp(pattern,"grid"))snprintf(path,sizeof(path),"%s",MIBR_BIN_DIR "/mibr-calib.avcc");
+    else snprintf(path,sizeof(path),MIBR_BIN_DIR "/mibr-calib-%s.avcc",pattern);
+    fd=open(path,O_RDONLY);
     if(fd<0)return NULL;
     if(fstat(fd,&st)||st.st_size<8||(size_t)st.st_size>G2_CALIB_MAX_BYTES||!(clip=malloc((size_t)st.st_size))){
         close(fd);
@@ -4874,8 +5516,9 @@ static void *gen2_calib_worker(void *arg)
     uint8_t *clip=NULL;
     size_t clip_n=0,at=0;
     uint64_t base=0;
-    int64_t started=0,next=0;
+    int64_t started=0,next=0,pattern_checked=0;
     int active=0;
+    char pattern[G2_CALIB_PATTERN_CAP]="",want[G2_CALIB_PATTERN_CAP];
     (void)arg;
     for(;;){
         int rc;
@@ -4896,10 +5539,28 @@ static void *gen2_calib_worker(void *arg)
             gen2_calib_nap(100000L);
             continue;
         }
-        if(!clip&&!(clip=gen2_calib_load(&clip_n))){
-            logf_u2("calibration clip not readable");
-            gen2_calib_nap(5000000L);
-            continue;
+        now=monotonic_us();
+        if(!clip||now-pattern_checked>=G2_CALIB_PATTERN_POLL_US){
+            pattern_checked=now;
+            gen2_calib_pattern(want);
+            if(clip&&strcmp(want,pattern)){
+                /* every clip starts with SPS/PPS + IDR, so a switch restarts cleanly at record 0 */
+                free(clip);clip=NULL;clip_n=0;at=0;
+                logf_u2("calibration pattern %s -> %s",pattern,want);
+            }
+        }
+        if(!clip){
+            if(!(clip=gen2_calib_load(want,&clip_n))&&strcmp(want,"grid")){
+                logf_u2("calibration clip %s not readable; grid instead",want);
+                snprintf(want,sizeof(want),"grid");
+                clip=gen2_calib_load(want,&clip_n);
+            }
+            if(!clip){
+                logf_u2("calibration clip not readable");
+                gen2_calib_nap(5000000L);
+                continue;
+            }
+            snprintf(pattern,sizeof(pattern),"%s",want);at=0;
         }
         if(!active){
             /* without the phone's parameter sets there would be no way back */
@@ -4915,7 +5576,7 @@ static void *gen2_calib_worker(void *arg)
             pthread_mutex_unlock(&g2_core_lock);
             active=1;at=0;
             started=next=monotonic_us();
-            logf_u2("calibration picture on");
+            logf_u2("calibration picture on pattern=%s",pattern);
         }
         if(at+4u>clip_n)at=0;
         len=((size_t)clip[at]<<24)|((size_t)clip[at+1u]<<16)|((size_t)clip[at+2u]<<8)|clip[at+3u];
@@ -5304,6 +5965,9 @@ static int gen2_ensure_advert_preflight(AirPlayReceiverSessionRef s)
     OSStatus err=0;
     uint8_t mac[6]={0};
     if(gen2_advert_ready_for(s))return 1;
+    pthread_mutex_lock(&g2_obs_lock);
+    g2_obs.preflights++;
+    pthread_mutex_unlock(&g2_obs_lock);
     check=AirPlayCopyServerInfo(s,NULL,mac,&err);
     if(check)p_CFRelease(check);
     return check && err==K_NO_ERR && gen2_advert_ready_for(s);
@@ -5326,6 +5990,18 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
      */
     e=call_stock_setup(s,request,&stockResp);
     logf_u2("SETUP stock result=%d response=%s",(int)e,stockResp?"yes":"no");
+    if(e==K_NO_ERR && request){
+        int t110=contains_stream_type(request,110),t111=contains_stream_type(request,111);
+        unsigned long long c110,c111;
+        pthread_mutex_lock(&g2_obs_lock);
+        if(t110)g2_obs.setup110++;
+        if(t111){g2_obs.setup111++;alt111_vs_observe_setup111(&g2_vss,monotonic_ms());}
+        c110=g2_obs.setup110;c111=g2_obs.setup111;
+        pthread_mutex_unlock(&g2_obs_lock);
+        if(t110||t111)
+            logf_u2("GEN2 OBS SETUP t=%llu has110=%d has111=%d setup110_count=%llu setup111_count=%llu",
+                    (unsigned long long)monotonic_ms(),t110,t111,c110,c111);
+    }
     if(e==K_NO_ERR && g_enabled && master_enabled()) set_active_session(s);
     if(e!=K_NO_ERR){
         if(outResponse)*outResponse=stockResp;
@@ -5373,6 +6049,16 @@ static OSStatus mibr_session_setup(AirPlayReceiverSessionRef s, CFDictionaryRef 
             (unsigned long long)cid,other);
     publish_state("setup");
 
+    if(!control_attempted && !gen2_advert_ready_for(s)){
+        uint64_t now=monotonic_ms(),until;
+        pthread_mutex_lock(&g2_obs_lock);
+        until=g2_probe186_window_until_ms;
+        pthread_mutex_unlock(&g2_obs_lock);
+        if(until && now<=until){
+            int ok=gen2_ensure_advert_preflight(s);
+            logf_u2("GEN2 PROBE186 P8 SETUP(111) without features inside probe window: re-advert from desired rc=%d",ok);
+        }
+    }
     if((control_attempted && !control_advert_ready) ||
        (!control_attempted && !gen2_advert_ready_for(s))){
         logf_u2("GEN2 stream111 SETUP withheld: no full same-session display advert");
@@ -5469,6 +6155,28 @@ static void mibr_session_teardown(AirPlayReceiverSessionRef s, CFDictionaryRef r
 
     logf_u2("GEN2 TEARDOWN entry request=%s reason=%d alt=%d main110=%d otherStreams=%d private111_decoupled=1",
             request?"dict":"NULL",(int)reason,has_alt,has_main,other);
+    {
+        unsigned long long c110,c111,cf;
+        pthread_mutex_lock(&g2_obs_lock);
+        if(full_session){g2_obs.tdfull++;alt111_vs_observe_full_teardown(&g2_vss);}
+        if(has_main)g2_obs.td110++;
+        if(has_alt)g2_obs.td111++;
+        c110=g2_obs.td110;c111=g2_obs.td111;cf=g2_obs.tdfull;
+        pthread_mutex_unlock(&g2_obs_lock);
+        logf_u2("GEN2 OBS TEARDOWN t=%llu full=%d has110=%d has111=%d td110_count=%llu td111_count=%llu tdfull_count=%llu",
+                (unsigned long long)monotonic_ms(),full_session,has_main,has_alt,c110,c111,cf);
+    }
+
+    {
+        unsigned long long own_s=0,own_age=0;unsigned have;
+        pthread_mutex_lock(&g_settings_lock);
+        have=g_settings_have_active;
+        if(have){own_s=(unsigned long long)(uintptr_t)g_settings_active_session;own_age=(unsigned long long)(monotonic_ms()-g_settings_active_since_ms);}
+        pthread_mutex_unlock(&g_settings_lock);
+        logf_u2("GEN2 TEARDOWN DECISION full=%d why=%s has111=%d active_owner=%u owner_session=0x%llx owner_age_ms=%llu req_session=0x%llx descriptor_release=%s",
+                full_session,request?"request_is_dict_not_NULL":"request_NULL",has_alt,have,own_s,own_age,
+                (unsigned long long)(uintptr_t)s,has_alt?"yes_explicit111":"NO_no111_in_request");
+    }
 
     if(has_alt){
         logf_u2("GEN2 TEARDOWN explicit stream111 otherStreams=%d main110=%d",other,has_main);

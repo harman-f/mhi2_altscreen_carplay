@@ -1,0 +1,226 @@
+{
+ "schema": "MIBR_CLUSTER_GEOMETRY/1",
+ "source": "photos 2026-11-15 23:21 (Skoda MU1440 cluster, calibration grid stream 111 1010x376), rectified by homography from grid points",
+ "coords": "stream 111 pixels, 1010x376, origin top left",
+ "accuracy_px": "about 3",
+ "common": {
+  "top_bar": {
+   "poly": [
+    [
+     0,
+     0
+    ],
+    [
+     1010,
+     0
+    ],
+    [
+     1010,
+     37
+    ],
+    [
+     555,
+     37
+    ],
+    [
+     532,
+     48
+    ],
+    [
+     478,
+     48
+    ],
+    [
+     455,
+     37
+    ],
+    [
+     0,
+     37
+    ]
+   ],
+   "kind": "translucent",
+   "note": "compass, clock tab, outside temperature"
+  },
+  "bottom_bar": {
+   "poly": [
+    [
+     0,
+     334
+    ],
+    [
+     1010,
+     334
+    ],
+    [
+     1010,
+     376
+    ],
+    [
+     0,
+     376
+    ]
+   ],
+   "kind": "opaque",
+   "note": "trip, assist icons, speed limit"
+  }
+ },
+ "views": {
+  "full": {
+   "chrome": [
+    {
+     "poly": [
+      [
+       0,
+       276
+      ],
+      [
+       165,
+       276
+      ],
+      [
+       217,
+       334
+      ],
+      [
+       0,
+       334
+      ]
+     ],
+     "kind": "opaque",
+     "note": "left corner"
+    },
+    {
+     "poly": [
+      [
+       866,
+       276
+      ],
+      [
+       1010,
+       276
+      ],
+      [
+       1010,
+       334
+      ],
+      [
+       815,
+       334
+      ]
+     ],
+     "kind": "opaque",
+     "note": "right corner, digital speed"
+    }
+   ],
+   "max_safe_rect": [
+    0,
+    48,
+    1010,
+    228
+   ]
+  },
+  "wide": {
+   "chrome": [
+    {
+     "poly": [
+      [
+       0,
+       0
+      ],
+      [
+       162,
+       0
+      ],
+      [
+       231,
+       334
+      ],
+      [
+       0,
+       334
+      ]
+     ],
+     "kind": "opaque",
+     "note": "left panel (trip data)"
+    },
+    {
+     "poly": [
+      [
+       847,
+       0
+      ],
+      [
+       1010,
+       0
+      ],
+      [
+       1010,
+       334
+      ],
+      [
+       777,
+       334
+      ]
+     ],
+     "kind": "opaque",
+     "note": "right panel (media/turn, speed)"
+    }
+   ],
+   "max_safe_rect": [
+    232,
+    48,
+    545,
+    285
+   ]
+  },
+  "center": {
+   "chrome": [
+    {
+     "circle": [
+      182,
+      186,
+      186
+     ],
+     "kind": "opaque",
+     "note": "left dial (rpm)"
+    },
+    {
+     "circle": [
+      822,
+      186,
+      186
+     ],
+     "kind": "opaque",
+     "note": "right dial (speed)"
+    }
+   ],
+   "max_safe_rect": [
+    370,
+    48,
+    266,
+    285
+   ]
+  }
+ },
+ "current_code_defaults_xywh": {
+  "full": [
+   0,
+   58,
+   1010,
+   248
+  ],
+  "wide": [
+   200,
+   58,
+   590,
+   248
+  ],
+  "center": [
+   370,
+   58,
+   256,
+   248
+  ]
+ }
+}

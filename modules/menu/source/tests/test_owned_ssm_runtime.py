@@ -143,12 +143,14 @@ class MibrOwnedSsmRows {
  MibrOwnedSsmRows(de.vw.mib.view.internal.AbstractViewHandler h,MibrOemSsmTemplate.Binding b,Runnable back,MibrPopupEditorModel m,MibrCarPlayMenuModel.Snapshot s){Trace.rows++;}
  MibrOwnedSsmRows(de.vw.mib.view.internal.AbstractViewHandler h,MibrOemSsmTemplate.Binding b,Runnable back,MibrPopupEditorModel m,MibrCarPlayMenuModel.Snapshot s,MibrControlClient client){Trace.rows++;}
  MibrOwnedSsmRows(de.vw.mib.view.internal.AbstractViewHandler h,MibrOemSsmTemplate.Binding b,Runnable back,MibrPopupEditorModel m,MibrCarPlayMenuModel.Snapshot s,MibrControlClient client,MibrV3Client v3){Trace.rows++;}
+ void sliders(MibrSafeSliderSource s){}
  void open(){Trace.events.add("four-native-categories");}
  MibrCarPlayMenuModel.Snapshot snapshot(){return new MibrCarPlayMenuModel.Snapshot();}
  MibrPopupEditorModel draftOwner(){return new MibrPopupEditorModel();}
  void detach(){if(!attached)throw new AssertionError("double row detach");attached=false;Trace.rowDetach++;}
 }
 """,
+"de/mibr/hmi/MibrSafeSliderSource.java": "package de.mibr.hmi; class MibrSafeSliderSource {MibrSafeSliderSource(){} void dispose(){}}",
 "de/mibr/hmi/MibrCarPlayMenuModel.java": """package de.mibr.hmi;
 class MibrCarPlayMenuModel {static final class Snapshot {}}
 """,

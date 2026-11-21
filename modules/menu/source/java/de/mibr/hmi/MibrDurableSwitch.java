@@ -12,6 +12,10 @@ import java.io.FileInputStream;
  */
 final class MibrDurableSwitch {
     private static final String[] ON_OFF={"off","on"};
+    /* navigation and safe-area switches live in the shared view profile
+     * (MIBR_NAV_VIEW_PROFILES/3, broker = only writer, same file as the HTML configurator). */
+    static final int PK_NONE=0,PK_PLAIN=1,PK_BOOL=2,PK_BOTTOM=3,PK_RECT=4;
+    static String profileFile="/mnt/app/root/mibr/config/cockpit/view-profiles.conf";
     /** "CarPlay-Navigation": route guidance of the iPhone in the cockpit. */
     static final MibrDurableSwitch CARPLAY_NAV=new MibrDurableSwitch(
         "/mnt/app/root/mibr/config/navigation/carplay-nav.conf","MIBR_CARPLAY_NAV/1","CARPLAY_NAV","carplay_nav",ON_OFF,"off");
@@ -21,7 +25,7 @@ final class MibrDurableSwitch {
     /** The line above the cockpit map: distance and target, street only, or nothing. */
     static final MibrDurableSwitch NAV_TEXT=new MibrDurableSwitch(
         "/mnt/app/root/mibr/config/navigation/nav-line.conf","MIBR_NAV_LINE/1","NAV_LINE","nav_line",
-        new String[]{"dist","street","off"},"dist");
+        new String[]{"dist","street","off"},"dist","global.legacyLine",PK_PLAIN);
     /** The CarPlay map: follow the car, always light, always dark. */
     static final MibrDurableSwitch NAV_NIGHT=new MibrDurableSwitch(
         "/mnt/app/root/mibr/config/navigation/nav-night.conf","MIBR_NAV_NIGHT/1","NAV_NIGHT","nav_night",
@@ -29,28 +33,28 @@ final class MibrDurableSwitch {
     /** Where the arrows come from; "phone" also works while the stock map is in the cockpit. */
     static final MibrDurableSwitch NAV_SOURCE=new MibrDurableSwitch(
         "/mnt/app/root/mibr/config/navigation/nav-source.conf","MIBR_NAV_SOURCE/1","NAV_SOURCE","nav_source",
-        new String[]{"auto","stock","phone"},"auto");
+        new String[]{"auto","stock","phone"},"auto","global.source",PK_PLAIN);
     /** Side panel arrow, the small symbol in the lane strip at the top, or both. */
     static final MibrDurableSwitch NAV_DISPLAY=new MibrDurableSwitch(
         "/mnt/app/root/mibr/config/navigation/nav-display.conf","MIBR_NAV_DISPLAY/1","NAV_DISPLAY","nav_display",
-        new String[]{"side","top","both"},"side");
+        new String[]{"side","top","both"},"side","global.legacyDisplay",PK_PLAIN);
     /** Arrival time or remaining travel time at the bottom. */
     static final MibrDurableSwitch NAV_BOTTOM=new MibrDurableSwitch(
         "/mnt/app/root/mibr/config/navigation/nav-bottom.conf","MIBR_NAV_BOTTOM/1","NAV_BOTTOM","nav_bottom",
-        new String[]{"eta","rtt"},"eta");
+        new String[]{"eta","rtt"},"eta","global.bottom",PK_BOTTOM);
     /** Side streets drawn into the arrow. */
     static final MibrDurableSwitch NAV_SIDE=new MibrDurableSwitch(
-        "/mnt/app/root/mibr/config/navigation/nav-side.conf","MIBR_NAV_SIDE/1","NAV_SIDE","nav_side",ON_OFF,"on");
+        "/mnt/app/root/mibr/config/navigation/nav-side.conf","MIBR_NAV_SIDE/1","NAV_SIDE","nav_side",ON_OFF,"on","global.sideStreets",PK_BOOL);
     /** Real lane guidance from the phone. */
     static final MibrDurableSwitch NAV_LANES=new MibrDurableSwitch(
-        "/mnt/app/root/mibr/config/navigation/nav-lanes.conf","MIBR_NAV_LANES/1","NAV_LANES","nav_lanes",ON_OFF,"on");
+        "/mnt/app/root/mibr/config/navigation/nav-lanes.conf","MIBR_NAV_LANES/1","NAV_LANES","nav_lanes",ON_OFF,"on","global.legacyLanes",PK_BOOL);
     /** Safe areas as "x,y,w,h"; GEN2 reads the same files when CarPlay connects. */
     static final MibrDurableSwitch SAFE_VOLL=new MibrDurableSwitch(
-        "/mnt/app/root/mibr/config/cockpit/safe-voll.conf","MIBR_SAFE_VOLL/1","SAFE_VOLL","safe_voll",null,"0,58,1010,248");
+        "/mnt/app/root/mibr/config/cockpit/safe-voll.conf","MIBR_SAFE_VOLL/1","SAFE_VOLL","safe_voll",null,"0,58,1010,248","view.full.safeArea",PK_RECT);
     static final MibrDurableSwitch SAFE_WIDE=new MibrDurableSwitch(
-        "/mnt/app/root/mibr/config/cockpit/safe-wide.conf","MIBR_SAFE_WIDE/1","SAFE_WIDE","safe_wide",null,"200,58,590,248");
+        "/mnt/app/root/mibr/config/cockpit/safe-wide.conf","MIBR_SAFE_WIDE/1","SAFE_WIDE","safe_wide",null,"200,58,590,248","view.wide.safeArea",PK_RECT);
     static final MibrDurableSwitch SAFE_CENTER=new MibrDurableSwitch(
-        "/mnt/app/root/mibr/config/cockpit/safe-center.conf","MIBR_SAFE_CENTER/1","SAFE_CENTER","safe_center",null,"370,58,256,248");
+        "/mnt/app/root/mibr/config/cockpit/safe-center.conf","MIBR_SAFE_CENTER/1","SAFE_CENTER","safe_center",null,"370,58,256,248","view.center.safeArea",PK_RECT);
     /** "Permanent" of the expert mode; "until restart" lives in MibrExpert. */
     static final MibrDurableSwitch EXPERT_MODE=new MibrDurableSwitch(
         "/mnt/app/root/mibr/config/features/expert-mode.conf","MIBR_EXPERT_MODE/1","EXPERT_MODE","expert_mode",ON_OFF,"off");
@@ -69,8 +73,23 @@ final class MibrDurableSwitch {
     private String fileValue;
     /* Session state of the menu's broker connection. */
     boolean available,asked,setInFlight;
+    /** r15 safe areas only: the newest live-edit wish not yet confirmed by the broker (MibrSafeArea), else null. */
+    String wanted;
+    /** Time of the newest wish (ms); the durable SET waits until the value was idle for MibrSafeArea.IDLE_MS. */
+    long wantedAt;
+    /** r15f: one STALE_REVISION was answered by a re-read; the next stale SET gives the wish up. */
+    boolean staleRetry;
+    /** r15f: re-send the newest wish once the running GET has read the current revision. */
+    boolean resendAfterRead;
 
+    final String profileKey;
+    final int profileKind;
     MibrDurableSwitch(String file,String magic,String verb,String capability,String[] values,String defaultValue){
+        this(file,magic,verb,capability,values,defaultValue,null,PK_NONE);
+    }
+    MibrDurableSwitch(String file,String magic,String verb,String capability,String[] values,String defaultValue,
+                      String profileKey,int profileKind){
+        this.profileKey=profileKey;this.profileKind=profileKind;
         this.file=file;this.magic=magic+"\nrevision=";this.verb=verb;this.capability=capability;
         this.values=values;compiledDefault=defaultValue;this.defaultValue=defaultValue;value=defaultValue;fileValue=defaultValue;
     }
@@ -87,6 +106,17 @@ final class MibrDurableSwitch {
         return false;
     }
     synchronized String value(){return value;}
+    /**
+     * r15f: profile-backed switches (view-profiles.conf) share ONE CAS revision (broker unit.revision). A verified SET of
+     * any of them moves it for all; the others keep their value and take the new revision (never invent one).
+     */
+    synchronized void adoptRevision(String rev){
+        if(profileKey!=null&&revision!=null&&rev!=null&&canonicalRevision(rev,0,rev.length()))revision=rev;
+    }
+    static void sharedRevision(MibrDurableSwitch writer,String rev){
+        if(writer==null||writer.profileKey==null)return;
+        for(int i=0;i<ALL.length;i++)if(ALL[i]!=writer)ALL[i].adoptRevision(rev);
+    }
     synchronized String revision(){return revision;}
     synchronized boolean writable(){return writer&&revision!=null;}
     synchronized String message(){return MibrI18n.localize(message);}
@@ -102,6 +132,17 @@ final class MibrDurableSwitch {
 
     /** Durable value as the broker wrote it; re-read only when the file changed. */
     synchronized String persistedValue(){
+        if(profileKey!=null){
+            String body=MibrViewProfile.body(profileFile);
+            if(body!=null){
+                String v=MibrViewProfile.decode(body,profileKey,profileKind);
+                return v!=null&&valid(v)?v:defaultValue();
+            }
+            /* no valid profile yet: the legacy file is the migration source */
+        }
+        return legacyPersistedValue();
+    }
+    private String legacyPersistedValue(){
         File f=new File(file);
         long stamp=f.lastModified(),length=f.length();
         /* Racy timestamp: a file changed within the last 2 s may change again with the same mtime and size. */
