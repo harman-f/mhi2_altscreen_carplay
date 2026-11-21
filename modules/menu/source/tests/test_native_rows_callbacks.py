@@ -257,7 +257,7 @@ class NativeRowsCallbacks(unittest.TestCase):
         for name in ("MibrControlProtocol", "MibrControlClient", "MibrControlSession", "MibrOwnedSsmRows", "MibrOemPageEntry", "MibrElementDetailRows", "MibrNativeDropdownEditor",
                      "MibrElementSpec", "MibrElementEngine", "MibrElementTree", "MibrCanonicalElementMenu", "MibrPopupEditorModel",
                      "MibrDraftChoiceModel", "MibrScalingState", "MibrCarPlayMenuModel", "MibrVdataDiag", "MibrEngineState", "MibrViewState", "MibrMenuDefinition", "MibrI18n",
-                     "MibrDurableSwitch", "MibrViewProfile", "MibrPlatformDefaults", "MibrSafeArea", "MibrGpsDemoState", "MibrVersionInfo",
+                     "MibrDurableSwitch", "MibrViewProfile", "MibrPlatformDefaults", "MibrSafeArea", "MibrVersionInfo",
                      "MibrMenuCatalog", "MibrMenuFunctions", "MibrMenuLayout", "MibrDropdownFrame", "MibrExpert",
                      "MibrV3Protocol", "MibrV3Client", "MibrV3Session",
                      "MibrSettingsCatalog"):

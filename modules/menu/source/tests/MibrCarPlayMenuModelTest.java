@@ -140,10 +140,10 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         check(view.screen == MibrCarPlayMenuModel.CATEGORIES, "Ansichten back to the main list");
         menu.select(9);
         check(view.screen == MibrCarPlayMenuModel.ITEMS && "Erweitert".equals(view.title), "Erweitert");
-        String[] advanced = {"CarPlay im Cockpit", "Bildrate", "Quellversion", "Motorart", "Menüsprache", "Demo-GPS-Position", "Logs auf SD-Karte", "Menü laden: aus Datei", "Expertenmodus", "Skalierung", "Diagnose"};
-        check(view.rows.length == 11, "Erweitert: 3 settings + engine type + language + demo GPS + SD log + menu load + expert mode + Skalierung + Diagnose");
+        String[] advanced = {"CarPlay im Cockpit", "Bildrate", "Quellversion", "Motorart", "Menüsprache", "Logs auf SD-Karte", "Menü laden: aus Datei", "Expertenmodus", "Skalierung", "Diagnose"};
+        check(view.rows.length == 10, "Erweitert: 3 settings + engine type + language + SD log + menu load + expert mode + Skalierung + Diagnose");
         for (int i = 0; i < advanced.length; i++) check(advanced[i].equals(view.rows[i]), "Erweitert row " + i);
-        check(menu.loadRow(7) && !menu.loadRow(6) && menu.keyForRow(7) == -1, "menu load is an action row");
+        check(menu.loadRow(6) && !menu.loadRow(5) && menu.keyForRow(6) == -1, "menu load is an action row");
         check(menu.keyForRow(3) == MibrPopupEditorModel.ENGINE && menu.groupForRow(3) == -1, "engine row is a value row (virtual key), never a link");
         check(MibrPopupEditorModel.ENGINE == MibrSettingsCatalog.KEYS.length, "virtual key sits after the 48 registry keys");
         MibrPopupEditorModel editor = new MibrPopupEditorModel();
@@ -180,41 +180,31 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         for (int row = 0; row < 3; row++)
             count += visitSetting(menu, view, visited, row, MibrCarPlayMenuModel.ITEMS);
         check(menu.keyForRow(4) == MibrPopupEditorModel.MENU_LANGUAGE &&
-              menu.keyForRow(5) == MibrPopupEditorModel.GPS_DEMO &&
-              menu.keyForRow(6) == MibrPopupEditorModel.SD_LOG &&
-              menu.groupForRow(4) == -1 && menu.groupForRow(5) == -1 && menu.groupForRow(6) == -1,
-              "language and demo GPS map to virtual settings, not submenu links");
+              menu.keyForRow(5) == MibrPopupEditorModel.SD_LOG &&
+              menu.groupForRow(4) == -1 && menu.groupForRow(5) == -1,
+              "language and SD log map to virtual settings, not submenu links");
         String[] languages = editor.options(MibrPopupEditorModel.MENU_LANGUAGE);
-        String[] gpsPresets = editor.options(MibrPopupEditorModel.GPS_DEMO);
-        check(gpsPresets.length==5,"GPS demo has five actual choices");
         check(languages.length==3 && "AUTO".equals(languages[0]) &&
               "de".equals(languages[1]) && "en".equals(languages[2]), "language enum");
-        check(gpsPresets.length==5 && "OFF".equals(gpsPresets[0]) &&
-              "BERLIN_DEMO".equals(gpsPresets[1]) &&
-              "HAMBURG_DEMO".equals(gpsPresets[2]) &&
-              "SCHWALEFELD_DEMO".equals(gpsPresets[3]) &&
-              "WINTERBERG_DEMO".equals(gpsPresets[4]), "five explicit GPS demo presets");
-        check(editor.liveViewGated(MibrPopupEditorModel.MENU_LANGUAGE) &&
-              editor.liveViewGated(MibrPopupEditorModel.GPS_DEMO), "unqualified backend cannot open either dropdown");
+        check(editor.liveViewGated(MibrPopupEditorModel.MENU_LANGUAGE), "unqualified backend cannot open the language dropdown");
         check(editor.directToggle(MibrPopupEditorModel.SD_LOG) && editor.liveViewGated(MibrPopupEditorModel.SD_LOG) &&
               "on".equals(editor.options(MibrPopupEditorModel.SD_LOG)[1]), "SD log is a direct toggle gated until the broker answers");
-        check(!editor.open(MibrPopupEditorModel.MENU_LANGUAGE) &&
-              !editor.open(MibrPopupEditorModel.GPS_DEMO), "disabled rows never create drafts");
+        check(!editor.open(MibrPopupEditorModel.MENU_LANGUAGE), "disabled rows never create drafts");
         menu.select(4);
         check(view.screen == MibrCarPlayMenuModel.ITEMS && "Erweitert".equals(view.title),
               "language row is never a separate navigation page");
-        check(menu.keyForRow(8) == MibrPopupEditorModel.EXPERT_MODE, "expert mode is a value row");
-        check(menu.keyForRow(9) == -1 && menu.groupForRow(9) == 6,
+        check(menu.keyForRow(7) == MibrPopupEditorModel.EXPERT_MODE, "expert mode is a value row");
+        check(menu.keyForRow(8) == -1 && menu.groupForRow(8) == 6,
               "Skalierung link is a page, not a registry key");
-        menu.select(9);
+        menu.select(8);
         check(view.screen == MibrCarPlayMenuModel.ITEMS && "Skalierung".equals(view.title) && view.rows.length == 5, "Skalierung has four controls and one read-only notice (r14c: no apply row)");
         check("Zoomfaktor Hauptdisplay".equals(view.rows[0]) && "Zoomfaktor Virtual Cockpit".equals(view.rows[1]) && "Physische Displaygröße Virtual Cockpit".equals(view.rows[2]) && "Physische Displaygröße Hauptdisplay".equals(view.rows[3]), "exact scaling row labels");
         check(menu.scalingPageOpen() && menu.keyForRow(0)==MibrPopupEditorModel.SCALE_MAIN && menu.keyForRow(1)==MibrPopupEditorModel.SCALE_CLUSTER && menu.keyForRow(2)==MibrPopupEditorModel.SCALE_PHYSICAL && menu.keyForRow(3)==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL, "four virtual scaling keys with main physical appended");
         for(int r=0;r<view.rows.length;r++)check(view.rows[r].indexOf("übernehmen")<0 && !menu.loadRow(r), "r14c: no zoom apply action in the standard menu");
-        check("Wirkt nach Neuverbinden".equals(view.rows[4]) && menu.keyForRow(4)==-1 && menu.noteRow(4), "read-only notice appears exactly once outside registry and SCALE_SET");
+        check("Mehr % = kleinere Darstellung. Wirkt nach Neuverbinden".equals(view.rows[4]) && menu.keyForRow(4)==-1 && menu.noteRow(4), "read-only notice appears exactly once outside registry and SCALE_SET");
         menu.select(4);check(menu.scalingPageOpen() && view.rows.length==5, "notice is not selectable");
         MibrI18n.forced="en_GB";menu.refresh();
-        check("Applies after reconnect".equals(view.rows[4]) && "Main display zoom factor".equals(view.rows[0]), "English notice and controls");
+        check("More % = smaller display. Applies after reconnect".equals(view.rows[4]) && "Main display zoom factor".equals(view.rows[0]), "English notice and controls");
         MibrI18n.forced="de_DE";menu.refresh();
         menu.select(0);check(view.screen==MibrCarPlayMenuModel.ITEMS && view.rows.length==5, "scaling row selection remains on flat page");
         boolean refused=false;
@@ -222,8 +212,8 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         catch(RuntimeException noVerb){refused=true;}
         check(refused, "r15i: the client no longer knows the removed CARPLAY_RECONNECT verb");
         menu.back();check("Erweitert".equals(view.title), "Scaling back to Erweitert");
-        check(menu.keyForRow(10) == -1 && menu.groupForRow(10) == 7, "Diagnose link follows Skalierung");
-        menu.select(10);
+        check(menu.keyForRow(9) == -1 && menu.groupForRow(9) == 7, "Diagnose link follows Skalierung");
+        menu.select(9);
         check(view.screen == MibrCarPlayMenuModel.ITEMS && "Diagnose".equals(view.title) && view.rows.length == 7,
               "Diagnose seven vehicle-data rows");
         check(view.rows[3].indexOf("Identify") >= 0 && view.rows[4].indexOf("iPhone") >= 0, "diagnostics rows come from status files only");
@@ -247,7 +237,7 @@ public final class MibrCarPlayMenuModelTest implements MibrCarPlayMenuModel.View
         check("hidden".equals(MibrSettingsCatalog.UI_SECTIONS[index("navigation.url")]), "URL hidden");
         check(MibrMenuDefinition.NATIVE_UI_KEYS.length == 11, "native scope=ui keeps 11 rows");
         // Snapshot/restore through the nested Diagnose screen.
-        menu.select(9); menu.select(10);
+        menu.select(9); menu.select(9);
         MibrCarPlayMenuModel.Snapshot diag = menu.snapshot();
         menu.back(); menu.select(1);
         MibrCarPlayMenuModel.Snapshot fpsDetail = menu.snapshot();

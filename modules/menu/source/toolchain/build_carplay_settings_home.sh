@@ -45,7 +45,6 @@ BINDING
  "$SRC/java/de/mibr/hmi/MibrDraftChoiceModel.java" \
  "$SRC/java/de/mibr/hmi/MibrPopupEditorModel.java" \
  "$SRC/java/de/mibr/hmi/MibrScalingState.java" \
- "$SRC/java/de/mibr/hmi/MibrGpsDemoState.java" \
  "$SRC/java/de/mibr/hmi/MibrVersionInfo.java" \
  "$SRC/java/de/mibr/hmi/MibrOemDropdownStyle.java" \
  "$SRC/java/de/mibr/hmi/MibrNativeDropdownEditor.java" \
