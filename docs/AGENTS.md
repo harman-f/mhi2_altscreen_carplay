@@ -2,6 +2,10 @@
 
 These rules apply to everything under `docs/` and supplement the [repository-wide agent and QNX rules](../AGENTS.md) and [documentation policy](DOCUMENTATION_POLICY.md).
 
+## AltScreen Cluster Atlas-specific maintenance
+
+For changes to `docs/index.html`, `docs/atlas/**`, the Atlas HTML checker or its GitHub Pages workflow, **read and follow [Cluster Atlas Maintenance Rules](atlas/MAINTENANCE_RULES.md)** before editing. This is the canonical, reusable update checklist for the interactive English research dashboard, including native wireless vs dongle separation, emulator/HA/Perk matrices, date and proof conventions, and safe Pages deployment. The original 58×22 scoring baseline must never be silently re-dated.
+
 ## Find the authoritative information first
 
 1. Start at [docs home](README.md). Product and vehicle claims belong to [feature evidence](status/FEATURE_STATUS.md), exact release availability to [packages](packages/README.md), exact firmware identity to [profiles](../modules/profiles/), current runtime design to [architecture](architecture/README.md), and research to [research library](research/README.md).
