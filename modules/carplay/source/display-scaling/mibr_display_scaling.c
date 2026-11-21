@@ -17,7 +17,7 @@ static const char *const ids[] = {
     "scaling.cluster.physicalSize", "scaling.main.physicalSize"
 };
 static const char *const values[] = {"AUTO","70","85","100","125","150"};
-static const char *const physicals[] = {"BASE","P20","P30","P50"};
+static const char *const physicals[] = {"BASE","P20","P30","P50"}; /* = 100/120/130/150 % */
 static int fail(char *e,size_t cap,const char *s){
     if(e&&cap)snprintf(e,cap,"%s",s);
     return -1;
@@ -30,33 +30,48 @@ int mibr_display_scaling_value_valid(const char *value){
     for(i=0;i<sizeof(values)/sizeof(values[0]);i++)if(!strcmp(value,values[i]))return 1;
     return 0;
 }
-int mibr_display_physical_value_valid(const char *value){
-    unsigned i;if(!value)return 0;
+/* r15j: physical size = percent of the display's base millimetres, 50..200 in 10 % steps.
+ * The legacy presets stay the canonical spelling of their percentages (BASE=100, P20=120,
+ * P30=130, P50=150), so every file an older build wrote stays valid and every value an
+ * older build can read is still written in its old spelling. The other twelve steps are
+ * the plain percentage ("50".."200"); "100"/"120"/"130"/"150" are non-canonical. */
+int mibr_display_physical_percent(const char *value){
+    unsigned i;int p=0;
+    if(!value)return -1;
     for(i=0;i<sizeof(physicals)/sizeof(physicals[0]);i++)
-        if(!strcmp(value,physicals[i]))return 1;
-    return 0;
+        if(!strcmp(value,physicals[i]))return i==0?100:i==1?120:i==2?130:150;
+    if(!value[0]||value[0]=='0'||strlen(value)>3)return -1;
+    for(i=0;value[i];i++){if(value[i]<'0'||value[i]>'9')return -1;p=p*10+(value[i]-'0');}
+    if(p<MIBR_DISPLAY_PHYSICAL_PERCENT_MIN||p>MIBR_DISPLAY_PHYSICAL_PERCENT_MAX||p%10)return -1;
+    if(p==100||p==120||p==130||p==150)return -1;
+    return p;
+}
+int mibr_display_physical_value_valid(const char *value){
+    return mibr_display_physical_percent(value)>0;
+}
+static int scale_mm(int base,int percent,int *out){
+    int64_t v;
+    if(base<=0||percent<=0)return -1;
+    /* Nearest integer, half up. 100 % is exact. */
+    v=((int64_t)base*percent+50)/100;
+    if(v<=0||v>INT32_MAX)return -1;
+    *out=(int)v;return 0;
 }
 int mibr_display_physical_dimensions(const char *value,int *width_mm,int *height_mm){
-    if(!mibr_display_physical_value_valid(value)||!width_mm||!height_mm)return -1;
-    if(!strcmp(value,"BASE")){*width_mm=200;*height_mm=74;}
-    else if(!strcmp(value,"P20")){*width_mm=240;*height_mm=89;}
-    else if(!strcmp(value,"P30")){*width_mm=260;*height_mm=96;}
-    else {*width_mm=300;*height_mm=111;}
+    int percent=mibr_display_physical_percent(value),w,h;
+    if(percent<=0||!width_mm||!height_mm)return -1;
+    /* Synthetic cluster baseline 200x74 mm; the presets keep their values
+     * (P20 240x89, P30 260x96, P50 300x111). */
+    if(scale_mm(200,percent,&w)||scale_mm(74,percent,&h))return -1;
+    *width_mm=w;*height_mm=h;
     return 0;
 }
 int mibr_display_main_physical_dimensions(const char *value,int original_width_mm,int original_height_mm,
     int *width_mm,int *height_mm){
-    int percent=100;
-    int64_t w,h;
-    if(!mibr_display_physical_value_valid(value)||original_width_mm<=0||original_height_mm<=0||!width_mm||!height_mm)return -1;
-    if(!strcmp(value,"P20"))percent=120;
-    else if(!strcmp(value,"P30"))percent=130;
-    else if(!strcmp(value,"P50"))percent=150;
-    /* Nearest integer, half up. BASE is exact, preserving OEM descriptors. */
-    w=((int64_t)original_width_mm*percent+50)/100;
-    h=((int64_t)original_height_mm*percent+50)/100;
-    if(w>INT32_MAX||h>INT32_MAX)return -1;
-    *width_mm=(int)w;*height_mm=(int)h;
+    int percent=mibr_display_physical_percent(value),w,h;
+    if(percent<=0||original_width_mm<=0||original_height_mm<=0||!width_mm||!height_mm)return -1;
+    if(scale_mm(original_width_mm,percent,&w)||scale_mm(original_height_mm,percent,&h))return -1;
+    *width_mm=w;*height_mm=h;
     return 0;
 }
 static int parse_revision(const char *p,size_t n,uint64_t *out){

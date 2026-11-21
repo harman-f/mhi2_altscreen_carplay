@@ -110,6 +110,12 @@
       "format": "cas",
       "writer": "broker"
     },
+    "cockpit.view_profiles": {
+      "current": "/mnt/app/root/mibr/config/cockpit/view-profiles.conf",
+      "target": "/mnt/app/root/mibr/config/cockpit/view-profiles.conf",
+      "format": "keyvalue",
+      "writer": "broker"
+    },
     "broker.sd_log": {
       "current": "/mnt/app/root/altscreen-u2/config/mibr-sd-log.conf",
       "target": "/mnt/app/root/mibr/config/features/sd-log.conf",

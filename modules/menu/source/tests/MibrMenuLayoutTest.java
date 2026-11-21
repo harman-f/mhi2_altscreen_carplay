@@ -109,11 +109,34 @@ public final class MibrMenuLayoutTest implements MibrCarPlayMenuModel.View {
         check(MibrCalibration.on(),"on with the marker");
         MibrCalibration.set(false);
         check(!MibrCalibration.on(),"off again");
-        check(new MibrPopupEditorModel().directToggle(MibrPopupEditorModel.CALIB_IMAGE),"a checkbox");
+        check("off".equals(MibrCalibration.get()),"get: off without the marker");
+        /* pattern ids round-trip; the marker content is the id */
+        String[] ids={"grid","black","white","contrast","motion"};
+        for(int i=0;i<ids.length;i++){
+            MibrCalibration.set(ids[i]);
+            check(MibrCalibration.on()&&ids[i].equals(MibrCalibration.get()),"round trip "+ids[i]);
+            check(ids[i].concat("\n").equals(new String(read(marker.getPath()),"ISO-8859-1")),"marker content "+ids[i]);
+        }
+        MibrCalibration.set("off");
+        check(!marker.exists()&&"off".equals(MibrCalibration.get()),"off deletes the marker");
+        /* old toggle marker: "1", empty or unknown content is the grid */
+        write(marker,"1".getBytes("ISO-8859-1"));check("grid".equals(MibrCalibration.get()),"legacy 1 is grid");
+        write(marker,new byte[0]);check("grid".equals(MibrCalibration.get()),"empty is grid");
+        write(marker,"bogus\n".getBytes("ISO-8859-1"));check("grid".equals(MibrCalibration.get()),"unknown is grid");
+        write(marker,"white\n".getBytes("ISO-8859-1"));check("white".equals(MibrCalibration.get()),"readback with newline");
+        MibrCalibration.set(true);check("grid".equals(MibrCalibration.get()),"set(true) is grid");
+        MibrCalibration.set("bogus");check("grid".equals(MibrCalibration.get()),"set(unknown) is grid");
+        MibrCalibration.set(false);check(!marker.exists(),"set(false) deletes the marker");
+        check(!new MibrPopupEditorModel().directToggle(MibrPopupEditorModel.CALIB_IMAGE),"no longer a checkbox");
         MibrPopupEditorModel calib=new MibrPopupEditorModel();
         calib.setAvailable(true);
         calib.readback(MibrPopupEditorModel.CALIB_IMAGE,"off");
-        check(calib.toggle(MibrPopupEditorModel.CALIB_IMAGE)&&"on".equals(calib.draft(MibrPopupEditorModel.CALIB_IMAGE)),"the checkbox toggles");
+        check(!calib.toggle(MibrPopupEditorModel.CALIB_IMAGE),"no toggle");
+        String[] copts=calib.options(MibrPopupEditorModel.CALIB_IMAGE);
+        check(copts.length==6&&"off".equals(copts[0])&&"grid".equals(copts[1])&&"black".equals(copts[2])&&"white".equals(copts[3])&&"contrast".equals(copts[4])&&"motion".equals(copts[5]),"six ordered options");
+        check(calib.open(MibrPopupEditorModel.CALIB_IMAGE),"the row opens a popup");
+        check(calib.choose(4)&&"contrast".equals(calib.draft(MibrPopupEditorModel.CALIB_IMAGE)),"choosing drafts the id");
+        check("Weiß".equals(calib.label(MibrPopupEditorModel.CALIB_IMAGE,"white"))&&"Aus".equals(calib.label(MibrPopupEditorModel.CALIB_IMAGE,"off")),"labels de");
 
         /* expert mode */
         MibrExpert.session(false);

@@ -164,6 +164,11 @@ int alt111_control_next(struct alt111_control *c, uint64_t now_ms,
         (void)alt111_control_complete(c, c->session, c->pending.request, 0, now_ms);
     }
     if (c->exhausted || now_ms < c->retry_at_ms) return ALT111_WAIT;
+    /* A failed optional VIEW is retried after a long cool-down so a committed view is never dropped for good. */
+    if (c->view_exhausted && now_ms >= c->view_retry_at_ms &&
+        now_ms - c->view_retry_at_ms >= ALT111_VIEW_REARM_MS) {
+        c->view_failures = c->view_exhausted = 0; c->view_retry_at_ms = 0;
+    }
     if (!c->desired) {
         if (c->may_be_visible) type = ALT111_CMD_STOP;
     } else if (c->reacquiring == 1) type = ALT111_CMD_STOP;

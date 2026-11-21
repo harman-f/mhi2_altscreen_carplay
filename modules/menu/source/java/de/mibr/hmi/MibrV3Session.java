@@ -426,11 +426,20 @@ final class MibrV3Session {
         issue(id(),sw.verb+"_GET",new String[0],new String[0],new MibrV3Client.Listener(){
             public void onReply(final MibrV3Protocol.Frame f,final String error){relay(version,new Runnable(){public void run(){
                 if(error!=null)sw.failed(MibrI18n.pick("Nicht lesbar","Unable to read"));
-                else try{
+                try{
                     String[] reply=MibrV3Protocol.durableSwitch(f,sw);
                     sw.readback(reply[0],reply[1],"ENABLED".equals(reply[2]));
                     drafts.readback(key,reply[0]);
                 }catch(Throwable failure){sw.failed(MibrI18n.pick("Antwort ungültig","Invalid response"));}
+                // r15f: after a STALE_REVISION the newest wish goes out with the revision just read
+                if(sw.values==null&&sw.resendAfterRead){
+                    sw.resendAfterRead=false;
+                    if(sw.revision()!=null){
+                        MibrSafeArea.diag("MIBR_SAFE_SLIDER_SET_REREAD "+sw.verb+" revision="+sw.revision());
+                        String next=MibrSafeArea.due(sw);
+                        if(next!=null)safeSend(sw,key,next);else safeTimer(sw,key);
+                    }else MibrSafeArea.drop(sw);
+                }
                 changed();
             }});}
         });
@@ -447,18 +456,39 @@ final class MibrV3Session {
             new String[]{wanted,revision,rid},new MibrV3Client.Listener(){
             public void onReply(final MibrV3Protocol.Frame f,final String error){relay(version,new Runnable(){public void run(){
                 sw.setInFlight=false;
+                if(sw.values==null&&error==null&&f!=null&&"STALE_REVISION".equals(f.error)){
+                    // r15f car 2026-11-19: SAFE_CENTER_SET expected_revision=0 -> STALE_REVISION (unit.revision moved)
+                    if(MibrSafeArea.onStale(sw)==MibrSafeArea.STALE_REREAD){
+                        MibrSafeArea.diag("MIBR_SAFE_SLIDER_SET_STALE_RETRY "+sw.verb+" sent_revision="+revision);
+                        switchRefresh(sw,key);changed();return;
+                    }
+                    MibrSafeArea.diag("MIBR_SAFE_SLIDER_SET_STALE "+sw.verb+" sent_revision="+revision+" (gave up, stored value shown)");
+                    switchRefresh(sw,key);changed();return;
+                }
                 if(error!=null || f==null || !f.ok()){
                     sw.failed(MibrI18n.pick("Speicherung unbestätigt","Save not confirmed"));
+                    MibrSafeArea.drop(sw);
                     switchRefresh(sw,key);return;
                 }
+                boolean saved=false;
                 try{
                     String[] reply=MibrV3Protocol.durableSwitch(f,sw);
                     if(!wanted.equals(reply[0])||!"VERIFIED".equals(reply[3]))
                         throw new IllegalArgumentException(sw.verb+"_SAVE_UNVERIFIED");
                     sw.readback(reply[0],reply[1],"ENABLED".equals(reply[2]));
                     drafts.readback(key,reply[0]);
+                    MibrDurableSwitch.sharedRevision(sw,reply[1]);
+                    synchronized(sw){sw.staleRetry=false;}
+                    saved=true;
                 }catch(Throwable bad){
                     sw.failed(MibrI18n.pick("Speicherung unbestätigt","Save not confirmed"));
+                    MibrSafeArea.drop(sw);
+                }
+                // r15 live edit: a slider moved on while this SET was in flight -> send the newest wish now.
+                if(saved&&sw.values==null){
+                    String next=MibrSafeArea.due(sw);
+                    if(next!=null){safeSend(sw,key,next);changed();return;}
+                    safeTimer(sw,key); // still moving: sent once it is idle
                 }
                 switchRefresh(sw,key);changed();
             }});}
@@ -467,10 +497,63 @@ final class MibrV3Session {
     void durableSet(int key,String wanted){
         MibrDurableSwitch sw=MibrPopupEditorModel.durable(key);
         if(MibrPopupEditorModel.isSafe(key)){
-            String now=sw.revision()!=null?sw.value():sw.persistedValue();
-            switchSet(sw,MibrPopupEditorModel.safeBase(key),
-                MibrSafeArea.step(now,sw.defaultValue(),MibrPopupEditorModel.safeField(key),wanted));
+            if(!attached||wanted==null)return;
+            MibrSafeArea.wantOption(sw,MibrPopupEditorModel.safeField(key),wanted);
+            safeFlush(sw,MibrPopupEditorModel.safeBase(key));
         }else switchSet(sw,key,wanted);
+    }
+    /** r15f: page entry of a safe-area page: read value+revision now, so the first SET carries the current one. */
+    void safeRefresh(int key){
+        if(!attached||!loaded||!MibrPopupEditorModel.isSafe(key))return;
+        MibrDurableSwitch sw=MibrPopupEditorModel.durable(key);
+        MibrSafeArea.diag("MIBR_SAFE_SLIDER_REFRESH "+sw.verb+" available="+sw.available+" inflight="+sw.setInFlight);
+        if(!sw.setInFlight)switchRefresh(sw,MibrPopupEditorModel.safeBase(key));
+    }
+    /** r15: slider of one safe-area edge moved to an absolute stream position (live, coalesced). */
+    void safeEdge(int key,int px){
+        if(!attached||!MibrPopupEditorModel.isSafe(key)||MibrPopupEditorModel.safeField(key)>3)return;
+        MibrDurableSwitch sw=MibrPopupEditorModel.durable(key);
+        MibrSafeArea.wantEdge(sw,MibrPopupEditorModel.safeField(key),px);
+        safeFlush(sw,MibrPopupEditorModel.safeBase(key));
+    }
+    /** r15: the slider row's own -/+ buttons, 1 px per press. */
+    void safeNudge(int key,int delta){
+        if(!attached||!MibrPopupEditorModel.isSafe(key)||MibrPopupEditorModel.safeField(key)>3||delta==0)return;
+        MibrDurableSwitch sw=MibrPopupEditorModel.durable(key);
+        MibrSafeArea.wantOption(sw,MibrPopupEditorModel.safeField(key),(delta>0?"+":"")+delta);
+        safeFlush(sw,MibrPopupEditorModel.safeBase(key));
+    }
+    /** Flash protection: the rows show the wish at once; the durable SET waits for MibrSafeArea.IDLE_MS of no change. */
+    private void safeFlush(MibrDurableSwitch sw,int key){
+        String next=MibrSafeArea.due(sw);
+        if(next!=null)safeSend(sw,key,next);
+        else safeTimer(sw,key);
+        changed();
+    }
+    /** One idle timer per change; only the one of the newest wish of this area acts (older ones see a newer stamp). */
+    private void safeTimer(final MibrDurableSwitch sw,final int key){
+        final long wait=MibrSafeArea.waitMs(sw,System.currentTimeMillis());
+        if(wait<0L)return;
+        final long stamp=sw.wantedAt;final int version=epoch;
+        Thread t=new Thread(new Runnable(){public void run(){
+            try{Thread.sleep(wait+20L);}catch(InterruptedException e){return;}
+            relay(version,new Runnable(){public void run(){
+                if(stamp!=sw.wantedAt)return;
+                // in flight: the SET reply sends the newest wish; else it is due now (or a newer change re-arms)
+                if(!sw.setInFlight)safeFlush(sw,key);
+            }});
+        }},"MibrSafeIdle");
+        t.setDaemon(true);t.start();
+    }
+    /** One SET; when it cannot be sent (no revision, not writable) the wish is dropped, never left dangling. */
+    private void safeSend(MibrDurableSwitch sw,int key,String next){
+        switchSet(sw,key,next);
+        if(!sw.setInFlight){
+            // r15g: say why nothing went out (car 2026-11-19: no SAFE_* request reached the broker)
+            MibrSafeArea.diag("MIBR_SAFE_SLIDER_SEND_REFUSED "+sw.verb+" value="+next+" attached="+attached+" loaded="+loaded+
+                " available="+sw.available+" writable="+sw.writable()+" rev="+sw.revision()+" same="+next.equals(sw.value()));
+            MibrSafeArea.drop(sw);
+        }else MibrSafeArea.diag("MIBR_SAFE_SLIDER_SEND "+sw.verb+" value="+next+" expected_revision="+sw.revision());
     }
 
     /** Independent MIBR-only menu locale readback; no vehicle language setter. */
@@ -557,6 +640,10 @@ final class MibrV3Session {
     private void finishScaleRefresh(){
         scalingRefreshInFlight=false;
         MibrScalingState.finishRefresh();
+        // r15i: a slider wish that waited for this refresh (SET reply, stale re-read) goes out now or re-arms its timer
+        // r15j: all four scaling sliders; the first due wish starts a SET, the others wait for its refresh end
+        for(int i=0;i<SCALE_KEYS.length;i++)
+            if(MibrScalingState.wanted(SCALE_KEYS[i])!=null&&!scalingSetInFlight&&!scalingRefreshInFlight)zoomFlush(SCALE_KEYS[i]);
     }
     private void scaleReadback(int index,String key,MibrV3Protocol.Frame f,boolean set,String wanted){
         if(f==null||!f.ok()||!key.equals(f.get("id")))throw new IllegalArgumentException("SCALING_ID_MISMATCH");
@@ -580,16 +667,77 @@ final class MibrV3Session {
         issue(rid,"SCALE_SET",new String[]{"id","value","expected_revision","request_id"},new String[]{key,wanted,old,rid},new MibrV3Client.Listener(){
             public void onReply(final MibrV3Protocol.Frame f,final String error){relay(version,new Runnable(){public void run(){
                 scalingSetInFlight=false;
-                if(error!=null){MibrScalingState.failed(index,"Ergebnis unklar; Lesestand wird abgeglichen");scaleRefresh();changed();return;}
-                if(f!=null&&"STALE_REVISION".equals(f.error))MibrScalingState.stale(index);
-                try{scaleReadback(index,key,f,true,wanted);}
-                catch(Throwable bad){MibrScalingState.failed(index,"Speicherung nicht bestätigt; Lesestand wird abgeglichen");scaleRefresh();changed();return;}
+                if(error!=null){MibrScalingState.drop(index);MibrScalingState.failed(index,"Ergebnis unklar; Lesestand wird abgeglichen");scaleRefresh();changed();return;}
+                boolean staleReply=f!=null&&"STALE_REVISION".equals(f.error);
+                if(staleReply){
+                    MibrScalingState.stale(index);
+                    // r15i: a slider wish is re-sent once with the revision of the following re-read, then dropped
+                    if(MibrScalingState.wanted(index)!=null)MibrSafeArea.diag(MibrScalingState.retryAfterStale(index)?
+                        "MIBR_ZOOM_SLIDER_SET_STALE_RETRY "+key+" sent_revision="+old:
+                        "MIBR_ZOOM_SLIDER_SET_STALE "+key+" sent_revision="+old+" (gave up, stored value shown)");
+                }
+                try{scaleReadback(index,key,f,true,wanted);MibrScalingState.saved(index);}
+                catch(Throwable bad){
+                    if(!staleReply)MibrScalingState.drop(index);
+                    MibrScalingState.failed(index,"Speicherung nicht bestätigt; Lesestand wird abgeglichen");scaleRefresh();changed();return;
+                }
                 // The service revision is global to both keys. Refresh both rows after every SET
                 // receipt so a later selection on the other display uses the same CAS revision.
                 scaleRefresh();
                 changed();
             }});}
         });
+    }
+
+    private static final int[] SCALE_KEYS={MibrPopupEditorModel.SCALE_MAIN,MibrPopupEditorModel.SCALE_CLUSTER,
+        MibrPopupEditorModel.SCALE_PHYSICAL,MibrPopupEditorModel.SCALE_MAIN_PHYSICAL};
+    /** r15i/r15j: a scaling slider moved (zoom 0..5 = AUTO,70,85,100,125,150; physical 0..15 = 50..200 %);
+     *  shown at once, saved debounced. */
+    void zoomSlide(int index,int position){
+        String value=MibrScalingState.valueAt(index,position);
+        if(!attached||!MibrScalingState.scaleSlider(index)||value==null)return;
+        MibrScalingState.want(index,value,System.currentTimeMillis());
+        zoomFlush(index);
+    }
+    /** r15i: the slider row's own -/+ buttons, one position per press (clamped at AUTO / 150). */
+    void zoomNudge(int index,int delta){
+        if(!attached||!MibrScalingState.scaleSlider(index)||delta==0)return;
+        int at=MibrScalingState.position(index,MibrScalingState.shown(index));
+        if(at<0)at=0;
+        int next=Math.max(0,Math.min(MibrScalingState.positions(index)-1,at+delta));
+        if(next==at&&MibrScalingState.wanted(index)==null)return;
+        zoomSlide(index,next);
+    }
+    /** Same flash protection as the safe-area edges: one SET after IDLE_MS without change, never while busy. */
+    private void zoomFlush(int index){
+        String next=MibrScalingState.due(index,System.currentTimeMillis(),scalingSetInFlight||scalingRefreshInFlight);
+        if(next!=null)zoomSend(index,next);
+        else if(!scalingSetInFlight&&!scalingRefreshInFlight)zoomTimer(index);
+        changed();
+    }
+    private void zoomTimer(final int index){
+        final long wait=MibrScalingState.waitMs(index,System.currentTimeMillis());
+        if(wait<0L)return;
+        final long stamp=MibrScalingState.wantedAt(index);final int version=epoch;
+        Thread t=new Thread(new Runnable(){public void run(){
+            try{Thread.sleep(wait+20L);}catch(InterruptedException e){return;}
+            relay(version,new Runnable(){public void run(){
+                if(stamp!=MibrScalingState.wantedAt(index))return;
+                // busy: the SET reply / refresh end flushes the newest wish
+                if(!scalingSetInFlight&&!scalingRefreshInFlight)zoomFlush(index);
+            }});
+        }},"MibrZoomIdle");
+        t.setDaemon(true);t.start();
+    }
+    private void zoomSend(int index,String next){
+        if(!attached||!scalingAvailable||!MibrScalingState.writable(index)||MibrScalingState.revision(index)==null){
+            MibrSafeArea.diag("MIBR_ZOOM_SLIDER_SEND_REFUSED "+MibrScalingState.id(index)+" value="+next+" attached="+attached+
+                " available="+scalingAvailable+" writable="+MibrScalingState.writable(index)+" rev="+MibrScalingState.revision(index));
+            MibrScalingState.drop(index);
+            return;
+        }
+        MibrSafeArea.diag("MIBR_ZOOM_SLIDER_SEND "+MibrScalingState.id(index)+" value="+next+" expected_revision="+MibrScalingState.revision(index));
+        scaleSet(index,next);
     }
 
     /** r46: read the engine type once per menu session (after the settings read-back). */
@@ -699,8 +847,95 @@ final class MibrV3Session {
         if(loaded)MibrMenuLayout.loaded();
         changed();
     }
+    /** r15j: the page-leave writer of the last run (host tests join it). */
+    Thread finalWriter;
     void detach(){
+        // Leaving the page never loses a final value: every unsent slider wish (safe-area edges, all four scaling
+        // rows) is queued and written one after another by a detached worker, each SET with the revision of the
+        // previous reply (a GET first when a SET was still in flight). The loopback client is one connection per
+        // request and does not belong to the page, so it outlives the detach.
+        java.util.Vector items=new java.util.Vector();
+        boolean profileBusy=false;
+        for(int i=0;i<MibrDurableSwitch.ALL.length;i++)
+            if(MibrDurableSwitch.ALL[i].profileKey!=null&&MibrDurableSwitch.ALL[i].setInFlight)profileBusy=true;
+        for(int a=0;a<3;a++){
+            MibrDurableSwitch sw=MibrPopupEditorModel.durable(MibrPopupEditorModel.SAFE_FIRST+5*a);
+            String last;
+            synchronized(sw){last=sw.wanted;}
+            if(last!=null&&sw.available&&(sw.setInFlight||!last.equals(sw.value())))
+                items.addElement(new FinalItem(sw.verb+"_SET",sw.verb+"_GET",null,last,profileBusy?null:sw.revision(),true));
+            MibrSafeArea.drop(sw);
+        }
+        boolean scaleBusy=scalingSetInFlight||scalingRefreshInFlight;
+        for(int i=0;i<SCALE_KEYS.length;i++){
+            int k=SCALE_KEYS[i];String zoom=MibrScalingState.wanted(k);
+            if(zoom==null||!scalingAvailable||!scaleBusy&&zoom.equals(MibrScalingState.desired(k)))continue;
+            items.addElement(new FinalItem("SCALE_SET","SCALE_GET",MibrScalingState.id(k),zoom,scaleBusy?null:MibrScalingState.revision(k),false));
+        }
+        finalWriter=null;
+        if(attached&&items.size()>0){
+            final FinalItem[] list=new FinalItem[items.size()];items.copyInto(list);
+            final MibrV3Client c=client;final String base=prefix+"f"+(++sequence);
+            finalWriter=new Thread(new Runnable(){public void run(){writeFinal(c,base,list);}},"MibrFinalWriter");
+            finalWriter.setDaemon(true);finalWriter.start();
+        }
         attached=false;epoch++;menuLoading=false;MibrMenuLayout.message(null);resetWireQueue();busy=false;loaded=false;writable=false;scalingAvailable=false;scalingRefreshInFlight=false;scalingSetInFlight=false;scalingRefreshPending=false;MibrScalingState.reset();
         for(int i=0;i<dirty.length;i++){dirty[i]=false;attempts[i]=0;}
+    }
+
+    /* ---- r15j: page-leave queue (runs on its own thread; touches no UI or session state) ---- */
+    static final class FinalItem {
+        final String setVerb,getVerb,id,value;final boolean profile;String revision;
+        FinalItem(String set,String get,String id,String value,String revision,boolean profile){
+            setVerb=set;getVerb=get;this.id=id;this.value=value;this.revision=revision;this.profile=profile;
+        }
+    }
+    /** Blocking request: waits for a free client slot (another request may still be in flight), then the reply. */
+    private static MibrV3Protocol.Frame call(MibrV3Client c,String rid,String verb,String[] names,String[] values){
+        final Object[] box=new Object[2];final boolean[] done=new boolean[1];
+        MibrV3Client.Listener l=new MibrV3Client.Listener(){public void onReply(MibrV3Protocol.Frame f,String e){
+            synchronized(box){box[0]=f;box[1]=e;done[0]=true;box.notifyAll();}}};
+        for(int tries=0;!c.send(rid,verb,names,values,l);tries++){
+            if(tries>=40)return null; // 6 s without a free slot: never sent
+            try{Thread.sleep(150L);}catch(InterruptedException e){return null;}
+        }
+        synchronized(box){
+            long end=System.currentTimeMillis()+8000L;
+            while(!done[0]){long left=end-System.currentTimeMillis();if(left<=0L)return null;
+                try{box.wait(left);}catch(InterruptedException e){return null;}}
+            return box[1]==null?(MibrV3Protocol.Frame)box[0]:null;
+        }
+    }
+    private static String rev(MibrV3Protocol.Frame f){
+        String r=f==null||!f.ok()?null:f.get("revision");
+        return MibrScalingState.revisionValidForProtocol(r)?r:null;
+    }
+    static void writeFinal(MibrV3Client c,String base,FinalItem[] items){
+        // One revision per store: scaling file and the shared profile unit.revision are independent CAS counters.
+        String scaleRev=null,profileRev=null;boolean scaleKnown=false,profileKnown=false;int n=0;
+        for(int i=0;i<items.length;i++){
+            FinalItem it=items[i];
+            String rev=it.profile?(profileKnown?profileRev:it.revision):(scaleKnown?scaleRev:it.revision);
+            String result="UNCONFIRMED";
+            for(int attempt=0;attempt<3;attempt++){
+                if(rev==null){
+                    MibrV3Protocol.Frame g=it.id==null?call(c,base+"_"+(++n),it.getVerb,new String[0],new String[0]):
+                        call(c,base+"_"+(++n),it.getVerb,new String[]{"id"},new String[]{it.id});
+                    rev=rev(g);
+                    String now=g==null?null:it.id==null?g.get("value"):g.get("desired");
+                    if(rev!=null&&it.value.equals(now)){result="ALREADY";break;}
+                    if(rev==null){result="GET_FAILED";break;}
+                }
+                String rid=base+"_"+(++n);
+                MibrV3Protocol.Frame f=it.id==null?
+                    call(c,rid,it.setVerb,new String[]{"value","expected_revision","request_id"},new String[]{it.value,rev,rid}):
+                    call(c,rid,it.setVerb,new String[]{"id","value","expected_revision","request_id"},new String[]{it.id,it.value,rev,rid});
+                if(f!=null&&"STALE_REVISION".equals(f.error)){rev=null;result="STALE";continue;}
+                rev=rev(f);result=rev!=null?"OK":"UNCONFIRMED";
+                break;
+            }
+            if(it.profile){profileRev=rev;profileKnown=true;}else{scaleRev=rev;scaleKnown=true;}
+            MibrSafeArea.diag("MIBR_FINAL_SET "+it.setVerb+(it.id==null?"":" "+it.id)+" value="+it.value+" result="+result);
+        }
     }
 }

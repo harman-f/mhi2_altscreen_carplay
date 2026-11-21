@@ -100,7 +100,7 @@ These entries exist in the checked-in standard menu but do **not** have a one-to
 | `view.area_wide` | `list` | No single compiled default in the two registries; inspect owner/firmware |
 | `view.area_center` | `list` | No single compiled default in the two registries; inspect owner/firmware |
 | `view.sport` | `list` | No single compiled default in the two registries; inspect owner/firmware |
-| `calib.image` | `toggle` | No single compiled default in the two registries; inspect owner/firmware |
+| `calib.image` | `list` (Aus, Gitter, Schwarz, Weiß, Kontrast, Bewegung) | No single compiled default in the two registries; inspect owner/firmware |
 | `safe_voll.x` | `number` | No single compiled default in the two registries; inspect owner/firmware |
 | `safe_voll.y` | `number` | No single compiled default in the two registries; inspect owner/firmware |
 | `safe_voll.w` | `number` | No single compiled default in the two registries; inspect owner/firmware |

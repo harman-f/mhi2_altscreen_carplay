@@ -11,6 +11,10 @@ public final class MibrDurableRevisionTest {
         o.write(s.getBytes("US-ASCII"));
         o.close();
     }
+    private static String crcOf(String t) throws Exception {
+        java.util.zip.CRC32 c=new java.util.zip.CRC32();byte[] b=t.getBytes("US-ASCII");c.update(b,0,b.length);
+        String h=Long.toHexString(c.getValue());while(h.length()<8)h="0"+h;return h;
+    }
     private static String digits21(){return "123456789012345678901";}
     public static void main(String[] args) throws Exception {
         String[] ok={"0","1","18446744073709551615","10","9999999999999999999"};
@@ -103,6 +107,33 @@ public final class MibrDurableRevisionTest {
         write(pd,"key.menu=99999999999\n");
         check(MibrPlatformDefaults.intOr("key.menu",16)==16,"key.menu overflow");
         pd.delete();
+
+        /* profile-backed switch reads the shared view profile; legacy file only without a valid one. */
+        File legacy=new File(dir,"lanes.conf"),prof=new File(dir,"view-profiles.conf");
+        MibrDurableSwitch.profileFile=prof.getPath();
+        MibrDurableSwitch lanes=new MibrDurableSwitch(legacy.getPath(),"MIBR_NAV_LANES/1","NAV_LANES","nav_lanes",
+            new String[]{"off","on"},"on","global.legacyLanes",MibrDurableSwitch.PK_BOOL);
+        MibrDurableSwitch safe=new MibrDurableSwitch(new File(dir,"safe.conf").getPath(),"MIBR_SAFE_VOLL/1","SAFE_VOLL","safe_voll",
+            null,"0,58,1010,248","view.full.safeArea",MibrDurableSwitch.PK_RECT);
+        MibrDurableSwitch bottom=new MibrDurableSwitch(new File(dir,"bottom.conf").getPath(),"MIBR_NAV_BOTTOM/1","NAV_BOTTOM","nav_bottom",
+            new String[]{"eta","rtt"},"eta","global.bottom",MibrDurableSwitch.PK_BOTTOM);
+        write(legacy,"MIBR_NAV_LANES/1\nrevision=3\nvalue=off\n");
+        legacy.setLastModified(old1);
+        check("off".equals(lanes.persistedValue()),"no profile: legacy is the migration source");
+        String body="MIBR_NAV_VIEW_PROFILES/3\nversion=3\nglobal.legacyLanes=true\nview.full.safeArea.x=10\n"+
+            "view.full.safeArea.y=130\nview.full.safeArea.w=990\nview.full.safeArea.h=140\nglobal.bottom=remaining\n"+
+            "view.center.native.tube=on\nunit.revision=4\n";
+        java.util.zip.CRC32 c=new java.util.zip.CRC32();byte[] bb=body.getBytes("US-ASCII");c.update(bb,0,bb.length);
+        String hex=Long.toHexString(c.getValue());while(hex.length()<8)hex="0"+hex;
+        write(prof,body+"crc32="+hex+"\n");prof.setLastModified(old1);
+        check("on".equals(lanes.persistedValue()),"profile wins over legacy");
+        check("10,130,990,140".equals(safe.persistedValue()),"profile rect");
+        check("rtt".equals(bottom.persistedValue()),"profile bottom encoding");
+        write(prof,body+"crc32=00000000\n");prof.setLastModified(old2);
+        check("off".equals(lanes.persistedValue()),"invalid profile: legacy");
+        write(prof,"MIBR_NAV_VIEW_PROFILES/3\nversion=3\n"+"crc32="+crcOf("MIBR_NAV_VIEW_PROFILES/3\nversion=3\n")+"\n");prof.setLastModified(old1-1000L);
+        check("on".equals(lanes.persistedValue()),"profile without key: default");
+        prof.delete();legacy.delete();
         sw.delete();dir.delete();
         System.out.println("MibrDurableRevisionTest PASS");
     }

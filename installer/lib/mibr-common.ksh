@@ -33,6 +33,21 @@ LSD=$ESO/hmi/lsd/lsd.sh
 JXE=$IFS_ROOT/lsd.jxe
 LOCK=${MIBR_LOCK_FILE:-/tmp/mibr-install.lock}
 
+# Backups live on the SD card, never on the unit's flash (wear). The SD (FAT32, normally mounted
+# read-only) is remounted read-write only for the writes. Layout (real path = logical path):
+#   $SDROOT/MIBR-Backup/<unit-key>/backup/<install-id>/...   the tree the installer used to keep in
+#   $NEW/backup/<id>; installed.manifest and receipts keep the relative name "backup/<id>/..." and
+#   bkfile maps it. FAT keeps no modes or links: modes are carried by MANIFEST / receipts.
+# The only flash trace is $BKPTR (one line "key=<unit-key>"); it tells uninstall/rollback where to
+# look. No pointer = pre-r14 install whose backups still sit on flash ($NEW/backup).
+SDROOT=${MIBR_SD_ROOT:-/fs/sda0}
+SDTOP=MIBR-Backup
+BKPTR=$NEW/state/backup-root
+MNT_SD=0
+BKMODE=flash
+BKBASE=$NEW/backup
+BKKEY=
+
 BEGIN_NEW="# MIBR-RUNTIME BEGIN"
 END_NEW="# MIBR-RUNTIME END"
 BEGIN_OLD="# MIBR-KIT BEGIN"
@@ -66,6 +81,23 @@ no_mount(){
   [ "${MIBR_NO_MOUNT:-}" = 1 ] || [ "${MIBR_MIGRATE_NO_MOUNT:-}" = 1 ]
 }
 
+# mnt_sd_rw: remount the backup SD read-write once (the exit trap restores read-only).
+mnt_sd_rw(){
+  if [ "$MNT_SD" = 0 ] && ! no_mount; then
+    # Already writable (probe): leave it alone and never "restore" it. Only a remount done here is undone.
+    # MIBR_SD_FORCE_RO=1 skips the probe (host tests, where root can write anywhere).
+    _sp=$SDROOT/.mibr-rwprobe.$$
+    if [ "${MIBR_SD_FORCE_RO:-}" != 1 ] && ( echo probe > "$_sp" ) 2>/dev/null; then
+      rm -f "$_sp"
+      return 0
+    fi
+    rm -f "$_sp" 2>/dev/null
+    mount -uw "$SDROOT" >/dev/null 2>&1 || return 1
+    MNT_SD=1
+  fi
+  return 0
+}
+
 # mnt_rw REALPATH: remount the owning partition read-write once.
 mnt_rw(){
   case $1 in
@@ -84,7 +116,7 @@ mnt_rw(){
 }
 
 mnt_ro(){
-  if [ "$MNT_SYS" = 1 ] || [ "$MNT_APP" = 1 ]; then
+  if [ "$MNT_SYS" = 1 ] || [ "$MNT_APP" = 1 ] || [ "$MNT_SD" = 1 ]; then
     sync || { say "  BLOCK sync failed before read-only restore"; RO_FAIL=1; }
   fi
   if [ "$MNT_SYS" = 1 ]; then
@@ -94,6 +126,10 @@ mnt_ro(){
   if [ "$MNT_APP" = 1 ]; then
     if mount -ur "$APP" >/dev/null 2>&1; then MNT_APP=0
     else say "  BLOCK $APP not back to read-only"; RO_FAIL=1; fi
+  fi
+  if [ "$MNT_SD" = 1 ]; then
+    if mount -ur "$SDROOT" >/dev/null 2>&1; then MNT_SD=0
+    else MNT_SD=0; WARNS=$((WARNS + 1)); say "  WARN  $SDROOT could not be set back to read-only (the SD only holds backups; no persistent unit filesystem is affected)"; fi
   fi
 }
 
@@ -257,6 +293,19 @@ getkey(){
   echo "$_gk"
 }
 
+# safe_replace TMP DEST: put TMP at DEST without ever losing the only copy of DEST.
+# mv first; if that fails (FAT/fs-dos refusing to overwrite) move DEST aside, move TMP in, and only
+# then drop the aside copy. On any failure DEST is restored and TMP is kept (return 1).
+safe_replace(){
+  mv "$1" "$2" 2>/dev/null && return 0
+  [ -e "$2" ] || return 1
+  _so=$2.mibr-old.$$
+  mv "$2" "$_so" 2>/dev/null || return 1
+  if mv "$1" "$2" 2>/dev/null; then rm -f "$_so"; return 0; fi
+  mv "$_so" "$2" 2>/dev/null
+  return 1
+}
+
 # put SRC DST SHA MODE: tmp + chmod + mv, read back.
 put(){
   _pd=${2%/*}
@@ -264,6 +313,42 @@ put(){
   _pt=$2.mibr-tmp.$$
   cp "$1" "$_pt" && chmod "$4" "$_pt" && [ "$(sha_of "$_pt")" = "$3" ] && mv "$_pt" "$2" || { rm -f "$_pt"; return 1; }
   [ "$(sha_of "$2")" = "$3" ]
+}
+
+# sdput SRC DST SHA: copy onto the backup SD (FAT: no chmod), tmp + mv, read back.
+sdput(){
+  mkdir -p "${2%/*}" || return 1
+  _pt=$2.mibr-tmp.$$
+  cp "$1" "$_pt" && [ "$(sha_of "$_pt")" = "$3" ] || { rm -f "$_pt"; return 1; }
+  safe_replace "$_pt" "$2" || return 1
+  [ "$(sha_of "$2")" = "$3" ]
+}
+
+# sdput_text DST: stdin -> backup SD (tmp + mv, no chmod).
+sdput_text(){
+  mkdir -p "${1%/*}" || return 1
+  _pt=$1.mibr-tmp.$$
+  cat > "$_pt" || { rm -f "$_pt"; return 1; }
+  safe_replace "$_pt" "$1" || return 1
+}
+
+# bk_resolve: BKMODE/BKBASE/BKKEY from the flash pointer (read-only). Fails on a malformed pointer.
+bk_resolve(){
+  BKMODE=flash; BKBASE=$NEW/backup; BKKEY=
+  [ -f "$BKPTR" ] || return 0
+  BKKEY=$(getkey "$BKPTR" key)
+  case $BKKEY in ''|*[!A-Za-z0-9._-]*|.*) BKKEY=; return 1 ;; esac
+  BKMODE=sd; BKBASE=$SDROOT/$SDTOP/$BKKEY/backup
+  MIBR_BACKUP_ROOT=$BKBASE; export MIBR_BACKUP_ROOT
+  return 0
+}
+
+# bkfile REL: real path of a manifest/receipt-relative backup file ("backup/<id>/...").
+bkfile(){
+  case $1 in
+    backup/*) echo "$BKBASE/${1#backup/}" ;;
+    *) echo "$NEW/$1" ;;
+  esac
 }
 
 # put_text DST MODE: stdin -> tmp + mv (no hash check).

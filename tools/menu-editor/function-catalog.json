@@ -262,12 +262,13 @@
 {
 "id": "calib.image",
 "parent": "views",
-"kind": "toggle",
+"kind": "list",
 "since": 2,
 "de": "Kalibrierbild",
 "en": "Calibration picture",
-"desc_de": "Zeigt im Cockpit statt des iPhone-Bilds ein Raster mit Pixelzahlen, um die Safe Area abzulesen. Die CarPlay-Verbindung bleibt bestehen. Endet beim Verlassen des Menüs.",
-"desc_en": "Shows a grid with pixel numbers in the cockpit instead of the iPhone picture, to read the safe area off. CarPlay stays connected. Ends when you leave the menu."
+"values": "Aus, Gitter, Schwarz, Weiß, Kontrast, Bewegung",
+"desc_de": "Zeigt im Cockpit statt des iPhone-Bilds ein Testbild (Gitter mit Pixelzahlen zum Ablesen der Safe Area, Schwarz, Weiß, Kontrast oder Bewegung). Die CarPlay-Verbindung bleibt bestehen. Endet beim Verlassen des Menüs.",
+"desc_en": "Shows a test pattern in the cockpit instead of the iPhone picture (grid with pixel numbers to read the safe area off, black, white, contrast or motion). CarPlay stays connected. Ends when you leave the menu."
 },
 {
 "id": "safe_voll",
@@ -328,8 +329,8 @@
 "id": "safe_voll.hint",
 "parent": "safe_voll",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach Neuverbinden",
+"en": "Applies after reconnect"
 },
 {
 "id": "safe_wide",
@@ -390,8 +391,8 @@
 "id": "safe_wide.hint",
 "parent": "safe_wide",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach Neuverbinden",
+"en": "Applies after reconnect"
 },
 {
 "id": "safe_center",
@@ -452,8 +453,8 @@
 "id": "safe_center.hint",
 "parent": "safe_center",
 "kind": "hint",
-"de": "Wirkt beim nächsten Verbinden des iPhones",
-"en": "Applies at the next iPhone connection"
+"de": "Wirkt nach Neuverbinden",
+"en": "Applies after reconnect"
 },
 {
 "id": "advanced",
@@ -606,8 +607,8 @@
 "id": "scaling.hint",
 "parent": "scaling",
 "kind": "hint",
-"de": "Änderungen werden bei der nächsten CarPlay-Verbindung übertragen.",
-"en": "Changes are sent on the next CarPlay connection."
+"de": "Wirkt nach Neuverbinden",
+"en": "Applies after reconnect"
 },
 {
 "id": "diagnostics",

@@ -13,6 +13,11 @@ VER=$NEW/version
 OWN=$VER/ownership
 if [ ! -d "$NEW" ]; then echo "MIBR_STATUS=NOT_INSTALLED"; exit 0; fi
 echo "root=$LNEW"
+if bk_resolve; then
+  if [ "$BKMODE" = sd ]; then
+    if [ -d "$BKBASE" ]; then echo "backup_root=$BKBASE (SD, present)"; else echo "backup_root=$BKBASE (SD, MISSING)"; fi
+  else echo "backup_root=$BKBASE (flash, legacy)"; fi
+else echo "backup_root=POINTER_BAD"; fi
 if [ -f "$VER/installed-version.properties" ]; then
   for k in product product_version source_commit identity_stage target_profile_id package_sha256 install_id; do echo "$k=$(getkey "$VER/installed-version.properties" $k)"; done
 else echo "installed-version.properties=absent"; fi

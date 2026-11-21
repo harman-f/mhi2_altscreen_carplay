@@ -89,3 +89,4 @@ mibr-carplay111-bit26.force-on config/features/mibr-carplay111-bit26.force-on pr
 # not_migrated: mibr-pr93-visual-rollback.ksh | test-only script, not state
 # not_migrated: mibr-kit/disabled | kill switch, carried by the dedicated kill-switch step (E4), never copied as data
 # not_migrated: mibr-rgi | RGI payload directory, reinstalled by the package into bin/; its rgi.on switch is mapped separately
+# not_migrated: mibr/config/cockpit/view-profiles.conf | shared view profile, created at its final path by the broker; no legacy source to copy

@@ -96,6 +96,12 @@ int main(void)
     assert(c.view_exhausted && !c.exhausted);
     assert(!alt111_control_keyframe_reason(&c, session, ALT111_KF_PERIODIC_FRAMES));
     assert(!alt111_control_next(&c, 15000, &cmd) && cmd.type == ALT111_CMD_KEYFRAME);
+    /* A committed view that exhausted its retries is re-armed after the cool-down, never dropped. */
+    assert(!alt111_control_complete(&c, session, cmd.request, 1, 15001));
+    assert(alt111_control_next(&c, 20000, &cmd) == ALT111_WAIT && c.view_exhausted);
+    assert(!alt111_control_next(&c, 20001, &cmd) && cmd.type == ALT111_CMD_VIEW && !c.view_exhausted);
+    assert(!alt111_control_complete(&c, session, cmd.request, 1, 20002));
+    assert(c.acknowledged_view == (int)c.desired_view);
     puts("ALT111_POLICY_TEST=PASS");
     return 0;
 }

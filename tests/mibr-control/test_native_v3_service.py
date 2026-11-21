@@ -101,6 +101,41 @@ class ServiceTest(unittest.TestCase):
                          ("on","VERIFIED","1"))
         off=self.req("nav_set2","CARPLAY_NAV_SET",{"value":"off","expected_revision":"1","request_id":"nav_set2"})
         self.assertEqual((off["fields"]["value"],off["fields"]["revision"]),("off","2"))
+    def test_view_profile_keys_share_profile_revision(self):
+        # per-view zoom/transition live only in the view profile, same CAS revision as nav/safe switches
+        base=Path(self.temp.name)
+        self.env["MIBR_V3_HOST_NAV_SOURCE_PATH"]=str(base/"persistent"/"nav-source.conf")
+        self.restart_service()
+        self.assertEqual(self.req("vp_cap","CAPABILITIES")["fields"]["view_profile"],"1")
+        got=self.req("vp_get0","VIEW_PROFILE_GET",{"key":"view.center.geometry.zoom"})
+        self.assertIsNone(got["error"],got)
+        self.assertEqual((got["fields"]["key"],got["fields"]["value"],got["fields"]["stored"],got["fields"]["revision"]),
+                         ("view.center.geometry.zoom","inherit","DEFAULT","0"))
+        self.assertEqual(self.req("vp_bad","VIEW_PROFILE_GET",{"key":"view.center.safeArea.x"})["error"],"INVALID_REQUEST")
+        self.assertEqual(self.req("vp_bad2","VIEW_PROFILE_SET",{"key":"view.center.geometry.zoom","value":"50",
+                         "expected_revision":"0","request_id":"vp_bad2"})["error"],"INVALID_REQUEST")
+        saved=self.req("vp_set1","VIEW_PROFILE_SET",{"key":"view.center.geometry.zoom","value":"70",
+                       "expected_revision":"0","request_id":"vp_set1"})
+        self.assertIsNone(saved["error"],saved)
+        self.assertEqual((saved["fields"]["value"],saved["fields"]["revision"],saved["fields"]["apply"]),
+                         ("70","1","NEXT_VIEW_CHANGE"))
+        gap=self.req("vp_set2","VIEW_PROFILE_SET",{"key":"global.transition.gap_ms","value":"750",
+                     "expected_revision":"1","request_id":"vp_set2"})
+        self.assertEqual((gap["fields"]["value"],gap["fields"]["revision"]),("750","2"))
+        self.assertEqual(self.req("vp_gapbad","VIEW_PROFILE_SET",{"key":"global.transition.gap_ms","value":"0750",
+                         "expected_revision":"2","request_id":"vp_gapbad"})["error"],"INVALID_REQUEST")
+        # the nav switch in the same file sees the shared revision; its own value is untouched
+        nav=self.req("vp_nav","NAV_SOURCE_GET")
+        self.assertEqual((nav["fields"]["value"],nav["fields"]["revision"]),("auto","2"))
+        self.assertEqual(self.req("vp_stale","NAV_SOURCE_SET",{"value":"phone","expected_revision":"1",
+                         "request_id":"vp_stale"})["error"],"STALE_REVISION")
+        text=(base/"persistent"/"nav-source.conf.profile").read_text()
+        self.assertIn("\nview.center.geometry.zoom=70\n",text)
+        self.assertIn("\nglobal.transition.gap_ms=750\n",text)
+        self.assertIn("\nunit.revision=2\n",text)
+        self.restart_service()
+        got=self.req("vp_get1","VIEW_PROFILE_GET",{"key":"view.center.geometry.zoom"})
+        self.assertEqual((got["fields"]["value"],got["fields"]["stored"],got["fields"]["revision"]),("70","VERIFIED","2"))
     def test_sd_log_switch_cas_persistence(self):
         self.assertEqual(self.req("sdl_cap","CAPABILITIES")["fields"]["sd_log"],"1")
         got=self.req("sdl_get0","SD_LOG_GET")
@@ -200,6 +235,23 @@ class ServiceTest(unittest.TestCase):
             "id":"scaling.cluster.physicalSize","value":"P25","expected_revision":"2",
             "request_id":"size_bad"})
         self.assertEqual(invalid["error"],"INVALID_REQUEST")
+        # r15j: 50..200 % in 10 % steps; legacy presets stay the spelling of 100/120/130/150
+        pct=self.req("size60","SCALE_SET",{
+            "id":"scaling.main.physicalSize","value":"60","expected_revision":"2",
+            "request_id":"size60"})
+        self.assertIsNone(pct["error"],pct)
+        self.assertEqual(pct["fields"]["desired"],"60")
+        self.assertIn("main_physical=60\n",Path(self.env["MIBR_V3_HOST_SCALING_PATH"]).read_text())
+        big=self.req("size200","SCALE_SET",{
+            "id":"scaling.cluster.physicalSize","value":"200","expected_revision":"3",
+            "request_id":"size200"})
+        self.assertIsNone(big["error"],big)
+        read=self.req("size_get","SCALE_GET",{"id":"scaling.cluster.physicalSize"})
+        self.assertEqual((read["fields"]["desired"],read["fields"]["revision"]),("200","4"))
+        for rid,value in (("noncanon","120"),("toosmall","40"),("toobig","210"),("offstep","55")):
+            bad=self.req(rid,"SCALE_SET",{"id":"scaling.cluster.physicalSize","value":value,
+                "expected_revision":"4","request_id":rid})
+            self.assertEqual(bad["error"],"INVALID_REQUEST",value)
 
     def test_bad_scaling_input_is_rejected_without_persistence(self):
         for rid,key,value in (("badrow","display.zoomFactor","125"),

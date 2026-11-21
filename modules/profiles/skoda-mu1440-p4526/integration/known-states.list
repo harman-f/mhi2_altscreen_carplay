@@ -14,3 +14,22 @@
 /mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 692f5b6623dadfa7a49e101f003a2e99c9c03340b12960935fae8d3c662c06ca pkg-beta-r3-r8
 /mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar fc9ea93c78ebd9c544b33669d1debe2f7362b8ee6cccdb8c98f4a5fc13fc52eb pkg-beta-r9-r10
 /mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 65d5dfd250d040f28e8bf0fa7f552d90f9d5cfd634026370092cd55ea6fb0035 pkg-beta-r10b
+# Own beta packages r12-r15h (2026-11-16..19): GEN2 libraries and menu JARs, so upgrades from these test builds are not blocked.
+/mnt/app/eso/lib/libmibr_carplay111.so c85776020599bfe5b8ac911169621c139ad54d084eba8baea9dee4900ca81689 pkg-beta-r12
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 5f63fcddfa267bc7dd134b3c548a9a0e300d57a625aac3fbf472164706884a39 pkg-beta-r11b-r12
+/mnt/app/eso/lib/libmibr_carplay111.so 5f3a60d5dd13864549a973d51aec78c48ea0f676b0e34c2d5dcb35f9a177e5ef pkg-beta-r13
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar dae1b0572a2742ba6a95fb4efaea3b11ff348fbc42d27d2d108778139c669332 pkg-beta-r13
+/mnt/app/eso/lib/libmibr_carplay111.so d375c2a47362db6e282ca470fd3590d942b039d89e30bac22d47274b846e06ff pkg-beta-r14b
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar f478f27ac1565eb423a444ada4c8e5cbd20b2965747aa9c4cad1f2345851ce4b pkg-beta-r14b
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 3b4bf087bec9aedd1f5962c621b0fba3015bed4f67cca0b0a6e2877483f7315e pkg-beta-r15
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 490ff10fae4523e0bbf1c1598f0bd9847f80e14d3bf62ef2aacffb9b95143acf pkg-beta-r15d
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar f46cdce2676e679c476ae6ba75adcd6bdcf269cc5ba247a8d4c3cf023d9fe266 pkg-beta-r15e
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 2fba17a6f6f1d77a2034ba5cd539961ed550a8fe14fb4abf46bfd440eda256bf pkg-beta-r15f
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 4883f34a1408da91171844e4438a6e193e71ecc0e44900ae9d9ced5be47c61ed pkg-beta-r15g
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar b3f8678a93f969cf236fc67b9232c00b6701769071b48a27e7224a6e2be44b7c pkg-beta-r15h
+# Own beta package r15i (2026-11-20): GEN2 library and menu JAR.
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 6423ee3a39cbedfa66b9a991e3e101de95a3ffbed852b71ed93844f5bc3540af pkg-beta-r15i
+/mnt/app/eso/lib/libmibr_carplay111.so f5e35dadde3f81c743f4bc8b30d1dff37c1f8ef4235b058af1492e31397f451b pkg-beta-r15i
+# Own beta package r15j (1.5.0-beta.16, 2026-11-20): GEN2 library and menu JAR.
+/mnt/app/eso/lib/libmibr_carplay111.so 24b60b76e59447c6127a5fdef833419ddec6bb895fec1c4c8c035838b2b380f6 pkg-beta-r15j
+/mnt/app/eso/hmi/lsd/jars/MIBR-CarPlay.jar 9dc4b8347b809f5f9fccbba026426697fcf7a0f1b710da0d015a9a3022298dea pkg-beta-r15j

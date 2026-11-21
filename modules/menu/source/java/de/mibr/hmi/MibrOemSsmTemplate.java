@@ -171,6 +171,23 @@ public final class MibrOemSsmTemplate {
         }
     }
 
+    /** Full stack trace of a failure into the same bounded diag file (r15e: LAYOUT_FAILED evidence). */
+    static void diagTrace(String prefix,Throwable failure){
+        if(failure==null||diagLines>=600)return;
+        diagLines++;
+        java.io.FileOutputStream out=null;
+        try{
+            out=new java.io.FileOutputStream("/tmp/mibr-hmi-diag.log",true);
+            java.io.PrintStream ps=new java.io.PrintStream(out);
+            ps.println(System.currentTimeMillis()+" "+prefix+" "+failure);
+            failure.printStackTrace(ps);
+            ps.flush();
+        }catch(Throwable ignored){
+        }finally{
+            if(out!=null)try{out.close();}catch(Throwable ignored){}
+        }
+    }
+
     public static boolean syncScrollbar(Binding b,boolean replaced) {
         try {
             diag("MIBR_SSM_SCROLLBAR_SYNC replaced="+replaced+" rows="+b.mainList.get_itemCount());

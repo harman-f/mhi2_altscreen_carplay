@@ -7,11 +7,13 @@
 #include <stdint.h>
 
 #define MIBR_DISPLAY_SCALING_VALUE_CAP 8u
+#define MIBR_DISPLAY_PHYSICAL_PERCENT_MIN 50
+#define MIBR_DISPLAY_PHYSICAL_PERCENT_MAX 200
 struct mibr_display_scaling_state {
     uint64_t revision;
     char main[MIBR_DISPLAY_SCALING_VALUE_CAP];
     char cluster[MIBR_DISPLAY_SCALING_VALUE_CAP];
-    char physical[MIBR_DISPLAY_SCALING_VALUE_CAP]; /* BASE / P20 / P30 / P50 */
+    char physical[MIBR_DISPLAY_SCALING_VALUE_CAP]; /* BASE/P20/P30/P50 or r15j percent 50..200 */
     char main_physical[MIBR_DISPLAY_SCALING_VALUE_CAP]; /* Type110; BASE preserves OEM dimensions */
     int stored; /* 0 = compiled AUTO/AUTO defaults, 1 = exact persisted file */
 };
@@ -44,6 +46,8 @@ int mibr_display_scaling_set(const char *path,
 int mibr_display_scaling_id_valid(const char *id);
 int mibr_display_scaling_value_valid(const char *value);
 int mibr_display_physical_value_valid(const char *value);
+/* Percent of the base size (BASE=100, P20=120, P30=130, P50=150, "50".."200" step 10), -1 if invalid. */
+int mibr_display_physical_percent(const char *value);
 int mibr_display_physical_dimensions(const char *value,int *width_mm,int *height_mm);
 int mibr_display_main_physical_dimensions(const char *value,int original_width_mm,int original_height_mm,
     int *width_mm,int *height_mm);

@@ -31,7 +31,7 @@ VALID_RELATIVE = re.compile(
     r"/[a-z0-9][a-z0-9._-]*"
 )
 
-# Exactly the 40 *additional candidates*, not a claim of 40 real settings.
+# Exactly the 41 *additional candidates*, not a claim of 41 real settings.
 # relative old path | reserved relative name or '-' | owner/role | file policy
 # | A3 disposition
 # "hold-*" means no automatic migration target exists yet. In particular,
@@ -67,6 +67,7 @@ mibr-parity-drive.enabled|config/features/parity-drive.conf|runtime-policy|prese
 mibr-parity-statistics-enabled|config/features/parity-statistics.conf|runtime-policy|preserve-value-boolean-default-on|KEEP_AT_LEGACY
 mibr-parity-status-enabled|config/features/parity-status.conf|runtime-policy|preserve-value-boolean-default-on|KEEP_AT_LEGACY
 mibr-rgi/rgi.on|config/features/rgi.conf|navigation-activation|convert-presence|KEEP_AT_LEGACY
+mibr/config/cockpit/view-profiles.conf|-|view-profile|preserve-native|KEEP_AT_LEGACY
 mibr-cpvc.enabled|config/features/cpvc.conf|runtime-policy|preserve-scalar|KEEP_AT_LEGACY
 mibr-kit/disabled|-|boot-kill-switch|hold-exact-presence|KEEP_AT_LEGACY
 mibr-rgi|-|navigation-payload-directory|hold-payload|EXCLUDE_NONCONFIG
@@ -114,6 +115,8 @@ REASONS = {
         "the installer that writes this receipt is not in source",
     "migrate-single-writer-proven":
         "one source writer and all source readers are known",
+    "already-at-a3-location":
+        "created at its A3 path by the broker (single writer); nothing to move",
 }
 
 ADDITIONAL_REASON = {
@@ -132,6 +135,7 @@ ADDITIONAL_REASON = {
     "mibr-parity-statistics-enabled": "value-file-paired-writer",
     "mibr-parity-status-enabled": "value-file-paired-writer",
     "mibr-rgi/rgi.on": "no-writer-in-source",
+    "mibr/config/cockpit/view-profiles.conf": "already-at-a3-location",
     "mibr-cpvc.enabled": "early-boot-or-stock-backup-contract",
     "mibr-kit/disabled": "early-boot-or-stock-backup-contract",
     "mibr-rgi": "payload-not-state",
@@ -213,6 +217,7 @@ mibr-parity-drive.enabled|DEFER_MIGRATION|config/features/parity-drive.conf|pari
 mibr-parity-statistics-enabled|DEFER_MIGRATION|config/features/parity-statistics.conf|parity_drive_status.sh|value boolean, absent means ON; shell and supervisors move together
 mibr-parity-status-enabled|DEFER_MIGRATION|config/features/parity-status.conf|parity_drive_status.sh|value boolean, absent means ON; native reader too
 mibr-rgi/rgi.on|DEFER_MIGRATION|config/features/rgi.conf|menu/broker (to be added)|no writer in source; two native readers in different processes
+mibr/config/cockpit/view-profiles.conf|KEEP_TECHNICALLY_REQUIRED|-|broker (mibr_durable_switch.c profile_set)|already at its A3 location; the broker is the only writer (CAS, stage+rename, .lastgood)
 mibr-cpvc.enabled|DEFER_MIGRATION|config/features/cpvc.conf|cpvc_config.sh enable/disable|read by the boot.ksh hook of the generated lsd.sh block; migrate only with hook regeneration, together with the parity-drive marker it writes
 mibr-kit/disabled|KEEP_TECHNICALLY_REQUIRED|-|boot-guard.ksh (auto) or operator|kill switch read by the lsd.sh block, boot.ksh, boot-guard.ksh, mm-ipod-rgi and mibr-watch; a rename orphans an installed switch
 mibr-rgi|EXCLUDE_NONCONFIG|-|installer payload|directory of installed RGI binaries and the enable file; follows the payload layout
@@ -289,7 +294,7 @@ def source_spec():
                        "owner_role": owner, "format_policy": policy,
                        "disposition": disposition, "reason": reason,
                        "writer": MIGRATE_WRITERS.get(old)}
-    require(len(specs) == 40, "unexpected additional storage candidates")
+    require(len(specs) == 41, "unexpected additional storage candidates")
     return specs
 
 
@@ -392,8 +397,8 @@ def build(graph, specs=None, arch=None):
         arch = arch_spec()
     require(graph["migration_authorized"] is False,
             "graph unexpectedly authorized runtime writes")
-    require(len(graph["records"]) == 66, "source candidate count changed")
-    require(len({r["current_path"] for r in graph["records"]}) == 66,
+    require(len(graph["records"]) == 67, "source candidate count changed")
+    require(len({r["current_path"] for r in graph["records"]}) == 67,
             "duplicate current storage paths")
     require(all(r["destination_path"] is None for r in graph["records"]),
             "unexpected independently authorized graph destination")
@@ -405,7 +410,7 @@ def build(graph, specs=None, arch=None):
     expected = {r["current_path"] for r in graph["records"]
                 if r["kind"] not in ("carplay-registry-group",
                                      "broker-durable-switch")}
-    require(set(specs) == expected and len(specs) == 40,
+    require(set(specs) == expected and len(specs) == 41,
             "added/removed unreviewed legacy store or source classification")
     rows, targets = [], {}
     for original in sorted(graph["records"], key=lambda r: r["current_path"]):
@@ -563,14 +568,14 @@ def require_migration_authorized(plan):
 def self_test():
     graph = access.build(ROOT)
     plan = build(graph)
-    assert plan["counts"]["input_candidate_paths"] == 66
-    assert plan["counts"]["additional_candidate_paths"] == 40
+    assert plan["counts"]["input_candidate_paths"] == 67
+    assert plan["counts"]["additional_candidate_paths"] == 41
     assert not plan["migration_authorized"]
     rows = {r["current_path_candidate"]: r for r in plan["records"]}
     assert rows[OLD + "altscreen-u2/config/mibr-menu.conf"][
         "native_format_or_conversion_policy"] == "preserve-crc"
     counts = plan["counts"]["a3_dispositions"]
-    assert counts == {"MIGRATE": 18, "KEEP_AT_LEGACY": 42,
+    assert counts == {"MIGRATE": 18, "KEEP_AT_LEGACY": 43,
                       "EXCLUDE_NONCONFIG": 3, "BLOCKED_INPUT": 3}, counts
     assert plan["counts"]["target_names_proposed"] == 18
     for row in plan["records"]:
@@ -600,7 +605,7 @@ def self_test():
     assert all(r["a3_disposition"] == "KEEP_AT_LEGACY" for r in plan["records"]
                if r["source_kind"] == "carplay-registry-group")
     arch = plan["counts"]["architecture_classes"]
-    assert arch == {"MIGRATE_AS_PLANNED": 18, "KEEP_TECHNICALLY_REQUIRED": 2,
+    assert arch == {"MIGRATE_AS_PLANNED": 18, "KEEP_TECHNICALLY_REQUIRED": 3,
                     "DEFER_MIGRATION": 20, "CONSOLIDATE_OR_RETIRE": 13,
                     "EXCLUDE_NONCONFIG": 8, "BLOCKED_INPUT": 5}, arch
     # KEEP now is not the end state: the registry groups have a long-term

@@ -202,13 +202,20 @@ mkdir -p "$OUT/hmi/common"
 for name in MIBR-NavIgnore.jar MIBR-Most20FPS.jar; do
   install -m 0644 "$MIBR_SUPPORT_JAR_DIR/$name" "$OUT/hmi/common/$name"
 done
+# build_modular requires the HMI JARs' source commit beside them.
+git -C "$ROOT" rev-parse HEAD > "$OUT/hmi/SOURCE_COMMIT.txt"
 NATIVE="$OUT/native"
 mkdir -p "$NATIVE/bin/navigation"
 QNX_TARGET="$QNX_TARGET" IAP2_LIB="$IAP2_LIB" CLANG="$CLANG" LLD="$LLD" \
   sh "$ROOT/modules/navigation/source/build.sh" "$NATIVE/bin/navigation"
-ffmpeg -hide_banner -loglevel error -y -version >/dev/null
+"$FFMPEG" -hide_banner -loglevel error -y -version >/dev/null
 python3 "$ROOT/modules/navigation/source/tools/make_calib_clip.py" \
   "$NATIVE/bin/navigation/mibr-calib.avcc" "$FFMPEG"
+# selectable test patterns (menu Kalibrierbild); keep in step with CALIB_PATTERNS in build_modular.py
+for pattern in black white contrast motion; do
+  python3 "$ROOT/modules/navigation/source/tools/make_calib_clip.py" \
+    "$NATIVE/bin/navigation/mibr-calib-$pattern.avcc" --pattern "$pattern" "$FFMPEG"
+done
 (cd "$NATIVE" && find bin -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
 (cd "$NATIVE" && sha256sum --check --strict SHA256SUMS >/dev/null) || {
   echo 'NATIVE_OUTPUT_MANIFEST_VERIFY_FAIL' >&2

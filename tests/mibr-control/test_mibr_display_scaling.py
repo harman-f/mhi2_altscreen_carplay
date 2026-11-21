@@ -105,6 +105,43 @@ class DisplayScalingStore(unittest.TestCase):
             self.assertEqual(result.returncode, 3)
         self.assertEqual(self.run_probe("read", self.path).stdout.strip(), "6|85|125|BASE|BASE|1")
 
+    def test_r15j_percent_steps_50_to_200_keep_legacy_spelling(self):
+        # 16 slider positions: legacy tokens are the canonical spelling of 100/120/130/150.
+        steps = {50: "50", 60: "60", 70: "70", 80: "80", 90: "90", 100: "BASE", 110: "110", 120: "P20",
+                 130: "P30", 140: "140", 150: "P50", 160: "160", 170: "170", 180: "180", 190: "190", 200: "200"}
+        revision = 0
+        for percent, token in steps.items():
+            for key, slot in (("scaling.cluster.physicalSize", 4), ("scaling.main.physicalSize", 5)):
+                result = self.run_probe("set", self.path, key, token, revision)
+                fields = result.stdout.strip().split("|")
+                self.assertEqual(fields[slot], token)
+                revision = int(fields[1])
+                self.assertEqual(self.run_probe("read", self.path).stdout.strip().split("|")[slot - 1], token)
+            # cluster: 200x74 mm base, nearest/half-up like the presets
+            w, h = (200 * percent + 50) // 100, (74 * percent + 50) // 100
+            self.assertEqual(self.run_probe("cluster", token).stdout.strip(), "%d|%d" % (w, h))
+            self.assertEqual(self.run_probe("dimensions", token, 153, 77).stdout.strip(),
+                             "%d|%d" % ((153 * percent + 50) // 100, (77 * percent + 50) // 100))
+        self.assertEqual(self.run_probe("cluster", "50").stdout.strip(), "100|37")
+        self.assertEqual(self.run_probe("cluster", "200").stdout.strip(), "400|148")
+        self.assertEqual(self.run_probe("cluster", "P20").stdout.strip(), "240|89")
+        self.assertEqual(self.run_probe("cluster", "P30").stdout.strip(), "260|96")
+        self.assertEqual(self.run_probe("cluster", "P50").stdout.strip(), "300|111")
+        self.assertEqual(self.run_probe("cluster", "BASE").stdout.strip(), "200|74")
+        before = self.path.read_text()
+        for invalid in ("100", "120", "130", "150", "40", "210", "55", "050", "0", "-50", "+60", "60 ", "1e2", "P60", "250"):
+            result = self.run_probe("set", self.path, "scaling.cluster.physicalSize", invalid, revision, ok=False)
+            self.assertEqual(result.returncode, 3, invalid)
+            self.assertEqual(self.run_probe("cluster", invalid, ok=False).returncode, 5, invalid)
+        self.assertEqual(self.path.read_text(), before)
+        # a stored percent survives a zoom write and is read by the strict v3 parser
+        self.run_probe("set", self.path, "scaling.cluster.physicalSize", "70", revision)
+        self.run_probe("set", self.path, "scaling.main.zoomFactor", "125", revision + 1)
+        self.assertIn("physical=70\n", self.path.read_text())
+        status = self.root / "scaling.status"
+        status.write_text("MIBR_SCALING_ADVERTISED/3\nrevision=%d\nmain=125\ncluster=AUTO\nphysical=70\nmain_physical=200\n" % (revision + 2))
+        self.assertEqual(self.run_probe("advertised", self.path, status).stdout.strip(), "1|125|AUTO|70|200")
+
     @unittest.skipUnless(DOWNGRADE_SOURCE.is_file(), "Research-only scaling downgrade helper is omitted from the public source tree")
     def test_legacy_rollback_stage_restores_two_key_format(self):
         self.run_probe("set", self.path, "scaling.main.zoomFactor", "125", 0)

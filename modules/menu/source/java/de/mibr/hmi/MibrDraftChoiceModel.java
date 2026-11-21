@@ -28,7 +28,8 @@ public final class MibrDraftChoiceModel {
     public String[] options() {
         if (index == MibrPopupEditorModel.ENGINE) return MibrEngineState.VALUES;
         if (index == MibrPopupEditorModel.MENU_LANGUAGE) return new String[]{"AUTO","de","en"};
-        if (index == MibrPopupEditorModel.NAV_DEMO || index == MibrPopupEditorModel.CALIB_IMAGE) return new String[]{"off","on"};
+        if (index == MibrPopupEditorModel.CALIB_IMAGE) return MibrCalibration.IDS;
+        if (index == MibrPopupEditorModel.NAV_DEMO) return new String[]{"off","on"};
         if (MibrPopupEditorModel.isSafe(index)) return MibrPopupEditorModel.safeField(index) == MibrSafeArea.RESET_FIELD ? MibrSafeArea.RESET_OPTIONS : MibrSafeArea.OPTIONS;
         if (index == MibrPopupEditorModel.EXPERT_MODE) return new String[]{"off","session","on"};
         if (MibrPopupEditorModel.durable(index) != null) return MibrPopupEditorModel.durable(index).values;
@@ -114,6 +115,14 @@ public final class MibrDraftChoiceModel {
             if ("on".equals(value)) return MibrI18n.pick("Dauerhaft","Permanent");
             return MibrI18n.pick("Aus","Off");
         }
+        if (index == MibrPopupEditorModel.CALIB_IMAGE) {
+            if ("grid".equals(value)) return MibrI18n.pick("Gitter","Grid");
+            if ("black".equals(value)) return MibrI18n.pick("Schwarz","Black");
+            if ("white".equals(value)) return MibrI18n.pick("Weiß","White");
+            if ("contrast".equals(value)) return MibrI18n.pick("Kontrast","Contrast");
+            if ("motion".equals(value)) return MibrI18n.pick("Bewegung","Motion");
+            return MibrI18n.pick("Aus","Off");
+        }
         if (index == MibrPopupEditorModel.GPS_DEMO) {
             if ("OFF".equals(value)) return MibrI18n.pick("Aus","Off");
             if ("BERLIN_DEMO".equals(value)) return "Berlin Alexanderplatz";
@@ -123,26 +132,15 @@ public final class MibrDraftChoiceModel {
             return MibrI18n.pick("Unbekannt","Unknown");
         }
         if (MibrPopupEditorModel.isScaling(index)) {
-            if (index==MibrPopupEditorModel.SCALE_PHYSICAL || index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL) {
-                boolean main=index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL;
-                if("BASE".equals(value))return MibrI18n.pick("Original","Original");
-                if(main){
-                    if("P20".equals(value))return "+20 %";
-                    if("P30".equals(value))return "+30 %";
-                    if("P50".equals(value))return "+50 %";
-                }
-                if ("BASE".equals(value)) return MibrI18n.pick("Original (200 x 74 mm)","Baseline (200 x 74 mm)");
-                if ("P20".equals(value)) return "+20 % (240 x 89 mm)";
-                if ("P30".equals(value)) return "+30 % (260 x 96 mm)";
-                if ("P50".equals(value)) return "+50 % (300 x 111 mm)";
-                return value;
-            }
+            if (index==MibrPopupEditorModel.SCALE_PHYSICAL || index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL)
+                // r15j: legacy presets and the 50..200 % steps (a slider value read on a dropdown profile)
+                return MibrScalingState.physicalLabel(index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL,value);
             if("AUTO".equals(value))return MibrI18n.pick("Automatisch", "Automatic");
             if("70".equals(value)||"85".equals(value)||"100".equals(value)||"125".equals(value)||"150".equals(value))return value+" %";
             return value;
         }
         if (index > MibrPopupEditorModel.ENGINE && index < MibrPopupEditorModel.SCALE_MAIN) return MibrViewState.valueLabel(index - MibrPopupEditorModel.VIEW_FOLLOW, value);
-        if (MibrPopupEditorModel.durableCheck(index)||index==MibrPopupEditorModel.NAV_DEMO||index==MibrPopupEditorModel.CALIB_IMAGE) return "on".equals(value) ? MibrI18n.pick("Ein","On") : MibrI18n.pick("Aus","Off");
+        if (MibrPopupEditorModel.durableCheck(index)||index==MibrPopupEditorModel.NAV_DEMO) return "on".equals(value) ? MibrI18n.pick("Ein","On") : MibrI18n.pick("Aus","Off");
         if ("user".equals(value) && "TRISTATE".equals(MibrSettingsCatalog.UI_KINDS[index]))
             return MibrI18n.pick("App-Vorgabe", "App default");
         // Display labels only. chooseDraft retains exact canonical URL bytes.
