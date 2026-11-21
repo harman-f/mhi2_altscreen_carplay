@@ -33,8 +33,6 @@ SERVICE=(
   "$SRC/mibr_app_rw_lease.c"
   "$SRC/mibr_durable_switch.c"
   "$SRC/mibr_menu_language.c"
-  "$SRC/mibr_gps_demo_mode.c"
-  "$SRC/mibr_gps_demo_ipc.c"
 )
 HOST_SERVICE=(
   "$SRC/mibr_v3_readonly.c"
@@ -48,8 +46,6 @@ HOST_SERVICE=(
   "$SRC/mibr_v3_owner_lifecycle.c"
   "$SRC/mibr_durable_switch.c"
   "$SRC/mibr_menu_language.c"
-  "$SRC/mibr_gps_demo_mode.c"
-  "$SRC/mibr_gps_demo_ipc.c"
 )
 HOST_HARNESS_SERVICE=(
   "$SRC/mibr_v3_readonly.c"
@@ -62,8 +58,6 @@ HOST_HARNESS_SERVICE=(
   "$SRC/mibr_v3_owner_lifecycle.c"
   "$SRC/mibr_durable_switch.c"
   "$SRC/mibr_menu_language.c"
-  "$SRC/mibr_gps_demo_mode.c"
-  "$SRC/mibr_gps_demo_ipc.c"
 )
 
 mkdir -p "$OUT"
@@ -112,7 +106,6 @@ case "$MODE" in
           "$S/mibr_v3_key40.c" "$S/mibr_v3_input_bridge.c" \
           "$S/mibr_v3_route_gateway.c" "$S/mibr_v3_owner_lifecycle.c" \
           "$S/mibr_app_rw_lease.c" "$S/mibr_durable_switch.c" "$S/mibr_menu_language.c" \
-          "$S/mibr_gps_demo_mode.c" "$S/mibr_gps_demo_ipc.c" \
           "$A/alt111-settings/settings_core.c" "$A/alt111-settings/settings_posix.c" \
           "$A/altscreen111-gen2/src/alt111_policy.c" \
           "$A/sha256sum-compat/sha256sum_compat.c" \

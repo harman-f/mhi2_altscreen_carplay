@@ -122,7 +122,6 @@ These entries exist in the checked-in standard menu but do **not** have a one-to
 | `advanced` | `page` | Layout only; not a value |
 | `engine.type` | `list` | No single compiled default in the two registries; inspect owner/firmware |
 | `menu.language` | `list` | No single compiled default in the two registries; inspect owner/firmware |
-| `gps.demo` | `list` | No single compiled default in the two registries; inspect owner/firmware |
 | `menu.load` | `action` | No single compiled default in the two registries; inspect owner/firmware |
 | `expert.mode` | `list` | No single compiled default in the two registries; inspect owner/firmware |
 | `scaling` | `page` | Layout only; not a value |

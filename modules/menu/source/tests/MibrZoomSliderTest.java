@@ -107,7 +107,7 @@ public final class MibrZoomSliderTest implements MibrCarPlayMenuModel.View {
         menu.toggleSafe(1);
         check(menu.consumeToggle()&&!menu.consumeToggle(),"toggle flag is one-shot");
         check(view.rows.length==6&&menu.sliderKeyForRow(2)==c&&menu.expandedRow()==1&&"Zoomfaktor Virtual Cockpit".equals(view.rows[1]),"expanded: slider row below the header");
-        check("Wirkt nach Neuverbinden".equals(view.rows[5])&&menu.noteRow(5),"short reconnect hint (single row)");
+        check("Mehr % = kleinere Darstellung. Wirkt nach Neuverbinden".equals(view.rows[5])&&menu.noteRow(5),"reconnect + size hint (single row)");
         menu.toggleSafe(1);
         check(view.rows.length==5&&menu.expandedRow()==-1,"second tap collapses");
         menu.toggleSafe(3);

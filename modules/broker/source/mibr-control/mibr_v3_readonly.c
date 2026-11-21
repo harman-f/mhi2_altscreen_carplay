@@ -324,28 +324,6 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
                 field(&w,mibr_switch_defs[i].capability,r&&r->switches[i].ready?"1":"0");
             {const struct mibr_switch_def *host=mibr_switch_for_op("NAV_SOURCE_GET",NULL);
              field(&w,"view_profile",r&&host&&r->switches[host-mibr_switch_defs].ready?"1":"0");}
-            /* Owner readiness is a *live current-session GET*, not the
-             * presence of the broker's always-registered IPC callback.
-             * Missing DIO original-owner socket must advertise unavailable. */
-            {int owner_ready=0;
-             char reply[128]={0},mode[32]={0},epoch[32]={0},active[8]={0},
-                  stationary[8]={0},extra[8]={0};
-             if(r&&r->gps_demo_op&&
-                !r->gps_demo_op(r->gps_demo_context,"GET",NULL,NULL,
-                                reply,sizeof(reply))&&
-                sscanf(reply,"OK %31s %31s %7s %7s %7s",
-                       mode,epoch,active,stationary,extra)==4&&
-                (!strcmp(mode,"OFF")||!strcmp(mode,"BERLIN_DEMO")||
-                 !strcmp(mode,"HAMBURG_DEMO")||
-                 !strcmp(mode,"SCHWALEFELD_DEMO")||
-                 !strcmp(mode,"WINTERBERG_DEMO"))&&
-                epoch[0]&&strspn(epoch,"0123456789")==strlen(epoch)&&
-                (!strcmp(active,"0")||!strcmp(active,"1"))&&
-                (!strcmp(stationary,"0")||!strcmp(stationary,"1"))&&
-                (strcmp(active,"1")||strcmp(mode,"OFF")))
-                 owner_ready=1;
-             field(&w,"gps_demo",owner_ready?"1":"0");
-            }
             field(&w,"test_override","0");field(&w,"presentation_refresh","0");
             field(&w,"reconnect","0");field(&w,"session_control","0");
             {struct mibr_v3_route_observation current;
@@ -448,72 +426,6 @@ int mibr_v3_handle(struct mibr_v3_reader *r,enum mibr_v3_role role,
         }
         response_start(&w,req.rid,"OK");
         field(&w,"result",result);
-    }else if(!strcmp(req.op,"GPS_DEMO_GET")||!strcmp(req.op,"GPS_DEMO_SET")){
-        /* This transport never creates a second sender. The qualified ORIGINAL
-         * DIO owner controls all fixes and reports its current-session state. */
-        int set=!strcmp(req.op,"GPS_DEMO_SET"),matched=0;
-        const char *choice=NULL,*expected=NULL,*rid=NULL;
-        char reply[128]={0},current[32]={0},epoch[32]={0},active[8]={0},stationary[8]={0};
-        char extra[8]={0};
-        if(role==MIBR_V3_INPUT){error_frame(out,cap,req.rid,"FORBIDDEN");return -1;}
-        if(set){
-            for(i=0;i<req.count;i++){
-                if(!strcmp(req.f[i].key,"value"))choice=req.f[i].value;
-                else if(!strcmp(req.f[i].key,"expected_epoch"))expected=req.f[i].value;
-                else if(!strcmp(req.f[i].key,"request_id"))rid=req.f[i].value;
-                else {error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;}
-            }
-            if(req.count!=3||!choice||!expected||!rid||strcmp(req.rid,rid)||
-               !(!strcmp(choice,"OFF")||!strcmp(choice,"BERLIN_DEMO")||
-                 !strcmp(choice,"HAMBURG_DEMO")||
-                 !strcmp(choice,"SCHWALEFELD_DEMO")||
-                 !strcmp(choice,"WINTERBERG_DEMO"))){
-                error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
-            }
-            if(!*expected||(expected[0]=='0'&&expected[1])){
-                error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
-            }
-            for(i=0;expected[i];i++){
-                if(expected[i]<'0'||expected[i]>'9'||i>=19){
-                    error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
-                }
-            }
-        }else if(req.count){
-            error_frame(out,cap,req.rid,"INVALID_REQUEST");return -1;
-        }
-        if(!r||!r->gps_demo_op){
-            error_frame(out,cap,req.rid,"NOT_READY");return -1;
-        }
-        if(r->gps_demo_op(r->gps_demo_context,set?"SET":"GET",choice,expected,
-                          reply,sizeof(reply))){
-            error_frame(out,cap,req.rid,"NOT_READY");return -1;
-        }
-        /* Exact bounded owner-IPC reply: OK MODE EPOCH ACTIVE STATIONARY. */
-        matched=sscanf(reply,"OK %31s %31s %7s %7s %7s",
-                       current,epoch,active,stationary,extra);
-        if(matched!=4||(strcmp(current,"OFF")&&strcmp(current,"BERLIN_DEMO")&&
-           strcmp(current,"HAMBURG_DEMO")&&
-           strcmp(current,"SCHWALEFELD_DEMO")&&
-           strcmp(current,"WINTERBERG_DEMO"))||
-           !(!strcmp(active,"0")||!strcmp(active,"1"))||
-           !(!strcmp(stationary,"0")||!strcmp(stationary,"1"))||
-           !*epoch){
-            error_frame(out,cap,req.rid,"OWNER_UNCONFIRMED");return -1;
-        }
-        for(i=0;epoch[i];i++){
-            if(epoch[i]<'0'||epoch[i]>'9'||i>=19){
-                error_frame(out,cap,req.rid,"OWNER_UNCONFIRMED");return -1;
-            }
-        }
-        /* Even matching SET is only current owner acceptance, never a
-         * statement that Apple's Maps renderer used accessory coordinates. */
-        if(set&&strcmp(choice,current)){
-            error_frame(out,cap,req.rid,"OWNER_UNCONFIRMED");return -1;
-        }
-        response_start(&w,req.rid,"OK");
-        field(&w,"choice",current);field(&w,"epoch",epoch);
-        field(&w,"active",active);field(&w,"stationary",stationary);
-        field(&w,"owner","MANUAL_CONTROL");field(&w,"effect","UNVERIFIED_IOS");
     }else if(!strcmp(req.op,"MENU_LANGUAGE_GET")||!strcmp(req.op,"MENU_LANGUAGE_SET")){
         struct mibr_menu_language fresh;
         int set=!strcmp(req.op,"MENU_LANGUAGE_SET");

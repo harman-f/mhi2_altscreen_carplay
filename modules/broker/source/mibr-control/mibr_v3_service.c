@@ -8,7 +8,6 @@
 #include "mibr_v3_readonly.h"
 #include "mibr_v3_runtime_observer.h"
 #include "mibr_v3_recovery_gate.h"
-#include "mibr_gps_demo_ipc.h"
 #include <stdlib.h>
 #include <string.h>
 #if defined(__QNXNTO__) && defined(MIBR_V3_TARGET_STORAGE_QUALIFIED)
@@ -522,9 +521,6 @@ int main(int argc,char **argv){
 #endif
         }
     }
-    /* Existing authenticated loopback broker -> existing original-DIO owner.
-     * No GPS output from this service. No active claim without owner reply. */
-    reader->gps_demo_op=mibr_gps_demo_ipc;reader->gps_demo_context=NULL;
     reader->presentation_request=request_show;
     reader->presentation_context=(void *)paths.temp;
     reader->live_apply=mibr_v3_live_apply;reader->live_revert=mibr_v3_live_revert;
