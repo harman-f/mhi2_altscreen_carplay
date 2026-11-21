@@ -7,7 +7,7 @@ MIB Runtime has **one shared codebase** and **three exact firmware profiles**, b
 | Line | Targets | Availability and scope | Instructions |
 | --- | --- | --- | --- |
 | **Frozen MU1440 developer reference** | Exact Škoda MU1440 P4526 / AID10-class reference | Seven-payload historical developer package; pinned bytes and limited observed capability. No newer Java/menu/three-profile promise | [Frozen release inventory](../../release/CURRENT.md), [legacy developer procedure](../INSTALLATION.md) |
-| **Modular MIB Runtime beta** | Škoda MU1440 P4526; SEAT MU1409 P4708; SEAT MU1447 P4709 | Shared `common/` plus all three `profiles/`; installer, selector and assembler are in source. **A complete validated final beta ZIP is not yet demonstrated by this page.** | [Package contract](../build/PACKAGE_LAYOUT.md), [profile matrix](../testing/MULTI_PROFILE_TESTING.md) |
+| **Modular MIB Runtime beta** | Škoda MU1440 P4526; SEAT MU1409 P4708; SEAT MU1447 P4709 | Shared `common/` plus all three `profiles/`; installer, selector and assembler are in source. **Release 1.6.0** (2026-11-21): the vehicle-accepted three-profile package (internal id 1.5.0-beta.16, Škoda vehicle-tested, SEAT built only); see [release/CURRENT.md](../../release/CURRENT.md). The archive is not published here. | [Package contract](../build/PACKAGE_LAYOUT.md), [profile matrix](../testing/MULTI_PROFILE_TESTING.md) |
 
 The frozen developer release is **not replaced** merely because newer source was merged. Its tag, bytes and hashes stay as published. The new MIB Runtime installer must not silently be used with the old seven-payload bundle.
 

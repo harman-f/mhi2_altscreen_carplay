@@ -1,5 +1,30 @@
 # MU1440 / AID10 developer test — current
 
+## Release 1.6.0 (2026-11-21)
+
+Release **1.6.0** is the vehicle-accepted modular MIB Runtime beta.
+
+**The accepted package**
+- The three-profile package was built by the private build repository and is internally labelled **1.5.0-beta.16**. Its `package.json` and installer `product_version` say 1.5.0-beta.16.
+- Archive sha256 `ae7c27058dc4904200b89ec14878101c7bb0edc2bdde9550e1eb99e63904cfae`, pinned in `tools/release/RESEARCH_PREBUILT_LOCK.json` and `modules/profiles/MENU_SOURCE_LOCK.json`.
+- The archive is not published as a GitHub Release, because its menu JARs are compiled against the OEM API jar.
+
+**The tag**
+- `v1.6.0` marks the public source state that is equivalent to that package: develop after #212 and #213, promoted to `main`.
+- The package was assembled from the private builder's equivalent tree. The tag therefore does not point at the package's embedded `source_commit`; the source locks are what tie the public tree to the archive.
+
+**Vehicle acceptance (Škoda MU1440 P4526, 2026-11-17..20)**
+- Safe-area edge sliders save.
+- The cockpit view stays in sync across a reboot.
+- Main and cockpit zoom, and the physical size (50..200 %), apply after an iPhone reconnect. At 200 % the cockpit was advertised as 400x148 mm and both displays rendered smaller, as expected.
+- Stream 111 resumed after each reconnect.
+- Install backups are kept on the SD card.
+
+**SEAT MU1409 P4708 / MU1447 P4709**
+- Built and included, not vehicle-tested. These profiles keep the dropdown rows instead of the slider rows.
+
+**Next:** 1.5.0-beta.17, which removes the Demo GPS location menu function, is open as a draft PR until its own vehicle acceptance.
+
 ## Current three-profile beta build status (2026-11-10)
 
 The public product repository contains source and publication checks only. Its
