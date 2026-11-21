@@ -1,5 +1,28 @@
 # MU1440 / AID10 developer test — current
 
+## Release 1.6.1 (2026-11-21)
+
+Release **1.6.1** is the vehicle-accepted modular MIB Runtime beta with the Demo GPS location menu function removed.
+
+**The accepted package**
+- The three-profile package was built by the private build repository and is internally labelled **1.5.0-beta.17 (r15k)**.
+- Archive sha256 `78559a44773266f5e95ae376a0124d03ad060aa67e5bbdab2d45304e645c3d27`, pinned in `tools/release/RESEARCH_PREBUILT_LOCK.json` and `modules/profiles/MENU_SOURCE_LOCK.json`.
+- The archive is not published as a GitHub Release, because its menu JARs are compiled against the OEM API jar.
+
+**Changes versus 1.6.0**
+- The Demo GPS location menu function is removed.
+- The physical-size hint now reads "More % = smaller display. Applies after reconnect".
+- Zoom and size code is unchanged from 1.6.0.
+
+**The tag**
+- `v1.6.1` marks the public source state that is equivalent to that package. As with 1.6.0, the source locks tie the public tree to the archive.
+
+**Vehicle acceptance (Škoda MU1440 P4526, 2026-11-21)**
+- The Demo GPS entry is gone, the scaling hint is visible, and CarPlay and navigation work.
+
+**SEAT MU1409 P4708 / MU1447 P4709**
+- Built and included, not vehicle-tested.
+
 ## Release 1.6.0 (2026-11-21)
 
 Release **1.6.0** is the vehicle-accepted modular MIB Runtime beta.
@@ -23,7 +46,7 @@ Release **1.6.0** is the vehicle-accepted modular MIB Runtime beta.
 **SEAT MU1409 P4708 / MU1447 P4709**
 - Built and included, not vehicle-tested. These profiles keep the dropdown rows instead of the slider rows.
 
-**Next:** 1.5.0-beta.17, which removes the Demo GPS location menu function, is open as a draft PR until its own vehicle acceptance.
+**Next:** 1.5.0-beta.17 (Demo GPS location removed) was accepted afterwards and is released as 1.6.1.
 
 ## Current three-profile beta build status (2026-11-10)
 
