@@ -12,7 +12,7 @@ ROOT = P.parents[2]
 GENERATED = Path(tempfile.mkdtemp(prefix="mibr-v3-generated-"))
 MAIN = ("MibrV3Protocol", "MibrV3Client", "MibrV3Bootstrap", "MibrV3Session", "MibrV3Route",
         "MibrI18n", "MibrPopupEditorModel", "MibrScalingState", "MibrCalibration", "MibrDraftChoiceModel", "MibrVersionInfo",
-        "MibrCarPlayMenuModel", "MibrGpsDemoState", "MibrVdataDiag", "MibrEngineState", "MibrViewState", "MibrElementSpec", "MibrElementEngine", "MibrElementTree", "MibrCanonicalElementMenu",
+        "MibrCarPlayMenuModel", "MibrVdataDiag", "MibrEngineState", "MibrViewState", "MibrElementSpec", "MibrElementEngine", "MibrElementTree", "MibrCanonicalElementMenu",
         "MibrDurableSwitch", "MibrViewProfile", "MibrPlatformDefaults", "MibrSafeArea", "MibrMenuCatalog", "MibrMenuFunctions", "MibrMenuLayout", "MibrExpert")
 
 

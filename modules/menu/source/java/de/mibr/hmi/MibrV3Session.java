@@ -14,7 +14,6 @@ final class MibrV3Session {
     private boolean attached=true,busy,loaded,writable,scalingAvailable,scalingRefreshInFlight,scalingSetInFlight,scalingRefreshPending;
     private int epoch,sequence;
     private boolean languageAvailable,languageAsked,languagePending,languageSetInFlight;
-    private boolean gpsAvailable,gpsAsked,gpsSetInFlight;
     // r11: per-key save queue. A tap while another SET is in flight is kept and
     // sent afterwards (latest wish wins); it is never silently dropped.
     private final boolean[] dirty=new boolean[MibrSettingsCatalog.KEYS.length];
@@ -127,7 +126,7 @@ final class MibrV3Session {
         if(!attached)return;
         epoch++;resetWireQueue();languageAvailable=false;languageAsked=false;languagePending=false;languageSetInFlight=false;
         for(int i=0;i<MibrDurableSwitch.ALL.length;i++)resetSwitch(MibrDurableSwitch.ALL[i]);
-        MibrI18n.menuLoading();MibrGpsDemoState.reset();loaded=false;writable=false;scalingAvailable=false;scalingRefreshInFlight=false;scalingSetInFlight=false;MibrScalingState.reset();busy=true;message="Konfigurationsdienst prüfen";changed();
+        MibrI18n.menuLoading();loaded=false;writable=false;scalingAvailable=false;scalingRefreshInFlight=false;scalingSetInFlight=false;MibrScalingState.reset();busy=true;message="Konfigurationsdienst prüfen";changed();
         final int version=epoch;final String request=id();
         issue(request,"HELLO",new String[0],new String[0],new MibrV3Client.Listener(){
             public void onReply(final MibrV3Protocol.Frame f,final String error){
@@ -148,7 +147,6 @@ final class MibrV3Session {
                     languageAvailable="1".equals(f.get("menu_language"));
                     for(int i=0;i<MibrDurableSwitch.ALL.length;i++)
                         MibrDurableSwitch.ALL[i].available="1".equals(f.get(MibrDurableSwitch.ALL[i].capability));
-                    gpsAvailable="1".equals(f.get("gps_demo"));
                     MibrScalingState.reset();
                     read(version,null,null,null);
                 }});
@@ -179,7 +177,6 @@ final class MibrV3Session {
         if(!languageAsked)menuLanguageRefresh();
         for(int i=0;i<MibrDurableSwitch.ALL.length;i++)
             if(!MibrDurableSwitch.ALL[i].asked)switchRefresh(MibrDurableSwitch.ALL[i],MibrPopupEditorModel.keyOf(MibrDurableSwitch.ALL[i]));
-        if(!gpsAsked)gpsDemoRefresh();
     }
     /** On SET, publish only one complete matching post-commit original-core revision. */
     private void read(final int version,final String committedKey,final String wanted,
@@ -362,59 +359,6 @@ final class MibrV3Session {
         }});
         poller.setDaemon(true);
         poller.start();
-    }
-
-    /** Read current DIO/iAP2 owner state, not a guessed static UI value. */
-    void gpsDemoRefresh(){
-        if(!attached||gpsSetInFlight)return;
-        if(!loaded)return;
-        gpsAsked=true;
-        if(!gpsAvailable){
-            MibrGpsDemoState.error(MibrI18n.pick("GPS-Demo nicht verfügbar","GPS demo unavailable"));
-            changed();return;
-        }
-        final int version=epoch;
-        issue(id(),"GPS_DEMO_GET",new String[0],new String[0],new MibrV3Client.Listener(){
-            public void onReply(final MibrV3Protocol.Frame f,final String error){relay(version,new Runnable(){public void run(){
-                if(error!=null){
-                    MibrGpsDemoState.error(MibrI18n.pick("GPS-Dienst nicht erreichbar","GPS service unavailable"));
-                }else try{
-                    String[] state=MibrV3Protocol.gpsDemo(f);
-                    MibrGpsDemoState.readback(state[0],state[1],state[2],state[3],true);
-                    drafts.readback(MibrPopupEditorModel.GPS_DEMO,state[0]);
-                }catch(Throwable failure){
-                    MibrGpsDemoState.error(MibrI18n.pick("GPS-Rückmeldung ungültig","Invalid GPS state"));
-                }
-                changed();
-            }});}
-        });
-    }
-    /** Mode switch is immediate in the current original iAP2 session.
-     *  Never treats an owner's ACK as proof of Apple Maps location rendering. */
-    void gpsDemoSet(final String selected){
-        final String currentEpoch=MibrGpsDemoState.epoch();
-        if(!attached||gpsSetInFlight||!gpsAvailable||!MibrGpsDemoState.writable()||
-           !MibrGpsDemoState.valid(selected)||currentEpoch==null)return;
-        gpsSetInFlight=true;MibrGpsDemoState.saving();changed();
-        final int version=epoch;final String rid=id();
-        issue(rid,"GPS_DEMO_SET",new String[]{"value","expected_epoch","request_id"},
-            new String[]{selected,currentEpoch,rid},new MibrV3Client.Listener(){
-            public void onReply(final MibrV3Protocol.Frame f,final String error){relay(version,new Runnable(){public void run(){
-                gpsSetInFlight=false;
-                if(error!=null||f==null||!f.ok()){
-                    MibrGpsDemoState.error(MibrI18n.pick("GPS-Umschaltung nicht bestätigt","GPS switch unconfirmed"));
-                }else try{
-                    String[] state=MibrV3Protocol.gpsDemo(f);
-                    if(!selected.equals(state[0])||!currentEpoch.equals(state[1]))
-                        throw new IllegalArgumentException("GPS_DEMO_SET_NOT_MATCHED");
-                    MibrGpsDemoState.readback(state[0],state[1],state[2],state[3],true);
-                    drafts.readback(MibrPopupEditorModel.GPS_DEMO,state[0]);
-                }catch(Throwable failure){
-                    MibrGpsDemoState.error(MibrI18n.pick("GPS-Rückmeldung ungültig","Invalid GPS response"));
-                }
-                gpsDemoRefresh();changed();
-            }});}
-        });
     }
 
     /** Readback of a durable switch (broker-owned file); key = its row in the popup editor model. */

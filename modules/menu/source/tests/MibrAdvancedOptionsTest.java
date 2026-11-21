@@ -12,12 +12,10 @@ public final class MibrAdvancedOptionsTest {
         MibrI18n.forced="de_DE";
         MibrI18n.applyMenuOverride("AUTO");
         MibrI18n.menuLoading();
-        MibrGpsDemoState.reset();
-        ok(!MibrI18n.menuWritable()&&!MibrGpsDemoState.writable(),"no unconfirmed writers");
+        ok(!MibrI18n.menuWritable(),"no unconfirmed writers");
         MibrPopupEditorModel choice=new MibrPopupEditorModel();
         choice.setAvailable(true);
-        ok(!choice.open(MibrPopupEditorModel.MENU_LANGUAGE) &&
-           !choice.open(MibrPopupEditorModel.GPS_DEMO),"no unqualified writes");
+        ok(!choice.open(MibrPopupEditorModel.MENU_LANGUAGE),"no unqualified writes");
         MibrV3Protocol.Frame lang=response("l1",
             new String[]{"value","revision","writer","stored","scope","apply"},
             new String[]{"en","4","ENABLED","VERIFIED","MIBR_ONLY","IMMEDIATE"});
@@ -47,32 +45,20 @@ public final class MibrAdvancedOptionsTest {
         MibrI18n.applyMenuOverride("de");
         ok("Lesestand ungültig".equals(MibrScalingState.uiMessage(MibrPopupEditorModel.SCALE_MAIN)),
            "same Scaling error follows German override");
-        MibrGpsDemoState.error("GPS-Demo nicht verfügbar");
         MibrI18n.applyMenuOverride("en");
-        ok("GPS demo unavailable".equals(MibrGpsDemoState.message()),
-           "visible GPS status follows English override");
         MibrScalingState.reset();
         ok(choice.open(MibrPopupEditorModel.MENU_LANGUAGE),"confirmed language writer");
         choice.cancel();
-        MibrV3Protocol.Frame gps=response("g1",
-            new String[]{"choice","epoch","active","stationary","owner","effect"},
-            new String[]{"OFF","12","0","1","READY","UNVERIFIED_IOS"});
-        String[] g=MibrV3Protocol.gpsDemo(gps);
-        MibrGpsDemoState.readback(g[0],g[1],g[2],g[3],true);
-        ok(MibrGpsDemoState.writable() && choice.open(MibrPopupEditorModel.GPS_DEMO),
-           "manual GPS control is selectable");
-        choice.cancel();
-        MibrGpsDemoState.readback("BERLIN_DEMO","0","1","0",true);
-        ok(MibrGpsDemoState.active()&&"BERLIN_DEMO".equals(MibrGpsDemoState.choice()),
-           "owner accepted Berlin without an iOS-render claim");
-        MibrGpsDemoState.readback("OFF","13","0","0",true);
-        ok(!MibrGpsDemoState.active()&&MibrGpsDemoState.writable(),"manual mode has no stationary gate");
-        boolean refused=false;
-        try{MibrGpsDemoState.readback("OFF","13","1","1",true);}
-        catch(IllegalArgumentException expected){refused=true;}
-        ok(refused,"reject contradictory active-off response");
         MibrI18n.menuFailed("unavailable");
         ok(!choice.open(MibrPopupEditorModel.MENU_LANGUAGE),"error removes write permission");
+        /* r15k: the "Demo GPS position" row (gps.demo) was removed; an old stored menu file that still lists it
+         * (valid CRC) must load, with the unknown id skipped and its neighbours intact. */
+        try{
+            String body="MIBR_MENU/1\ncatalog=2\nbrand=skoda\nname=Old\nadvanced\troot\t-\t\t\ngps.demo\tadvanced\t-\tDemo-GPS-Position\tDemo GPS location\nsd_log\tadvanced\t-\t\t\n";
+            byte[] b=body.getBytes("UTF-8");
+            MibrMenuLayout layout=MibrMenuLayout.parse((body+"crc32="+MibrMenuLayout.crc32(b,b.length)+"\n").getBytes("UTF-8"));
+            ok(layout.skipped==1,"old menu file with removed gps.demo loads, the id is skipped");
+        }catch(Exception e){ok(false,"old menu file with removed gps.demo must still load: "+e);}
         MibrI18n.applyMenuOverride("AUTO");MibrI18n.forced=null;
         System.out.println("MIBR_ADVANCED_OPTIONS_HOST_PASS");
     }

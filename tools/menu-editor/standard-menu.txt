@@ -54,7 +54,6 @@ maxFPS	advanced	-
 sourceVersion	advanced	-		
 engine.type	advanced	-		
 menu.language	advanced	-		
-gps.demo	advanced	-		
 sd_log	advanced	-		
 menu.load	advanced	-		
 expert.mode	advanced	-		
@@ -66,4 +65,4 @@ scaling.main.physicalSize	scaling	-
 scaling.hint	scaling	-		
 diagnostics	advanced	-		
 version	root	-		
-crc32=52d2ec2f
+crc32=114d2064

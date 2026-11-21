@@ -116,10 +116,6 @@ struct mibr_v3_reader {
     unsigned menu_language_receipt_cursor;
     /* MIBR-only durable on/off switches, one slot per row of mibr_switch_defs. */
     struct mibr_v3_switch_slot switches[MIBR_SWITCH_COUNT];
-    /* Low-frequency demo control forwarded to original iAP2 owner only. */
-    int (*gps_demo_op)(void *,const char *,const char *,const char *,
-                       char *,size_t);
-    void *gps_demo_context;
     /* r13 live-first hooks (implemented in the storage layer, never in this library). */
     int (*live_apply)(const struct alt111_settings_paths *,const struct alt111_settings *,unsigned,const char *,uint64_t *);
     int (*live_revert)(const struct alt111_settings_paths *,unsigned,const char *,uint64_t);

@@ -8,7 +8,8 @@ public final class MibrPopupEditorModel {
     public static final int VIEW_FOLLOW = ENGINE + 1, VIEW_POS = ENGINE + 2, VIEW_RS = ENGINE + 3, VIEW_MAP0 = ENGINE + 4,
         VIEW_MAP1 = ENGINE + 5, VIEW_MAP4 = ENGINE + 6, VIEW_SPORT = ENGINE + 7,
         SCALE_MAIN = ENGINE + 8, SCALE_CLUSTER = ENGINE + 9,
-        MENU_LANGUAGE = ENGINE + 10, GPS_DEMO = ENGINE + 11,
+        MENU_LANGUAGE = ENGINE + 10,
+        // ENGINE + 11 was the removed "Demo GPS position" row (r15k); the number stays unused, no renumbering.
         SCALE_PHYSICAL = ENGINE + 12,
         SCALE_MAIN_PHYSICAL = ENGINE + 13,
         /** R2 2026-10-31: main-list checkbox "CarPlay-Navigation" (broker CARPLAY_NAV_*, values on/off). */
@@ -119,9 +120,7 @@ public final class MibrPopupEditorModel {
     public boolean liveViewGated(int index) {
         if(isScaling(index))return !MibrScalingState.writable(index);
         // No writable UI without a separately verified MIBR/3 language store
-        // or qualified original-DIO GPS-demo session owner.
         if(index==MENU_LANGUAGE)return !MibrI18n.menuWritable();
-        if(index==GPS_DEMO)return !MibrGpsDemoState.writable();
         if(durable(index)!=null)return !durable(index).writable();
         if(!visible(index) || isVirtual(index))return false;
         String key=MibrSettingsCatalog.KEYS[index];

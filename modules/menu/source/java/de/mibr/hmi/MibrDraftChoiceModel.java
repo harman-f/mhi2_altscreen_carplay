@@ -33,7 +33,6 @@ public final class MibrDraftChoiceModel {
         if (MibrPopupEditorModel.isSafe(index)) return MibrPopupEditorModel.safeField(index) == MibrSafeArea.RESET_FIELD ? MibrSafeArea.RESET_OPTIONS : MibrSafeArea.OPTIONS;
         if (index == MibrPopupEditorModel.EXPERT_MODE) return new String[]{"off","session","on"};
         if (MibrPopupEditorModel.durable(index) != null) return MibrPopupEditorModel.durable(index).values;
-        if (index == MibrPopupEditorModel.GPS_DEMO) return new String[]{"OFF","BERLIN_DEMO","HAMBURG_DEMO","SCHWALEFELD_DEMO","WINTERBERG_DEMO"};
         if (MibrPopupEditorModel.isScaling(index)) return MibrMenuDefinition.VIRTUAL_CONTROL_OPTIONS[0][MibrScalingState.slot(index)];
         if (index > MibrPopupEditorModel.ENGINE && index < MibrPopupEditorModel.SCALE_MAIN) return MibrViewState.options(index - MibrPopupEditorModel.VIEW_FOLLOW);
         String kind = MibrSettingsCatalog.UI_KINDS[index];
@@ -122,14 +121,6 @@ public final class MibrDraftChoiceModel {
             if ("contrast".equals(value)) return MibrI18n.pick("Kontrast","Contrast");
             if ("motion".equals(value)) return MibrI18n.pick("Bewegung","Motion");
             return MibrI18n.pick("Aus","Off");
-        }
-        if (index == MibrPopupEditorModel.GPS_DEMO) {
-            if ("OFF".equals(value)) return MibrI18n.pick("Aus","Off");
-            if ("BERLIN_DEMO".equals(value)) return "Berlin Alexanderplatz";
-            if ("HAMBURG_DEMO".equals(value)) return "Hamburg Binnenalster";
-            if ("SCHWALEFELD_DEMO".equals(value)) return MibrI18n.pick("Schwalefeld Ortskern","Schwalefeld centre");
-            if ("WINTERBERG_DEMO".equals(value)) return MibrI18n.pick("Winterberg Ortskern","Winterberg centre");
-            return MibrI18n.pick("Unbekannt","Unknown");
         }
         if (MibrPopupEditorModel.isScaling(index)) {
             if (index==MibrPopupEditorModel.SCALE_PHYSICAL || index==MibrPopupEditorModel.SCALE_MAIN_PHYSICAL)

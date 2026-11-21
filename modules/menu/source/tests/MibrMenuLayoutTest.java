@@ -89,6 +89,13 @@ public final class MibrMenuLayoutTest implements MibrCarPlayMenuModel.View {
             "nav_lanes\troot\tx\t\t\n"+
             "hint.1\tpage.1\t-\tText\tText\n",2));
         check(m.skipped==2,"unknown IDs reported");
+        /* r15k: an old stored menu that still carries the removed "gps.demo" row (valid CRC) loads; the id is skipped. */
+        MibrMenuLayout withGps=MibrMenuLayout.parse(file(
+            "root\t-\t-\tAlt\tOld\n"+
+            "advanced\troot\t-\t\t\n"+
+            "gps.demo\tadvanced\t-\tDemo-GPS-Position\tDemo GPS location\n"+
+            "nav_side\troot\t-\t\t\n",2));
+        check(withGps.skipped==1&&child(withGps.root,"gps.demo")==null&&child(withGps.root,"nav_side")!=null,"removed gps.demo id in an old menu file is skipped, not refused");
         check("Mein Menü".equals(m.root.title()),"menu title");
         MibrMenuLayout.Node page=child(m.root,"page.1");
         check("Straßen".equals(child(page,"nav_side").title())&&child(page,"nav_side").key==MibrPopupEditorModel.NAV_SIDE,"moved and renamed");

@@ -44,7 +44,6 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
     private boolean attached=true;
     private boolean detached;
     private boolean scalingPageVisible;
-    private boolean advancedPageVisible;
     private int epoch;
     private int lastScreen=-1;
     private int lastGroup=-2,lastPage=-1,lastSelected=-2;
@@ -179,9 +178,6 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
             }else if(MibrPopupEditorModel.durable(index)!=null){
                 String wish=drafts.draft(index);drafts.discardDraft(index);
                 if(wish!=null)v3.durableSet(index,wish);
-            }else if(index==MibrPopupEditorModel.GPS_DEMO){
-                String wish=drafts.draft(index);drafts.discardDraft(index);
-                if(wish!=null)v3.gpsDemoSet(wish);
             }else if(MibrPopupEditorModel.isScaling(index)){
                 String wish=drafts.draft(index);drafts.discardDraft(index);
                 if(wish!=null)v3.scaleSet(index,wish);
@@ -212,10 +208,6 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         boolean enteredScalingPage=onScalingPage&&!scalingPageVisible;
         scalingPageVisible=onScalingPage;
         if(enteredScalingPage&&v3!=null)v3.scaleRefresh();
-        boolean inAdvanced=screen==MibrCarPlayMenuModel.ITEMS && menu.pageHas(MibrPopupEditorModel.GPS_DEMO);
-        boolean enteredAdvanced=inAdvanced&&!advancedPageVisible;
-        advancedPageVisible=inAdvanced;
-        if(enteredAdvanced&&v3!=null)v3.gpsDemoRefresh();
         // A DETAIL state must render actual native stock ListItems, not merely a title.
         // The independent long-text/Scrollbar OEM adapter is a later visual gate.
         if(screen==MibrCarPlayMenuModel.DETAIL)rows=MibrElementDetailRows.lines(detail);
@@ -540,7 +532,6 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
         if(key==MibrPopupEditorModel.EXPERT_MODE)drafts.readback(key,MibrExpert.choice());
         else if(key==MibrPopupEditorModel.ENGINE)drafts.readback(key,MibrEngineState.engine());
         else if(key==MibrPopupEditorModel.MENU_LANGUAGE)drafts.readback(key,MibrI18n.menuOverride());
-        else if(key==MibrPopupEditorModel.GPS_DEMO)drafts.readback(key,MibrGpsDemoState.choice());
         else if(key==MibrPopupEditorModel.CARPLAY_NAV)drafts.readback(key,MibrDurableSwitch.CARPLAY_NAV.revision()!=null?
             MibrDurableSwitch.CARPLAY_NAV.value():MibrDurableSwitch.CARPLAY_NAV.persistedOn()?"on":"off");
         else if(key==MibrPopupEditorModel.NAV_DEMO)drafts.readback(key,MibrRgiCockpit.demoRequested()?"on":"off");
@@ -585,8 +576,7 @@ final class MibrOwnedSsmRows implements MibrCarPlayMenuModel.View,ListItemTransf
                 MibrOemSsmTemplate.VALUE_TEXT_TARGET_ID,TextArea.class);
             String uiMessage=MibrPopupEditorModel.isScaling(key)?MibrScalingState.uiMessage(key):
                 key==MibrPopupEditorModel.MENU_LANGUAGE?MibrI18n.menuMessage():
-                MibrPopupEditorModel.durable(key)!=null?MibrPopupEditorModel.durable(key).message():
-                key==MibrPopupEditorModel.GPS_DEMO?MibrGpsDemoState.message():null;
+                MibrPopupEditorModel.durable(key)!=null?MibrPopupEditorModel.durable(key).message():null;
             value.set_text(uiMessage!=null?uiMessage:(current==null?"":drafts.label(key,current)));
             value.set_shorten(true);
         }

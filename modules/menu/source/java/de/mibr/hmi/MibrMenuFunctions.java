@@ -17,7 +17,6 @@ final class MibrMenuFunctions {
         {"scaling.cluster.physicalSize",new Integer(MibrPopupEditorModel.SCALE_PHYSICAL)},
         {"scaling.main.physicalSize",new Integer(MibrPopupEditorModel.SCALE_MAIN_PHYSICAL)},
         {"menu.language",new Integer(MibrPopupEditorModel.MENU_LANGUAGE)},
-        {"gps.demo",new Integer(MibrPopupEditorModel.GPS_DEMO)},
         {"carplay_nav",new Integer(MibrPopupEditorModel.CARPLAY_NAV)},
         {"sd_log",new Integer(MibrPopupEditorModel.SD_LOG)},
         {"nav_source",new Integer(MibrPopupEditorModel.NAV_SOURCE)},

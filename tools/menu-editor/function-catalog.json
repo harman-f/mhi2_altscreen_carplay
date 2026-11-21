@@ -516,16 +516,6 @@
 "desc_en": "Language of this menu."
 },
 {
-"id": "gps.demo",
-"parent": "advanced",
-"kind": "list",
-"de": "Demo-GPS-Position",
-"en": "Demo GPS location",
-"values": "Aus, Berlin Alexanderplatz, Hamburg Binnenalster, Schwalefeld Ortskern, Winterberg Ortskern",
-"desc_de": "Meldet eine feste Position an das iPhone, zum Testen im Stand.",
-"desc_en": "Reports a fixed location to the iPhone, for parked testing."
-},
-{
 "id": "sd_log",
 "parent": "advanced",
 "kind": "toggle",
@@ -607,8 +597,8 @@
 "id": "scaling.hint",
 "parent": "scaling",
 "kind": "hint",
-"de": "Wirkt nach Neuverbinden",
-"en": "Applies after reconnect"
+"de": "Mehr % = kleinere Darstellung. Wirkt nach Neuverbinden",
+"en": "More % = smaller display. Applies after reconnect"
 },
 {
 "id": "diagnostics",
