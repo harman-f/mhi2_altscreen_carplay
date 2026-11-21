@@ -69,10 +69,11 @@ jobs:
           touch _atlas_site/.nojekyll
           test -s _atlas_site/index.html
           test -s _atlas_site/configurator/index.html
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _atlas_site
+          include-hidden-files: true
       - name: Deploy GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
