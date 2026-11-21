@@ -2002,8 +2002,6 @@
     "/tmp/mibr-engine.boot",
     "/tmp/mibr-engine.lock",
     "/tmp/mibr-expert-mode-readonly.conf",
-    "/tmp/mibr-gps-demo-owner.sock",
-    "/tmp/mibr-gps-demo.choice",
     "/tmp/mibr-hmi-activation.status",
     "/tmp/mibr-hmi-diag.log",
     "/tmp/mibr-hmi-up",

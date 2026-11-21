@@ -24,7 +24,6 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/java/de/mibr/hmi/MibrPlatformDefaults.java" \
   "$MODULE/java/de/mibr/hmi/MibrSafeArea.java" \
   "$MODULE/java/de/mibr/hmi/MibrScalingState.java" \
-  "$MODULE/java/de/mibr/hmi/MibrGpsDemoState.java" \
   "$MODULE/java/de/mibr/hmi/MibrVersionInfo.java" \
   "$MODULE/java/de/mibr/hmi/MibrMenuCatalog.java" \
   "$MODULE/java/de/mibr/hmi/MibrMenuFunctions.java" \
@@ -52,7 +51,7 @@ python3 "$MODULE/generate_catalog.py" \
   "$MODULE/tests/MibrDurableRevisionTest.java" \
   "$MODULE/tests/MibrDropdownFrameTest.java" \
   "$MODULE/tests/MibrMenuRestoredNoticeTest.java"   "$MODULE/tests/MibrSafeSliderTest.java"   "$MODULE/tests/MibrSafeRevisionTest.java" \
-  "$MODULE/tests/MibrScalingBindingTest.java" "$MODULE/tests/MibrZoomSliderTest.java"
+  "$MODULE/tests/MibrScalingBindingTest.java" "$MODULE/tests/MibrZoomSliderTest.java" "$MODULE/tests/MibrAdvancedOptionsTest.java"
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrViewStateTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrCanonicalElementMenuTest
 "$JAVA" -Dmibr.menu.standard="$(cd "$MODULE/../../.." && pwd)/tools/menu-editor/standard-menu.txt" \
@@ -68,3 +67,4 @@ python3 "$MODULE/generate_catalog.py" \
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrSafeRevisionTest
 "$JAVA" -Dmibr.menu.standard="$REPO/tools/menu-editor/standard-menu.txt" -cp "$OUT/classes" de.mibr.hmi.MibrZoomSliderTest
 "$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrScalingBindingTest
+"$JAVA" -cp "$OUT/classes" de.mibr.hmi.MibrAdvancedOptionsTest
