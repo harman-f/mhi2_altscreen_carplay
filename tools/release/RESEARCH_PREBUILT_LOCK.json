@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "reference_version": "1.5.0-beta.16",
-  "archive_sha256": "ae7c27058dc4904200b89ec14878101c7bb0edc2bdde9550e1eb99e63904cfae",
-  "research_commit": "b5e2bc25442bf48fa5e32550b0c18cd1e856e66b",
-  "research_archive_path": "MIBR-CarPlay-beta-3profile-r15j.zip",
-  "research_blob": "93894cdce6d812ff880579290bd2b406c125197f",
-  "reviewed_public_source_commit": "a8dae8cc81d2b9ede686e1d24c7b493dacc91332",
+  "reference_version": "1.5.0-beta.17",
+  "archive_sha256": "78559a44773266f5e95ae376a0124d03ad060aa67e5bbdab2d45304e645c3d27",
+  "research_commit": "619fa9f9b3fa03500356cf681647cf925e3f413b",
+  "research_archive_path": "MIBR-CarPlay-beta-3profile-r15k.zip",
+  "research_blob": "7a45d5b04385d4d4fe8fd247310ace213c6b04e0",
+  "reviewed_public_source_commit": "e57e80373417be715324b494802931cbb33f2b96",
   "profiles": [
     "skoda-mu1440-p4526",
     "seat-mu1409-p4708",
@@ -13,7 +13,7 @@
   ],
   "git_objects": {
     "modules/carplay/source": "188f704967b035f3bb05542ee6c404bc14850706",
-    "modules/broker/source": "c1f5659b93ec34d30b49807d4c3be7bbe1bdff3a",
+    "modules/broker/source": "7a76a54f4470ee7aeca36ee37fe1c526425a8d23",
     "modules/navigation/source/src": "83c15c21fd9b6f293d88dae58fe3b6063432e98a",
     "modules/navigation/source/third_party": "67dec5a1dd6b1437daea3719737fbf65d51c8de4",
     "modules/navigation/source/tools": "e249e90412f193b8726e468ab72a0dfd11c1a777",
@@ -24,12 +24,12 @@
     "tools/build_direct_ts_parity.sh": "217337762aa17516f8e92baef6f2ee259e78071b",
     "tools/build_direct_ts_remux.sh": "dbd755c8d2863ae01b94787421a7b5a038fab6a2",
     "tools/build_native_isotx2_guard.sh": "fabc92ee446cdef849456759a02e2b14a9eca7e8",
-    "tools/build_mibr_control.sh": "d4b66106c6c28ba2e4169e55ea9c93966e5f01a8",
+    "tools/build_mibr_control.sh": "181105c42b93139307b8d5d64965b66b71fd329a",
     "tools/build_keypanel_native.sh": "514d4430c9c71a78c8c9345613a795daf5311e04",
     "tools/build_support_tools.sh": "5d5bbc3992447d333d1e3e9e0c4fd55d3765749b",
     "tools/ci_qnx65_image.sh": "11ac40ee99d2c3cb7f84152f4667938430c37340",
     "tools/qnx65-image.lock": "6304e13a38bbe5ca2f306ba820dcebc8a8cacc64",
     "modules/module-index.json": "148851b833d23654bc4419cde9f9c926a6b132e8",
-    "settings/registry.json": "477e2020025679c30b19b51f1f6f5bd949178ad4"
+    "settings/registry.json": "49ee015b543079ac3634befe0eac26dcdad12a6c"
   }
 }
