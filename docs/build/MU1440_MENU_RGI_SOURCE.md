@@ -1,7 +1,7 @@
 # MU1440 menu, controller and route-guidance source
 
 This source update brings the OEM-style menu model and editor, MIBR/3 controller,
-independent display scaling, paired FPS/keyframe settings, demo GPS controls and
+independent display scaling, paired FPS/keyframe settings and
 route-guidance helpers into one buildable source tree. It does not replace the
 published vehicle-version binaries or installer ZIP.
 
@@ -16,8 +16,8 @@ requires a Unit restart. The selected maximum does not prove the phone sends60FP
 
 Main-display and cluster zoom and millimetre dimensions are separate controls.
 Changing advertised physical dimensions can affect applications differently.
-GPS-demo selection and route-guidance state are experimental; source or host-test
-success is not evidence of phone-side GPS acceptance or an installed route-guidance
+Route-guidance state is experimental; source or host-test
+success is not evidence of an installed route-guidance
 integration.
 
 ## Reproduction

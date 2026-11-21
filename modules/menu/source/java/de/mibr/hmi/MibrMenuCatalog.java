@@ -56,7 +56,6 @@ final class MibrMenuCatalog {
   "sourceVersion",
   "engine.type",
   "menu.language",
-  "gps.demo",
   "sd_log",
   "menu.load",
   "expert.mode",
@@ -117,7 +116,6 @@ final class MibrMenuCatalog {
   "list",
   "hint",
   "page",
-  "list",
   "list",
   "list",
   "list",
@@ -188,7 +186,6 @@ final class MibrMenuCatalog {
   "Quellversion",
   "Motorart",
   "Menüsprache",
-  "Demo-GPS-Position",
   "Logs auf SD-Karte",
   "Menü laden",
   "Expertenmodus",
@@ -197,7 +194,7 @@ final class MibrMenuCatalog {
   "Zoomfaktor Virtual Cockpit",
   "Physische Displaygröße Virtual Cockpit",
   "Physische Displaygröße Hauptdisplay",
-  "Wirkt nach Neuverbinden",
+  "Mehr % = kleinere Darstellung. Wirkt nach Neuverbinden",
   "Diagnose",
   "Version"
  };
@@ -254,7 +251,6 @@ final class MibrMenuCatalog {
   "Source version",
   "Engine type",
   "Menu language",
-  "Demo GPS location",
   "Logs to SD card",
   "Load menu",
   "Expert mode",
@@ -263,10 +259,10 @@ final class MibrMenuCatalog {
   "Virtual Cockpit zoom factor",
   "Virtual Cockpit physical size",
   "Main display physical size",
-  "Applies after reconnect",
+  "More % = smaller display. Applies after reconnect",
   "Diagnostics",
   "Version"
  };
- static final int[] SINCE={1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+ static final int[] SINCE={1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
  static final String BASIC="MIBR_MENU/1\ncatalog=2\nbrand=skoda\nname=Basic\nversion\troot\t-\t\t\nadvanced\troot\t-\t\t\nmenu.load\tadvanced\t-\t\t\ncrc32=9907a544\n";
 }
