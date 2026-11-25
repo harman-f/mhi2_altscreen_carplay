@@ -1,8 +1,9 @@
 # MIB Atlas — source library
 
-**Research status · latest targeted public source refresh 2026-11-20; original 58×22 scoring baseline still 2026-11-04.** This directory contains dated, independently scoped public-source evidence for the [single-file interactive MIB Atlas](../index.html). Individual project versions, target hardware and proof strength are not interchangeable.
+**Research status · latest targeted public source refresh 2026-11-25; original 58×22 scoring baseline still 2026-11-04.** This directory contains dated, independently scoped public-source evidence for the [single-file interactive MIB Atlas](../index.html). Individual project versions, target hardware and proof strength are not interchangeable.
 
 - [MIB Atlas recurring editorial and publication rules](MAINTENANCE_RULES.md)
+- [25 Nov 2026 source refresh: real Škoda MU1440 Wireless CarPlay/VC user tests, reliability issues, source audit, tomasz, chrzanowy and ContiTool](ATLAS_REFRESH_2026-11-25.md) — new external vehicle evidence on P4526, explicit proof limits and current release/source status.
 - [20 Nov 2026 targeted source refresh: native wireless V3.2, MU1367 vehicle port, receiver source audit and open dongle firmware](ATLAS_REFRESH_2026-11-20.md) — exact release dates, hardware acceptance and GitHub source/build limits.
 - [Overview-only site hero and slightly enlarged brand, 16 Nov](OVERVIEW_HERO_SCOPE_2026-11-16.md) — large title, four statistics and introductory feedback banner restricted to Overview; other nine-tab views remain content-first.
 - [Primary navigation placement and contrast refinement, 16 Nov](TOP_NAVIGATION_UI_2026-11-16.md) — topic bar directly beneath compact header, above hero; readable active/hover/focus states and mobile sticky behavior.

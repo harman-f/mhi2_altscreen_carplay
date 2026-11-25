@@ -122,7 +122,7 @@ def audit(path: Path) -> None:
     for marker in ('<title>MIB Atlas', 'id="mib1-retrofit"', 'data-atlas-filter-table="native"', 'data-atlas-filter-table="emulators"', 'data-atlas-filter-table="ha-tools"', 'data-atlas-filter-table="contitool"', 'data-atlas-filter-table="roadmap"', 'data-atlas-filter-table="misc"', 'data-atlas-filter-table="lineage"', 'data-atlas-filter-table="oem-hud"', 'data-atlas-filter-table="aftermarket-hud"', 'id="atlas-theme-toggle"'):
         if marker not in data:
             errors.append("MIB Atlas required feature missing: "+marker)
-    for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 20 NOV 2026'):
+    for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 25 NOV 2026'):
         if marker not in data:
             errors.append("Missing evidence date boundary: "+marker)
     # Interaction contract: all nine research matrices have actual search/filter/reset handlers.
@@ -145,30 +145,41 @@ def audit(path: Path) -> None:
         errors.append("raw Markdown emphasis inside public HTML")
     if 'MHI2Q_WiFi_CarPlay' not in data or 'perkthefox/mqb_contitool' not in data:
         errors.append("source-anchored native wireless or ContiTool evidence missing")
-    if 'Wireless CarPlay Maps V3.2' not in data or 'data-proof="Experimental release"' not in data:
-        errors.append("omonob latest V3.2 native wireless entry missing")
-    if 'MU1367 790/791' not in data or 'Škoda MU1440 / AID 790' not in data:
-        errors.append("native MU1367 and Skoda MU1440 firmware constraints missing")
-    if 'MU1440/791 unsupported' not in data and 'MU1440 / 791 unsupported' not in data:
-        errors.append("unsupported MU1440 AID 791 not stated")
-    if 'MU1433/MU1447 wired-only' not in data:
-        errors.append("MU1433 / MU1447 native wireless boundary missing")
-    if 'MU1367 / AID 790' not in data or 'SD manager registration and complete feature installation' not in data:
-        errors.append("new MU1367 V3.2 installation-only evidence missing")
-    if 'not released the complete receiver implementation/build sources' not in data.lower():
-        errors.append("full omonob receiver implementation source remains unavailable")
-    if 'tomasz-twardzicki' not in data or 'MU1367-v1.6.1' not in data:
-        errors.append("native wireless MU1367 downstream vehicle port missing")
-    if 'CatPlay / CarPlay2Air V0.32.0' not in data or 'kamgurgul V1.5' not in data:
-        errors.append("November 20 dongle and Android Auto source deltas missing")
-    if '20 Nov</b><span>Last source review' not in data:
-        errors.append("source review date stale")
+    # Native Wireless is evidenced by exact release + separately scoped GitHub user reports.
+    # The historical baseline still dates to 4 Nov, but the latest source review is 25 Nov.
+    if 'Wireless CarPlay Maps V3.2' not in data or 'data-search="omonob Wireless CarPlay Maps V3.2' not in data:
+        errors.append("latest omonob V3.2 experimental release entry missing")
+    if 'Škoda MU1440 790' not in data or 'MU1367 790/791' not in data:
+        errors.append("native firmware/cluster exact profile list missing")
+    if 'MU1440/791 unsupported' not in data or 'MU1433/MU1447 wired-only' not in data:
+        errors.append("unsupported newer AID/other-MU native wireless boundary missing")
+    if 'SD install had already been reported' not in data:
+        errors.append("MU1367 V3.2 installation user report absent")
+    if 'not a complete receiver implementation/build source release' not in data.lower():
+        errors.append("missing explicit omonob complete source/build limitation")
+    if 'issues/72' not in data or 'issues/73' not in data or 'iPhone 16 Pro Max' not in data:
+        errors.append("MU1440 real-wireless no-VC and VC user field reports missing")
+    if 'Exact cluster part number not supplied' not in data and 'Exact cluster part/790 suffix not specified' not in data:
+        errors.append("MU1440 VC part-number uncertainty must be explicit")
+    for issue in ('issues/70','issues/71','issues/75','issues/76','issues/79'):
+        if issue not in data:
+            errors.append("missing unresolved omonob field regression: "+issue)
+    if 'MU1367-v1.6.7-e' not in data or 'v1.6.6-e was withdrawn' not in data:
+        errors.append("latest tomasz MU1367 experimental 790 / withdrawn history missing")
+    if 'MU1367-v1.6.1' not in data or 'AID 791' not in data:
+        errors.append("vehicle-tested stable MU1367 downstream lineage missing")
+    if 'chrzanowy MU1161/AID791 v1.9.0' not in data or 'ContiTool v2.2.1' not in data:
+        errors.append("25 Nov nearby MHI2 AA and J533 tool updates missing")
+    if 'CatPlay / CarPlay2Air V0.32.0' not in data:
+        errors.append("open USB dongle project must remain in its Misc tab")
+    if '25 Nov</b><span>Last source review' not in data:
+        errors.append("latest source review date stale")
     if '7 / 7' not in data or data.count('data-search="tomasz-twardzicki MHI2 CarPlay Maps') != 1:
-        errors.append("seven documented native leads including one downstream port required")
+        errors.append("seven distinct native research/port entries required")
     if 'https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/releases/tag/v3.2' not in data:
-        errors.append("omonob latest v3.2 release link missing")
-    if 'MU1440 is NOT wireless compatible in V3.0' in data or 'V3.0 (MU1102 only)' in data:
-        errors.append("stale original native wireless scope persists")
+        errors.append("omonob latest release link missing")
+    if 'MU1440 wireless still lacks hardware acceptance' in data or 'MU1440/790 have only offline V3.2 regression' in data:
+        errors.append("stale 20 Nov MU1440 offline-only claim on current site")
     if 'issues/187' not in data or 'id="oem-hud-overview"' not in data or 'id="aftermarket-hud-overview"' not in data:
         errors.append("HUD taxonomy or feedback issue missing")
     if data.count('data-lineage-edge="1"') != 38 or data.count('class="atlas-lineage-svg"') != 4:
