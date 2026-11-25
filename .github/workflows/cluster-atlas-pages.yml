@@ -41,6 +41,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
+      actions: read
       pages: write
       id-token: write
     environment:
@@ -77,6 +78,24 @@ jobs:
           name: github-pages-${{ github.run_attempt }}
           path: _atlas_site
           include-hidden-files: true
+      - name: Wait until GitHub Actions lists the uploaded Pages artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_ARTIFACT: github-pages-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          # Upload finalization can precede the REST artifact-list visibility.
+          # Deploy-pages looks up by name and otherwise returns a transient zero-artifact error.
+          for check in {1..15}; do
+            if gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" --jq '.artifacts[].name' | grep -Fxq "$PAGES_ARTIFACT"; then
+              echo "Pages artifact ready: $PAGES_ARTIFACT"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo '::error::Uploaded Pages artifact not visible in Actions after bounded retries'
+          exit 1
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
