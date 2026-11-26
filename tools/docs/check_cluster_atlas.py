@@ -122,7 +122,7 @@ def audit(path: Path) -> None:
     for marker in ('<title>MIB Atlas', 'id="mib1-retrofit"', 'data-atlas-filter-table="native"', 'data-atlas-filter-table="emulators"', 'data-atlas-filter-table="ha-tools"', 'data-atlas-filter-table="contitool"', 'data-atlas-filter-table="roadmap"', 'data-atlas-filter-table="misc"', 'data-atlas-filter-table="lineage"', 'data-atlas-filter-table="oem-hud"', 'data-atlas-filter-table="aftermarket-hud"', 'id="atlas-theme-toggle"'):
         if marker not in data:
             errors.append("MIB Atlas required feature missing: "+marker)
-    for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 25 NOV 2026'):
+    for marker in ('58-ENTRY SCORE BASELINE 04 NOV 2026', 'SOURCE REVIEW 26 NOV 2026'):
         if marker not in data:
             errors.append("Missing evidence date boundary: "+marker)
     # Interaction contract: all nine research matrices have actual search/filter/reset handlers.
@@ -146,7 +146,7 @@ def audit(path: Path) -> None:
     if 'MHI2Q_WiFi_CarPlay' not in data or 'perkthefox/mqb_contitool' not in data:
         errors.append("source-anchored native wireless or ContiTool evidence missing")
     # Native Wireless is evidenced by exact release + separately scoped GitHub user reports.
-    # The historical baseline still dates to 4 Nov, but the latest source review is 25 Nov.
+    # The historical baseline still dates to 4 Nov, but the latest source review is 26 Nov.
     if 'Wireless CarPlay Maps V3.2' not in data or 'data-search="omonob Wireless CarPlay Maps V3.2' not in data:
         errors.append("latest omonob V3.2 experimental release entry missing")
     if 'Škoda MU1440 790' not in data or 'MU1367 790/791' not in data:
@@ -170,10 +170,13 @@ def audit(path: Path) -> None:
         errors.append("vehicle-tested stable MU1367 downstream lineage missing")
     if 'chrzanowy MU1161/AID791 v1.9.0' not in data or 'ContiTool v2.2.1' not in data:
         errors.append("25 Nov nearby MHI2 AA and J533 tool updates missing")
-    if 'CatPlay / CarPlay2Air V0.32.0' not in data:
+    if 'CatPlay / CarPlay2Air V0.33.0' not in data:
         errors.append("open USB dongle project must remain in its Misc tab")
-    if '25 Nov</b><span>Last source review' not in data:
+    if '26 Nov</b><span>Last source review' not in data:
         errors.append("latest source review date stale")
+    for marker in ('ATLAS_REFRESH_2026-11-26.md', 'primaryInputDevice=0', 'HW301 v1178', 'issues/80', 'issues/119', 'issues/120', 'source review 26 Nov 2026'):
+        if marker not in data:
+            errors.append("26 Nov evidence missing: "+marker)
     if '7 / 7' not in data or data.count('data-search="tomasz-twardzicki MHI2 CarPlay Maps') != 1:
         errors.append("seven distinct native research/port entries required")
     if 'https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/releases/tag/v3.2' not in data:
