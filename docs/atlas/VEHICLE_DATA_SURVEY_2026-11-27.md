@@ -1,0 +1,26 @@
+# Vehicle data / Sport HMI / Home Assistant — targeted source review, 27 November 2026
+
+Public source index, no new vehicle or hardware acceptance by HARMAN-F. Historical 56 active scored entries and 22 attributes unchanged; new thematic rows do not constitute a new scoring pass. No private logs, credentials or firmware copied. The search is targeted, not exhaustive.
+
+| Project | Category | Platform / path | Evidence and limitations |
+| --- | --- | --- | --- |
+| [OEM Sport HMI](https://wiki.mib-helper.com/index.php?title=SPORT_HMI_Performance_Monitor) | Vehicle extensions | VW / SEAT / Škoda MIB2 CAR menu | Factory performance display; availability depends on equipment, entitlement and supplied data; not a custom receiver. |
+| [Victor-Unsullied · Sports Gauges v1.0.0](https://github.com/Victor-Unsullied/mib2-sports-gauges) | Vehicle extensions | Delphi MST2 MU0757 P0635D | Native Sport HMI corrections for oil/coolant temperature, torque/power and gauge configuration. Earlier fixed setup car-tested on Golf 7 CXSA; configurable v1.0.0 offline-only, boost correction absent. Not Harman MU1440. |
+| [jilleb · MQB Performance Monitor](https://github.com/jilleb/mqb-pm) | Vehicle extensions | Android Auto / EXLAP / optional OBD | Phone-side performance display, historical README lists Škoda MU1440 as working. Not a native HU service or LTE uploader; original dependency availability not verified. |
+| [Toprr · VehLog / cockpit overlay](https://github.com/Toprr/audi-a6-a7-c7-mib2-high-diy-info-database-carplay-cockpit-overlay-vehicle-data-3d-car-model-kzb-mods) | Vehicle extensions | Harman MHI2 AU57x K3663 MU1425 | Read-only DSI logger: 717 callbacks, 145 valid, 37 changing during two drives; speedometer speed, odometer, range, consumption. RPM, coolant/oil temp invalid on that specific car. Overlay separate; optional street filter not read-only. |
+| [ijord · EXLAP MIB2 Atlas](https://github.com/ijord/EXLAP-mib2-atlas) | Vehicle data protocol | MIB2 High TCP/XML SAI | 260 constructors: 229 addressable candidates, 31 nested types. Reference unit: 75 measured vehicle-data and 22 navigation URLs. Exact target availability depends on equipment and firmware. |
+| [korhojoa · exlap](https://github.com/korhojoa/exlap) | Vehicle data protocol | Rust protocol core / TCP | Typed samples, units/validity, directory and subscriptions. QNX MU1440 standalone build and LTE service not demonstrated. |
+| [korhojoa · exlap-client v0.2.0](https://github.com/korhojoa/exlap-client) | Vehicle data protocol | WASM / aa-proxy-rs Android Auto vendor channel | Same Rust protocol core over AA; live web UI and EV battery endpoint. Not the separately reported MQTT-to-HA bridge. |
+| [edub0 · EXLAP](https://github.com/edub0/EXLAP) | Vehicle data protocol | Python / XML schema | Porsche-tested historical protocol client per author; useful host comparator, not QNX MU1440 acceptance. |
+| [Matze89x · Car Assistant 0.5.38 Beta](https://github.com/Matze89x/ha-car-assistant) | Vehicle backend | HA add-on / standalone app / HTTP API | Vehicle logbook, trips, service, location, costs, per-car API and optional MQTT output. README version, not separately tagged release. No public native MIB collector verified. |
+| [Matze89x · Car Assistant Sources](https://github.com/Matze89x/ha-car-assistant-sources) | Vehicle backend | Plugin catalog / HA entities into app | HA plugin imports selected HA entities live into Car Assistant. Demo and descriptor packages; no QNX vehicle-side collector. |
+
+Additional existing references: [AmbientFX](https://github.com/Matze89x/mib2q-ambient-fx) is a reactive lighting Java patch, author-tested MU1329, not a telemetry uploader. [MIB2 extenders](https://github.com/korhojoa/mib2-extenders) provides QNX extension infrastructure; it is not proof of a completed MQTT bridge. Existing cloud integrations and phone CarPlay frontend remain separate.
+
+## Data-source and transport boundaries
+
+EXLAP and the native DSI APIs are complementary, not synonymous with raw CAN access. Public EXLAP directory candidates include Nav_GeoPosition, tankLevelPrimary, totalDistance, clampState, doorState, lightState_front/rear, batteryVoltage, vehicleSpeed, engineSpeed, oilTemperature and tyrePressures. Presence in the reference directory does not mean a particular MU1440 car delivers valid live values. In particular a locking setting is not a verified lock status, and indicated speed differs from true speed. The historical MQB Performance Monitor lists MU1440 with EXLAP over Android Auto; local TCP access and a standalone QNX exporter need separate validation. No direct vehicle-side LTE exporter is claimed as released by the projects in this review.
+
+[Car Assistant API](https://github.com/Matze89x/ha-car-assistant/blob/main/docs/api.md) accepts per-vehicle scoped data; [HA plugin](https://github.com/Matze89x/ha-car-assistant/blob/main/docs/home-assistant.md) maps existing HA entities into the app. Optional MQTT exports can publish app sensor values to HA. These are ingestion/display capabilities, not a source of car data on their own. A vehicle that sleeps can only report last-known state until it wakes again.
+
+Public-source findings only. No installer, remote-control or firmware changes in this index.

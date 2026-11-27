@@ -1,8 +1,9 @@
 # MIB Atlas — source library
 
-**Research status · latest targeted public source refresh 2026-11-26; original 58×22 scoring baseline still 2026-11-04.** This directory contains dated, independently scoped public-source evidence for the [single-file interactive MIB Atlas](../index.html). Individual project versions, target hardware and proof strength are not interchangeable.
+**Research status · latest targeted public source refresh 2026-11-27; original 58×22 scoring baseline still 2026-11-04.** This directory contains dated, independently scoped public-source evidence for the [single-file interactive MIB Atlas](../index.html). Individual project versions, target hardware and proof strength are not interchangeable.
 
 - [MIB Atlas recurring editorial and publication rules](MAINTENANCE_RULES.md)
+- [27 Nov 2026 targeted vehicle-data and Sport HMI survey](VEHICLE_DATA_SURVEY_2026-11-27.md) — EXLAP, native DSI logger, performance display and Car Assistant backend, with independent evidence tiers.
 - [26 Nov 2026 targeted refresh: CatPlay V0.33.0, HW301 v1178 car test, MHI2Q field reports and NAR migration status](ATLAS_REFRESH_2026-11-26.md) — distinct evidence for adapter, wired cluster and native receiver tracks.
 - [25 Nov 2026 source refresh: real Škoda MU1440 Wireless CarPlay/VC user tests, reliability issues, source audit, tomasz, chrzanowy and ContiTool](ATLAS_REFRESH_2026-11-25.md) — new external vehicle evidence on P4526, explicit proof limits and current release/source status.
 - [20 Nov 2026 targeted source refresh: native wireless V3.2, MU1367 vehicle port, receiver source audit and open dongle firmware](ATLAS_REFRESH_2026-11-20.md) — exact release dates, hardware acceptance and GitHub source/build limits.
